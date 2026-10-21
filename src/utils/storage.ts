@@ -295,4 +295,68 @@ export const StorageService = {
       return false;
     }
   },
+
+  async fetchFromGAS(): Promise<{
+    success: boolean;
+    reflections?: Reflection[];
+    feedbacks?: MentorFeedback[];
+    messages?: Message[];
+    spreadsheetName?: string;
+    needsScriptUpdate?: boolean;
+    error?: string;
+  }> {
+    const settings = this.getSettings();
+    if (!settings.gasWebAppUrl || !settings.gasWebAppUrl.startsWith('http')) {
+      return { success: false, error: 'URL Google Apps Script belum diatur.' };
+    }
+
+    try {
+      const url = new URL(settings.gasWebAppUrl);
+      url.searchParams.set('action', 'get_data');
+      url.searchParams.set('_t', String(Date.now()));
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Koneksi HTTP menghasilkan status: ${response.status}`);
+      }
+
+      const resData = await response.json();
+
+      const hasReflections = Array.isArray(resData.reflections);
+      const hasMessages = Array.isArray(resData.messages);
+
+      if (hasReflections || hasMessages) {
+        return {
+          success: true,
+          reflections: resData.reflections || [],
+          feedbacks: resData.feedbacks || [],
+          messages: resData.messages || [],
+          spreadsheetName: resData.spreadsheet || 'Google Spreadsheet',
+        };
+      }
+
+      if (resData.spreadsheet && !hasReflections) {
+        return {
+          success: false,
+          spreadsheetName: resData.spreadsheet,
+          needsScriptUpdate: true,
+          error: `Terhubung ke Google Spreadsheet "${resData.spreadsheet}", namun skrip Google Apps Script masih versi 1.0 (belum memiliki fungsi pembacaan data). Silakan perbarui skrip di spreadsheet Anda.`,
+        };
+      }
+
+      return {
+        success: false,
+        error: 'Respons dari Google Apps Script tidak mengandung data refleksi atau pesan.',
+      };
+    } catch (err: any) {
+      console.warn('Gagal menarik data dari Google Apps Script:', err);
+      return {
+        success: false,
+        error: err?.message || 'Gagal terhubung ke Google Apps Script.',
+      };
+    }
+  },
 };

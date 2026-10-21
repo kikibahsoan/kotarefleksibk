@@ -223,21 +223,64 @@ export default function App() {
 
   // Teacher Reply to Message
   const handleReplyMessage = (messageId: string, reply: string) => {
+    const repliedAt = new Date().toLocaleString('id-ID', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
     const updated = messages.map((m) =>
       m.id === messageId
         ? {
             ...m,
             teacherReply: reply,
             status: 'replied' as const,
-            repliedAt: new Date().toLocaleString('id-ID', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-            }),
+            repliedAt,
           }
         : m
     );
     setMessages(updated);
     StorageService.setMessages(updated);
+
+    // Sync reply back to Google Spreadsheet
+    StorageService.syncWithGAS('reply_message', { messageId, reply, repliedAt });
+  };
+
+  // Sync reflections & messages from Google Spreadsheet
+  const handleSyncReflectionsAndMessages = (
+    syncedReflections: Reflection[],
+    syncedFeedbacks: MentorFeedback[],
+    syncedMessages: Message[]
+  ) => {
+    // Merge reflections by ID
+    const refMap = new Map<string, Reflection>();
+    syncedReflections.forEach((r) => refMap.set(r.id, r));
+    reflections.forEach((r) => {
+      if (!refMap.has(r.id)) refMap.set(r.id, r);
+    });
+    const mergedReflections = Array.from(refMap.values());
+
+    // Merge feedbacks
+    const fbMap = new Map<string, MentorFeedback>();
+    syncedFeedbacks.forEach((f) => fbMap.set(f.id, f));
+    feedbacks.forEach((f) => {
+      if (!fbMap.has(f.id)) fbMap.set(f.id, f);
+    });
+    const mergedFeedbacks = Array.from(fbMap.values());
+
+    // Merge messages
+    const msgMap = new Map<string, Message>();
+    syncedMessages.forEach((m) => msgMap.set(m.id, m));
+    messages.forEach((m) => {
+      if (!msgMap.has(m.id)) msgMap.set(m.id, m);
+    });
+    const mergedMessages = Array.from(msgMap.values());
+
+    setReflections(mergedReflections);
+    setFeedbacks(mergedFeedbacks);
+    setMessages(mergedMessages);
+
+    StorageService.setReflections(mergedReflections);
+    StorageService.setFeedbacks(mergedFeedbacks);
+    StorageService.setMessages(mergedMessages);
   };
 
   // Add Materi (from Teacher)
@@ -608,6 +651,7 @@ export default function App() {
           onUpdateSettings={handleUpdateSettings}
           onDeleteReflection={handleDeleteReflection}
           onClearAllReflections={handleClearAllReflections}
+          onSyncReflectionsAndMessages={handleSyncReflectionsAndMessages}
         />
       )}
     </div>

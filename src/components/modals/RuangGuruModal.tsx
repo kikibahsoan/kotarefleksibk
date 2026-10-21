@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Materi,
   LearningObjective,
@@ -10,7 +10,8 @@ import {
   BuildingId,
 } from '../../types/index.ts';
 import { SMK_CLASSES } from '../../data/initialData.ts';
-import { calculateClassStats, generateCSVExport, getGoogleAppsScriptCode } from '../../utils/rules.ts';
+import { calculateClassStats, generateCSVExport, getGoogleAppsScriptCode, parseSpreadsheetPastedText } from '../../utils/rules.ts';
+import { StorageService } from '../../utils/storage.ts';
 import {
   X,
   LayoutDashboard,
@@ -29,6 +30,10 @@ import {
   Flag,
   FileSpreadsheet,
   KeyRound,
+  RefreshCw,
+  UploadCloud,
+  ArrowDownToLine,
+  Info,
 } from 'lucide-react';
 
 interface RuangGuruModalProps {
@@ -47,6 +52,11 @@ interface RuangGuruModalProps {
   onUpdateSettings: (settings: TownSettings) => void;
   onDeleteReflection?: (reflectionId: string) => void;
   onClearAllReflections?: () => void;
+  onSyncReflectionsAndMessages?: (
+    reflections: Reflection[],
+    feedbacks: MentorFeedback[],
+    messages: Message[]
+  ) => void;
 }
 
 export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
@@ -65,6 +75,7 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
   onUpdateSettings,
   onDeleteReflection,
   onClearAllReflections,
+  onSyncReflectionsAndMessages,
 }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'reflections' | 'materi' | 'messages' | 'settings'>('dashboard');
   const [selectedClass, setSelectedClass] = useState<string>('all');
@@ -72,6 +83,14 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
   // Teacher AI Summary State
   const [aiSummary, setAiSummary] = useState<any>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+
+  // Synchronization State
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<{ type: 'success' | 'error' | 'warning'; msg: string } | null>(null);
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [showScriptModal, setShowScriptModal] = useState(false);
+  const [pastedText, setPastedText] = useState('');
+  const [pasteError, setPasteError] = useState<string | null>(null);
 
   // New Materi Form State
   const [newTitle, setNewTitle] = useState('');
@@ -97,6 +116,79 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
   const [gasUrl, setGasUrl] = useState(settings.gasWebAppUrl || '');
   const [isCopiedGAS, setIsCopiedGAS] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+
+  // Auto-sync from Google Spreadsheet on modal open
+  useEffect(() => {
+    if (settings.gasWebAppUrl && onSyncReflectionsAndMessages) {
+      handleSyncWithSpreadsheet();
+    }
+  }, []);
+
+  const handleSyncWithSpreadsheet = async () => {
+    setIsSyncing(true);
+    setSyncNotice(null);
+    try {
+      const res = await StorageService.fetchFromGAS();
+      if (res.success && res.reflections && res.feedbacks && res.messages) {
+        if (onSyncReflectionsAndMessages) {
+          onSyncReflectionsAndMessages(res.reflections, res.feedbacks, res.messages);
+        }
+        setSyncNotice({
+          type: 'success',
+          msg: `Berhasil menarik ${res.reflections.length} refleksi murid dan ${res.messages.length} pesan dari Google Spreadsheet "${res.spreadsheetName}"!`,
+        });
+        setTimeout(() => setSyncNotice(null), 8000);
+      } else if (res.needsScriptUpdate) {
+        setSyncNotice({
+          type: 'warning',
+          msg: `Terhubung ke Google Spreadsheet "${res.spreadsheetName}", namun skrip Google Apps Script masih versi 1.0 (belum memiliki fungsi pembacaan data).`,
+        });
+        setShowScriptModal(true);
+      } else {
+        setSyncNotice({
+          type: 'error',
+          msg: res.error || 'Gagal membaca data dari Google Spreadsheet.',
+        });
+      }
+    } catch (e: any) {
+      setSyncNotice({
+        type: 'error',
+        msg: e?.message || 'Terjadi kesalahan saat menghubungkan ke Google Apps Script.',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleImportPastedData = () => {
+    setPasteError(null);
+    if (!pastedText.trim()) {
+      setPasteError('Silakan tempel teks baris data dari Google Spreadsheet Anda.');
+      return;
+    }
+
+    try {
+      const parsed = parseSpreadsheetPastedText(pastedText);
+      const totalParsed = parsed.reflections.length + parsed.messages.length;
+      if (totalParsed === 0) {
+        setPasteError('Format data tidak terdeteksi. Pastikan Anda menyalin langsung baris dari sheet Data_Refleksi_Siswa atau Pesan_Kantor_Pos.');
+        return;
+      }
+
+      if (onSyncReflectionsAndMessages) {
+        onSyncReflectionsAndMessages(parsed.reflections, parsed.feedbacks, parsed.messages);
+      }
+      setShowManualModal(false);
+      setPastedText('');
+      setSyncNotice({
+        type: 'success',
+        msg: `Sukses mengimpor ${parsed.reflections.length} data refleksi murid dan ${parsed.messages.length} pesan ke Ruang Guru!`,
+      });
+      setTimeout(() => setSyncNotice(null), 8000);
+    } catch (err: any) {
+      setPasteError('Gagal memproses data: ' + err.message);
+    }
+  };
 
   const stats = calculateClassStats(reflections, feedbacks, students, materis, selectedClass);
 
@@ -303,6 +395,85 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
             <span>Google Sheets & Pengaturan</span>
           </button>
         </div>
+
+        {/* Spreadsheet Sync Banner & Quick Action Bar */}
+        <div className="bg-slate-900/95 border-b border-slate-800 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+          <div className="flex items-center gap-2 text-slate-300">
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-semibold text-slate-200">Google Spreadsheet:</span>
+            <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 truncate max-w-[180px] sm:max-w-xs">
+              {settings.gasWebAppUrl ? 'Data Base Kota Refleksi' : 'Belum Terhubung'}
+            </span>
+            <span className="text-[11px] text-slate-400 hidden md:inline">
+              • {reflections.length} Refleksi • {messages.length} Pesan Tersimpan
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={() => setShowManualModal(true)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-semibold flex items-center gap-1.5 transition text-xs cursor-pointer shadow-sm"
+              title="Salin dan tempel baris dari Google Spreadsheet Anda secara langsung"
+            >
+              <UploadCloud className="w-3.5 h-3.5 text-sky-400" />
+              <span>📥 Tempel Data</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSyncWithSpreadsheet}
+              disabled={isSyncing}
+              className={`px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-2 transition text-xs shadow-md cursor-pointer ${
+                isSyncing
+                  ? 'bg-indigo-700/60 text-indigo-300 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+              }`}
+              title="Ambil data refleksi dan pesan murid dari Google Spreadsheet secara otomatis"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Menghubungkan...' : '🔄 Tarik dari Spreadsheet'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Sync Notification Notice */}
+        {syncNotice && (
+          <div
+            className={`px-4 sm:px-6 py-2.5 text-xs font-medium flex items-center justify-between border-b ${
+              syncNotice.type === 'success'
+                ? 'bg-emerald-950/90 text-emerald-200 border-emerald-800/60'
+                : syncNotice.type === 'warning'
+                ? 'bg-amber-950/90 text-amber-200 border-amber-800/60'
+                : 'bg-rose-950/90 text-rose-200 border-rose-800/60'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm">
+                {syncNotice.type === 'success' ? '✅' : syncNotice.type === 'warning' ? '⚠️' : '❌'}
+              </span>
+              <span>{syncNotice.msg}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {syncNotice.type === 'warning' && (
+                <button
+                  type="button"
+                  onClick={() => setShowScriptModal(true)}
+                  className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded-lg font-bold border border-amber-500/30 text-[11px] cursor-pointer"
+                >
+                  Perbarui Skrip (1 Menit) →
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSyncNotice(null)}
+                className="text-slate-400 hover:text-white px-1 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Content Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 min-h-0">
@@ -573,14 +744,46 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
                 })}
 
                 {filteredReflections.length === 0 && (
-                  <div className="text-center py-12 px-4 rounded-2xl bg-slate-800/30 border border-dashed border-slate-700/60">
-                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xl">
-                      📝
+                  <div className="text-center py-10 px-4 rounded-2xl bg-slate-800/40 border border-dashed border-slate-700/80 space-y-4">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-2xl border border-indigo-500/20">
+                      📊
                     </div>
-                    <p className="text-sm font-bold text-slate-300">Belum Ada Refleksi Murid</p>
-                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                      Data refleksi murid bersih dari data dummy. Refleksi baru akan otomatis muncul di sini dan tersinkronisasi ke Google Spreadsheet saat murid mengisi jurnal.
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-white">Belum Ada Refleksi Murid yang Termuat di Layar Ini</p>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                        Data refleksi murid yang tersimpan di Google Spreadsheet (<strong>Data Base Kota Refleksi</strong>) dapat langsung ditarik ke Ruang Guru dengan menekan tombol di bawah:
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSyncWithSpreadsheet}
+                        disabled={isSyncing}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                        <span>{isSyncing ? 'Menghubungkan...' : '🔄 Tarik Data dari Spreadsheet'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowManualModal(true)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-sky-400" />
+                        <span>📥 Tempel / Impor Data Manual</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowScriptModal(true)}
+                        className="px-3.5 py-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                        <span>Panduan Skrip Versi 2.0</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -866,7 +1069,36 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
                 ))}
 
                 {messages.length === 0 && (
-                  <p className="text-center text-xs text-slate-500 py-12">Belum ada surat masuk dari murid.</p>
+                  <div className="text-center py-10 px-4 rounded-2xl bg-slate-800/40 border border-dashed border-slate-700/80 space-y-4">
+                    <div className="w-12 h-12 mx-auto rounded-2xl bg-red-500/10 text-red-400 flex items-center justify-center text-2xl border border-red-500/20">
+                      📬
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-white">Belum Ada Surat Masuk dari Murid di Layar Ini</p>
+                      <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                        Pesan murid yang tersimpan di Google Spreadsheet (sheet <em>Pesan_Kantor_Pos</em>) dapat langsung ditarik ke sini:
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSyncWithSpreadsheet}
+                        disabled={isSyncing}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shadow-md"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                        <span>{isSyncing ? 'Menghubungkan...' : '🔄 Tarik Pesan dari Spreadsheet'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowManualModal(true)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-sky-400" />
+                        <span>📥 Tempel Data</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -967,23 +1199,161 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
                 </div>
 
                 <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed bg-slate-900/60 p-4 rounded-xl border border-slate-800">
-                  <li>Buat satu file baru di <strong>Google Spreadsheet</strong> Anda (misal: "Kota Refleksi SMK").</li>
+                  <li>Buka file <strong>Google Spreadsheet</strong> Anda (<em>Data Base Kota Refleksi</em>).</li>
                   <li>Buka menu <strong>Ekstensi &gt; Apps Script</strong>.</li>
-                  <li>Hapus kode bawaan, lalu tempel kode yang disalin dengan tombol di atas.</li>
-                  <li>Jalankan fungsi <code>setupSpreadsheet()</code> satu kali untuk membuat 8 sheet otomatis (murid, kelas, materi, tp, refleksi, umpan_balik, pesan, pengaturan).</li>
-                  <li>Klik <strong>Terapkan (Deploy) &gt; Deployment Baru</strong>, pilih jenis <strong>Aplikasi Web</strong>:
-                    <ul className="list-disc list-inside pl-4 mt-1 space-y-0.5 text-slate-400">
-                      <li>Jalankan sebagai: <em>Saya (akun Google guru)</em></li>
-                      <li>Siapa yang memiliki akses: <em>Siapa saja (Anyone)</em></li>
-                    </ul>
-                  </li>
-                  <li>Salin URL Web App yang dihasilkan, lalu tempelkan di kotak isian URL di atas. Semua refleksi murid akan otomatis tercatat di Google Spreadsheet Anda!</li>
+                  <li>Hapus kode lama, lalu tempel kode Skrip Versi 2.0 yang disalin dengan tombol di atas.</li>
+                  <li>Klik <strong>Terapkan (Deploy) &gt; Kelola Deployment</strong>, klik ikon pensil (Edit), pilih <strong>Versi Baru (New version)</strong>, dan klik <strong>Terapkan</strong>.</li>
+                  <li>Selesai! Sekarang tombol <strong>Tarik dari Spreadsheet</strong> di Ruang Guru dapat otomatis membaca seluruh refleksi dan pesan murid.</li>
                 </ol>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* MODAL 1: TEMPEL / IMPOR DATA DARI GOOGLE SPREADSHEET */}
+      {showManualModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-4 text-slate-100 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-lg border border-sky-500/30">
+                  📥
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Impor / Tempel Data dari Spreadsheet</h3>
+                  <p className="text-xs text-slate-400">Salin baris langsung dari Google Spreadsheet dan tempel di sini</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowManualModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 flex-1 overflow-y-auto">
+              <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-800/40 text-xs text-indigo-200 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-indigo-300">
+                  <Info className="w-4 h-4 shrink-0" />
+                  <span>Cara Mudah:</span>
+                </p>
+                <ol className="list-decimal list-inside pl-1 space-y-1 text-slate-300">
+                  <li>Buka spreadsheet Anda (sheet <strong>Data_Refleksi_Siswa</strong> atau <strong>Pesan_Kantor_Pos</strong>).</li>
+                  <li>Blok baris data siswa yang sudah ada (dari kolom waktu sampai kolom terakhir), lalu tekan <strong>Ctrl + C</strong>.</li>
+                  <li>Klik di kotak di bawah dan tekan <strong>Ctrl + V</strong> (Tempel).</li>
+                </ol>
+              </div>
+
+              <textarea
+                value={pastedText}
+                onChange={(e) => {
+                  setPastedText(e.target.value);
+                  setPasteError(null);
+                }}
+                rows={8}
+                placeholder="Tempel baris data Google Spreadsheet Anda di sini (Ctrl + V)..."
+                className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+
+              {pasteError && (
+                <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{pasteError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowManualModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleImportPastedData}
+                className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-sky-600/20 cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Proses & Tampilkan Data Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: CARA UPDATE SKRIP GOOGLE APPS SCRIPT VERSI 2.0 */}
+      {showScriptModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-4 text-slate-100 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg border border-emerald-500/30">
+                  📋
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Perbarui Skrip Google Apps Script (Versi 2.0)</h3>
+                  <p className="text-xs text-slate-400">Hanya 1 menit agar tombol 'Tarik Data' dapat otomatis membaca spreadsheet</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScriptModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 flex-1 overflow-y-auto text-xs text-slate-300">
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <p className="font-bold text-white">Langkah Pembaruan di Google Spreadsheet:</p>
+                <ol className="list-decimal list-inside space-y-1.5 pl-1 leading-relaxed text-slate-300">
+                  <li>Buka spreadsheet <strong>Data Base Kota Refleksi</strong> di tab browser Anda.</li>
+                  <li>Klik menu <strong>Ekstensi &gt; Apps Script</strong>.</li>
+                  <li>Tekan <strong>Ctrl + A</strong> pada editor skrip untuk memblok semua kode lama, lalu tekan <strong>Delete</strong>.</li>
+                  <li>Tempelkan kode skrip Versi 2.0 yang sudah Anda salin di bawah.</li>
+                  <li>Klik tombol biru <strong>Terapkan (Deploy)</strong> di kanan atas &gt; pilih <strong>Kelola Deployment</strong>.</li>
+                  <li>Klik ikon <strong>Pensil (Edit)</strong> di sebelah deployment aktif Anda:
+                    <div className="pl-4 pt-1 text-emerald-400 font-semibold space-y-0.5">
+                      <p>• Versi: pilih <strong>Versi Baru (New version)</strong></p>
+                      <p>• Siapa yang memiliki akses: tetap <strong>Siapa saja (Anyone)</strong></p>
+                    </div>
+                  </li>
+                  <li>Klik <strong>Terapkan (Deploy)</strong>.</li>
+                </ol>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/40">
+                <span className="font-semibold text-emerald-200">Skrip Apps Script Versi 2.0 (Dua Arah: Simpan &amp; Tarik Data)</span>
+                <button
+                  type="button"
+                  onClick={handleCopyGAS}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md"
+                >
+                  {isCopiedGAS ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{isCopiedGAS ? 'Kode Disalin!' : 'Salin Skrip Versi 2.0'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowScriptModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

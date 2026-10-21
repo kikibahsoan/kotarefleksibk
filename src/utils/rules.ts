@@ -1,4 +1,4 @@
-import type { Reflection, ReflectionAnswers, Student, Materi, MentorFeedback } from '../types/index.ts';
+import type { Reflection, ReflectionAnswers, Student, Materi, MentorFeedback, Message } from '../types/index.ts';
 
 export interface LevelInfo {
   level: number;
@@ -251,22 +251,152 @@ export function generateCSVExport(
   return [headers.join(','), ...rows].join('\n');
 }
 
+export function parseSpreadsheetPastedText(rawText: string): {
+  reflections: Reflection[];
+  feedbacks: MentorFeedback[];
+  messages: Message[];
+} {
+  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const reflections: Reflection[] = [];
+  const feedbacks: MentorFeedback[] = [];
+  const messages: Message[] = [];
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+    // Split by tab (default copy from Google Spreadsheet) or comma/semicolon
+    let cols = line.split('\t');
+    if (cols.length < 3) {
+      cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+    }
+    cols = cols.map((c) => c.replace(/^["']|["']$/g, '').trim());
+
+    // Skip header row
+    const lineLower = line.toLowerCase();
+    if (
+      lineLower.includes('waktu catat') ||
+      lineLower.includes('id refleksi') ||
+      lineLower.includes('nama siswa') ||
+      lineLower.includes('isi pesan') ||
+      lineLower.includes('waktu kirim')
+    ) {
+      continue;
+    }
+
+    // Check if reflection row (has multiple columns)
+    if (cols.length >= 6) {
+      const possibleScale = parseInt(cols[6], 10);
+      const isScaleValid = !isNaN(possibleScale) && possibleScale >= 1 && possibleScale <= 5;
+
+      // Columns in Data_Refleksi_Siswa:
+      // 0: Waktu Catat, 1: ID Refleksi, 2: Nama Siswa, 3: Kelas, 4: No. Absen, 5: Judul Materi, 6: Skala (1-5), 7: Mood,
+      // 8: Dipahami, 9: Sulit, 10: Rencana, 11: Custom, 12: Apresiasi AI, 13: Dikuasai, 14: Diperkuat, 15: Saran, 16: Pemantik, 17: Rencana AI, 18: Perlu Perhatian
+      if (isScaleValid || cols.length >= 9) {
+        const createdAt = cols[0] || new Date().toLocaleString('id-ID');
+        const refId = cols[1] && cols[1].startsWith('ref-') ? cols[1] : `ref-sheet-${Date.now().toString(36)}-${idx}`;
+        const studentName = cols[2] || 'Siswa SMK';
+        const className = cols[3] || 'X DKV 1 (Desain Komunikasi Visual)';
+        const studentNumber = cols[4] || '';
+        const materiTitle = cols[5] || 'Refleksi Berpikir Komputasional';
+        const scale = isScaleValid ? possibleScale : 4;
+        const moodEmoji = cols[7] || '😊';
+        const understood = cols[8] || '-';
+        const difficult = cols[9] || '-';
+        const actionPlan = cols[10] || '-';
+        const customAnswersStr = cols[11] || '';
+
+        const fbApresiasi = cols[12] || `Bagus sekali refleksimu, ${studentName}!`;
+        const fbSudah = cols[13] ? cols[13].split('; ') : [understood];
+        const fbPerlu = cols[14] ? cols[14].split('; ') : [difficult];
+        const fbSaran = cols[15] ? cols[15].split('; ') : ['Terus kembangkan pemahaman materi.'];
+        const fbPemantik = cols[16] || 'Bagaimana penerapan materi ini pada proyekmu?';
+        const fbRencana = cols[17] ? cols[17].split('; ') : [actionPlan];
+        const fbPerhatian = (cols[18] || '').toUpperCase().includes('YA');
+
+        const studentId = `std-${studentName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
+        reflections.push({
+          id: refId,
+          studentId,
+          studentName,
+          className,
+          studentNumber,
+          materiId: 'mat-sheet',
+          materiTitle,
+          scale,
+          moodEmoji,
+          answers: {
+            understood,
+            difficult,
+            actionPlan,
+            customAnswers: customAnswersStr ? { 'Catatan': customAnswersStr } : undefined,
+          },
+          createdAt,
+        });
+
+        feedbacks.push({
+          id: `fb-${refId}`,
+          reflectionId: refId,
+          apresiasi: fbApresiasi,
+          sudah_dikuasai: fbSudah,
+          perlu_diperkuat: fbPerlu,
+          saran: fbSaran,
+          pertanyaan_pemantik: fbPemantik,
+          rencana_belajar: fbRencana,
+          perlu_perhatian_guru: fbPerhatian,
+          completedSteps: [false, false, false],
+        });
+        continue;
+      }
+    }
+
+    // Check if message row (Columns: [Waktu Kirim, ID Pesan, Nama Siswa, Kelas, Isi Pesan, Balasan Guru, Status, Waktu Dibalas])
+    if (cols.length >= 4) {
+      const createdAt = cols[0] || new Date().toLocaleString('id-ID');
+      const msgId = cols[1] && cols[1].startsWith('msg-') ? cols[1] : `msg-sheet-${Date.now().toString(36)}-${idx}`;
+      const studentName = cols[2] || 'Siswa SMK';
+      const className = cols[3] || 'X DKV 1 (Desain Komunikasi Visual)';
+      const content = cols[4] || '';
+      const teacherReply = cols[5] || undefined;
+      const status = (cols[6] === 'replied' || teacherReply ? 'replied' : 'unread') as 'read' | 'unread' | 'replied';
+      const repliedAt = cols[7] || undefined;
+
+      if (content || studentName) {
+        messages.push({
+          id: msgId,
+          studentId: `std-${studentName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+          studentName,
+          className,
+          content: content || 'Pesan refleksi siswa',
+          teacherReply,
+          status,
+          createdAt,
+          repliedAt,
+        });
+      }
+    }
+  }
+
+  return { reflections, feedbacks, messages };
+}
+
 export function getGoogleAppsScriptCode(): string {
   return `/**
  * =========================================================================
- * GOOGLE APPS SCRIPT: BACKEND KOTA REFLEKSI (SMK INFORMATIKA)
- * Guru: Pak Abdul Rahman Bahsoan
+ * GOOGLE APPS SCRIPT: BACKEND KOTA REFLEKSI (VERSI 2.0 - DUA ARAH)
+ * Guru: Pak Abdul Rahman Bahsoan (SMK Negeri 2 Gorontalo)
+ * Fitur: Simpan Refleksi/Pesan & BACA KEMBALI data ke Ruang Guru Kota Refleksi
  * =========================================================================
- * CARA PAKAI:
- * 1. Buka Google Spreadsheet baru di browser Anda.
+ * PANDUAN PEMBARUAN CEPAT (1 MENIT):
+ * 1. Buka spreadsheet 'Data Base Kota Refleksi' di Google Spreadsheet Anda.
  * 2. Klik menu 'Ekstensi' > 'Apps Script'.
- * 3. Hapus semua kode bawaan, lalu tempel SELURUH skrip ini.
- * 4. Klik tombol 'Terapkan (Deploy)' > 'Deployment Baru'.
- * 5. Pilih jenis 'Aplikasi Web' (Web App):
- *    - Jalankan sebagai (Execute as): 'Saya' (akun Google guru Anda)
- *    - Siapa yang memiliki akses (Who has access): 'Siapa saja' (Anyone)  <-- PENTING!
- * 6. Klik 'Terapkan', lalu izinkan akses Google saat diminta.
- * 7. Salin URL Web App yang berakhiran '/exec', lalu tempel di Ruang Guru Kota Refleksi.
+ * 3. Hapus seluruh kode lama yang ada di editor, lalu tempel SELURUH skrip ini.
+ * 4. Klik tombol 'Terapkan (Deploy)' di kanan atas > pilih 'Kelola Deployment' (Manage Deployments).
+ * 5. Klik ikon PENSIL (Edit) di samping deployment aktif Anda:
+ *    - Versi: pilih 'Versi Baru' (New version)
+ *    - Jalankan sebagai: 'Saya'
+ *    - Akses: 'Siapa saja' (Anyone)  <-- Wajib Siapa saja!
+ * 6. Klik 'Terapkan (Deploy)'.
+ * 7. Selesai! Ruang Guru sekarang dapat otomatis menyinkronkan data langsung dari Spreadsheet!
  * =========================================================================
  */
 
@@ -319,24 +449,142 @@ function setupSpreadsheet() {
     'Waktu Dibalas'
   ];
 
-  var headersMurid = [
-    'ID Siswa',
-    'Nama Siswa',
-    'Kelas',
-    'No. Absen',
-    'Total Poin XP',
-    'Daftar Lencana',
-    'Terakhir Aktif'
-  ];
-
   getOrCreateSheet('Data_Refleksi_Siswa', headersRefleksi, '#0284C7');
   getOrCreateSheet('Pesan_Kantor_Pos', headersPesan, '#DC2626');
-  getOrCreateSheet('Daftar_Siswa', headersMurid, '#059669');
 }
 
+/**
+ * Endpoint GET: Membaca data refleksi & pesan dari Google Spreadsheet untuk Ruang Guru
+ */
+function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var result = {
+    status: "Online",
+    version: "2.0",
+    app: "Kota Refleksi SMK",
+    spreadsheet: ss.getName(),
+    time: new Date().toISOString(),
+    reflections: [],
+    feedbacks: [],
+    messages: []
+  };
+
+  try {
+    // 1. Baca Data_Refleksi_Siswa
+    var refSheet = ss.getSheetByName('Data_Refleksi_Siswa');
+    if (refSheet && refSheet.getLastRow() > 1) {
+      var numRows = refSheet.getLastRow() - 1;
+      var numCols = Math.max(refSheet.getLastColumn(), 19);
+      var rows = refSheet.getRange(2, 1, numRows, numCols).getValues();
+
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var studentName = String(r[2] || '').trim();
+        var materiTitle = String(r[5] || '').trim();
+        if (!studentName && !materiTitle) continue;
+
+        var refId = String(r[1] || ('ref-' + (i + 1))).trim();
+        var createdAt = String(r[0] || new Date().toLocaleString('id-ID')).trim();
+        var className = String(r[3] || 'X DKV 1 (Desain Komunikasi Visual)').trim();
+        var studentNumber = String(r[4] || '').trim();
+        var scale = Number(r[6]) || 4;
+        var moodEmoji = String(r[7] || '😊').trim();
+        var understood = String(r[8] || '').trim();
+        var difficult = String(r[9] || '').trim();
+        var actionPlan = String(r[10] || '').trim();
+        var customAnswersStr = String(r[11] || '').trim();
+
+        var fbApresiasi = String(r[12] || ('Bagus sekali refleksimu, ' + studentName)).trim();
+        var fbSudah = String(r[13] || understood).trim();
+        var fbPerlu = String(r[14] || difficult).trim();
+        var fbSaran = String(r[15] || 'Terus kembangkan pemahaman materi ini').trim();
+        var fbPemantik = String(r[16] || 'Bagaimana penerapan materi ini pada proyekmu?').trim();
+        var fbRencana = String(r[17] || actionPlan).trim();
+        var fbPerhatian = String(r[18] || '').trim();
+
+        var studentId = 'std-' + studentName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+        result.reflections.push({
+          id: refId,
+          studentId: studentId,
+          studentName: studentName,
+          className: className,
+          studentNumber: studentNumber,
+          materiId: 'mat-sheet-' + (i + 1),
+          materiTitle: materiTitle || 'Refleksi Berpikir Komputasional',
+          scale: scale,
+          moodEmoji: moodEmoji,
+          answers: {
+            understood: understood,
+            difficult: difficult,
+            actionPlan: actionPlan,
+            customAnswers: customAnswersStr ? { 'Catatan': customAnswersStr } : undefined
+          },
+          createdAt: createdAt
+        });
+
+        result.feedbacks.push({
+          id: 'fb-' + refId,
+          reflectionId: refId,
+          apresiasi: fbApresiasi,
+          sudah_dikuasai: fbSudah ? fbSudah.split('; ') : [understood],
+          perlu_diperkuat: fbPerlu ? fbPerlu.split('; ') : [difficult],
+          saran: fbSaran ? fbSaran.split('; ') : ['Terus kembangkan pemahaman materi.'],
+          pertanyaan_pemantik: fbPemantik,
+          rencana_belajar: fbRencana ? fbRencana.split('; ') : [actionPlan],
+          perlu_perhatian_guru: fbPerhatian.toUpperCase().indexOf('YA') !== -1,
+          completedSteps: [false, false, false]
+        });
+      }
+    }
+
+    // 2. Baca Pesan_Kantor_Pos
+    var pSheet = ss.getSheetByName('Pesan_Kantor_Pos');
+    if (pSheet && pSheet.getLastRow() > 1) {
+      var pRows = pSheet.getRange(2, 1, pSheet.getLastRow() - 1, Math.max(pSheet.getLastColumn(), 8)).getValues();
+      for (var j = 0; j < pRows.length; j++) {
+        var pr = pRows[j];
+        var mContent = String(pr[4] || '').trim();
+        var mName = String(pr[2] || '').trim();
+        if (!mContent && !mName) continue;
+
+        var msgId = String(pr[1] || ('msg-' + (j + 1))).trim();
+        var mCreated = String(pr[0] || new Date().toLocaleString('id-ID')).trim();
+        var mClass = String(pr[3] || 'X DKV 1 (Desain Komunikasi Visual)').trim();
+        var mReply = String(pr[5] || '').trim();
+        var mStatus = String(pr[6] || (mReply ? 'replied' : 'unread')).trim();
+        var mRepliedAt = String(pr[7] || '').trim();
+
+        result.messages.push({
+          id: msgId,
+          studentId: 'std-' + mName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+          studentName: mName || 'Siswa SMK',
+          className: mClass,
+          content: mContent,
+          teacherReply: mReply || undefined,
+          status: mStatus === 'replied' ? 'replied' : 'unread',
+          createdAt: mCreated,
+          repliedAt: mRepliedAt || undefined
+        });
+      }
+    }
+
+  } catch (err) {
+    result.error = err.toString();
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Endpoint POST: Menyimpan refleksi baru, pesan baru, atau balasan guru
+ */
 function doPost(e) {
   var lock = LockService.getScriptLock();
   lock.tryLock(15000);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   try {
     var contents = e && e.postData && e.postData.contents ? e.postData.contents : '{}';
@@ -431,6 +679,26 @@ function doPost(e) {
         msg.repliedAt || ''
       ]);
       result.message = "Pesan siswa berhasil dicatat di Spreadsheet!";
+
+    } else if (action === 'reply_message') {
+      var msgId = requestData.messageId;
+      var reply = requestData.reply;
+      var repliedAt = requestData.repliedAt || new Date().toLocaleString('id-ID');
+
+      var sheetP = ss.getSheetByName('Pesan_Kantor_Pos');
+      if (sheetP && sheetP.getLastRow() > 1) {
+        var ids = sheetP.getRange(2, 2, sheetP.getLastRow() - 1, 1).getValues();
+        for (var k = 0; k < ids.length; k++) {
+          if (String(ids[k][0]).trim() === String(msgId).trim()) {
+            var rowIndex = k + 2;
+            sheetP.getRange(rowIndex, 6).setValue(reply);
+            sheetP.getRange(rowIndex, 7).setValue('replied');
+            sheetP.getRange(rowIndex, 8).setValue(repliedAt);
+            break;
+          }
+        }
+      }
+      result.message = "Balasan guru berhasil diperbarui di Spreadsheet!";
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -441,17 +709,6 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   } finally {
     lock.releaseLock();
-  }
-}
-
-function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  return ContentService.createTextOutput(JSON.stringify({
-    status: "Online",
-    app: "Kota Refleksi SMK",
-    spreadsheet: ss.getName(),
-    time: new Date().toISOString()
-  })).setMimeType(ContentService.MimeType.JSON);
 }
 `;
 }
