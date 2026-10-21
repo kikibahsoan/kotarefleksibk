@@ -1,0 +1,6 @@
+{
+  "name": "Kota Refleksi",
+  "description": "Aplikasi web refleksi pembelajaran murid SMK dengan dunia 3D interaktif, AI Mentor Kota, dan Ruang Guru",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

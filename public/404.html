@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kota Refleksi - Belajar & Refleksi Interaktif</title>
+    <script>
+      // Single Page Application redirect for GitHub Pages
+      sessionStorage.redirect = location.href;
+      var repoBase = location.pathname.split('/')[1] || '';
+      location.replace('/' + (repoBase ? repoBase + '/' : ''));
+    </script>
+  </head>
+  <body style="background-color: #0f172a; color: #f8fafc; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+    <div style="text-align: center;">
+      <h2>Memuat Kota Refleksi...</h2>
+      <p>Mengarahkan kembali ke beranda.</p>
+    </div>
+  </body>
+</html>

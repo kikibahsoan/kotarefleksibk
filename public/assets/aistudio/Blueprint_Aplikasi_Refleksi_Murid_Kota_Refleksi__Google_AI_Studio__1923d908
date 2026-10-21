@@ -1,0 +1,195 @@
+﻿Blueprint Aplikasi Refleksi Murid: Kota Refleksi (Google AI Studio)
+Oct 20, 2026
+1. Ringkasan & tujuan
+"Kota Refleksi" adalah aplikasi web yang dibangun di Google AI Studio (mode Build) dengan Gemini sebagai mesin umpan balik: murid masuk dengan nama dan kelas, berjalan di kota 3D kecil, lalu merefleksikan pembelajaran di tempat-tempat yang sudah disiapkan guru.
+Tujuan utama:
+* Murid terbiasa merefleksikan apa yang sudah dipelajari, apa yang masih sulit, dan strategi belajarnya.
+* Murid mendapat umpan balik personal dan rencana belajar berikutnya dari AI, dalam bahasa yang ramah.
+* Guru menambahkan materi dan tujuan pembelajaran yang langsung muncul sebagai lokasi atau misi di kota murid.
+* Guru menerima data refleksi murid sebagai bahan evaluasi dan perbaikan pembelajaran.
+2. Peran pengguna & alur masuk
+Aplikasi punya dua peran: murid masuk hanya dengan nama dan kelas, guru masuk lewat kode guru.
+Peran
+	Cara masuk
+	Yang bisa dilakukan
+	Murid
+	Isi nama lengkap + pilih kelas dari daftar
+	Menjelajah kota, belajar materi, menulis refleksi, menerima umpan balik AI, melihat progres dan lencana
+	Guru
+	Tombol "Masuk Guru" + kode guru (PIN)
+	Menambah materi dan tujuan pembelajaran, menentukan lokasinya di kota, melihat refleksi murid dan ringkasan kelas
+	Alur murid:
+1. Layar sambutan: judul kota, kolom nama, pilihan kelas, tombol "Masuk Kota".
+2. Aplikasi menyimpan nama dan kelas di perangkat sehingga murid tidak mengisi ulang setiap kali.
+3. Avatar muncul di Balai Kota dan misi hari ini ditampilkan.
+4. Murid berjalan ke lokasi mana pun, menyelesaikan aktivitas, lalu mendapat poin dan lencana.
+Catatan: nama + kelas tanpa kata sandi hanya cocok untuk kegiatan kelas, bukan untuk data yang sensitif. Nama yang sama di kelas yang sama perlu ditangani (mis. tambahkan nomor absen) agar data tidak tertukar.
+3. Dunia 3D: kota kecil & lokasinya
+Kota dibuat bergaya low-poly yang ringan, dengan kamera dari atas (isometrik) dan avatar yang berjalan ke titik yang diketuk atau diklik. Setiap bangunan adalah pintu menuju satu aktivitas. Teknologi yang disarankan: React + Three.js (React Three Fiber), karena ringan dan cocok untuk ponsel murid.
+Lokasi
+	Fungsi bagi murid
+	Terhubung ke guru
+	Balai Kota
+	Beranda: misi hari ini, tujuan pembelajaran aktif, pengumuman
+	Guru menulis misi dan pengumuman
+	Perpustakaan
+	Membaca materi, ringkasan, tautan, dan video
+	Guru menambah dan mengubah materi
+	Taman Refleksi
+	Menulis refleksi setelah belajar
+	Refleksi masuk ke dashboard guru
+	Menara Mentor
+	Umpan balik AI dan rencana belajar berikutnya
+	Guru melihat saran yang diberikan AI
+	Bengkel Latihan
+	Kuis singkat atau tantangan untuk menguji pemahaman
+	Guru menyiapkan soal latihan
+	Kantor Pos
+	Mengirim pertanyaan atau kesulitan ke guru
+	Guru membaca dan membalas
+	Pasar Prestasi
+	Melihat lencana, poin, dan perkembangan
+	Guru menentukan syarat lencana
+	Prinsip tampilan:
+* Bangunan yang punya materi baru dari guru diberi penanda bersinar atau tanda seru.
+* Kontrol sentuh di ponsel: ketuk untuk berjalan, ketuk bangunan untuk masuk.
+* Tersedia tombol "Menu Cepat" (daftar 2D) sebagai cadangan bila perangkat murid tidak kuat memuat 3D.
+4. Fitur murid: refleksi, umpan balik, rencana belajar
+Inti aplikasi ada di Taman Refleksi dan Menara Mentor. Alurnya berurutan:
+1. Murid memilih materi atau tujuan pembelajaran yang baru dipelajari.
+2. Murid menjawab pertanyaan panduan: apa yang saya pahami, apa yang masih sulit, apa yang akan saya lakukan agar lebih paham.
+3. Murid memilih skala pemahaman 1 sampai 5 dan boleh menambahkan emoji suasana hati.
+4. Murid menulis dengan teks bebas, atau dengan suara jika perangkat mendukung.
+5. Gemini membaca refleksi, lalu Menara Mentor menampilkan umpan balik dan rencana belajar.
+Isi umpan balik AI (maksimal satu layar ponsel):
+* Apresiasi singkat pada usaha murid, bukan pada nilai.
+* Ringkasan apa yang sudah dikuasai dan apa yang masih perlu diperkuat.
+* Dua sampai tiga saran konkret untuk pembelajaran berikutnya.
+* Satu pertanyaan pemantik untuk dipikirkan.
+* Rencana belajar tiga langkah yang bisa dicentang murid.
+Fitur pendukung: riwayat refleksi per materi, grafik perkembangan pemahaman, poin dan lencana (mis. "Penjelajah Rajin" untuk refleksi tiga hari berturut-turut), serta pertanyaan ke guru lewat Kantor Pos.
+5. Fitur guru: materi, tujuan pembelajaran, dan data murid
+Guru memakai panel "Ruang Guru" yang sama dengan aplikasi, tetapi dengan menu pengelolaan. Materi yang disimpan guru langsung muncul di dunia murid.
+Fitur
+	Isi
+	Efek di dunia murid
+	Tambah materi
+	Judul, mapel, kelas sasaran, isi teks, tautan, atau video
+	Muncul di Perpustakaan, bangunan diberi penanda baru
+	Tambah tujuan pembelajaran
+	Rumusan tujuan, indikator, tenggat
+	Tampil di Balai Kota sebagai misi dan menjadi dasar umpan balik AI
+	Hubungkan ke lokasi
+	Pilih bangunan tempat materi atau misi tampil
+	Materi terhubung ke peta kota murid
+	Pertanyaan refleksi khusus
+	Guru menulis 1 sampai 3 pertanyaan tambahan per materi
+	Muncul di Taman Refleksi
+	Dashboard kelas
+	Daftar refleksi per murid, rata-rata skala pemahaman, topik yang paling sulit, murid yang belum refleksi
+	Tidak terlihat murid
+	Ringkasan AI untuk guru
+	Gemini merangkum tema kesulitan umum dan usulan tindak lanjut
+	Tidak terlihat murid
+	Kotak pesan
+	Pertanyaan murid dari Kantor Pos, guru dapat membalas
+	Balasan muncul di Kantor Pos murid
+	Ekspor
+	Unduh rekap refleksi sebagai CSV
+	Tidak terlihat murid
+	Karena tujuan pembelajaran menjadi dasar umpan balik, setiap refleksi murid dikirim ke AI bersama tujuan pembelajaran terkait sehingga saran yang diberikan sesuai target kelas.
+6. Struktur data & arsitektur teknis
+Semua data disimpan di satu Google Spreadsheet milik guru. Aplikasi tidak menulis langsung ke spreadsheet: ia memanggil Google Apps Script (web app) yang terhubung ke spreadsheet itu untuk membaca dan menulis baris data, dan yang sama memanggil Gemini sehingga kunci API tetap tersembunyi. Alurnya: aplikasi (React + Three.js) → web app Apps Script → Google Spreadsheet, dan web app → Gemini untuk umpan balik. Setiap sheet (tab) di spreadsheet mewakili satu jenis data.
+Sheet (tab)
+	Kolom utama
+	murid
+	id_murid, nama, kelas, poin, lencana, terakhir_masuk
+	kelas
+	id_kelas, nama_kelas, daftar_mapel
+	materi
+	id_materi, judul, mapel, kelas_sasaran, isi_atau_tautan, lokasi_di_kota, tanggal_dibuat
+	tujuan_pembelajaran
+	id_tp, id_materi, rumusan_tujuan, indikator, tenggat
+	refleksi
+	id_refleksi, id_murid, nama, kelas, id_materi, jawaban_panduan, skala_pemahaman, waktu
+	umpan_balik
+	id_refleksi, apresiasi, sudah_dikuasai, perlu_diperkuat, saran, pertanyaan_pemantik, rencana_belajar, perlu_perhatian_guru
+	pesan
+	id_pesan, id_murid, isi_pertanyaan, balasan_guru, status, waktu
+	pengaturan
+	kode_guru (disimpan di Script Properties, bukan di sheet), judul_kota, tahun_ajaran
+	Catatan teknis:
+* Apps Script dipasang sebagai web app (Deploy → Web app) dan menyediakan endpoint sederhana: login murid, ambil materi, simpan refleksi, minta umpan balik AI, ambil dashboard guru, simpan materi dan tujuan pembelajaran, kirim dan balas pesan.
+* Kunci API Gemini dan kode guru disimpan di Script Properties Apps Script, tidak pernah di kode yang terlihat murid.
+* Spreadsheet hanya dibagikan ke guru sebagai editor; murid tidak punya akses langsung ke file, hanya lewat aplikasi.
+* Gunakan LockService pada setiap penulisan agar data tidak bertabrakan saat banyak murid mengirim bersamaan.
+* Tambahkan id unik pada setiap baris dan simpan waktu, sehingga data bisa dilacak dan dirapikan.
+* Apps Script punya batas kuota harian dan waktu eksekusi; untuk satu atau beberapa kelas biasanya cukup, tetapi uji dengan jumlah murid sebenarnya.
+* Buat salinan cadangan spreadsheet secara berkala (File → Buat salinan, atau pemicu terjadwal di Apps Script).
+7. Desain AI: aturan umpan balik
+Gemini berperan sebagai "Mentor Kota" yang hangat, singkat, dan fokus pada proses belajar. Aturan yang ditanamkan ke instruksi sistem:
+* Selalu berbahasa Indonesia yang sederhana dan sesuai usia SMK.
+* Menilai usaha dan strategi, tidak memberi angka atau label seperti "bodoh" atau "malas".
+* Mengaitkan saran dengan tujuan pembelajaran yang diberikan guru.
+* Tidak menjawab soal ujian menggantikan murid; arahkan murid memahami langkahnya.
+* Jika refleksi menunjukkan tekanan emosional yang serius, sarankan murid berbicara dengan guru atau guru BK, tanpa mendiagnosis.
+* Jika refleksi terlalu singkat atau tidak jelas, ajukan satu pertanyaan penggali sebelum memberi saran.
+Keluaran Gemini dibuat terstruktur (JSON) agar mudah ditampilkan di Menara Mentor dan dirangkum guru:
+{
+ "apresiasi": "kalimat singkat",
+ "sudah_dikuasai": ["..."],
+ "perlu_diperkuat": ["..."],
+ "saran": ["saran 1", "saran 2"],
+ "pertanyaan_pemantik": "...",
+ "rencana_belajar": ["langkah 1", "langkah 2", "langkah 3"],
+ "perlu_perhatian_guru": false
+}
+Bidang perlu_perhatian_guru bernilai true bila ada tanda kesulitan serius, sehingga muncul penanda di dashboard guru.
+8. Prompt siap tempel untuk Google AI Studio (Build)
+Tempel prompt berikut ke kolom Build di Google AI Studio. Jika hasil pertama terlalu berat atau terlalu luas, bangun bertahap sesuai bagian 9 dengan menempel satu tahap per prompt.
+Buatkan aplikasi web bernama "Kota Refleksi" untuk murid SMK sebagai media refleksi pembelajaran. Semua teks dalam bahasa Indonesia.
+
+PERAN DAN MASUK
+- Layar awal meminta Nama Lengkap dan Kelas (dropdown). Simpan di perangkat agar tidak perlu mengisi ulang.
+- Ada tombol "Masuk Guru" dengan kode guru (PIN) untuk membuka Ruang Guru.
+
+TAMPILAN
+- Dunia 3D kota kecil bergaya low-poly (Three.js / React Three Fiber), kamera dari atas, avatar murid berjalan ke titik yang diketuk.
+- Bangunan: Balai Kota (misi hari ini, tujuan pembelajaran, pengumuman), Perpustakaan (materi), Taman Refleksi (menulis refleksi), Menara Mentor (umpan balik AI), Bengkel Latihan (kuis singkat), Kantor Pos (pesan ke guru), Pasar Prestasi (poin dan lencana).
+- Bangunan yang punya materi baru diberi penanda bersinar.
+- Ramah ponsel; sediakan Menu Cepat 2D sebagai cadangan bila 3D berat.
+
+FITUR MURID
+- Taman Refleksi: pilih materi, jawab 3 pertanyaan panduan (apa yang saya pahami, apa yang masih sulit, apa yang akan saya lakukan), pilih skala pemahaman 1-5, tulis refleksi.
+- Setelah dikirim, panggil Gemini sebagai "Mentor Kota" dan tampilkan di Menara Mentor: apresiasi, hal yang sudah dikuasai, hal yang perlu diperkuat, 2-3 saran, 1 pertanyaan pemantik, rencana belajar 3 langkah yang bisa dicentang.
+- Aturan Mentor Kota: bahasa sederhana, menilai usaha bukan angka, kaitkan dengan tujuan pembelajaran dari guru, jangan menjawab soal ujian menggantikan murid, jika ada tanda kesulitan emosional serius sarankan bicara dengan guru atau guru BK dan tandai perlu_perhatian_guru = true. Keluaran dalam JSON.
+- Riwayat refleksi, grafik perkembangan pemahaman, poin, lencana.
+
+FITUR GURU (Ruang Guru)
+- Tambah dan ubah materi: judul, mapel, kelas sasaran, isi atau tautan, bangunan tempat materi muncul.
+- Tambah tujuan pembelajaran dan pertanyaan refleksi khusus per materi.
+- Dashboard kelas: refleksi per murid, rata-rata skala pemahaman, topik tersulit, murid yang belum refleksi, murid bertanda perlu perhatian.
+- Ringkasan AI untuk guru: tema kesulitan umum dan saran tindak lanjut.
+- Kotak pesan dari Kantor Pos untuk dibalas. Ekspor rekap ke CSV.
+
+DATA
+- Simpan SEMUA data di satu Google Spreadsheet lewat Google Apps Script (web app) dengan sheet: murid, kelas, materi, tujuan_pembelajaran, refleksi, umpan_balik, pesan, pengaturan. Aplikasi hanya memanggil URL web app Apps Script untuk membaca dan menulis data.
+- Hanya guru yang boleh mengubah materi dan tujuan pembelajaran. Murid hanya menulis refleksi dan pesan miliknya.
+- Jangan menaruh kunci API di kode sisi murid; simpan kunci Gemini dan kode guru di Script Properties Apps Script. Sertakan kode Code.gs lengkap beserta langkah membuat spreadsheet dan men-deploy web app.
+
+GAYA
+- Warna cerah dan ramah, tombol besar, font mudah dibaca, animasi ringan.
+9. Tahapan pengembangan, uji coba, privasi
+Bangun bertahap supaya setiap tahap bisa diuji sebelum menambah fitur:
+1. Tahap 1: layar masuk (nama + kelas), kota 3D sederhana dengan 3 bangunan (Balai Kota, Perpustakaan, Taman Refleksi).
+2. Tahap 2: refleksi dan umpan balik Gemini dengan keluaran JSON, ditampilkan di Menara Mentor.
+3. Tahap 3: Ruang Guru untuk menambah materi dan tujuan pembelajaran, disimpan di Google Spreadsheet.
+4. Tahap 4: dashboard guru, ringkasan AI, Kantor Pos, ekspor CSV.
+5. Tahap 5: poin, lencana, Bengkel Latihan, dan penyempurnaan tampilan.
+Uji coba: mulai dengan satu kelas kecil (5 sampai 10 murid) selama satu minggu, lalu catat apakah murid paham alurnya, apakah umpan balik AI terasa tepat, dan apakah 3D lancar di ponsel yang mereka pakai.
+Privasi dan keamanan:
+* Kumpulkan data seminimal mungkin: nama, kelas, dan refleksi.
+* Beri tahu murid dan sekolah bahwa refleksi dibaca guru dan diproses AI; sesuaikan dengan kebijakan sekolah.
+* Peringatkan murid agar tidak menulis data pribadi sensitif (alamat, nomor telepon, kata sandi) di refleksi.
+* Simpan kode guru secara aman dan ganti secara berkala.
+* Tinjau sendiri sejumlah umpan balik AI di awal untuk memastikan nadanya tepat sebelum dipakai seluruh kelas.
