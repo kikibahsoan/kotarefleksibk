@@ -4,30 +4,48 @@ Aplikasi web refleksi pembelajaran interaktif untuk murid SMK (Informatika - Ber
 
 ---
 
-## 🚀 1. Cara Deploy ke GitHub Pages
+## 🚀 1. Cara Deploy ke GitHub Pages (Bebas Blank Putih)
 
-File konfigurasi GitHub Pages telah disiapkan lengkap:
-- `vite.config.ts`: telah disetel dengan `base: './'` agar semua aset relatif berfungsi di `username.github.io/nama-repo/`.
-- `.github/workflows/deploy.yml`: GitHub Actions otomatis untuk membangun dan mempublikasikan aplikasi saat push ke branch `main` atau `master`.
-- `public/404.html`: Fallback SPA agar reload halaman di GitHub Pages tidak error 404.
+Aplikasi telah dilengkapi file build produksi dan konfigurasi khusus GitHub Pages agar tidak terjadi layar kosong (*blank putih*):
 
-### Langkah-langkah:
-1. **Push kode ini ke repositori GitHub Anda**:
+### Opsi A (Paling Mudah: "Deploy from a branch" ke folder `/docs`)
+Jika Anda memilih **Deploy from a branch** di GitHub Pages:
+1. Jalankan `npm run build` (secara otomatis mengompilasi aplikasi ke folder `docs/` beserta file `.nojekyll` dan `404.html`).
+2. Push seluruh file dan folder `docs/` ke repositori GitHub:
    ```bash
-   git init
    git add .
-   git commit -m "feat: Siap deploy GitHub Pages Kota Refleksi"
-   git branch -M main
-   git remote add origin https://github.com/<username>/<nama-repo>.git
-   git push -u origin main
+   git commit -m "build: Siapkan folder docs untuk GitHub Pages"
+   git push origin main
    ```
-2. **Aktifkan GitHub Pages**:
-   - Buka repositori Anda di GitHub.
-   - Masuk ke tab **Settings** > **Pages** (di menu sebelah kiri).
-   - Di bagian **Build and deployment > Source**, pilih **GitHub Actions**.
-   - Alur kerja (workflow) akan otomatis berjalan pada tab **Actions**.
-   - Setelah selesai (sekitar 1-2 menit), situs web Anda akan langsung aktif di:
-     `https://<username>.github.io/<nama-repo>/`
+3. Di repositori GitHub Anda:
+   - Masuk ke menu **Settings** > **Pages** (di sidebar kiri).
+   - Di bagian **Build and deployment > Source**: pilih **Deploy from a branch**.
+   - Pada pilihan **Branch**: pilih `main` (atau branch utama Anda).
+   - **PENTING**: Pada dropdown folder di sebelahnya (yang biasanya berisi `/(root)`), ganti menjadi **`/docs`**.
+   - Klik **Save**.
+4. Dalam 1–2 menit, GitHub Pages selesai dan saat link diklik aplikasi akan langsung terbuka sempurna tanpa layar putih!
+
+> **Mengapa sebelumnya Blank Putih?**
+> Jika memilih folder `/(root)`, GitHub Pages hanya menyajikan kode sumber `index.html` mentah yang belum dikompilasi oleh Vite, sehingga browser tidak dapat menjalankan file TypeScript/React secara langsung. Dengan memilih folder **`/docs`**, GitHub Pages menyajikan hasil kompilasi JavaScript yang siap dijalankan oleh browser mana pun.
+
+---
+
+### Opsi B (Otomatis dengan `npm run deploy` ke branch `gh-pages`)
+1. Jalankan perintah di terminal:
+   ```bash
+   npm run deploy
+   ```
+2. Di GitHub **Settings** > **Pages**:
+   - **Source**: Deploy from a branch
+   - **Branch**: pilih `gh-pages` dan folder **`/(root)`**.
+   - Klik **Save**.
+
+---
+
+### Opsi C (Otomatis via GitHub Actions)
+- Di GitHub **Settings** > **Pages**:
+- **Source**: pilih **GitHub Actions**.
+- File alur kerja `.github/workflows/deploy.yml` yang telah disediakan akan otomatis mengompilasi dan mendeploy setiap kali Anda melakukan `git push`.
 
 ---
 

@@ -36,6 +36,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
   const mountRef = useRef<HTMLDivElement>(null);
   const [hoveredBuilding, setHoveredBuilding] = useState<BuildingInfo | null>(null);
   const [isWalking, setIsWalking] = useState(false);
+  const [webglError, setWebglError] = useState<string | null>(null);
 
   // Store callbacks & dynamic props in refs to prevent WebGL teardown
   const onSelectBuildingRef = useRef(onSelectBuilding);
@@ -94,10 +95,18 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     updateCameraFraming(width, height);
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({
-      antialias: !isHeadless,
-      powerPreference: 'high-performance',
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: !isHeadless,
+        powerPreference: 'high-performance',
+      });
+    } catch (err: any) {
+      console.warn('WebGL initialization failed, falling back to 2D view:', err);
+      setWebglError(err?.message || 'WebGL tidak tersedia pada perangkat/browser ini');
+      return;
+    }
+
     renderer.setSize(width, height);
     renderer.setPixelRatio(isHeadless ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -838,14 +847,61 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
-      domElement.removeEventListener('click', handlePointerDown);
-      domElement.removeEventListener('mousemove', handlePointerMove);
-      renderer.dispose();
-      if (container.contains(domElement)) {
-        container.removeChild(domElement);
+      if (renderer) renderer.dispose();
+      if (domElement) {
+        domElement.removeEventListener('click', handlePointerDown);
+        domElement.removeEventListener('mousemove', handlePointerMove);
+        if (container.contains(domElement)) {
+          container.removeChild(domElement);
+        }
       }
     };
   }, []);
+
+  if (webglError) {
+    return (
+      <div className="relative w-full h-full select-none overflow-y-auto bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 p-4 sm:p-6 flex flex-col items-center justify-center">
+        <div className="max-w-xl w-full text-center space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold border border-indigo-500/30">
+            <span>🏛️</span>
+            <span>Mode Peta 2D Kota Refleksi</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black font-display text-white">
+            Peta Gedung Pembelajaran
+          </h2>
+          <p className="text-xs text-slate-400">
+            Pilih gedung di bawah untuk langsung membuka ruang belajar dan refleksi:
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-left">
+            {BUILDINGS_INFO.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => onSelectBuilding(b.id)}
+                className="p-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 flex items-center gap-3 transition shadow-lg cursor-pointer hover:border-indigo-500"
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md shrink-0 text-base"
+                  style={{ backgroundColor: '#' + b.color.toString(16).padStart(6, '0') }}
+                >
+                  🏛️
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-white">{b.name}</span>
+                    {newMateriBuildingIds.includes(b.id) && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    )}
+                  </div>
+                  <span className="text-xs text-slate-400">{b.tagline}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full select-none overflow-hidden" data-testid="threejs-town-canvas">
