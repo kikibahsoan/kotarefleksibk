@@ -357,7 +357,7 @@ export function parseSpreadsheetPastedText(rawText: string): {
       const className = cols[3] || 'X DKV 1 (Desain Komunikasi Visual)';
       const content = cols[4] || '';
       const teacherReply = cols[5] || undefined;
-      const status = (cols[6] === 'replied' || teacherReply ? 'replied' : 'unread') as 'read' | 'unread' | 'replied';
+      const status: 'unread' | 'replied' = cols[6] === 'replied' || teacherReply ? 'replied' : 'unread';
       const repliedAt = cols[7] || undefined;
 
       if (content || studentName) {
@@ -709,6 +709,7 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   } finally {
     lock.releaseLock();
+  }
 }
 `;
 }

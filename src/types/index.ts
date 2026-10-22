@@ -52,6 +52,7 @@ export interface Reflection {
   studentId: string;
   studentName: string;
   className: string;
+  studentNumber?: string;
   materiId: string;
   materiTitle?: string;
   answers: ReflectionAnswers;
