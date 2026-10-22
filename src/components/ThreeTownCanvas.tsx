@@ -26,10 +26,12 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'bengkel_latihan', name: 'Bengkel Latihan', tagline: 'Kuis & Tantangan', position: [14, 0, 7], color: 0xf59e0b },
   { id: 'kantor_pos', name: 'Kantor Pos', tagline: 'Kirim Pesan ke Guru', position: [-8, 0, 15], color: 0xef4444 },
   { id: 'pasar_prestasi', name: 'Pasar Prestasi', tagline: 'Lencana & Poin', position: [8, 0, 15], color: 0x06b6d4 },
+  { id: 'monumen_warga', name: 'Monumen Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0xec4899 },
 ];
 
 export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
   onSelectBuilding,
+  activeBuilding,
   newMateriBuildingIds,
   timeOfDay = 'day',
 }) => {
@@ -41,6 +43,8 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
   // Store callbacks & dynamic props in refs to prevent WebGL teardown
   const onSelectBuildingRef = useRef(onSelectBuilding);
   onSelectBuildingRef.current = onSelectBuilding;
+  const activeBuildingRef = useRef(activeBuilding);
+  activeBuildingRef.current = activeBuilding;
   const newMateriBuildingIdsRef = useRef(newMateriBuildingIds);
   newMateriBuildingIdsRef.current = newMateriBuildingIds;
   const timeOfDayRef = useRef(timeOfDay);
@@ -75,6 +79,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     const height = container.clientHeight || 600;
     const camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 220);
 
+    const defaultCamPos = new THREE.Vector3(0, 24, 28);
     const updateCameraFraming = (w: number, h: number) => {
       const aspect = w / h;
       camera.aspect = aspect;
@@ -89,6 +94,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
         camera.position.set(0, 24, 28);
         camera.lookAt(0, 0, 0);
       }
+      defaultCamPos.copy(camera.position);
       camera.updateProjectionMatrix();
     };
 
@@ -188,39 +194,9 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     plaza.receiveShadow = !isHeadless;
     scene.add(plaza);
 
-    // Central Fountain in Plaza
-    const fountainGroup = new THREE.Group();
-    const basinGeo = new THREE.CylinderGeometry(2.4, 2.8, 0.6, 24);
-    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.6 });
-    const basin = new THREE.Mesh(basinGeo, stoneMat);
-    basin.position.y = 0.3;
-    basin.castShadow = !isHeadless;
-    basin.receiveShadow = !isHeadless;
-    fountainGroup.add(basin);
-
-    const waterGeo = new THREE.CylinderGeometry(2.2, 2.2, 0.45, 24);
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      roughness: 0.1,
-      metalness: 0.8,
-    });
-    const water = new THREE.Mesh(waterGeo, waterMat);
-    water.position.y = 0.45;
-    fountainGroup.add(water);
-
-    const pillarGeo = new THREE.CylinderGeometry(0.3, 0.5, 1.4, 16);
-    const pillar = new THREE.Mesh(pillarGeo, stoneMat);
-    pillar.position.y = 0.9;
-    fountainGroup.add(pillar);
-
-    const topBowlGeo = new THREE.CylinderGeometry(1.0, 0.4, 0.3, 16);
-    const topBowl = new THREE.Mesh(topBowlGeo, stoneMat);
-    topBowl.position.y = 1.6;
-    fountainGroup.add(topBowl);
-    scene.add(fountainGroup);
-
-    // Pathways to each building
+    // Pathways to each building (skip monumen_warga which is at center [0,0,0])
     BUILDINGS_INFO.forEach((b) => {
+      if (b.id === 'monumen_warga') return;
       const dx = b.position[0];
       const dz = b.position[2];
       const dist = Math.hypot(dx, dz);
@@ -336,13 +312,15 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       bGroup.position.set(b.position[0], 0, b.position[2]);
       bGroup.userData = { buildingId: b.id, buildingInfo: b };
 
-      // Base Foundation
-      const baseGeo = new THREE.BoxGeometry(5.2, 0.4, 5.2);
-      const baseMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.7 });
-      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-      baseMesh.position.y = 0.2;
-      baseMesh.receiveShadow = !isHeadless;
-      bGroup.add(baseMesh);
+      // Base Foundation (rectangular for buildings, round for monumen_warga)
+      if (b.id !== 'monumen_warga') {
+        const baseGeo = new THREE.BoxGeometry(5.2, 0.4, 5.2);
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.7 });
+        const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+        baseMesh.position.y = 0.2;
+        baseMesh.receiveShadow = !isHeadless;
+        bGroup.add(baseMesh);
+      }
 
       // Unique Architecture per building
       if (b.id === 'balai_kota') {
@@ -579,13 +557,103 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
         const star = new THREE.Mesh(new THREE.DodecahedronGeometry(0.6), goldMat);
         star.position.set(0, 4.4, 0);
         bGroup.add(star);
+
+      } else if (b.id === 'monumen_warga') {
+        const stoneMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.6 });
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.8 });
+        const sakuraMat = new THREE.MeshStandardMaterial({
+          color: 0xf472b6,
+          emissive: 0xdb2777,
+          emissiveIntensity: 0.45,
+          roughness: 0.2,
+        });
+        const benchWoodMat = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.7 });
+
+        // Monument Stepped Base
+        const step1 = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.9, 0.25, 28), stoneMat);
+        step1.position.y = 0.12;
+        step1.receiveShadow = !isHeadless;
+        bGroup.add(step1);
+
+        const step2 = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 3.0, 0.3, 24), stoneMat);
+        step2.position.y = 0.38;
+        step2.receiveShadow = !isHeadless;
+        bGroup.add(step2);
+
+        // Water Basin & Surface
+        const waterGeo = new THREE.CylinderGeometry(2.4, 2.4, 0.2, 24);
+        const waterMat = new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          roughness: 0.1,
+          metalness: 0.8,
+        });
+        const water = new THREE.Mesh(waterGeo, waterMat);
+        water.position.y = 0.52;
+        bGroup.add(water);
+
+        // Center Pillar with Gold Rings
+        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.65, 2.4, 16), stoneMat);
+        pillar.position.y = 1.7;
+        pillar.castShadow = !isHeadless;
+        bGroup.add(pillar);
+
+        const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.08, 8, 20), goldMat);
+        ring1.rotation.x = Math.PI / 2;
+        ring1.position.y = 1.2;
+        bGroup.add(ring1);
+
+        const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.08, 8, 20), goldMat);
+        ring2.rotation.x = Math.PI / 2;
+        ring2.position.y = 2.4;
+        bGroup.add(ring2);
+
+        // Monument Sakura Crystal / Flower at Peak
+        const sakuraCrystal = new THREE.Mesh(new THREE.DodecahedronGeometry(0.75, 0), sakuraMat);
+        sakuraCrystal.position.y = 3.35;
+        bGroup.add(sakuraCrystal);
+
+        // 4 Circular Plaza Benches with Gathered Classmates
+        const benchAngles = [0.25, Math.PI / 2 + 0.15, Math.PI + 0.35, (3 * Math.PI) / 2 + 0.25];
+        const studentShirtColors = [0xec4899, 0x10b981, 0x8b5cf6, 0xf59e0b];
+        const studentSkinMat = new THREE.MeshStandardMaterial({ color: 0xfbcfe8, roughness: 0.8 });
+        const studentHairMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+
+        benchAngles.forEach((angle, idx) => {
+          const bx = Math.cos(angle) * 4.4;
+          const bz = Math.sin(angle) * 4.4;
+
+          // Wooden Bench
+          const bench = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.35, 0.6), benchWoodMat);
+          bench.position.set(bx, 0.25, bz);
+          bench.rotation.y = -angle + Math.PI / 2;
+          bGroup.add(bench);
+
+          // Classmate avatar
+          const cmGroup = new THREE.Group();
+          cmGroup.position.set(bx, 0.45, bz);
+
+          const cmShirtMat = new THREE.MeshStandardMaterial({ color: studentShirtColors[idx], roughness: 0.7 });
+          const cmTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.6, 10), cmShirtMat);
+          cmTorso.position.y = 0.35;
+          cmGroup.add(cmTorso);
+
+          const cmHead = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 12), studentSkinMat);
+          cmHead.position.y = 0.82;
+          cmGroup.add(cmHead);
+
+          const cmHair = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10, 0, Math.PI * 2, 0, Math.PI / 2), studentHairMat);
+          cmHair.position.y = 0.92;
+          cmGroup.add(cmHair);
+
+          bGroup.add(cmGroup);
+        });
       }
 
       // Beacon indicator over building for new material / mission
       const beaconGeo = new THREE.OctahedronGeometry(0.45, 0);
       const beaconMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, wireframe: false });
       const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-      beacon.position.y = 7.0;
+      beacon.position.y = b.id === 'monumen_warga' ? 5.2 : 7.0;
       bGroup.add(beacon);
 
       scene.add(bGroup);
@@ -677,7 +745,11 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           const bId = parent.userData.buildingId as BuildingId;
           const bInfo = BUILDINGS_INFO.find((b) => b.id === bId);
           if (bInfo) {
-            targetPos.set(bInfo.position[0] * 0.7, 0, bInfo.position[2] * 0.7);
+            if (bId === 'monumen_warga') {
+              targetPos.set(0, 0, 2.8);
+            } else {
+              targetPos.set(bInfo.position[0] * 0.7, 0, bInfo.position[2] * 0.7);
+            }
             targetBuildingId = bId;
             isMoving = true;
             setIsWalking(true);
@@ -837,6 +909,19 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
             onSelectBuildingRef.current(chosen);
           }
         }
+      }
+
+      // Smooth camera focus when visiting Monumen Warga gathering
+      if (activeBuildingRef.current === 'monumen_warga') {
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, 0, 3.5, delta);
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, 9.8, 3.5, delta);
+        camera.position.z = THREE.MathUtils.damp(camera.position.z, 12.8, 3.5, delta);
+        camera.lookAt(0, 1.2, 0);
+      } else if (defaultCamPos.lengthSq() > 0 && camera.position.distanceTo(defaultCamPos) > 0.05) {
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, defaultCamPos.x, 3.2, delta);
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, defaultCamPos.y, 3.2, delta);
+        camera.position.z = THREE.MathUtils.damp(camera.position.z, defaultCamPos.z, 3.2, delta);
+        camera.lookAt(0, 0, 0);
       }
 
       renderer.render(scene, camera);

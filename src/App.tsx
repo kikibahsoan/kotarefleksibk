@@ -29,6 +29,7 @@ import { BengkelLatihanModal } from './components/modals/BengkelLatihanModal.tsx
 import { KantorPosModal } from './components/modals/KantorPosModal.tsx';
 import { PasarPrestasiModal } from './components/modals/PasarPrestasiModal.tsx';
 import { RuangGuruModal } from './components/modals/RuangGuruModal.tsx';
+import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal.tsx';
 import {
   Compass,
   Lock,
@@ -516,6 +517,7 @@ export default function App() {
                   bengkel_latihan: '🛠️',
                   kantor_pos: '📮',
                   pasar_prestasi: '🎪',
+                  monumen_warga: '🌸',
                 };
 
                 return (
@@ -609,6 +611,13 @@ export default function App() {
           onClose={() => setActiveBuilding(null)}
           student={student}
           reflections={reflections}
+        />
+      )}
+
+      {activeBuilding === 'monumen_warga' && (
+        <MonumenWargaChatModal
+          onClose={() => setActiveBuilding(null)}
+          student={student}
         />
       )}
 

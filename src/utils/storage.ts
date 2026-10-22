@@ -7,6 +7,7 @@ import {
   MentorFeedback,
   Message,
   TownSettings,
+  PublicChatMessage,
 } from '../types/index.ts';
 import {
   INITIAL_MATERI,
@@ -17,6 +18,7 @@ import {
   INITIAL_FEEDBACKS,
   INITIAL_MESSAGES,
   INITIAL_SETTINGS,
+  INITIAL_PUBLIC_CHAT,
 } from '../data/initialData.ts';
 
 const STORAGE_KEYS = {
@@ -29,6 +31,7 @@ const STORAGE_KEYS = {
   FEEDBACKS: 'kota_refleksi_feedbacks',
   MESSAGES: 'kota_refleksi_messages',
   SETTINGS: 'kota_refleksi_settings',
+  PUBLIC_CHAT: 'kota_refleksi_public_chat',
 };
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -232,6 +235,32 @@ export const StorageService = {
   updateMessage(msg: Message): void {
     const items = this.getMessages().map((m) => (m.id === msg.id ? msg : m));
     this.setMessages(items);
+  },
+
+  getPublicChatMessages(): PublicChatMessage[] {
+    return safeGet<PublicChatMessage[]>(STORAGE_KEYS.PUBLIC_CHAT, INITIAL_PUBLIC_CHAT);
+  },
+
+  setPublicChatMessages(items: PublicChatMessage[]): void {
+    safeSet(STORAGE_KEYS.PUBLIC_CHAT, items);
+    try {
+      window.dispatchEvent(new CustomEvent('kota_refleksi_public_chat_updated', { detail: items }));
+    } catch (e) {
+      // safe fallback
+    }
+  },
+
+  addPublicChatMessage(msg: PublicChatMessage): void {
+    const items = this.getPublicChatMessages();
+    const updated = [msg, ...items];
+    this.setPublicChatMessages(updated);
+  },
+
+  reportChatMessage(msgId: string): void {
+    const items = this.getPublicChatMessages().map((m) =>
+      m.id === msgId ? { ...m, isReported: true } : m
+    );
+    this.setPublicChatMessages(items);
   },
 
   getSettings(): TownSettings {

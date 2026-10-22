@@ -5,7 +5,22 @@ export type BuildingId =
   | 'menara_mentor'
   | 'bengkel_latihan'
   | 'kantor_pos'
-  | 'pasar_prestasi';
+  | 'pasar_prestasi'
+  | 'monumen_warga';
+
+export interface PublicChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderHandle: string; // e.g. "@budi_dkv"
+  className: string;
+  roomNumber: 1 | 2 | 3;
+  content: string; // max 120 chars
+  timestamp: string; // e.g. "23.12"
+  createdAt: string; // ISO
+  avatarColor?: string;
+  isReported?: boolean;
+}
 
 export interface Student {
   id: string;

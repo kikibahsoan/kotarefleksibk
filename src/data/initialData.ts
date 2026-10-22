@@ -8,6 +8,7 @@ import {
   MentorFeedback,
   Message,
   TownSettings,
+  PublicChatMessage,
 } from '../types/index.ts';
 
 export const SMK_CLASSES = [
@@ -321,3 +322,79 @@ export const INITIAL_SETTINGS: TownSettings = {
   gasWebAppUrl:
     'https://script.google.com/macros/s/AKfycbwzHhVYKBfznA_k4dZlB1eGFevpeLoJDiSUbLKXJACQPgsKFxi0HfbNNbjUZBWa7finfw/exec',
 };
+
+export const INITIAL_PUBLIC_CHAT: PublicChatMessage[] = [
+  {
+    id: 'pchat-1',
+    senderId: 'std-dkv-101',
+    senderName: 'Budi Santoso',
+    senderHandle: '@budi_dkv',
+    className: 'X DKV 1 (Desain Komunikasi Visual)',
+    roomNumber: 1,
+    content: 'Halo teman-teman DKV 1! Sudah baca materi arsitektur Von Neumann di perpustakaan?',
+    timestamp: '23.10',
+    createdAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
+    avatarColor: '#38bdf8',
+  },
+  {
+    id: 'pchat-2',
+    senderId: 'std-dkv-102',
+    senderName: 'Siti Rahmawati',
+    senderHandle: '@siti_rahma',
+    className: 'X DKV 2 (Desain Komunikasi Visual)',
+    roomNumber: 1,
+    content: 'Halo Budi! Seru banget analogi meja kerja RAM dan bahan es tehnya hehe 😄',
+    timestamp: '23.12',
+    createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    avatarColor: '#f472b6',
+  },
+  {
+    id: 'pchat-3',
+    senderId: 'std-dkv-103',
+    senderName: 'Mohamad Rizki',
+    senderHandle: '@m_rizki',
+    className: 'X DKV 3 (Desain Komunikasi Visual)',
+    roomNumber: 1,
+    content: 'Salam kenal semua! Siapa yang lagi santai kumpul di Monumen Warga sekarang?',
+    timestamp: '23.14',
+    createdAt: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+    avatarColor: '#4ade80',
+  },
+  {
+    id: 'pchat-4',
+    senderId: 'std-dkv-104',
+    senderName: 'Nurul Aini',
+    senderHandle: '@nurul_aini',
+    className: 'X DKV 1 (Desain Komunikasi Visual)',
+    roomNumber: 1,
+    content: 'Aku udah kirim refleksi di Taman Refleksi, dapet +30 XP langsung naik level! 🚀',
+    timestamp: '23.16',
+    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    avatarColor: '#fbbf24',
+  },
+  {
+    id: 'pchat-5',
+    senderId: 'std-dkv-105',
+    senderName: 'Fajar Pratama',
+    senderHandle: '@fajar_p',
+    className: 'X DKV 2 (Desain Komunikasi Visual)',
+    roomNumber: 2,
+    content: 'Ruang 2 DKV kumpul di sini ya! Ayo latihan kuis di Bengkel Latihan bareng!',
+    timestamp: '23.15',
+    createdAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
+    avatarColor: '#a78bfa',
+  },
+  {
+    id: 'pchat-6',
+    senderId: 'std-dkv-106',
+    senderName: 'Dewi Lestari',
+    senderHandle: '@dewi_lestari',
+    className: 'X DKV 3 (Desain Komunikasi Visual)',
+    roomNumber: 3,
+    content: 'Ruang 3 hadir! Semangat buat proyek portfolio desain semester ini teman-teman ✨',
+    timestamp: '23.18',
+    createdAt: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
+    avatarColor: '#34d399',
+  },
+];
+

@@ -17,6 +17,7 @@ const BUILDING_ICONS: Record<BuildingId, string> = {
   bengkel_latihan: '🛠️',
   kantor_pos: '📮',
   pasar_prestasi: '🎪',
+  monumen_warga: '🌸',
 };
 
 const BUILDING_DESCRIPTIONS: Record<BuildingId, string> = {
@@ -27,6 +28,7 @@ const BUILDING_DESCRIPTIONS: Record<BuildingId, string> = {
   bengkel_latihan: 'Kuis cepat dan tantangan kejuruan untuk menambah poin XP.',
   kantor_pos: 'Kirim surat pertanyaan atau kesulitan langsung ke gurumu.',
   pasar_prestasi: 'Lihat koleksi lencana, poin XP, streak hari, dan level murid.',
+  monumen_warga: 'Sapa & obrolan langsung sesama warga dan teman kelas di tengah kota.',
 };
 
 export const QuickNav2D: React.FC<QuickNav2DProps> = ({
