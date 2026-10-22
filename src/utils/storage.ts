@@ -32,6 +32,7 @@ const STORAGE_KEYS = {
   MESSAGES: 'kota_refleksi_messages',
   SETTINGS: 'kota_refleksi_settings',
   PUBLIC_CHAT: 'kota_refleksi_public_chat',
+  DELETED_REFLECTIONS: 'kota_refleksi_deleted_reflections',
 };
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -157,14 +158,23 @@ export const StorageService = {
 
   getReflections(): Reflection[] {
     const items = safeGet<Reflection[]>(STORAGE_KEYS.REFLECTIONS, INITIAL_REFLECTIONS);
-    // Automatically purge old dummy reflections (ref-bk-001, ref-bk-002) if stored in localStorage
+    const deletedIds = new Set(this.getDeletedReflectionIds());
+    // Automatically purge old dummy reflections and deleted ones
     const cleaned = (items || []).filter(
-      (r) => r.id !== 'ref-bk-001' && r.id !== 'ref-bk-002' && !r.id.startsWith('dummy-')
+      (r) =>
+        r.id !== 'ref-bk-001' &&
+        r.id !== 'ref-bk-002' &&
+        !r.id.startsWith('dummy-') &&
+        !deletedIds.has(r.id)
     );
     if (cleaned.length !== (items || []).length) {
       safeSet(STORAGE_KEYS.REFLECTIONS, cleaned);
     }
     return cleaned;
+  },
+
+  getDeletedReflectionIds(): string[] {
+    return safeGet<string[]>(STORAGE_KEYS.DELETED_REFLECTIONS, []);
   },
 
   setReflections(items: Reflection[]): void {
@@ -182,11 +192,43 @@ export const StorageService = {
     // Also remove any corresponding feedback
     const feedbacks = this.getFeedbacks().filter((f) => f.reflectionId !== id);
     this.setFeedbacks(feedbacks);
+
+    // Save to deleted list so spreadsheet sync won't re-add it
+    const deleted = this.getDeletedReflectionIds();
+    if (!deleted.includes(id)) {
+      safeSet(STORAGE_KEYS.DELETED_REFLECTIONS, [...deleted, id]);
+    }
+
+    // Sync delete action to Google Apps Script
+    this.syncWithGAS('delete_reflection', { reflectionId: id });
+  },
+
+  deleteMultipleReflections(ids: string[]): void {
+    const idSet = new Set(ids);
+    const items = this.getReflections().filter((r) => !idSet.has(r.id));
+    this.setReflections(items);
+    const feedbacks = this.getFeedbacks().filter((f) => !idSet.has(f.reflectionId));
+    this.setFeedbacks(feedbacks);
+
+    const deleted = this.getDeletedReflectionIds();
+    const updatedDeleted = Array.from(new Set([...deleted, ...ids]));
+    safeSet(STORAGE_KEYS.DELETED_REFLECTIONS, updatedDeleted);
+
+    ids.forEach((id) => {
+      this.syncWithGAS('delete_reflection', { reflectionId: id });
+    });
   },
 
   clearReflections(): void {
+    const current = this.getReflections();
+    const currentIds = current.map((r) => r.id);
     this.setReflections([]);
     this.setFeedbacks([]);
+    const deleted = this.getDeletedReflectionIds();
+    safeSet(STORAGE_KEYS.DELETED_REFLECTIONS, Array.from(new Set([...deleted, ...currentIds])));
+
+    // Sync clear action to Google Apps Script
+    this.syncWithGAS('clear_all_reflections', {});
   },
 
   getFeedbacks(): MentorFeedback[] {
@@ -358,10 +400,18 @@ export const StorageService = {
       const hasMessages = Array.isArray(resData.messages);
 
       if (hasReflections || hasMessages) {
+        const deletedIds = new Set(this.getDeletedReflectionIds());
+        const validReflections = (resData.reflections || []).filter(
+          (r: Reflection) => !deletedIds.has(r.id)
+        );
+        const validFeedbacks = (resData.feedbacks || []).filter(
+          (f: MentorFeedback) => !deletedIds.has(f.reflectionId)
+        );
+
         return {
           success: true,
-          reflections: resData.reflections || [],
-          feedbacks: resData.feedbacks || [],
+          reflections: validReflections,
+          feedbacks: validFeedbacks,
           messages: resData.messages || [],
           spreadsheetName: resData.spreadsheet || 'Google Spreadsheet',
         };

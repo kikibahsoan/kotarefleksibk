@@ -92,6 +92,13 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
   const [pastedText, setPastedText] = useState('');
   const [pasteError, setPasteError] = useState<string | null>(null);
 
+  // In-App Deletion States (Replaces window.confirm blocked by iframes)
+  const [reflectionToDelete, setReflectionToDelete] = useState<Reflection | null>(null);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [selectedReflectionIds, setSelectedReflectionIds] = useState<string[]>([]);
+  const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState(false);
+  const [deleteSuccessNotice, setDeleteSuccessNotice] = useState<string | null>(null);
+
   // New Materi Form State
   const [newTitle, setNewTitle] = useState('');
   const [newSubject, setNewSubject] = useState('');
@@ -196,6 +203,61 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
   const filteredReflections = selectedClass === 'all'
     ? reflections
     : reflections.filter((r) => r.className === selectedClass);
+
+  // In-App Deletion Handlers (Guaranteed to work in iframe)
+  const handleConfirmSingleDelete = () => {
+    if (!reflectionToDelete) return;
+    const targetId = reflectionToDelete.id;
+    const studentName = reflectionToDelete.studentName;
+    if (onDeleteReflection) {
+      onDeleteReflection(targetId);
+    } else {
+      StorageService.deleteReflection(targetId);
+    }
+    setSelectedReflectionIds((prev) => prev.filter((id) => id !== targetId));
+    setReflectionToDelete(null);
+    setDeleteSuccessNotice(`Refleksi dari "${studentName}" berhasil dihapus.`);
+    setTimeout(() => setDeleteSuccessNotice(null), 4000);
+  };
+
+  const handleConfirmClearAll = () => {
+    if (onClearAllReflections) {
+      onClearAllReflections();
+    } else {
+      StorageService.clearReflections();
+    }
+    setSelectedReflectionIds([]);
+    setIsClearAllModalOpen(false);
+    setDeleteSuccessNotice('Semua data refleksi murid berhasil dikosongkan.');
+    setTimeout(() => setDeleteSuccessNotice(null), 4000);
+  };
+
+  const handleConfirmBatchDelete = () => {
+    if (selectedReflectionIds.length === 0) return;
+    StorageService.deleteMultipleReflections(selectedReflectionIds);
+    selectedReflectionIds.forEach((id) => {
+      onDeleteReflection?.(id);
+    });
+    const count = selectedReflectionIds.length;
+    setSelectedReflectionIds([]);
+    setIsBatchDeleteModalOpen(false);
+    setDeleteSuccessNotice(`${count} refleksi murid terpilih berhasil dihapus.`);
+    setTimeout(() => setDeleteSuccessNotice(null), 4000);
+  };
+
+  const handleToggleSelectReflection = (id: string) => {
+    setSelectedReflectionIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedReflectionIds.length === filteredReflections.length) {
+      setSelectedReflectionIds([]);
+    } else {
+      setSelectedReflectionIds(filteredReflections.map((r) => r.id));
+    }
+  };
 
   // Generate AI Summary
   const handleGenerateSummary = async () => {
@@ -636,47 +698,121 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
           {/* TAB 2: DATA REFLEKSI MURID */}
           {activeTab === 'reflections' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                    Daftar Refleksi Murid ({filteredReflections.length})
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Refleksi ditandai merah memerlukan perhatian / bimbingan khusus
-                  </p>
-                </div>
-                {onClearAllReflections && reflections.length > 0 && (
+              {/* Success Notification Banner */}
+              {deleteSuccessNotice && (
+                <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-xs rounded-2xl flex items-center justify-between shadow-lg animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">✅</span>
+                    <span className="font-semibold">{deleteSuccessNotice}</span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.confirm('Apakah Bapak/Ibu guru yakin ingin menghapus semua data refleksi murid?')) {
-                        onClearAllReflections();
-                      }
-                    }}
-                    className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 text-xs font-semibold transition"
+                    onClick={() => setDeleteSuccessNotice(null)}
+                    className="text-slate-400 hover:text-white px-2 py-0.5 rounded text-xs font-bold"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Kosongkan Semua Refleksi</span>
+                    ✕
                   </button>
-                )}
+                </div>
+              )}
+
+              {/* Batch Action Bar if items selected */}
+              {selectedReflectionIds.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 to-slate-900/90 border border-rose-600/50 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+                  <div className="flex items-center gap-2.5">
+                    <span className="px-3 py-1 rounded-full bg-rose-600 text-white font-extrabold text-xs shadow">
+                      {selectedReflectionIds.length} dipilih
+                    </span>
+                    <span className="text-xs text-slate-300">
+                      dari {filteredReflections.length} refleksi yang ditampilkan
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsBatchDeleteModalOpen(true)}
+                      className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-600/30 transition cursor-pointer active:scale-95"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus ({selectedReflectionIds.length}) Terpilih</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedReflectionIds([])}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition cursor-pointer"
+                    >
+                      Batal Pilih
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Header Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>Daftar Refleksi Murid ({filteredReflections.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Refleksi berbingkai merah menandakan siswa memerlukan bimbingan guru
+                  </p>
+                </div>
+
+                <div className="flex items-center flex-wrap gap-2">
+                  {filteredReflections.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleToggleSelectAll}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+                    >
+                      <span>
+                        {selectedReflectionIds.length === filteredReflections.length
+                          ? 'Batal Pilih Semua'
+                          : 'Pilih Semua'}
+                      </span>
+                    </button>
+                  )}
+
+                  {reflections.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsClearAllModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 hover:border-rose-600 text-xs font-semibold transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Kosongkan Semua Refleksi</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-3">
                 {filteredReflections.map((r) => {
                   const fb = feedbacks.find((f) => f.reflectionId === r.id);
                   const isAttention = fb?.perlu_perhatian_guru || r.scale <= 2;
+                  const isSelected = selectedReflectionIds.includes(r.id);
 
                   return (
                     <div
                       key={r.id}
-                      className={`p-4 rounded-2xl border transition ${
-                        isAttention
+                      className={`p-4 rounded-2xl border transition relative ${
+                        isSelected
+                          ? 'bg-rose-950/30 border-rose-500 shadow-md ring-1 ring-rose-500'
+                          : isAttention
                           ? 'bg-rose-950/20 border-rose-600/60 shadow-sm'
-                          : 'bg-slate-800/70 border-slate-700/70'
+                          : 'bg-slate-800/70 border-slate-700/70 hover:border-slate-600'
                       }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-700/50">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2.5">
+                          {/* Checkbox for batch select */}
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelectReflection(r.id)}
+                            className="w-4 h-4 rounded text-rose-600 bg-slate-900 border-slate-700 focus:ring-rose-500 cursor-pointer shrink-0"
+                            title="Pilih untuk hapus massal"
+                          />
+
                           <span className="font-extrabold text-sm text-white">{r.studentName}</span>
                           <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono">
                             {r.className}
@@ -688,26 +824,24 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-slate-400">
+
+                        <div className="flex items-center gap-2.5 text-xs text-slate-400">
                           <span>{r.createdAt}</span>
                           <span className="text-amber-400 font-mono font-bold">
                             {'★'.repeat(r.scale)} ({r.scale}/5)
                           </span>
                           <span>{r.moodEmoji}</span>
-                          {onDeleteReflection && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (window.confirm(`Hapus refleksi dari ${r.studentName}?`)) {
-                                  onDeleteReflection(r.id);
-                                }
-                              }}
-                              title="Hapus refleksi ini"
-                              className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+
+                          {/* Explicit In-App Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => setReflectionToDelete(r)}
+                            title={`Hapus refleksi dari ${r.studentName}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-950/50 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 hover:border-rose-500 text-xs font-semibold transition cursor-pointer active:scale-95 shadow-sm"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            <span>Hapus</span>
+                          </button>
                         </div>
                       </div>
 
@@ -1349,6 +1483,149 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
                 className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold cursor-pointer"
               >
                 Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL 1: HAPUS SATU REFLEKSI */}
+      {reflectionToDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-rose-500/50 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 text-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30 shrink-0">
+                <Trash2 className="w-6 h-6 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">Hapus Refleksi Murid?</h3>
+                <p className="text-xs text-slate-400">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Nama Murid:</span>
+                <span className="font-bold text-white">{reflectionToDelete.studentName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Kelas:</span>
+                <span className="font-mono text-slate-200">{reflectionToDelete.className}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Materi:</span>
+                <span className="font-medium text-indigo-300 text-right max-w-[200px] truncate">
+                  {reflectionToDelete.materiTitle || 'Refleksi'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Skala Bintang:</span>
+                <span className="text-amber-400 font-bold font-mono">
+                  {'★'.repeat(reflectionToDelete.scale)} ({reflectionToDelete.scale}/5)
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Refleksi ini akan dihapus dari daftar Ruang Guru dan tidak akan dimuat kembali meskipun tombol Tarik Data Spreadsheet ditekan.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setReflectionToDelete(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSingleDelete}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-lg shadow-rose-600/30 cursor-pointer transition active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Refleksi</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL 2: HAPUS REFLEKSI TERPILIH (BATCH DELETE) */}
+      {isBatchDeleteModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-rose-500/50 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 text-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30 shrink-0">
+                <Trash2 className="w-6 h-6 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">Hapus {selectedReflectionIds.length} Refleksi?</h3>
+                <p className="text-xs text-slate-400">Hapus massal beberapa data sekaligus</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800">
+              Bapak/Ibu guru akan menghapus <strong>{selectedReflectionIds.length} data refleksi murid</strong> yang telah dipilih. Seluruh data tersebut akan disisihkan dari tampilan Ruang Guru.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsBatchDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBatchDelete}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-lg shadow-rose-600/30 cursor-pointer transition active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus {selectedReflectionIds.length} Data</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL 3: KOSONGKAN SEMUA REFLEKSI */}
+      {isClearAllModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-rose-500/60 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 text-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-600/20 text-rose-400 flex items-center justify-center border border-rose-500/40 shrink-0">
+                <AlertTriangle className="w-6 h-6 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">Kosongkan Semua Refleksi?</h3>
+                <p className="text-xs text-rose-300">Peringatan: Seluruh data refleksi akan dihapus</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-800/60 space-y-2 text-xs text-rose-200">
+              <p className="font-bold">Apakah Bapak/Ibu guru yakin ingin menghapus SEMUA ({reflections.length}) data refleksi murid?</p>
+              <p className="text-slate-300">
+                Pastikan Anda telah mendownload <strong>Ekspor CSV Rekap</strong> terlebih dahulu jika masih memerlukan arsip nilai dan laporan.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsClearAllModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClearAll}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-red-700 to-rose-700 hover:from-red-600 hover:to-rose-600 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-lg shadow-red-700/30 cursor-pointer transition active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Kosongkan Semua Data</span>
               </button>
             </div>
           </div>

@@ -251,19 +251,23 @@ export default function App() {
     syncedFeedbacks: MentorFeedback[],
     syncedMessages: Message[]
   ) => {
+    const deletedIds = new Set(StorageService.getDeletedReflectionIds());
+    const validSyncedReflections = syncedReflections.filter((r) => !deletedIds.has(r.id));
+    const validSyncedFeedbacks = syncedFeedbacks.filter((f) => !deletedIds.has(f.reflectionId));
+
     // Merge reflections by ID
     const refMap = new Map<string, Reflection>();
-    syncedReflections.forEach((r) => refMap.set(r.id, r));
+    validSyncedReflections.forEach((r) => refMap.set(r.id, r));
     reflections.forEach((r) => {
-      if (!refMap.has(r.id)) refMap.set(r.id, r);
+      if (!refMap.has(r.id) && !deletedIds.has(r.id)) refMap.set(r.id, r);
     });
     const mergedReflections = Array.from(refMap.values());
 
     // Merge feedbacks
     const fbMap = new Map<string, MentorFeedback>();
-    syncedFeedbacks.forEach((f) => fbMap.set(f.id, f));
+    validSyncedFeedbacks.forEach((f) => fbMap.set(f.id, f));
     feedbacks.forEach((f) => {
-      if (!fbMap.has(f.id)) fbMap.set(f.id, f);
+      if (!fbMap.has(f.id) && !deletedIds.has(f.reflectionId)) fbMap.set(f.id, f);
     });
     const mergedFeedbacks = Array.from(fbMap.values());
 

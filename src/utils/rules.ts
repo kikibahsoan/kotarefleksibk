@@ -699,6 +699,27 @@ function doPost(e) {
         }
       }
       result.message = "Balasan guru berhasil diperbarui di Spreadsheet!";
+
+    } else if (action === 'delete_reflection') {
+      var delRefId = requestData.reflectionId;
+      var sheetR = ss.getSheetByName('Data_Refleksi_Siswa');
+      if (sheetR && sheetR.getLastRow() > 1 && delRefId) {
+        var rIds = sheetR.getRange(2, 2, sheetR.getLastRow() - 1, 1).getValues();
+        for (var d = 0; d < rIds.length; d++) {
+          if (String(rIds[d][0]).trim() === String(delRefId).trim()) {
+            sheetR.deleteRow(d + 2);
+            result.message = "Baris refleksi berhasil dihapus dari Spreadsheet!";
+            break;
+          }
+        }
+      }
+
+    } else if (action === 'clear_all_reflections') {
+      var sheetAll = ss.getSheetByName('Data_Refleksi_Siswa');
+      if (sheetAll && sheetAll.getLastRow() > 1) {
+        sheetAll.deleteRows(2, sheetAll.getLastRow() - 1);
+        result.message = "Seluruh baris refleksi berhasil dikosongkan dari Spreadsheet!";
+      }
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))
