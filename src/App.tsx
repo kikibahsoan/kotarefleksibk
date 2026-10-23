@@ -31,15 +31,8 @@ import { PasarPrestasiModal } from './components/modals/PasarPrestasiModal.tsx';
 import { RuangGuruModal } from './components/modals/RuangGuruModal.tsx';
 import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal.tsx';
 import {
-  Compass,
-  Lock,
   LogOut,
-  ChevronDown,
-  ChevronUp,
-  Award,
-  Layers,
   Sparkles,
-  School,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -59,7 +52,6 @@ export default function App() {
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [isTeacherPinModalOpen, setIsTeacherPinModalOpen] = useState(false);
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
-  const [isDockCollapsed, setIsDockCollapsed] = useState(false);
   const [preselectedMateriForReflection, setPreselectedMateriForReflection] = useState<string | undefined>(undefined);
   const [timeOfDay, setTimeOfDay] = useState<'day' | 'night' | 'auto'>('day');
 
@@ -382,179 +374,123 @@ export default function App() {
         activeBuilding={activeBuilding}
         newMateriBuildingIds={newMateriBuildingIds}
         studentName={student.name}
+        studentGender={student.gender}
         timeOfDay={timeOfDay}
       />
 
-      {/* TOP HEADER OVERLAY (Minimal, Non-obstructive) */}
-      <header className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-20">
-        {/* Left: Town title & Student Info */}
-        <div className="flex items-center gap-3 bg-slate-900/90 border border-slate-700/80 px-4 py-2 rounded-2xl shadow-lg pointer-events-auto">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white text-base shadow">
-            🏛️
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xs sm:text-sm text-white font-display">
-                {settings.townName || 'Kota Refleksi'}
+      {/* TOP HEADER OVERLAY (Hidden when inside building modals or 2D menu) - Liquid Glass */}
+      {!activeBuilding && !isQuickNavOpen && (
+        <header className="absolute top-4 sm:top-5 left-3 sm:left-4 right-3 sm:right-4 flex items-center justify-between pointer-events-none z-20 gap-2">
+          {/* Left: Kota Refleksi • Nama • Kelas • XP • Level */}
+          <div className="flex items-center gap-2 sm:gap-3 bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/25 px-3.5 py-2 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] pointer-events-auto max-w-[75vw] sm:max-w-none overflow-x-auto">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-base shadow-sm shrink-0">
+              🏛️
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs whitespace-nowrap">
+              <span className="font-extrabold text-white font-display text-xs sm:text-sm tracking-tight">
+                Kota Refleksi
               </span>
-              <span className="text-[10px] bg-blue-950 text-blue-300 px-2 py-0.5 rounded-full font-bold border border-blue-800">
-                SMK
+              <span className="text-slate-400 font-bold">•</span>
+              <span className="font-bold text-slate-100 max-w-[120px] sm:max-w-[200px] truncate" title={student.name}>
+                {student.name}
+              </span>
+              <span className="text-slate-400 font-bold">•</span>
+              <span className="px-2 py-0.5 rounded-lg bg-blue-900/60 text-blue-200 font-bold border border-blue-400/40 text-[11px] backdrop-blur-sm">
+                {student.className}
+              </span>
+              <span className="text-slate-400 font-bold">•</span>
+              <span className="px-2 py-0.5 rounded-lg bg-amber-900/60 text-amber-200 font-bold border border-amber-400/40 text-[11px] flex items-center gap-1 backdrop-blur-sm">
+                ⭐ {student.points} XP
+              </span>
+              <span className="text-slate-400 font-bold hidden md:inline">•</span>
+              <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-lg bg-emerald-900/60 text-emerald-200 font-bold border border-emerald-400/40 text-[11px] backdrop-blur-sm">
+                Lv. {levelInfo.level} ({levelInfo.title})
               </span>
             </div>
-            <p className="text-[11px] text-slate-300 font-medium">
-              {student.name} <span className="text-slate-500">•</span> {student.className.split(' ')[0]}
-            </p>
           </div>
-        </div>
 
-        {/* Right: Day/Night, Quick Nav 2D, Teacher Room, Logout */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {/* Day / Night Cycle Button */}
-          <button
-            onClick={() => {
-              if (timeOfDay === 'day') setTimeOfDay('night');
-              else if (timeOfDay === 'night') setTimeOfDay('auto');
-              else setTimeOfDay('day');
-            }}
-            className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 px-3 py-2 rounded-2xl shadow-lg text-xs font-bold flex items-center gap-1.5 transition"
-            title="Ganti Waktu Kota: Siang / Malam / Otomatis (Pergantian Siklus)"
-          >
-            {timeOfDay === 'day' && (
-              <>
-                <Sun className="w-4 h-4 text-amber-400" />
-                <span className="hidden sm:inline">Siang</span>
-              </>
-            )}
-            {timeOfDay === 'night' && (
-              <>
-                <Moon className="w-4 h-4 text-indigo-300" />
-                <span className="hidden sm:inline">Malam</span>
-              </>
-            )}
-            {timeOfDay === 'auto' && (
-              <>
-                <Sparkles className="w-4 h-4 text-cyan-400" />
-                <span className="hidden sm:inline">Auto</span>
-              </>
-            )}
-          </button>
-
-          {/* Quick Nav 2D button */}
-          <button
-            onClick={() => setIsQuickNavOpen(true)}
-            className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 px-3 py-2 rounded-2xl shadow-lg text-xs font-bold flex items-center gap-1.5 transition"
-            title="Buka daftar 2D semua bangunan"
-          >
-            <Layers className="w-4 h-4 text-sky-400" />
-            <span className="hidden sm:inline">Menu Cepat 2D</span>
-          </button>
-
-          {/* Teacher Room */}
-          <button
-            onClick={() => setIsTeacherPinModalOpen(true)}
-            className="bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-slate-700/80 px-3 py-2 rounded-2xl shadow-lg text-xs font-bold flex items-center gap-1.5 transition"
-            title="Masuk ke Ruang Guru (PIN)"
-          >
-            <Lock className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Ruang Guru</span>
-          </button>
-
-          {/* Logout / Switch User */}
-          <button
-            onClick={handleLogout}
-            className="bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-red-400 border border-slate-700/80 p-2 sm:px-3 sm:py-2 rounded-2xl shadow-lg text-xs font-bold flex items-center gap-1.5 transition"
-            title="Keluar / Ganti Siswa"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Ganti Siswa</span>
-          </button>
-        </div>
-      </header>
-
-      {/* UNIFIED COLLAPSIBLE BOTTOM DOCK (Per Three.js skill layout directive) */}
-      <footer
-        className={`absolute left-1/2 -translate-x-1/2 z-20 transition-all duration-300 flex flex-col items-center pointer-events-auto max-w-[96vw] ${
-          isDockCollapsed ? 'bottom-2' : 'bottom-5'
-        }`}
-      >
-        {/* Collapse / Expand Toggle Button */}
-        <button
-          onClick={() => setIsDockCollapsed(!isDockCollapsed)}
-          className="mb-1.5 px-3 py-1 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 text-[11px] font-bold flex items-center gap-1 shadow-md transition"
-        >
-          {isDockCollapsed ? (
-            <>
-              <ChevronUp className="w-3.5 h-3.5 text-sky-400" />
-              <span>Tampilkan Menu Gedung Kota</span>
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              <span>Sembunyikan Menu</span>
-            </>
-          )}
-        </button>
-
-        {/* Horizontal Glassmorphic Dock */}
-        {!isDockCollapsed && (
-          <div className="bg-slate-900/95 border border-slate-700/80 rounded-3xl p-2 sm:p-2.5 shadow-2xl flex items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full">
-            {/* Student Points Pill */}
+          {/* Right: ONLY Siang/Malam and Keluar - Liquid Glass */}
+          <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
+            {/* Day / Night Cycle Button */}
             <button
-              onClick={() => setActiveBuilding('pasar_prestasi')}
-              className="px-3 py-2 rounded-2xl bg-gradient-to-r from-cyan-950 to-blue-950 border border-cyan-700/50 flex items-center gap-2 text-left shrink-0 hover:border-cyan-500 transition"
-              title="Lihat Poin dan Lencana"
+              onClick={() => {
+                if (timeOfDay === 'day') setTimeOfDay('night');
+                else if (timeOfDay === 'night') setTimeOfDay('auto');
+                else setTimeOfDay('day');
+              }}
+              className="bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl backdrop-saturate-150 text-slate-100 border border-white/25 hover:border-white/50 px-3 py-2 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+              title="Ganti Waktu Kota: Siang / Malam / Otomatis"
             >
-              <div className="w-7 h-7 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold">
-                {levelInfo.level}
-              </div>
-              <div className="hidden sm:block">
-                <span className="text-[10px] text-cyan-300 block font-bold leading-none">
-                  {student.points} XP
-                </span>
-                <span className="text-[11px] text-white font-extrabold leading-tight">
-                  {levelInfo.title}
-                </span>
-              </div>
+              {timeOfDay === 'day' && (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="hidden sm:inline">Siang</span>
+                </>
+              )}
+              {timeOfDay === 'night' && (
+                <>
+                  <Moon className="w-4 h-4 text-indigo-300" />
+                  <span className="hidden sm:inline">Malam</span>
+                </>
+              )}
+              {timeOfDay === 'auto' && (
+                <>
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  <span className="hidden sm:inline">Auto</span>
+                </>
+              )}
             </button>
 
-            <div className="w-px h-7 bg-slate-800 shrink-0 mx-1" />
-
-            {/* Quick Icon Buttons for 7 Buildings */}
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-              {BUILDINGS_INFO.map((b) => {
-                const hasNew = newMateriBuildingIds.includes(b.id);
-                const icons: Record<BuildingId, string> = {
-                  balai_kota: '🏛️',
-                  perpustakaan: '📚',
-                  taman_refleksi: '🌸',
-                  menara_mentor: '🔭',
-                  bengkel_latihan: '🛠️',
-                  kantor_pos: '📮',
-                  pasar_prestasi: '🎪',
-                  monumen_warga: '🌸',
-                };
-
-                return (
-                  <button
-                    key={b.id}
-                    onClick={() => setActiveBuilding(b.id)}
-                    className="relative p-2 sm:px-3 sm:py-2 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 hover:border-slate-500 flex items-center gap-1.5 text-xs font-bold text-slate-200 transition group"
-                    title={`${b.name} - ${b.tagline}`}
-                  >
-                    <span className="text-base group-hover:scale-110 transition transform">
-                      {icons[b.id]}
-                    </span>
-                    <span className="hidden md:inline">{b.name}</span>
-                    {hasNew && (
-                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-slate-900" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Logout / Switch User */}
+            <button
+              onClick={handleLogout}
+              className="bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl backdrop-saturate-150 hover:from-red-900/40 text-slate-200 hover:text-red-300 border border-white/25 hover:border-red-400/50 px-3 py-2 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+              title="Keluar / Ganti Siswa"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Keluar</span>
+            </button>
           </div>
-        )}
-      </footer>
+        </header>
+      )}
+
+      {/* BOTTOM DOCK - ICON ONLY MENU - Liquid Glass */}
+      {!activeBuilding && !isQuickNavOpen && (
+        <footer className="absolute bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center pointer-events-auto max-w-[96vw]">
+          <div className="bg-gradient-to-b from-white/25 via-slate-900/75 to-slate-950/90 backdrop-blur-2xl backdrop-saturate-150 border border-white/25 rounded-full px-2.5 sm:px-3.5 py-2 sm:py-2.5 shadow-[0_16px_48px_0_rgba(0,0,0,0.55),inset_0_1px_1px_0_rgba(255,255,255,0.25)] flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto">
+            {BUILDINGS_INFO.map((b) => {
+              const hasNew = newMateriBuildingIds.includes(b.id);
+              const icons: Record<BuildingId, string> = {
+                balai_kota: '🏛️',
+                perpustakaan: '📚',
+                taman_refleksi: '🌸',
+                menara_mentor: '🔭',
+                bengkel_latihan: '🛠️',
+                kantor_pos: '📮',
+                pasar_prestasi: '🎪',
+                monumen_warga: '💬',
+              };
+
+              return (
+                <button
+                  key={b.id}
+                  onClick={() => setActiveBuilding(b.id)}
+                  className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 hover:border-white/45 flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-sm group shrink-0"
+                  title={`${b.name} — ${b.tagline}`}
+                  aria-label={b.name}
+                >
+                  <span className="text-lg sm:text-xl select-none transition-transform group-hover:scale-110">
+                    {icons[b.id]}
+                  </span>
+                  {hasNew && (
+                    <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-amber-400 rounded-full border-2 border-slate-900 animate-pulse" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </footer>
+      )}
 
       {/* BUILDING MODALS */}
       {activeBuilding === 'balai_kota' && (

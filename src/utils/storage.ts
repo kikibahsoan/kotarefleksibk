@@ -288,19 +288,28 @@ export const StorageService = {
     this.setMessages(items);
   },
 
-  // Monumen Warga 24-Hour Purge Helper: removes messages older than 24 hours (86,400,000 ms)
+  // Monumen Warga 24-Hour Purge & Max 25 Messages Helper:
+  // Removes messages older than 24 hours and strictly keeps only the latest 25 messages
   purgeExpiredPublicChats(items: PublicChatMessage[]): PublicChatMessage[] {
     const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    const MAX_CHATS = 25;
     const cutoff = Date.now() - TWENTY_FOUR_HOURS;
-    return (items || []).filter((m) => {
-      const time = new Date(m.createdAt).getTime();
-      return !isNaN(time) && time >= cutoff && !m.isReported;
-    });
+    return (items || [])
+      .filter((m) => {
+        const time = new Date(m.createdAt).getTime();
+        return !isNaN(time) && time >= cutoff && !m.isReported;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, MAX_CHATS);
   },
 
   getPublicChatMessages(): PublicChatMessage[] {
     const raw = safeGet<PublicChatMessage[]>(STORAGE_KEYS.PUBLIC_CHAT, INITIAL_PUBLIC_CHAT);
-    const cleaned = this.purgeExpiredPublicChats(raw);
+    const map = new Map<string, PublicChatMessage>();
+    (raw || []).forEach((m) => {
+      if (m && m.id) map.set(m.id, m);
+    });
+    const cleaned = this.purgeExpiredPublicChats(Array.from(map.values()));
     if (cleaned.length !== raw.length) {
       safeSet(STORAGE_KEYS.PUBLIC_CHAT, cleaned);
     }
@@ -308,7 +317,11 @@ export const StorageService = {
   },
 
   setPublicChatMessages(items: PublicChatMessage[]): void {
-    const cleaned = this.purgeExpiredPublicChats(items);
+    const map = new Map<string, PublicChatMessage>();
+    (items || []).forEach((m) => {
+      if (m && m.id) map.set(m.id, m);
+    });
+    const cleaned = this.purgeExpiredPublicChats(Array.from(map.values()));
     safeSet(STORAGE_KEYS.PUBLIC_CHAT, cleaned);
     try {
       window.dispatchEvent(new CustomEvent('kota_refleksi_public_chat_updated', { detail: cleaned }));
@@ -328,7 +341,9 @@ export const StorageService = {
       if (response.ok) {
         const result = await response.json();
         if (result.success && Array.isArray(result.data)) {
-          result.data.forEach((m: PublicChatMessage) => msgMap.set(m.id, m));
+          result.data.forEach((m: PublicChatMessage) => {
+            if (m && m.id) msgMap.set(m.id, m);
+          });
         }
       }
     } catch (err) {
@@ -339,7 +354,9 @@ export const StorageService = {
     try {
       const gasResult = await this.fetchFromGAS();
       if (gasResult && gasResult.success && Array.isArray(gasResult.chats)) {
-        gasResult.chats.forEach((m: PublicChatMessage) => msgMap.set(m.id, m));
+        gasResult.chats.forEach((m: PublicChatMessage) => {
+          if (m && m.id) msgMap.set(m.id, m);
+        });
       }
     } catch (err) {
       // Safe fallback
@@ -352,8 +369,14 @@ export const StorageService = {
 
   async addPublicChatMessage(msg: PublicChatMessage): Promise<void> {
     const items = this.getPublicChatMessages();
-    const updated = [msg, ...items];
-    const cleaned = this.purgeExpiredPublicChats(updated);
+    const map = new Map<string, PublicChatMessage>();
+    map.set(msg.id, msg);
+    items.forEach((m) => {
+      if (m && m.id && !map.has(m.id)) {
+        map.set(m.id, m);
+      }
+    });
+    const cleaned = this.purgeExpiredPublicChats(Array.from(map.values()));
     this.setPublicChatMessages(cleaned);
 
     // Broadcast to server API so other students immediately receive it

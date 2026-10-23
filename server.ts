@@ -316,27 +316,32 @@ let serverChatMessages: ServerPublicChatMessage[] = [
   },
 ];
 
-// Automatically purge messages older than 24 hours (86,400,000 ms)
+const MAX_SERVER_CHAT_MESSAGES = 25;
+
+// Automatically purge messages older than 24 hours and keep at most 25 newest messages
 function purgeExpiredServerChats() {
   const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
   const cutoffTime = Date.now() - TWENTY_FOUR_HOURS;
-  serverChatMessages = serverChatMessages.filter((msg) => {
-    const time = new Date(msg.createdAt).getTime();
-    return !isNaN(time) && time >= cutoffTime && !msg.isReported;
-  });
+  serverChatMessages = serverChatMessages
+    .filter((msg) => {
+      const time = new Date(msg.createdAt).getTime();
+      return !isNaN(time) && time >= cutoffTime && !msg.isReported;
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, MAX_SERVER_CHAT_MESSAGES);
 }
 
-// Get chats (filtered by 24-hour expiration)
+// Get chats (filtered by 24-hour expiration and max 25 messages)
 app.get('/api/chat/messages', (_req, res) => {
   purgeExpiredServerChats();
   const room = _req.query.roomNumber ? Number(_req.query.roomNumber) : undefined;
   const filtered = room
     ? serverChatMessages.filter((m) => m.roomNumber === room)
     : serverChatMessages;
-  res.json({ success: true, data: filtered, ttlHours: 24 });
+  res.json({ success: true, data: filtered.slice(0, MAX_SERVER_CHAT_MESSAGES), ttlHours: 24, maxLimit: MAX_SERVER_CHAT_MESSAGES });
 });
 
-// Post chat message (shared with all students)
+// Post chat message (shared with all students, keeping only latest 25 messages)
 app.post('/api/chat/messages', (req, res) => {
   purgeExpiredServerChats();
   const { senderId, senderName, senderHandle, className, roomNumber, content, avatarColor } = req.body;
@@ -364,7 +369,11 @@ app.post('/api/chat/messages', (req, res) => {
   };
 
   serverChatMessages.unshift(newChat);
-  res.json({ success: true, data: newChat, ttlHours: 24 });
+  // Strictly enforce max 25 messages
+  if (serverChatMessages.length > MAX_SERVER_CHAT_MESSAGES) {
+    serverChatMessages = serverChatMessages.slice(0, MAX_SERVER_CHAT_MESSAGES);
+  }
+  res.json({ success: true, data: newChat, ttlHours: 24, maxLimit: MAX_SERVER_CHAT_MESSAGES });
 });
 
 // Report chat message

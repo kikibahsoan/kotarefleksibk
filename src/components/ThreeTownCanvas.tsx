@@ -7,6 +7,7 @@ interface ThreeTownCanvasProps {
   activeBuilding: BuildingId | null;
   newMateriBuildingIds: BuildingId[];
   studentName?: string;
+  studentGender?: string;
   timeOfDay?: 'day' | 'night' | 'auto';
 }
 
@@ -33,6 +34,8 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
   onSelectBuilding,
   activeBuilding,
   newMateriBuildingIds,
+  studentName,
+  studentGender,
   timeOfDay = 'day',
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -765,44 +768,118 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       buildingMeshes.push({ id: b.id, group: bGroup, beacon });
     });
 
-    // 3D STUDENT AVATAR
+    // 3D STUDENT AVATAR - Distinct Models for Male ('L') and Female ('P')
     const avatarGroup = new THREE.Group();
     avatarGroup.position.set(0, 0, 3.5);
 
-    // Avatar parts
+    const isFemale = studentGender === 'P';
+
+    // Skin & Materials
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xfbcfe8, roughness: 0.8 });
     const hairMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
-    const shirtMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.7 });
-    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.8 });
-    const bagMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.6 });
+    const shirtMat = new THREE.MeshStandardMaterial({
+      color: isFemale ? 0x0284c7 : 0x2563eb, // DKV cyan-blue for female, vibrant royal blue for male
+      roughness: 0.7,
+    });
+    const bottomMat = new THREE.MeshStandardMaterial({
+      color: 0x1e1b4b, // Deep navy school skirt / trousers
+      roughness: 0.85,
+    });
+    const bagMat = new THREE.MeshStandardMaterial({
+      color: isFemale ? 0xf43f5e : 0xf59e0b, // Rose pink sling bag for female, amber backpack for male
+      roughness: 0.6,
+    });
+    const hijabMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc, // Clean white veil/hijab
+      roughness: 0.65,
+    });
+    const ribbonMat = new THREE.MeshStandardMaterial({
+      color: 0xec4899,
+      roughness: 0.5,
+    });
 
-    // Head & Hair
+    // Head
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), skinMat);
     head.position.y = 1.7;
     head.castShadow = !isHeadless;
     avatarGroup.add(head);
 
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2), hairMat);
-    hair.position.y = 1.82;
-    avatarGroup.add(hair);
+    if (isFemale) {
+      // --- PEREMPUAN: Stylized Hijab & School Skirt ---
+      // Hijab crown covering upper head
+      const hijabCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.42, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.75),
+        hijabMat
+      );
+      hijabCap.position.y = 1.75;
+      hijabCap.castShadow = !isHeadless;
+      avatarGroup.add(hijabCap);
 
-    // Torso
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.75, 12), shirtMat);
-    torso.position.y = 1.1;
-    torso.castShadow = !isHeadless;
-    avatarGroup.add(torso);
+      // Hijab cowl/drape covering neck & shoulders
+      const hijabDrape = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.36, 0.48, 0.46, 16),
+        hijabMat
+      );
+      hijabDrape.position.y = 1.45;
+      hijabDrape.castShadow = !isHeadless;
+      avatarGroup.add(hijabDrape);
 
-    // Backpack
-    const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.25), bagMat);
-    backpack.position.set(0, 1.1, -0.32);
-    avatarGroup.add(backpack);
+      // Brooch pin on veil
+      const brooch = new THREE.Mesh(new THREE.DodecahedronGeometry(0.08), ribbonMat);
+      brooch.position.set(0.34, 1.72, 0.2);
+      avatarGroup.add(brooch);
+
+      // Torso - Feminine blouse
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.33, 0.75, 12), shirtMat);
+      torso.position.y = 1.1;
+      torso.castShadow = !isHeadless;
+      avatarGroup.add(torso);
+
+      // Skirt (Rok Panjang Sekolah)
+      const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.44, 0.65, 14), bottomMat);
+      skirt.position.y = 0.55;
+      skirt.castShadow = !isHeadless;
+      avatarGroup.add(skirt);
+
+      // Side Sling Bag (Tas Selempang)
+      const slingBag = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.38, 0.16), bagMat);
+      slingBag.position.set(0.34, 0.88, 0);
+      slingBag.rotation.z = -0.15;
+      avatarGroup.add(slingBag);
+
+      // Strap across chest
+      const strap = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.03, 6, 16), bagMat);
+      strap.rotation.x = Math.PI / 3;
+      strap.rotation.y = 0.5;
+      strap.position.set(0, 1.15, 0);
+      avatarGroup.add(strap);
+    } else {
+      // --- LAKI-LAKI: Cropped Hair, Polo Shirt & Backpack ---
+      const hair = new THREE.Mesh(
+        new THREE.SphereGeometry(0.4, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+        hairMat
+      );
+      hair.position.y = 1.82;
+      avatarGroup.add(hair);
+
+      // Torso - Broader shoulders
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.36, 0.75, 12), shirtMat);
+      torso.position.y = 1.1;
+      torso.castShadow = !isHeadless;
+      avatarGroup.add(torso);
+
+      // Backpack
+      const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.25), bagMat);
+      backpack.position.set(0, 1.1, -0.32);
+      avatarGroup.add(backpack);
+    }
 
     // Legs
-    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.7, 8), pantsMat);
+    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.7, 8), bottomMat);
     leftLeg.position.set(-0.16, 0.4, 0);
     avatarGroup.add(leftLeg);
 
-    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.7, 8), pantsMat);
+    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.7, 8), bottomMat);
     rightLeg.position.set(0.16, 0.4, 0);
     avatarGroup.add(rightLeg);
 
@@ -815,6 +892,145 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     avatarGroup.add(avatarShadow);
 
     scene.add(avatarGroup);
+
+    // ---------------------------------------------------------
+    // RANDOM WANDERING CITIZENS / CLASSMATES ("Orang-orang Bergerak Random")
+    // ---------------------------------------------------------
+    interface WanderingStudent {
+      group: THREE.Group;
+      leftLeg: THREE.Mesh;
+      rightLeg: THREE.Mesh;
+      targetPos: THREE.Vector3;
+      speed: number;
+      pauseTimer: number;
+      isPaused: boolean;
+      cycleOffset: number;
+    }
+
+    const wanderingStudents: WanderingStudent[] = [];
+
+    // Helper to generate a random walkable target on town paths and plazas
+    const getNextWalkTarget = (): THREE.Vector3 => {
+      const zone = Math.floor(Math.random() * 5);
+      let tx = 0;
+      let tz = 0;
+      if (zone === 0) {
+        // Plaza around Monument
+        const angle = Math.random() * Math.PI * 2;
+        const rad = 2.2 + Math.random() * 3.8;
+        tx = Math.cos(angle) * rad;
+        tz = Math.sin(angle) * rad;
+      } else if (zone === 1) {
+        // East walkways towards Bengkel & Kantor Pos
+        tx = 5 + Math.random() * 6;
+        tz = -6 + Math.random() * 12;
+      } else if (zone === 2) {
+        // West walkways towards Perpustakaan & Taman Refleksi
+        tx = -11 + Math.random() * 6;
+        tz = -6 + Math.random() * 12;
+      } else if (zone === 3) {
+        // North avenue towards Balai Kota
+        tx = -4 + Math.random() * 8;
+        tz = -11 + Math.random() * 5;
+      } else {
+        // South walkway towards Menara Mentor
+        tx = -4 + Math.random() * 8;
+        tz = 5 + Math.random() * 6;
+      }
+      return new THREE.Vector3(tx, 0, tz);
+    };
+
+    const npcConfigs = [
+      { isFemale: true, shirtColor: 0x06b6d4, x: -3.2, z: 2.2, speed: 1.4 },
+      { isFemale: false, shirtColor: 0xf59e0b, x: 4.2, z: -3.0, speed: 1.7 },
+      { isFemale: true, shirtColor: 0xec4899, x: -6.0, z: -2.5, speed: 1.3 },
+      { isFemale: false, shirtColor: 0x3b82f6, x: 5.5, z: 3.2, speed: 1.6 },
+      { isFemale: true, shirtColor: 0xa855f7, x: 2.0, z: -6.2, speed: 1.5 },
+      { isFemale: false, shirtColor: 0x10b981, x: -4.2, z: 5.2, speed: 1.8 },
+    ];
+
+    npcConfigs.forEach((cfg, idx) => {
+      const npcGroup = new THREE.Group();
+      npcGroup.position.set(cfg.x, 0, cfg.z);
+
+      const npcShirtMat = new THREE.MeshStandardMaterial({ color: cfg.shirtColor, roughness: 0.7 });
+
+      // Head
+      const npcHead = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 12), skinMat);
+      npcHead.position.y = 1.55;
+      npcHead.castShadow = !isHeadless;
+      npcGroup.add(npcHead);
+
+      if (cfg.isFemale) {
+        // Hijab
+        const npcHijab = new THREE.Mesh(
+          new THREE.SphereGeometry(0.36, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.78),
+          hijabMat
+        );
+        npcHijab.position.y = 1.58;
+        npcGroup.add(npcHijab);
+
+        const npcCowl = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.36, 12), hijabMat);
+        npcCowl.position.y = 1.32;
+        npcGroup.add(npcCowl);
+
+        // Blouse
+        const npcTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.29, 0.62, 10), npcShirtMat);
+        npcTorso.position.y = 1.02;
+        npcGroup.add(npcTorso);
+
+        // Skirt
+        const npcSkirt = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.37, 0.52, 12), bottomMat);
+        npcSkirt.position.y = 0.5;
+        npcGroup.add(npcSkirt);
+      } else {
+        // Boy hair
+        const npcHair = new THREE.Mesh(
+          new THREE.SphereGeometry(0.34, 10, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+          hairMat
+        );
+        npcHair.position.y = 1.64;
+        npcGroup.add(npcHair);
+
+        // Torso
+        const npcTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.31, 0.65, 10), npcShirtMat);
+        npcTorso.position.y = 1.02;
+        npcGroup.add(npcTorso);
+
+        // Backpack
+        const npcBag = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.2), bagMat);
+        npcBag.position.set(0, 1.02, -0.25);
+        npcGroup.add(npcBag);
+      }
+
+      // Legs
+      const npcLeftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.58, 6), bottomMat);
+      npcLeftLeg.position.set(-0.12, 0.32, 0);
+      npcGroup.add(npcLeftLeg);
+
+      const npcRightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.58, 6), bottomMat);
+      npcRightLeg.position.set(0.12, 0.32, 0);
+      npcGroup.add(npcRightLeg);
+
+      // Shadow
+      const npcShadow = new THREE.Mesh(shadowGeo, shadowMat);
+      npcShadow.rotation.x = -Math.PI / 2;
+      npcShadow.position.y = 0.02;
+      npcGroup.add(npcShadow);
+
+      scene.add(npcGroup);
+
+      wanderingStudents.push({
+        group: npcGroup,
+        leftLeg: npcLeftLeg,
+        rightLeg: npcRightLeg,
+        targetPos: getNextWalkTarget(),
+        speed: cfg.speed,
+        pauseTimer: Math.random() * 2,
+        isPaused: false,
+        cycleOffset: idx * 1.5,
+      });
+    });
 
     // Click / Target Navigation State
     let targetPos = new THREE.Vector3(0, 0, 3.5);
@@ -1027,6 +1243,44 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
         }
       }
 
+      // Animate Wandering Citizens / Students moving randomly around town
+      wanderingStudents.forEach((ws) => {
+        if (ws.isPaused) {
+          ws.pauseTimer -= delta;
+          ws.leftLeg.rotation.x = THREE.MathUtils.damp(ws.leftLeg.rotation.x, 0, 8, delta);
+          ws.rightLeg.rotation.x = THREE.MathUtils.damp(ws.rightLeg.rotation.x, 0, 8, delta);
+          ws.group.position.y = THREE.MathUtils.damp(ws.group.position.y, 0, 8, delta);
+          // Look around subtly while paused
+          ws.group.rotation.y += Math.sin(elapsedTime * 0.8 + ws.cycleOffset) * 0.003;
+          if (ws.pauseTimer <= 0) {
+            ws.isPaused = false;
+            ws.targetPos = getNextWalkTarget();
+          }
+        } else {
+          const pos = ws.group.position;
+          const dist = pos.distanceTo(ws.targetPos);
+          if (dist > 0.35) {
+            const angle = Math.atan2(ws.targetPos.x - pos.x, ws.targetPos.z - pos.z);
+            ws.group.rotation.y = THREE.MathUtils.damp(ws.group.rotation.y, angle, 6, delta);
+
+            // Move step
+            const moveStep = Math.min(dist, ws.speed * delta);
+            pos.x += Math.sin(angle) * moveStep;
+            pos.z += Math.cos(angle) * moveStep;
+
+            // Leg swing & subtle walking bob
+            const legSwing = Math.sin(elapsedTime * 11 + ws.cycleOffset) * 0.45;
+            ws.leftLeg.rotation.x = legSwing;
+            ws.rightLeg.rotation.x = -legSwing;
+            ws.group.position.y = Math.abs(Math.sin(elapsedTime * 11 + ws.cycleOffset)) * 0.05;
+          } else {
+            // Reached target -> pause and look around
+            ws.isPaused = true;
+            ws.pauseTimer = 2.0 + Math.random() * 3.5;
+          }
+        }
+      });
+
       // Smooth camera focus when visiting Monumen Warga gathering
       if (activeBuildingRef.current === 'monumen_warga') {
         camera.position.x = THREE.MathUtils.damp(camera.position.x, 0, 3.5, delta);
@@ -1109,31 +1363,38 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       {/* 3D WebGL Canvas Mount Container */}
       <div ref={mountRef} className="w-full h-full" />
 
-      {/* Hover Info Badge */}
+      {/* Hover Info Badge - Positioned neatly directly ABOVE bottom dock with Liquid Glass styling */}
       {hoveredBuilding && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none z-10">
-          <div className="bg-slate-900/90 text-white px-5 py-2.5 rounded-2xl shadow-xl border border-slate-700/60 flex items-center gap-3">
+        <div className="absolute bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 pointer-events-none z-30 animate-fade-in-up max-w-[94vw]">
+          <div className="bg-gradient-to-b from-white/25 via-slate-900/80 to-slate-950/95 backdrop-blur-2xl backdrop-saturate-150 text-white px-4 sm:px-5 py-2.5 rounded-2xl shadow-[0_16px_48px_0_rgba(0,0,0,0.55),inset_0_1px_1px_0_rgba(255,255,255,0.25)] border border-white/25 flex items-center gap-3">
             <span
-              className="w-3.5 h-3.5 rounded-full inline-block"
-              style={{ backgroundColor: '#' + hoveredBuilding.color.toString(16).padStart(6, '0') }}
+              className="w-3.5 h-3.5 rounded-full inline-block shadow-[0_0_10px_currentColor] shrink-0"
+              style={{
+                backgroundColor: '#' + hoveredBuilding.color.toString(16).padStart(6, '0'),
+                color: '#' + hoveredBuilding.color.toString(16).padStart(6, '0'),
+              }}
             />
-            <div>
-              <p className="font-bold text-sm leading-tight text-white">{hoveredBuilding.name}</p>
-              <p className="text-xs text-slate-300 font-medium">{hoveredBuilding.tagline}</p>
+            <div className="min-w-0">
+              <p className="font-extrabold text-xs sm:text-sm leading-tight text-white truncate">
+                {hoveredBuilding.name}
+              </p>
+              <p className="text-[11px] sm:text-xs text-slate-300 font-medium truncate">
+                {hoveredBuilding.tagline}
+              </p>
             </div>
-            <span className="text-[11px] bg-white/20 px-2 py-0.5 rounded text-white font-mono">
+            <span className="text-[10px] sm:text-[11px] bg-white/15 px-2.5 py-1 rounded-full text-white font-mono border border-white/20 shadow-sm ml-1 shrink-0 whitespace-nowrap">
               Ketuk untuk masuk
             </span>
           </div>
         </div>
       )}
 
-      {/* Walking Status Badge */}
+      {/* Walking Status Badge - Elevated above hover popup */}
       {isWalking && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 pointer-events-none z-10">
-          <div className="bg-slate-900/80 text-white text-xs px-4 py-1.5 rounded-full shadow border border-slate-700/50 flex items-center gap-2">
-            <span>🏃</span>
-            <span>Murid sedang berjalan...</span>
+        <div className="absolute bottom-36 left-1/2 -translate-x-1/2 pointer-events-none z-30 animate-fade-in-up">
+          <div className="bg-gradient-to-b from-white/20 via-slate-900/80 to-slate-950/90 backdrop-blur-xl text-white text-xs px-4 py-1.5 rounded-full shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.2)] border border-white/25 flex items-center gap-2">
+            <span className="animate-bounce">🏃</span>
+            <span className="font-semibold text-emerald-300">Murid sedang berjalan...</span>
           </div>
         </div>
       )}

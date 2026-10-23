@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Student, PublicChatMessage } from '../../types/index.ts';
 import { StorageService } from '../../utils/storage.ts';
 import {
@@ -108,13 +108,33 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
     const loadMessages = async () => {
       // 1. Instantly read local messages (cleaned of expired >24h)
       const local = StorageService.getPublicChatMessages();
-      if (isMounted) setMessages(local);
+      if (isMounted) {
+        setMessages((prev) => {
+          const map = new Map<string, PublicChatMessage>();
+          (local || []).forEach((m) => {
+            if (m && m.id) map.set(m.id, m);
+          });
+          (prev || []).forEach((m) => {
+            if (m && m.id && !map.has(m.id)) map.set(m.id, m);
+          });
+          return Array.from(map.values());
+        });
+      }
 
       // 2. Fetch shared messages from server API & Google Apps Script
       try {
         const shared = await StorageService.fetchPublicChatMessages();
         if (isMounted && shared && shared.length > 0) {
-          setMessages(shared);
+          setMessages((prev) => {
+            const map = new Map<string, PublicChatMessage>();
+            (shared || []).forEach((m) => {
+              if (m && m.id) map.set(m.id, m);
+            });
+            (prev || []).forEach((m) => {
+              if (m && m.id && !map.has(m.id)) map.set(m.id, m);
+            });
+            return Array.from(map.values());
+          });
         }
       } catch (err) {
         // safe fallback
@@ -150,10 +170,18 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
     };
   }, [isSoundOn, isAutoSyncOn]);
 
-  // Filter messages for current room
-  const currentRoomMessages = messages
-    .filter((m) => m.roomNumber === activeRoom && !m.isReported)
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  // Filter messages for current room and deduplicate strictly by ID
+  const currentRoomMessages = useMemo(() => {
+    const map = new Map<string, PublicChatMessage>();
+    (messages || []).forEach((m) => {
+      if (m && m.id && m.roomNumber === activeRoom && !m.isReported) {
+        map.set(m.id, m);
+      }
+    });
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  }, [messages, activeRoom]);
 
   // Auto scroll to bottom when messages update
   useEffect(() => {
@@ -220,7 +248,7 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
     };
 
     StorageService.addPublicChatMessage(newMsg);
-    setMessages((prev) => [newMsg, ...prev]);
+    setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [newMsg, ...prev]));
     setInputText('');
     playChimeAudio(isSoundOn);
     setTimeout(scrollToBottom, 60);
@@ -238,32 +266,32 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
   const latestMessage = currentRoomMessages[currentRoomMessages.length - 1];
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col pointer-events-none select-none">
+    <div className="fixed inset-0 z-40 flex flex-col justify-between pointer-events-none select-none overflow-hidden">
       {/* =========================================================================
-          TOP BAR OVERLAY (Exact match to reference screenshot)
-          ←  [🌸 Monumen Warga • Ruang 1 • 14 pengunjung • 15 warga]  [1 (25)] [2 (21)] [3 (14)]  🔊
+          TOP BAR OVERLAY - Liquid Glass Design
+          ←  [🌸 Monumen Warga • Khusus X DKV 2 ...]  [X DKV 2 (Ruang Saya)]  [Tarik]  🔊
          ========================================================================= */}
-      <div className="p-3 sm:p-4 flex items-center justify-between gap-2 pointer-events-auto">
+      <div className="pt-8 sm:pt-10 md:pt-12 px-3 sm:px-6 flex items-center justify-between gap-2 pointer-events-auto shrink-0 z-30">
         {/* Left: Back Button */}
         <button
           onClick={onClose}
-          className="w-10 h-10 rounded-full bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700/80 shadow-xl flex items-center justify-center transition active:scale-95"
+          className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-b from-white/25 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl text-white border border-white/30 hover:border-white/50 shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] flex items-center justify-center transition active:scale-95 shrink-0"
           title="Kembali ke Peta Kota"
           aria-label="Kembali"
         >
           <ArrowLeft className="w-5 h-5 text-slate-100" />
         </button>
 
-        {/* Center: Info Pill */}
-        <div className="flex-1 max-w-xl mx-auto flex items-center justify-center">
-          <div className="bg-slate-900/90 text-white border border-slate-700/80 px-4 py-2 rounded-full shadow-xl flex items-center gap-2 text-xs sm:text-sm font-semibold truncate">
-            <span className="text-pink-400">🌸</span>
+        {/* Center: Info Pill - Liquid Glass */}
+        <div className="flex-1 max-w-xl mx-auto flex items-center justify-center px-1 sm:px-2">
+          <div className="bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl text-white border border-white/25 shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full flex items-center gap-2 text-xs sm:text-sm font-semibold truncate">
+            <span className="text-pink-400 text-sm">🌸</span>
             <span className="font-bold text-white">Monumen Warga</span>
             <span className="text-slate-500">•</span>
-            <span className="text-emerald-400 font-bold">Khusus {myClassShort}</span>
+            <span className="text-emerald-300 font-extrabold">{myClassShort}</span>
             <span className="text-slate-500 hidden sm:inline">•</span>
-            <span className="text-amber-300 font-medium hidden sm:inline" title="Seluruh obrolan otomatis dibersihkan setiap 24 jam">
-              🕒 Bersih Otomatis 24 Jam
+            <span className="text-cyan-300 font-medium text-[11px] bg-cyan-950/70 px-2 py-0.5 rounded-full border border-cyan-500/30 hidden sm:inline" title="Sistem otomatis membatasi maksimal 25 pesan teranyar">
+              💬 Maks 25 Chat
             </span>
             <span className="text-slate-500 hidden md:inline">•</span>
             <span className="text-teal-300 font-medium hidden md:inline">{activeRoomData.memberCount} Siswa</span>
@@ -271,19 +299,19 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
         </div>
 
         {/* Right: Class Locked Badge, Manual Sync & Sound Toggle */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Class Locked Badge */}
-          <div className="flex items-center bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-full shadow-xl gap-1.5 text-xs">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Class Locked Badge - Liquid Glass */}
+          <div className="flex items-center bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl border border-white/25 shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] px-3 py-1.5 rounded-full gap-1.5 text-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="font-extrabold text-emerald-300">{myClassShort}</span>
-            <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">(Ruang Saya)</span>
+            <span className="text-[10px] text-slate-300 font-medium hidden sm:inline">(Ruang Saya)</span>
           </div>
 
           {/* Tombol Tarik / Sinkronkan Obrolan Baru */}
           <button
             onClick={handleManualSync}
             disabled={isSyncing}
-            className="w-10 h-10 rounded-full border shadow-xl flex items-center justify-center transition active:scale-95 bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 text-teal-400 hover:text-teal-300 disabled:opacity-50"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] flex items-center justify-center transition active:scale-95 bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl border-white/25 hover:border-white/50 text-teal-300 disabled:opacity-50"
             title={isSyncing ? 'Sedang menarik obrolan baru...' : 'Tarik Obrolan Baru dari Teman di Device Lain'}
             aria-label="Tarik Obrolan"
           >
@@ -293,10 +321,8 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
           {/* Audio toggle button */}
           <button
             onClick={handleToggleSound}
-            className={`w-10 h-10 rounded-full border shadow-xl flex items-center justify-center transition active:scale-95 ${
-              isSoundOn
-                ? 'bg-slate-900/90 hover:bg-slate-800 text-teal-400 border-slate-700/80'
-                : 'bg-slate-900/90 hover:bg-slate-800 text-slate-400 border-slate-700/80'
+            className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full border shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] flex items-center justify-center transition active:scale-95 backdrop-blur-2xl bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 border-white/25 hover:border-white/50 ${
+              isSoundOn ? 'text-teal-300' : 'text-slate-400'
             }`}
             title={isSoundOn ? 'Suara Aktif (Klik untuk Matikan)' : 'Suara Mati (Klik untuk Nyalakan)'}
             aria-label="Toggle Sound"
@@ -307,23 +333,24 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
       </div>
 
       {/* =========================================================================
-          CENTER 3D VIEWPORT FLOATING SPEECH BUBBLE (Exact match to reference)
-          White speech bubble with downward pointer arrow + @handle underneath
+          CENTER 3D VIEWPORT FLOATING SPEECH BUBBLE - Liquid Glass
+          - On laptop: centered in open space with clearance from right sidebar (md:mr-[430px])
+          - On mobile: neat floating bubble constrained in middle without overlapping drawer
          ========================================================================= */}
-      <div className="flex-1 relative flex items-center justify-center p-4">
+      <div className="flex-1 min-h-0 flex items-center justify-center p-3 pointer-events-auto md:mr-[430px] my-auto">
         {latestMessage && (
-          <div className="pointer-events-auto transform transition-all duration-300 hover:scale-105 max-w-sm sm:max-w-md">
-            {/* White Speech Bubble */}
-            <div className="relative bg-white text-slate-900 px-5 py-3 rounded-2xl shadow-2xl border border-white/90 text-sm sm:text-base font-semibold leading-snug">
+          <div className="transform transition-all duration-300 hover:scale-105 max-w-xs sm:max-w-md w-full animate-fade-in-up">
+            {/* Liquid Crystal Speech Bubble */}
+            <div className="relative bg-gradient-to-b from-white/95 via-white/85 to-slate-100/90 text-slate-900 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.6)] backdrop-blur-xl border border-white/80 text-xs sm:text-base font-semibold leading-snug max-h-24 sm:max-h-36 overflow-y-auto">
               <p className="break-words">{latestMessage.content}</p>
 
               {/* Speech bubble pointer arrow */}
-              <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white" />
+              <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white/95" />
             </div>
 
             {/* Handle tag underneath arrow */}
-            <div className="mt-3 flex items-center justify-center">
-              <span className="bg-slate-900/90 text-cyan-400 font-mono text-xs px-3 py-1 rounded-full border border-slate-700 shadow-lg font-bold flex items-center gap-1.5">
+            <div className="mt-2.5 flex items-center justify-center">
+              <span className="bg-gradient-to-b from-white/20 via-slate-900/80 to-slate-950/90 text-cyan-300 font-mono text-[11px] sm:text-xs px-3 py-1 rounded-full border border-white/25 shadow-xl font-bold flex items-center gap-1.5 backdrop-blur-xl">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                 {latestMessage.senderHandle}
               </span>
@@ -333,30 +360,28 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
       </div>
 
       {/* =========================================================================
-          BOTTOM CHAT TRAY / DRAWER (Exact match to reference screenshot)
-          - Header: "Obrolan • X pesan"
-          - "Pesan baru ↓" notification button
-          - Scrollable message rows with @cyan handle, text, flag report, timestamp
-          - Bottom input: "Tulis pesan... (maks. 120 huruf)" and teal "Kirim" button
+          CHAT FEATURE: Liquid Glass Container
+          - ON LAPTOP (md:): Moves to right sidebar panel (md:fixed md:right-6 md:top-28 md:bottom-8 md:w-[410px])
+          - ON MOBILE (phone): Stays elevated at bottom with clearance (mb-4 px-3) so nothing overlaps!
          ========================================================================= */}
-      <div className="p-3 sm:p-4 max-w-2xl w-full mx-auto pointer-events-auto transition-all duration-300">
-        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-          {/* Tray Header */}
-          <div className="px-3 sm:px-4 py-2.5 bg-slate-800/80 border-b border-slate-700/70 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <MessageCircle className="w-4 h-4 text-cyan-400" />
-              <span className="font-extrabold text-xs sm:text-sm text-white">
-                Obrolan • {currentRoomMessages.length} pesan
+      <div className="shrink-0 mb-4 sm:mb-6 px-3 sm:px-4 max-w-lg w-full mx-auto pointer-events-auto transition-all duration-300 md:fixed md:right-6 md:top-28 md:bottom-8 md:w-[410px] md:max-w-[420px] md:z-50 md:flex md:flex-col md:m-0 md:p-0 animate-fade-in-up">
+        <div className="bg-gradient-to-b from-white/20 via-slate-900/75 to-slate-950/90 backdrop-blur-2xl backdrop-saturate-150 border border-white/25 shadow-[0_16px_48px_0_rgba(0,0,0,0.55),inset_0_1px_1px_0_rgba(255,255,255,0.25)] rounded-3xl overflow-hidden flex flex-col md:h-full">
+          {/* Tray / Sidebar Header */}
+          <div className="shrink-0 px-3.5 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-b border-white/15 flex items-center justify-between gap-2 backdrop-blur-md">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <MessageCircle className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span className="font-extrabold text-xs sm:text-sm text-white truncate">
+                Obrolan {myClassShort} • {currentRoomMessages.length}/25
               </span>
-              <span className="text-[10px] bg-slate-800 text-amber-300 px-2 py-0.5 rounded-full font-mono border border-slate-700 hidden lg:inline">
-                🕒 Bersih 24 Jam
+              <span className="text-[10px] bg-white/10 text-cyan-200 px-2 py-0.5 rounded-full font-mono border border-white/15 hidden lg:inline">
+                Maks 25 Chat
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {/* Feedback toast */}
               {syncFeedback && (
-                <span className="text-[10px] sm:text-[11px] font-bold text-teal-300 bg-teal-950/80 px-2.5 py-0.5 rounded-full border border-teal-500/40 animate-in fade-in truncate max-w-[130px] sm:max-w-[170px]">
+                <span className="text-[10px] font-bold text-teal-300 bg-teal-950/80 px-2 py-0.5 rounded-full border border-teal-500/40 animate-in fade-in truncate max-w-[110px] sm:max-w-[150px]">
                   {syncFeedback}
                 </span>
               )}
@@ -370,7 +395,7 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
                 title="Tarik & perbarui obrolan terbaru dari teman-teman di device lain"
               >
                 <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-teal-400' : ''}`} />
-                <span className="hidden sm:inline">{isSyncing ? 'Menarik...' : 'Tarik Obrolan'}</span>
+                <span className="hidden sm:inline">{isSyncing ? 'Menarik...' : 'Tarik'}</span>
               </button>
 
               {/* Tombol Toggle Auto-Sync */}
@@ -393,24 +418,24 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
                 }
               >
                 <span className={`w-2 h-2 rounded-full ${isAutoSyncOn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-                <span className="hidden sm:inline">Auto-Sync</span>
+                <span className="hidden sm:inline">Auto</span>
               </button>
 
               {/* Pesan Baru button when scrolled up */}
               {hasNewMessagesBelow && (
                 <button
                   onClick={scrollToBottom}
-                  className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[11px] font-extrabold px-2.5 py-1 rounded-full shadow flex items-center gap-1 animate-bounce transition"
+                  className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[10px] sm:text-[11px] font-extrabold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shadow flex items-center gap-1 animate-bounce transition"
                 >
-                  <span>Pesan baru</span>
+                  <span>Baru</span>
                   <ChevronDown className="w-3 h-3" />
                 </button>
               )}
 
-              {/* Minimize/Maximize Tray */}
+              {/* Minimize/Maximize Tray (active on mobile, optional on laptop) */}
               <button
                 onClick={() => setIsTrayExpanded(!isTrayExpanded)}
-                className="w-7 h-7 rounded-full bg-slate-700/70 hover:bg-slate-600 text-slate-200 flex items-center justify-center transition"
+                className="w-7 h-7 rounded-full bg-slate-700/70 hover:bg-slate-600 text-slate-200 flex items-center justify-center transition shrink-0"
                 title={isTrayExpanded ? 'Sembunyikan Obrolan' : 'Buka Obrolan'}
                 aria-label="Toggle Tray"
               >
@@ -419,20 +444,23 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
             </div>
           </div>
 
-          {/* Message List (Collapsible) */}
+          {/* Message List:
+              - On mobile: max-h-40 sm:max-h-48 (elevated, never crowds screen)
+              - On laptop: md:flex-1 md:max-h-none md:overflow-y-auto (fills sidebar)
+          */}
           {isTrayExpanded && (
             <div
               ref={chatContainerRef}
               onScroll={handleScroll}
-              className="max-h-44 sm:max-h-56 overflow-y-auto p-3 sm:p-4 space-y-2.5 divide-y divide-slate-800/50"
+              className="max-h-40 sm:max-h-48 md:max-h-none md:flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5 divide-y divide-slate-800/50 min-h-0"
             >
               {currentRoomMessages.length === 0 ? (
                 <div className="py-6 text-center text-slate-400 text-xs">
-                  Belum ada pesan di Ruang {activeRoom}. Jadilah yang pertama menyapa teman-teman sekelasmu!
+                  Belum ada pesan di Ruang {myClassShort}. Jadilah yang pertama menyapa teman-teman sekelasmu!
                 </div>
               ) : (
-                currentRoomMessages.map((msg) => (
-                  <div key={msg.id} className="pt-2 first:pt-0 flex items-start justify-between gap-3 group">
+                currentRoomMessages.map((msg, idx) => (
+                  <div key={`${msg.id}-${idx}`} className="pt-2 first:pt-0 flex items-start justify-between gap-2.5 group">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {/* Cyan Handle */}
@@ -447,7 +475,7 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
                     </div>
 
                     {/* Right side: Report Flag & Timestamp */}
-                    <div className="flex items-center gap-2 shrink-0 text-[11px] text-slate-400 pt-0.5">
+                    <div className="flex items-center gap-1.5 shrink-0 text-[11px] text-slate-400 pt-0.5">
                       {reportSuccessId === msg.id ? (
                         <span className="text-emerald-400 text-[10px] font-bold flex items-center gap-0.5">
                           <Check className="w-3 h-3" /> Dilaporkan
@@ -462,7 +490,7 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
                           <Flag className="w-3 h-3" />
                         </button>
                       )}
-                      <span className="font-mono text-slate-400">{msg.timestamp}</span>
+                      <span className="font-mono text-slate-400 text-[10px] sm:text-xs">{msg.timestamp}</span>
                     </div>
                   </div>
                 ))
@@ -471,19 +499,19 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
             </div>
           )}
 
-          {/* Bottom Input Field */}
+          {/* Bottom Input Field (Pinned at bottom of sidebar or drawer) - Liquid Glass */}
           <form
             onSubmit={handleSendMessage}
-            className="p-2 sm:p-3 bg-slate-950/60 border-t border-slate-800 flex items-center gap-2"
+            className="shrink-0 p-2.5 sm:p-3 bg-slate-950/60 backdrop-blur-xl border-t border-white/15 flex items-center gap-2"
           >
             <div className="relative flex-1">
               <input
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value.slice(0, 120))}
-                placeholder="Tulis pesan... (maks. 120 huruf)"
+                placeholder={`Tulis pesan untuk ${myClassShort}...`}
                 maxLength={120}
-                className="w-full bg-slate-800/90 text-white placeholder-slate-400 text-xs sm:text-sm rounded-2xl px-4 py-2.5 pr-14 focus:outline-none focus:ring-2 focus:ring-teal-500 border border-slate-700/80 font-medium"
+                className="w-full bg-white/10 text-white placeholder-slate-400 text-xs sm:text-sm rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 pr-12 focus:outline-none focus:ring-2 focus:ring-teal-400/80 border border-white/20 backdrop-blur-md font-medium"
               />
               <span
                 className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono pointer-events-none ${
@@ -497,7 +525,7 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
             <button
               type="submit"
               disabled={!inputText.trim()}
-              className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold flex items-center gap-1.5 shadow-lg shadow-teal-500/20 transition active:scale-95 shrink-0"
+              className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold flex items-center gap-1.5 shadow-lg shadow-teal-500/20 transition active:scale-95 shrink-0"
             >
               <span>Kirim</span>
               <Send className="w-3.5 h-3.5" />

@@ -198,8 +198,8 @@ export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-sm animate-backdrop-fade">
+      <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100 animate-fade-in-up">
         {/* Header */}
         <div className="bg-gradient-to-r from-pink-700 via-rose-700 to-fuchsia-700 px-6 py-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -247,62 +247,112 @@ export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
             )}
           </div>
 
-          {/* Step 2: Scale of Understanding & Mood */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-            {/* Scale 1-5 */}
+          {/* Step 2: Scale of Understanding & Mood (Revamped tactile UI) */}
+          <div className="space-y-4 p-4 sm:p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+            {/* 2A. Skala Pemahaman */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                2. Skala Pemahaman (1 - 5 Bintang)
-              </label>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setScale(num)}
-                    className="p-1 text-2xl transition transform hover:scale-110 active:scale-95"
-                    aria-label={`Skala ${num} bintang`}
-                  >
-                    <Star
-                      className={`w-7 h-7 ${
-                        num <= scale
-                          ? 'fill-amber-400 text-amber-400'
-                          : 'fill-transparent text-slate-600'
-                      }`}
-                    />
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                  <span>2. Skala Pemahaman Materi</span>
+                  <span className="text-pink-400">*</span>
+                </label>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setScale(num)}
+                      className="p-0.5 transition transform hover:scale-125 active:scale-95"
+                      aria-label={`Pilih ${num} bintang`}
+                    >
+                      <Star
+                        className={`w-5 h-5 transition-colors ${
+                          num <= scale
+                            ? 'fill-amber-400 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]'
+                            : 'fill-transparent text-slate-600 hover:text-slate-500'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
               </div>
-              <p className="text-[11px] font-bold text-amber-300 mt-1">
-                {scale === 1 && '⭐ Belum paham sama sekali'}
-                {scale === 2 && '⭐⭐ Masih banyak yang bingung'}
-                {scale === 3 && '⭐⭐⭐ Cukup paham dasarnya'}
-                {scale === 4 && '⭐⭐⭐⭐ Sudah paham dan bisa mempraktikkan'}
-                {scale === 5 && '⭐⭐⭐⭐⭐ Sangat paham dan siap bantu teman!'}
-              </p>
+
+              {/* 5 Expressive Scale Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {[
+                  { lvl: 1, title: 'Perlu Bimbingan', sub: 'Belum paham dasar', stars: '★' },
+                  { lvl: 2, title: 'Mulai Paham', sub: 'Ada yang bingung', stars: '★★' },
+                  { lvl: 3, title: 'Cukup Mengerti', sub: 'Paham intinya', stars: '★★★' },
+                  { lvl: 4, title: 'Paham Baik', sub: 'Bisa praktikkan', stars: '★★★★' },
+                  { lvl: 5, title: 'Sangat Mahir', sub: 'Siap bantu kawan', stars: '★★★★★' },
+                ].map((item) => {
+                  const isSelected = scale === item.lvl;
+                  return (
+                    <button
+                      key={item.lvl}
+                      type="button"
+                      onClick={() => setScale(item.lvl)}
+                      className={`p-2.5 rounded-xl text-left border transition-all duration-200 flex flex-col justify-between ${
+                        isSelected
+                          ? 'bg-gradient-to-b from-amber-500/25 to-amber-700/20 border-amber-400 text-white shadow-lg ring-1 ring-amber-400/50 scale-[1.02]'
+                          : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className={`text-xs font-mono font-black ${isSelected ? 'text-amber-300' : 'text-slate-500'}`}>
+                          {item.stars}
+                        </span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                          isSelected ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-700 text-slate-400'
+                        }`}>
+                          Lv.{item.lvl}
+                        </span>
+                      </div>
+                      <div>
+                        <div className={`text-xs font-bold leading-tight ${isSelected ? 'text-amber-200' : 'text-slate-200'}`}>
+                          {item.title}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
+                          {item.sub}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Mood Emoji */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Suasana Hati Saat Belajar
+            {/* 2B. Suasana Hati Saat Belajar */}
+            <div className="pt-2 border-t border-slate-700/50">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2 flex items-center gap-1.5">
+                <span>💭 Suasana Hati Saat Belajar</span>
+                <span className="text-pink-400">*</span>
               </label>
-              <div className="flex items-center gap-2">
-                {MOODS.map((m) => (
-                  <button
-                    key={m.emoji}
-                    type="button"
-                    onClick={() => setMoodEmoji(m.emoji)}
-                    className={`px-3 py-2 rounded-xl text-lg transition border flex flex-col items-center gap-0.5 ${
-                      moodEmoji === m.emoji
-                        ? 'bg-pink-600/30 border-pink-500 scale-105 shadow'
-                        : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <span>{m.emoji}</span>
-                    <span className="text-[10px] font-semibold">{m.label}</span>
-                  </button>
-                ))}
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {MOODS.map((m) => {
+                  const isSelected = moodEmoji === m.emoji;
+                  return (
+                    <button
+                      key={m.emoji}
+                      type="button"
+                      onClick={() => setMoodEmoji(m.emoji)}
+                      className={`p-2.5 rounded-xl text-center border transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
+                        isSelected
+                          ? 'bg-gradient-to-b from-pink-500/25 to-rose-700/20 border-pink-400 text-white shadow-lg ring-1 ring-pink-400/50 scale-[1.02]'
+                          : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-2xl transition transform group-hover:scale-110">
+                        {m.emoji}
+                      </span>
+                      <span className={`text-xs font-bold ${isSelected ? 'text-pink-200' : 'text-slate-200'}`}>
+                        {m.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

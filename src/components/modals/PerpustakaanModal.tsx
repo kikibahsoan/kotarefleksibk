@@ -28,8 +28,8 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
   const activeMateri = materis.find((m) => m.id === selectedMateriId) || filteredMateris[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-sm animate-backdrop-fade">
+      <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100 animate-fade-in-up">
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-green-700 px-6 py-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">

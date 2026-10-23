@@ -28,8 +28,8 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-3xl shadow-2xl p-6 text-slate-100 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-backdrop-fade">
+      <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-3xl shadow-2xl p-6 text-slate-100 relative animate-fade-in-up">
         <button
           onClick={onClose}
           aria-label="Tutup Login Guru"
