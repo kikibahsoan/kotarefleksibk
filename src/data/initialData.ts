@@ -924,7 +924,7 @@ export const INITIAL_MESSAGES: Message[] = [
 ];
 
 export const INITIAL_SETTINGS: TownSettings = {
-  townName: 'Kota Refleksi SMK Negeri 2 Gorontalo',
+  townName: 'Refleksia City SMK Negeri 2 Gorontalo',
   academicYear: '2026/2027 Ganjil',
   teacherPin: 'Kiki123!',
   gasWebAppUrl:

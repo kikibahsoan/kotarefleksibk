@@ -382,7 +382,7 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-extrabold text-white font-display">Ruang Guru: Kota Refleksi</h2>
+                <h2 className="text-lg font-extrabold text-white font-display">Ruang Guru: Refleksia City</h2>
                 <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold">
                   Panel Guru SMK
                 </span>

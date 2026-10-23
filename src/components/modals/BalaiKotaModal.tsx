@@ -27,7 +27,7 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
               🏛️
             </div>
             <div>
-              <h2 className="text-xl font-extrabold font-display leading-tight">Balai Kota Refleksi</h2>
+              <h2 className="text-xl font-extrabold font-display leading-tight">Balai Kota Refleksia</h2>
               <p className="text-xs text-blue-100 font-medium">Pusat Informasi & Misi Pembelajaran Aktif</p>
             </div>
           </div>
@@ -52,7 +52,7 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
                 Pengumuman Balai Kota {studentName ? `untuk ${studentName}` : ''}
               </h3>
               <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                Selamat datang di Kota Refleksi! Selesaikan pembelajaran hari ini, tulis refleksimu secara jujur di Taman Refleksi, dan dengarkan masukan dari AI Mentor Kota di Menara Mentor.
+                Selamat datang di Refleksia City! Selesaikan pembelajaran hari ini, tulis refleksimu secara jujur di Taman Refleksi, dan dengarkan masukan dari AI Mentor Kota di Menara Mentor.
               </p>
             </div>
           </div>

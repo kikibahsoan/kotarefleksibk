@@ -121,7 +121,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
             <School className="w-9 h-9" />
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mb-2 font-display">
-            Kota Refleksi
+            Refleksia City
           </h1>
           <div className="inline-block px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold mb-2">
             Informatika (KKA) • Khusus Kelas X DKV 2 & X DKV 3
@@ -262,7 +262,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
             className="w-full mt-3 py-3.5 px-6 rounded-xl font-extrabold text-base bg-gradient-to-r from-emerald-600 via-teal-600 to-green-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/30 transition transform active:scale-[0.99] flex items-center justify-center gap-2"
           >
             <Compass className="w-5 h-5" />
-            <span>Masuk Kota Refleksi</span>
+            <span>Masuk Refleksia City</span>
           </button>
         </form>
 

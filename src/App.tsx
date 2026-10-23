@@ -53,7 +53,7 @@ export default function App() {
   const [isTeacherPinModalOpen, setIsTeacherPinModalOpen] = useState(false);
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
   const [preselectedMateriForReflection, setPreselectedMateriForReflection] = useState<string | undefined>(undefined);
-  const [timeOfDay, setTimeOfDay] = useState<'day' | 'night' | 'auto'>('day');
+  const [timeOfDay, setTimeOfDay] = useState<'day' | 'night' | 'auto'>('night');
 
   // Check ?autostart=1 for headless testing & fast access
   useEffect(() => {
@@ -381,14 +381,14 @@ export default function App() {
       {/* TOP HEADER OVERLAY (Hidden when inside building modals or 2D menu) - Liquid Glass */}
       {!activeBuilding && !isQuickNavOpen && (
         <header className="absolute top-4 sm:top-5 left-3 sm:left-4 right-3 sm:right-4 flex items-center justify-between pointer-events-none z-20 gap-2">
-          {/* Left: Kota Refleksi • Nama • Kelas • XP • Level */}
+          {/* Left: Refleksia City • Nama • Kelas • XP • Level */}
           <div className="flex items-center gap-2 sm:gap-3 bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/25 px-3.5 py-2 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] pointer-events-auto max-w-[75vw] sm:max-w-none overflow-x-auto">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-base shadow-sm shrink-0">
               🏛️
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 text-xs whitespace-nowrap">
               <span className="font-extrabold text-white font-display text-xs sm:text-sm tracking-tight">
-                Kota Refleksi
+                Refleksia City
               </span>
               <span className="text-slate-400 font-bold">•</span>
               <span className="font-bold text-slate-100 max-w-[120px] sm:max-w-[200px] truncate" title={student.name}>
@@ -454,9 +454,9 @@ export default function App() {
         </header>
       )}
 
-      {/* BOTTOM DOCK - ICON ONLY MENU - Liquid Glass */}
+      {/* BOTTOM DOCK - ICON ONLY MENU - Liquid Glass (Elevated above chat bar) */}
       {!activeBuilding && !isQuickNavOpen && (
-        <footer className="absolute bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center pointer-events-auto max-w-[96vw]">
+        <footer className="absolute bottom-16 sm:bottom-18 left-1/2 -translate-x-1/2 z-20 flex items-center pointer-events-auto max-w-[96vw]">
           <div className="bg-gradient-to-b from-white/25 via-slate-900/75 to-slate-950/90 backdrop-blur-2xl backdrop-saturate-150 border border-white/25 rounded-full px-2.5 sm:px-3.5 py-2 sm:py-2.5 shadow-[0_16px_48px_0_rgba(0,0,0,0.55),inset_0_1px_1px_0_rgba(255,255,255,0.25)] flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto">
             {BUILDINGS_INFO.map((b) => {
               const hasNew = newMateriBuildingIds.includes(b.id);
@@ -468,7 +468,7 @@ export default function App() {
                 bengkel_latihan: '🛠️',
                 kantor_pos: '📮',
                 pasar_prestasi: '🎪',
-                monumen_warga: '💬',
+                monumen_warga: '📋',
               };
 
               return (

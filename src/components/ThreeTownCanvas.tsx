@@ -1,6 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
-import { BuildingId } from '../types/index.ts';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { BuildingId, PublicChatMessage } from '../types/index.ts';
+import { StorageService } from '../utils/storage.ts';
+import {
+  Send,
+  X,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 
 interface ThreeTownCanvasProps {
   onSelectBuilding: (buildingId: BuildingId) => void;
@@ -11,7 +17,7 @@ interface ThreeTownCanvasProps {
   timeOfDay?: 'day' | 'night' | 'auto';
 }
 
-interface BuildingInfo {
+export interface BuildingInfo {
   id: BuildingId;
   name: string;
   tagline: string;
@@ -20,1381 +26,1307 @@ interface BuildingInfo {
 }
 
 export const BUILDINGS_INFO: BuildingInfo[] = [
-  { id: 'balai_kota', name: 'Balai Kota', tagline: 'Misi & Pengumuman', position: [0, 0, -14], color: 0x3b82f6 },
-  { id: 'perpustakaan', name: 'Perpustakaan', tagline: 'Materi & Video', position: [-14, 0, -8], color: 0x10b981 },
-  { id: 'taman_refleksi', name: 'Taman Refleksi', tagline: 'Tulis Refleksi', position: [-13, 0, 7], color: 0xec4899 },
-  { id: 'menara_mentor', name: 'Menara Mentor', tagline: 'Umpan Balik AI', position: [14, 0, -8], color: 0x8b5cf6 },
-  { id: 'bengkel_latihan', name: 'Bengkel Latihan', tagline: 'Kuis & Tantangan', position: [14, 0, 7], color: 0xf59e0b },
-  { id: 'kantor_pos', name: 'Kantor Pos', tagline: 'Kirim Pesan ke Guru', position: [-8, 0, 15], color: 0xef4444 },
-  { id: 'pasar_prestasi', name: 'Pasar Prestasi', tagline: 'Lencana & Poin', position: [8, 0, 15], color: 0x06b6d4 },
-  { id: 'monumen_warga', name: 'Monumen Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0xec4899 },
+  { id: 'balai_kota', name: 'Balai Kota', tagline: 'Misi & Pengumuman Utama', position: [0, -165, 0], color: 0x3b82f6 },
+  { id: 'perpustakaan', name: 'Perpustakaan', tagline: 'Materi & Video Ajar', position: [-210, -95, 0], color: 0x10b981 },
+  { id: 'taman_refleksi', name: 'Taman Refleksi', tagline: 'Tulis Refleksi Harian', position: [-210, 85, 0], color: 0xec4899 },
+  { id: 'menara_mentor', name: 'Menara Mentor', tagline: 'Umpan Balik AI Mentor', position: [210, -95, 0], color: 0x8b5cf6 },
+  { id: 'bengkel_latihan', name: 'Bengkel Latihan', tagline: 'Kuis & Tantangan', position: [210, 85, 0], color: 0xf59e0b },
+  { id: 'kantor_pos', name: 'Kantor Pos', tagline: 'Kirim Pesan ke Guru', position: [-110, 145, 0], color: 0xef4444 },
+  { id: 'pasar_prestasi', name: 'Pasar Prestasi', tagline: 'Lencana & Poin XP', position: [110, 145, 0], color: 0x06b6d4 },
+  { id: 'monumen_warga', name: 'Papan Informasi', tagline: 'Pusat Pengumuman & Berita Kota', position: [0, 0, 0], color: 0xec4899 },
 ];
+
+interface ProfessionNPC {
+  id: string;
+  name: string;
+  handle: string;
+  gender: 'L' | 'P';
+  profession: string;
+  professionBadge: string;
+  badgeBg: string;
+  shirtColor: string;
+  pantsColor: string;
+  skinColor: string;
+  hairColor: string;
+  hasHijab?: boolean;
+  accessory?: 'glasses' | 'police_hat' | 'guard_hat' | 'broom' | 'stethoscope' | 'apron' | 'fishing_rod';
+  waypoints: { x: number; y: number }[];
+  currentWaypointIdx: number;
+  x: number;
+  y: number;
+  facing: 'left' | 'right';
+  pauseTimer: number;
+  quotes: string[];
+}
 
 export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
   onSelectBuilding,
   activeBuilding,
   newMateriBuildingIds,
-  studentName,
-  studentGender,
-  timeOfDay = 'day',
+  studentName = 'Murid Refleksia',
+  studentGender = 'L',
+  timeOfDay = 'night',
 }) => {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const [hoveredBuilding, setHoveredBuilding] = useState<BuildingInfo | null>(null);
+  // Player state
+  const [playerPos, setPlayerPos] = useState({ x: 0, y: 55 });
+  const [targetPos, setTargetPos] = useState({ x: 0, y: 55 });
   const [isWalking, setIsWalking] = useState(false);
-  const [webglError, setWebglError] = useState<string | null>(null);
+  const [playerFacing, setPlayerFacing] = useState<'left' | 'right'>('right');
+  const [playerSpeechBubble, setPlayerSpeechBubble] = useState<string | null>(null);
 
-  // Store callbacks & dynamic props in refs to prevent WebGL teardown
-  const onSelectBuildingRef = useRef(onSelectBuilding);
-  onSelectBuildingRef.current = onSelectBuilding;
-  const activeBuildingRef = useRef(activeBuilding);
-  activeBuildingRef.current = activeBuilding;
-  const newMateriBuildingIdsRef = useRef(newMateriBuildingIds);
-  newMateriBuildingIdsRef.current = newMateriBuildingIds;
-  const timeOfDayRef = useRef(timeOfDay);
-  timeOfDayRef.current = timeOfDay;
+  // Active temporary NPC bubble (only 1 or at most 2, automatically disappears)
+  const [activeNpcBubble, setActiveNpcBubble] = useState<{
+    npcId: string;
+    text: string;
+  } | null>(null);
 
+  // Hovered building info
+  const [hoveredBuilding, setHoveredBuilding] = useState<BuildingInfo | null>(null);
+
+  // Cafe popup modal state
+  const [isCafeOpen, setIsCafeOpen] = useState(false);
+  const [cafeFeedback, setCafeFeedback] = useState<string | null>(null);
+
+  // Kolam pancing feedback
+  const [fishingFeedback, setFishingFeedback] = useState<string | null>(null);
+
+  // Chat bar & Obrolan window state
+  const [chatInput, setChatInput] = useState('');
+  const [isChatWindowOpen, setIsChatWindowOpen] = useState(true);
+  const [chatMessages, setChatMessages] = useState<PublicChatMessage[]>(() =>
+    StorageService.getPublicChatMessages()
+  );
+
+  // Day / Night state calculation
+  const isNight = timeOfDay === 'night' || (timeOfDay === 'auto' && new Date().getHours() >= 18);
+
+  // Moving Clouds State for Day Mode ("awan berjalan")
+  const [clouds, setClouds] = useState([
+    { id: 1, x: -350, y: -210, speed: 14, scale: 1.1 },
+    { id: 2, x: -180, y: -160, speed: 22, scale: 0.85 },
+    { id: 3, x: 20, y: -230, speed: 10, scale: 1.35 },
+    { id: 4, x: 190, y: -180, speed: 18, scale: 0.95 },
+    { id: 5, x: 380, y: -140, speed: 25, scale: 0.75 },
+  ]);
+
+  // Animated Fireflies for Night Mode ("kunang-kunang")
+  const fireflyBases = useMemo(() => [
+    { id: 1, x: -160, y: -40, phase: 0.2, speed: 1.8 },
+    { id: 2, x: -90, y: -110, phase: 1.4, speed: 2.2 },
+    { id: 3, x: -40, y: -30, phase: 2.8, speed: 1.6 },
+    { id: 4, x: 50, y: -50, phase: 4.1, speed: 2.0 },
+    { id: 5, x: 120, y: -70, phase: 0.9, speed: 1.7 },
+    { id: 6, x: -180, y: 50, phase: 3.3, speed: 2.1 },
+    { id: 7, x: -80, y: 80, phase: 5.0, speed: 1.5 },
+    { id: 8, x: 70, y: 40, phase: 2.1, speed: 1.9 },
+    { id: 9, x: 140, y: 70, phase: 0.5, speed: 2.3 },
+    { id: 10, x: 170, y: 140, phase: 4.4, speed: 1.6 },
+    { id: 11, x: -220, y: 20, phase: 1.8, speed: 2.0 },
+    { id: 12, x: 20, y: -130, phase: 3.7, speed: 1.7 },
+    { id: 13, x: 0, y: 90, phase: 2.5, speed: 2.2 },
+    { id: 14, x: 90, y: 120, phase: 1.1, speed: 1.8 },
+  ], []);
+
+  const [fireflyOffsets, setFireflyOffsets] = useState(
+    fireflyBases.map(() => ({ dx: 0, dy: 0, glow: 1 }))
+  );
+
+  // 6+ Moving NPCs with Professions (Guru, Polisi, Penjaga Kota, Tukang Bersih, Petugas Medis, Barista, Pemancing)
+  const [npcList, setNpcList] = useState<ProfessionNPC[]>([
+    {
+      id: 'npc-guru',
+      name: 'Pak Rahman',
+      handle: '@guru_rahman',
+      gender: 'L',
+      profession: 'Guru DKV',
+      professionBadge: '👨‍🏫 GURU DKV',
+      badgeBg: '#059669',
+      shirtColor: '#10b981',
+      pantsColor: '#1e293b',
+      skinColor: '#fbcfe8',
+      hairColor: '#1e293b',
+      accessory: 'glasses',
+      x: 0,
+      y: -100,
+      facing: 'right',
+      pauseTimer: 2,
+      currentWaypointIdx: 0,
+      waypoints: [
+        { x: 0, y: -140 },
+        { x: -120, y: -65 },
+        { x: 0, y: -45 },
+        { x: 0, y: -100 },
+      ],
+      quotes: [
+        'Sudah memahami konsep IPO Von Neumann? Yuk refleksi!',
+        'Semangat belajarnya ya anak-anak!',
+        'Karya desain DKV yang baik dimulai dari logika yang teratur.',
+      ],
+    },
+    {
+      id: 'npc-polisi',
+      name: 'Bripka Dimas',
+      handle: '@polisi_dimas',
+      gender: 'L',
+      profession: 'Polisi Kota',
+      professionBadge: '👮 POLISI KOTA',
+      badgeBg: '#2563eb',
+      shirtColor: '#1d4ed8',
+      pantsColor: '#0f172a',
+      skinColor: '#fed7aa',
+      hairColor: '#0f172a',
+      accessory: 'police_hat',
+      x: 100,
+      y: -40,
+      facing: 'right',
+      pauseTimer: 3,
+      currentWaypointIdx: 0,
+      waypoints: [
+        { x: 170, y: -75 },
+        { x: 60, y: -25 },
+        { x: 120, y: 40 },
+        { x: 180, y: 70 },
+      ],
+      quotes: [
+        'Situasi Refleksia City aman dan tertib!',
+        'Silakan belajar dengan fokus dan tenang ya!',
+        'Patroli kota berjalan lancar.',
+      ],
+    },
+    {
+      id: 'npc-penjaga',
+      name: 'Pak Hendra',
+      handle: '@penjaga_hendra',
+      gender: 'L',
+      profession: 'Penjaga Kota',
+      professionBadge: '🛡️ PENJAGA KOTA',
+      badgeBg: '#d97706',
+      shirtColor: '#65a30d',
+      pantsColor: '#365314',
+      skinColor: '#fbcfe8',
+      hairColor: '#1e293b',
+      accessory: 'guard_hat',
+      x: -60,
+      y: 20,
+      facing: 'left',
+      pauseTimer: 1,
+      currentWaypointIdx: 0,
+      waypoints: [
+        { x: 0, y: 35 },
+        { x: -60, y: 20 },
+        { x: -120, y: 45 },
+        { x: -50, y: -20 },
+      ],
+      quotes: [
+        'Fasilitas kota terjaga rapi untuk murid SMK!',
+        'Jaga kebersihan dan ketertiban kota kita bersama.',
+        'Papan informasi di tengah plaza siap dibaca.',
+      ],
+    },
+    {
+      id: 'npc-kebersihan',
+      name: 'Ibu Siti',
+      handle: '@kebersihan_siti',
+      gender: 'P',
+      profession: 'Petugas Kebersihan',
+      professionBadge: '🧹 TUKANG BERSIH',
+      badgeBg: '#0d9488',
+      shirtColor: '#f97316',
+      pantsColor: '#1e293b',
+      skinColor: '#fed7aa',
+      hairColor: '#f8fafc',
+      hasHijab: true,
+      accessory: 'broom',
+      x: -140,
+      y: -50,
+      facing: 'right',
+      pauseTimer: 4,
+      currentWaypointIdx: 0,
+      waypoints: [
+        { x: -120, y: -25 },
+        { x: -160, y: 60 },
+        { x: -80, y: -20 },
+        { x: -140, y: -50 },
+      ],
+      quotes: [
+        'Kota yang asri dan bersih membuat pikiran segar berefleksi!',
+        'Ayo jaga taman dan jalan tetap bersih ya.',
+        'Sapu dulu area sekitar kafe dan taman.',
+      ],
+    },
+    {
+      id: 'npc-medis',
+      name: 'dr. Maya',
+      handle: '@medis_maya',
+      gender: 'P',
+      profession: 'Petugas Medis',
+      professionBadge: '🩺 DOKTER UKS',
+      badgeBg: '#e11d48',
+      shirtColor: '#f8fafc',
+      pantsColor: '#475569',
+      skinColor: '#fbcfe8',
+      hairColor: '#f8fafc',
+      hasHijab: true,
+      accessory: 'stethoscope',
+      x: -40,
+      y: -70,
+      facing: 'left',
+      pauseTimer: 2,
+      currentWaypointIdx: 0,
+      waypoints: [
+        { x: 0, y: -60 },
+        { x: -120, y: -65 },
+        { x: -60, y: 30 },
+        { x: -40, y: -70 },
+      ],
+      quotes: [
+        'Jaga kesehatan dan cukup minum air saat belajar!',
+        'Kesehatan mental dan fisik sangat penting untuk murid.',
+        'Ada yang butuh vitamin atau istirahat sejenak?',
+      ],
+    },
+    {
+      id: 'npc-barista',
+      name: 'Nnisa',
+      handle: '@nnisa_0311',
+      gender: 'P',
+      profession: 'Barista Cafe',
+      professionBadge: '☕ BARISTA',
+      badgeBg: '#b45309',
+      shirtColor: '#b45309',
+      pantsColor: '#1e1b4b',
+      skinColor: '#fde047',
+      hairColor: '#1e293b',
+      accessory: 'apron',
+      x: -115,
+      y: -25,
+      facing: 'right',
+      pauseTimer: 99999, // Stationary at cafe
+      currentWaypointIdx: 0,
+      waypoints: [{ x: -115, y: -25 }],
+      quotes: [
+        'Cafe buka! Kopi dan roti siap disajikan ☕',
+        'Nikmati aroma kopi di Refleksia City.',
+      ],
+    },
+    {
+      id: 'npc-pancing',
+      name: 'Kiky',
+      handle: '@kikybahsoan',
+      gender: 'L',
+      profession: 'Pemancing',
+      professionBadge: '🎣 PEMANCING',
+      badgeBg: '#0284c7',
+      shirtColor: '#0284c7',
+      pantsColor: '#1e293b',
+      skinColor: '#fbcfe8',
+      hairColor: '#1e293b',
+      accessory: 'fishing_rod',
+      x: 165,
+      y: 110,
+      facing: 'left',
+      pauseTimer: 99999, // Stationary at pier
+      currentWaypointIdx: 0,
+      waypoints: [{ x: 165, y: 110 }],
+      quotes: [
+        'Asyik memancing di kolam Refleksia! Dapet ikan mujair 🐟',
+        'Menunggu kail sambil santai sejenak.',
+      ],
+    },
+  ]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number | null>(null);
+
+  // Periodic random single speech bubble (strictly 1 NPC occasionally, auto disappearing)
   useEffect(() => {
-    const container = mountRef.current;
-    if (!container) return;
+    const timer = setInterval(() => {
+      const activeCandidates = npcList.filter((n) => n.quotes.length > 0);
+      const chosen = activeCandidates[Math.floor(Math.random() * activeCandidates.length)];
+      const text = chosen.quotes[Math.floor(Math.random() * chosen.quotes.length)];
 
-    // Check headless
-    const isHeadless =
-      typeof navigator !== 'undefined' &&
-      (navigator.webdriver || /HeadlessChrome/i.test(navigator.userAgent));
-
-    // Scene
-    // Scene - Lush verdant green horizon & night emerald sky
-    const scene = new THREE.Scene();
-    const daySkyColor = new THREE.Color(0x86efac); // Lush pastel meadow green
-    const nightSkyColor = new THREE.Color(0x064e3b); // Deep emerald forest night
-    const daySunColor = new THREE.Color(0xfffaed);
-    const nightMoonColor = new THREE.Color(0x6ee7b7);
-    const dayHemiSky = new THREE.Color(0xbbf7d0);
-    const nightHemiSky = new THREE.Color(0x064e3b);
-    const dayHemiGround = new THREE.Color(0x22c55e);
-    const nightHemiGround = new THREE.Color(0x022c22);
-
-    scene.background = new THREE.Color(0x86efac);
-    // Expand fog range so mobile camera distance keeps the green atmosphere without fogging buildings
-    scene.fog = new THREE.Fog(0x86efac, 55, 260);
-
-    // Camera - Isometric top-down perspective with dynamic mobile framing
-    const width = container.clientWidth || 800;
-    const height = container.clientHeight || 600;
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 280);
-
-    const defaultCamPos = new THREE.Vector3(0, 24, 28);
-    const updateCameraFraming = (w: number, h: number) => {
-      const aspect = w / h;
-      camera.aspect = aspect;
-      if (aspect < 1.0) {
-        // Mobile phone portrait: scale camera distance comfortably while keeping town centered in lush green
-        const mobileFactor = Math.max(1.4, Math.min(2.1, 1.05 / aspect));
-        camera.fov = 44;
-        camera.position.set(0, 22 * mobileFactor, 26 * mobileFactor);
-        camera.lookAt(0, 0, -1.8);
-      } else {
-        camera.fov = 42;
-        camera.position.set(0, 24, 28);
-        camera.lookAt(0, 0, 0);
-      }
-      defaultCamPos.copy(camera.position);
-      camera.updateProjectionMatrix();
-    };
-
-    updateCameraFraming(width, height);
-
-    // Renderer
-    let renderer: THREE.WebGLRenderer;
-    try {
-      renderer = new THREE.WebGLRenderer({
-        antialias: !isHeadless,
-        powerPreference: 'high-performance',
-      });
-    } catch (err: any) {
-      console.warn('WebGL initialization failed, falling back to 2D view:', err);
-      setWebglError(err?.message || 'WebGL tidak tersedia pada perangkat/browser ini');
-      return;
-    }
-
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(isHeadless ? 1 : Math.min(window.devicePixelRatio, 2));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
-    renderer.shadowMap.enabled = !isHeadless;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-    container.appendChild(renderer.domElement);
-
-    // Lighting
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xcfd8dc, 0.85);
-    hemiLight.position.set(0, 30, 0);
-    scene.add(hemiLight);
-
-    const dirLight = new THREE.DirectionalLight(0xfffaed, 1.4);
-    dirLight.position.set(15, 28, 18);
-    if (!isHeadless) {
-      dirLight.castShadow = true;
-      dirLight.shadow.mapSize.width = 1024;
-      dirLight.shadow.mapSize.height = 1024;
-      dirLight.shadow.camera.near = 0.5;
-      dirLight.shadow.camera.far = 70;
-      const d = 26;
-      dirLight.shadow.camera.left = -d;
-      dirLight.shadow.camera.right = d;
-      dirLight.shadow.camera.top = d;
-      dirLight.shadow.camera.bottom = -d;
-      dirLight.shadow.bias = -0.0005;
-      dirLight.shadow.normalBias = 0.02;
-    }
-    scene.add(dirLight);
-
-    // Twinkling Starfield for Night
-    const starCount = 450;
-    const starsGeo = new THREE.BufferGeometry();
-    const starPositions = new Float32Array(starCount * 3);
-    for (let i = 0; i < starCount; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 0.75 + 0.25);
-      const r = 55 + Math.random() * 35;
-      starPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      starPositions[i * 3 + 1] = r * Math.cos(phi);
-      starPositions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-    }
-    starsGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const starsMat = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.85,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-    });
-    const starField = new THREE.Points(starsGeo, starsMat);
-    scene.add(starField);
-
-    // =========================================================================
-    // LUSH GREEN GROUND & SURROUNDINGS (Fix Mobile White Horizon)
-    // =========================================================================
-    // Expansive Ground Plane with rich grass green covering all camera angles
-    const groundGeo = new THREE.PlaneGeometry(500, 500);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x4ade80, // Rich vibrant lush spring grass green
-      roughness: 0.88,
-      metalness: 0.04,
-    });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.05;
-    ground.receiveShadow = !isHeadless;
-    scene.add(ground);
-
-    // Surrounding Rolling Green Hills / Perimeter Mounds
-    const hillMat = new THREE.MeshStandardMaterial({
-      color: 0x22c55e, // Emerald green hill slope
-      roughness: 0.9,
-      metalness: 0.02,
-    });
-    const hillGroup = new THREE.Group();
-    const hillGeo = new THREE.ConeGeometry(9.0, 4.5, 7);
-    const hillPositions: [number, number, number, number][] = [
-      [-38, 1.8, -32, 1.4],
-      [-18, 1.6, -42, 1.6],
-      [12, 1.7, -40, 1.5],
-      [36, 1.9, -35, 1.3],
-      [-42, 1.6, -10, 1.2],
-      [42, 1.8, -8, 1.4],
-      [-40, 1.7, 18, 1.3],
-      [38, 1.9, 22, 1.5],
-      [-25, 1.6, 36, 1.4],
-      [8, 1.8, 38, 1.3],
-      [28, 1.7, 34, 1.2],
-    ];
-    hillPositions.forEach(([hx, hy, hz, hScale]) => {
-      const hill = new THREE.Mesh(hillGeo, hillMat);
-      hill.position.set(hx, hy, hz);
-      hill.scale.set(hScale, hScale * 0.75, hScale);
-      hill.receiveShadow = !isHeadless;
-      hillGroup.add(hill);
-    });
-    scene.add(hillGroup);
-
-    // =========================================================================
-    // MOVING 3D CLOUDS SYSTEM ("Efek Awan Berjalan")
-    // =========================================================================
-    const cloudsList: {
-      group: THREE.Group;
-      speed: number;
-      baseY: number;
-      bobSeed: number;
-    }[] = [];
-
-    const cloudPuffGeo = new THREE.DodecahedronGeometry(1.6, 1);
-    const cloudMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.35,
-      metalness: 0.05,
-      transparent: true,
-      opacity: 0.92,
-      flatShading: true,
-    });
-
-    const createCloud = (x: number, y: number, z: number, scale: number, speed: number) => {
-      const cGroup = new THREE.Group();
-      cGroup.position.set(x, y, z);
-      cGroup.scale.set(scale, scale * 0.65, scale);
-
-      // Puffs inside cloud
-      const puffOffsets: [number, number, number, number][] = [
-        [0, 0, 0, 1.0],
-        [1.3, -0.2, 0.3, 0.78],
-        [-1.3, -0.15, -0.2, 0.82],
-        [0.6, 0.35, 0.1, 0.75],
-        [-0.5, 0.3, 0.2, 0.72],
-        [0.2, -0.25, 0.8, 0.68],
-        [-0.3, -0.2, -0.7, 0.65],
-      ];
-
-      puffOffsets.forEach(([px, py, pz, pScale]) => {
-        const puff = new THREE.Mesh(cloudPuffGeo, cloudMat);
-        puff.position.set(px, py, pz);
-        puff.scale.setScalar(pScale);
-        puff.castShadow = !isHeadless;
-        cGroup.add(puff);
+      setActiveNpcBubble({
+        npcId: chosen.id,
+        text,
       });
 
-      scene.add(cGroup);
-      cloudsList.push({
-        group: cGroup,
-        speed,
-        baseY: y,
-        bobSeed: Math.random() * Math.PI * 2,
-      });
-    };
-
-    // Instantiate 10 drifting clouds hovering over the town
-    const initialCloudConfigs = [
-      { x: -50, y: 17, z: -28, scale: 2.2, speed: 1.4 },
-      { x: -25, y: 19, z: -12, scale: 2.6, speed: 1.8 },
-      { x: 0, y: 16, z: -38, scale: 2.0, speed: 1.2 },
-      { x: 26, y: 18, z: -18, scale: 2.4, speed: 1.6 },
-      { x: -38, y: 20, z: 10, scale: 2.5, speed: 1.5 },
-      { x: -10, y: 17, z: 20, scale: 2.1, speed: 1.3 },
-      { x: 16, y: 19, z: 26, scale: 2.3, speed: 1.7 },
-      { x: 40, y: 16, z: 6, scale: 2.7, speed: 1.9 },
-      { x: -60, y: 18, z: -42, scale: 2.8, speed: 1.5 },
-      { x: -12, y: 21, z: -48, scale: 3.0, speed: 1.4 },
-    ];
-
-    initialCloudConfigs.forEach((cfg) => {
-      createCloud(cfg.x, cfg.y, cfg.z, cfg.scale, cfg.speed);
-    });
-
-    // Cobblestone Plaza & Pathways
-    const plazaGeo = new THREE.CylinderGeometry(7.5, 7.5, 0.06, 32);
-    const plazaMat = new THREE.MeshStandardMaterial({
-      color: 0xf1f5f9,
-      roughness: 0.7,
-      metalness: 0.1,
-    });
-    const plaza = new THREE.Mesh(plazaGeo, plazaMat);
-    plaza.position.set(0, 0, 0);
-    plaza.receiveShadow = !isHeadless;
-    scene.add(plaza);
-
-    // Pathways to each building (skip monumen_warga which is at center [0,0,0])
-    BUILDINGS_INFO.forEach((b) => {
-      if (b.id === 'monumen_warga') return;
-      const dx = b.position[0];
-      const dz = b.position[2];
-      const dist = Math.hypot(dx, dz);
-      const angle = Math.atan2(dz, dx);
-      const pathGeo = new THREE.BoxGeometry(dist, 0.04, 2.4);
-      const pathMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 });
-      const pathMesh = new THREE.Mesh(pathGeo, pathMat);
-      pathMesh.position.set(dx / 2, 0.01, dz / 2);
-      pathMesh.rotation.y = -angle;
-      pathMesh.receiveShadow = !isHeadless;
-      scene.add(pathMesh);
-    });
-
-    // Street Lamps with Warm Amber Lanterns for Night
-    const lampPostMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6, metalness: 0.8 });
-    const lampBulbMat = new THREE.MeshStandardMaterial({
-      color: 0xffedd5,
-      emissive: 0xf59e0b,
-      emissiveIntensity: 0,
-      roughness: 0.3,
-    });
-
-    const lampPositions: [number, number][] = [
-      [-5.5, -6],
-      [5.5, -6],
-      [-5.5, 6],
-      [5.5, 6],
-      [-8.5, 0],
-      [8.5, 0],
-    ];
-
-    const lampLights: THREE.PointLight[] = [];
-
-    lampPositions.forEach(([lx, lz]) => {
-      const lampGroup = new THREE.Group();
-      lampGroup.position.set(lx, 0, lz);
-
-      // Pole
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 2.8, 8), lampPostMat);
-      pole.position.y = 1.4;
-      pole.castShadow = !isHeadless;
-      lampGroup.add(pole);
-
-      // Cross arm
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.08), lampPostMat);
-      arm.position.y = 2.75;
-      lampGroup.add(arm);
-
-      // Lantern Head
-      const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.45, 0.32), lampBulbMat);
-      lantern.position.y = 2.55;
-      lampGroup.add(lantern);
-
-      // PointLight
-      if (!isHeadless) {
-        const pointLight = new THREE.PointLight(0xf59e0b, 0, 14, 2);
-        pointLight.position.y = 2.5;
-        lampGroup.add(pointLight);
-        lampLights.push(pointLight);
-      }
-
-      scene.add(lampGroup);
-    });
-
-    // Decorative Low-Poly Trees
-    const treePositions = [
-      [-6, -4], [6, -4], [-8, 4], [8, 4],
-      [-18, -2], [18, -2], [-18, 12], [18, 12],
-      [-5, -20], [5, -20], [-20, -18], [20, -18],
-      [-16, 20], [16, 20], [0, 22]
-    ];
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
-    const foliageMat1 = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.8 });
-    const foliageMat2 = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.8 });
-
-    treePositions.forEach(([tx, tz], i) => {
-      const treeGroup = new THREE.Group();
-      treeGroup.position.set(tx, 0, tz);
-
-      const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.6, 8);
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-      trunk.position.y = 0.8;
-      trunk.castShadow = !isHeadless;
-      treeGroup.add(trunk);
-
-      const fMat = i % 2 === 0 ? foliageMat1 : foliageMat2;
-      const f1 = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.2, 7), fMat);
-      f1.position.y = 2.4;
-      f1.castShadow = !isHeadless;
-      treeGroup.add(f1);
-
-      const f2 = new THREE.Mesh(new THREE.ConeGeometry(1.2, 1.8, 7), fMat);
-      f2.position.y = 3.3;
-      f2.castShadow = !isHeadless;
-      treeGroup.add(f2);
-
-      scene.add(treeGroup);
-    });
-
-    // Window Material that glows at night
-    const windowMat = new THREE.MeshStandardMaterial({
-      color: 0x60a5fa,
-      emissive: 0xf59e0b,
-      emissiveIntensity: 0,
-      roughness: 0.3,
-    });
-
-    // BUILDINGS CREATION
-    const buildingMeshes: { id: BuildingId; group: THREE.Group; beacon: THREE.Mesh }[] = [];
-
-    BUILDINGS_INFO.forEach((b) => {
-      const bGroup = new THREE.Group();
-      bGroup.position.set(b.position[0], 0, b.position[2]);
-      bGroup.userData = { buildingId: b.id, buildingInfo: b };
-
-      // Base Foundation (rectangular for buildings, round for monumen_warga)
-      if (b.id !== 'monumen_warga') {
-        const baseGeo = new THREE.BoxGeometry(5.2, 0.4, 5.2);
-        const baseMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.7 });
-        const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-        baseMesh.position.y = 0.2;
-        baseMesh.receiveShadow = !isHeadless;
-        bGroup.add(baseMesh);
-      }
-
-      // Unique Architecture per building
-      if (b.id === 'balai_kota') {
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
-        const roofMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.3, metalness: 0.2 });
-        const goldMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3, metalness: 0.7 });
-
-        const body = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.6, 4.2), wallMat);
-        body.position.y = 2.0;
-        body.castShadow = !isHeadless;
-        bGroup.add(body);
-
-        // Pillars
-        for (let px of [-1.6, -0.6, 0.6, 1.6]) {
-          const col = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 3.4, 12), wallMat);
-          col.position.set(px, 1.9, 2.2);
-          col.castShadow = !isHeadless;
-          bGroup.add(col);
-        }
-
-        // Portico pediment
-        const pediment = new THREE.Mesh(new THREE.ConeGeometry(2.4, 1.4, 4), roofMat);
-        pediment.rotation.y = Math.PI / 4;
-        pediment.position.set(0, 4.3, 2.1);
-        bGroup.add(pediment);
-
-        // Grand Dome
-        const domeBase = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.8, 16), wallMat);
-        domeBase.position.y = 4.2;
-        bGroup.add(domeBase);
-
-        const dome = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), roofMat);
-        dome.position.y = 4.6;
-        bGroup.add(dome);
-
-        // Gold Spire
-        const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.2, 1.5, 8), goldMat);
-        spire.position.y = 6.2;
-        bGroup.add(spire);
-
-        // Clock disc
-        const clock = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.1, 16), goldMat);
-        clock.rotation.x = Math.PI / 2;
-        clock.position.set(0, 3.2, 2.15);
-        bGroup.add(clock);
-
-        // Balai Kota glowing windows
-        const win1 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 0.08), windowMat);
-        win1.position.set(-1.1, 2.1, 2.12);
-        bGroup.add(win1);
-        const win2 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 0.08), windowMat);
-        win2.position.set(1.1, 2.1, 2.12);
-        bGroup.add(win2);
-
-      } else if (b.id === 'perpustakaan') {
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.6 });
-        const roofMat = new THREE.MeshStandardMaterial({ color: 0x059669, roughness: 0.4 });
-        const timberMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7 });
-
-        const body = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.4, 4.4), wallMat);
-        body.position.y = 1.9;
-        body.castShadow = !isHeadless;
-        bGroup.add(body);
-
-        // Mansard Roof
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4, 2.2, 4), roofMat);
-        roof.rotation.y = Math.PI / 4;
-        roof.position.y = 4.4;
-        bGroup.add(roof);
-
-        // Arch Entrance
-        const arch = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.2, 8, 16, Math.PI), timberMat);
-        arch.position.set(0, 1.8, 2.25);
-        bGroup.add(arch);
-
-        // Signboard
-        const sign = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 0.1), timberMat);
-        sign.position.set(0, 2.9, 2.25);
-        bGroup.add(sign);
-
-        // Perpustakaan Windows
-        const libWinL = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.08), windowMat);
-        libWinL.position.set(-1.2, 1.9, 2.22);
-        bGroup.add(libWinL);
-        const libWinR = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.08), windowMat);
-        libWinR.position.set(1.2, 1.9, 2.22);
-        bGroup.add(libWinR);
-
-      } else if (b.id === 'taman_refleksi') {
-        const woodMat = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.6 });
-        const cherryMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.8 });
-        const pagodaMat = new THREE.MeshStandardMaterial({ color: 0xdb2777, roughness: 0.3 });
-
-        // Circular stone garden wall
-        const gWall = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 0.5, 24), new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }));
-        gWall.position.y = 0.25;
-        bGroup.add(gWall);
-
-        // Wooden pavilion pillars
-        for (let angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
-          const px = Math.cos(angle) * 1.4;
-          const pz = Math.sin(angle) * 1.4;
-          const pCol = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.8, 8), woodMat);
-          pCol.position.set(px, 1.6, pz);
-          bGroup.add(pCol);
-        }
-
-        // Curved Tiered Roof
-        const roof1 = new THREE.Mesh(new THREE.ConeGeometry(2.5, 0.9, 8), pagodaMat);
-        roof1.position.y = 3.2;
-        bGroup.add(roof1);
-
-        const roof2 = new THREE.Mesh(new THREE.ConeGeometry(1.7, 0.8, 8), pagodaMat);
-        roof2.position.y = 3.9;
-        bGroup.add(roof2);
-
-        // Miniature Blossom Tree
-        const bTree = new THREE.Mesh(new THREE.DodecahedronGeometry(0.9, 1), cherryMat);
-        bTree.position.set(1.6, 2.0, 1.2);
-        bGroup.add(bTree);
-
-      } else if (b.id === 'menara_mentor') {
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.4 });
-        const purpleMat = new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.2, metalness: 0.5 });
-        const goldMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.8 });
-
-        // Octagonal Tower Body
-        const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.2, 5.2, 8), wallMat);
-        tower.position.y = 2.8;
-        tower.castShadow = !isHeadless;
-        bGroup.add(tower);
-
-        // Observatory Dome
-        const obsDome = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), purpleMat);
-        obsDome.position.y = 5.4;
-        bGroup.add(obsDome);
-
-        // Telescope
-        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, 2.2, 12), goldMat);
-        scope.rotation.x = -Math.PI / 4;
-        scope.rotation.z = Math.PI / 6;
-        scope.position.set(0.6, 6.2, 0.6);
-        bGroup.add(scope);
-
-        // Glowing Orbit Ring
-        const ringGeo = new THREE.TorusGeometry(2.4, 0.1, 8, 24);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
-        const orbitRing = new THREE.Mesh(ringGeo, ringMat);
-        orbitRing.rotation.x = Math.PI / 3;
-        orbitRing.position.y = 3.8;
-        bGroup.add(orbitRing);
-
-      } else if (b.id === 'bengkel_latihan') {
-        const brickMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.8 });
-        const roofMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5 });
-        const ironMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3, metalness: 0.8 });
-
-        const bBody = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.0, 4.0), brickMat);
-        bBody.position.y = 1.7;
-        bBody.castShadow = !isHeadless;
-        bGroup.add(bBody);
-
-        // Industrial Slanted Roof
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.3, 1.8, 4), roofMat);
-        roof.rotation.y = Math.PI / 4;
-        roof.position.y = 3.8;
-        bGroup.add(roof);
-
-        // Chimney
-        const chim = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.6, 0.8), brickMat);
-        chim.position.set(1.4, 4.0, -1.0);
-        bGroup.add(chim);
-
-        // Giant Gear accent
-        const gear = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.2, 6, 12), ironMat);
-        gear.position.set(0, 2.2, 2.1);
-        bGroup.add(gear);
-
-        // Bengkel Windows
-        const bWin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.7, 0.08), windowMat);
-        bWin.position.set(0, 1.1, 2.05);
-        bGroup.add(bWin);
-
-      } else if (b.id === 'kantor_pos') {
-        const redMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 });
-        const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
-        const yellowMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 });
-
-        const pBody = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.8, 3.8), whiteMat);
-        pBody.position.y = 1.6;
-        bGroup.add(pBody);
-
-        // Red Roof
-        const pRoof = new THREE.Mesh(new THREE.ConeGeometry(3.0, 1.8, 4), redMat);
-        pRoof.rotation.y = Math.PI / 4;
-        pRoof.position.y = 3.6;
-        bGroup.add(pRoof);
-
-        // Striped Awning
-        const awning = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 1.0), redMat);
-        awning.rotation.x = 0.2;
-        awning.position.set(0, 1.8, 2.2);
-        bGroup.add(awning);
-
-        // Yellow Postbox Pillar
-        const mailbox = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.2, 12), yellowMat);
-        mailbox.position.set(1.6, 0.8, 2.4);
-        bGroup.add(mailbox);
-
-        // Kantor Pos Windows
-        const posWin = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.08), windowMat);
-        posWin.position.set(-1.0, 1.8, 1.95);
-        bGroup.add(posWin);
-
-      } else if (b.id === 'pasar_prestasi') {
-        const tentMat1 = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.5 });
-        const tentMat2 = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5 });
-        const goldMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.2, metalness: 0.8 });
-
-        const stall = new THREE.Mesh(new THREE.BoxGeometry(4.0, 2.4, 3.8), new THREE.MeshStandardMaterial({ color: 0xfef08a }));
-        stall.position.y = 1.4;
-        bGroup.add(stall);
-
-        // Striped tent canopy
-        const canopy1 = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.6, 6), tentMat1);
-        canopy1.position.set(-0.8, 3.0, 0);
-        bGroup.add(canopy1);
-
-        const canopy2 = new THREE.Mesh(new THREE.ConeGeometry(2.4, 1.5, 6), tentMat2);
-        canopy2.position.set(1.0, 3.2, 0);
-        bGroup.add(canopy2);
-
-        // Trophy star banner
-        const star = new THREE.Mesh(new THREE.DodecahedronGeometry(0.6), goldMat);
-        star.position.set(0, 4.4, 0);
-        bGroup.add(star);
-
-      } else if (b.id === 'monumen_warga') {
-        const stoneMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.6 });
-        const goldMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.3, metalness: 0.8 });
-        const sakuraMat = new THREE.MeshStandardMaterial({
-          color: 0xf472b6,
-          emissive: 0xdb2777,
-          emissiveIntensity: 0.45,
-          roughness: 0.2,
-        });
-        const benchWoodMat = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.7 });
-
-        // Monument Stepped Base
-        const step1 = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.9, 0.25, 28), stoneMat);
-        step1.position.y = 0.12;
-        step1.receiveShadow = !isHeadless;
-        bGroup.add(step1);
-
-        const step2 = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 3.0, 0.3, 24), stoneMat);
-        step2.position.y = 0.38;
-        step2.receiveShadow = !isHeadless;
-        bGroup.add(step2);
-
-        // Water Basin & Surface
-        const waterGeo = new THREE.CylinderGeometry(2.4, 2.4, 0.2, 24);
-        const waterMat = new THREE.MeshStandardMaterial({
-          color: 0x38bdf8,
-          roughness: 0.1,
-          metalness: 0.8,
-        });
-        const water = new THREE.Mesh(waterGeo, waterMat);
-        water.position.y = 0.52;
-        bGroup.add(water);
-
-        // Center Pillar with Gold Rings
-        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.65, 2.4, 16), stoneMat);
-        pillar.position.y = 1.7;
-        pillar.castShadow = !isHeadless;
-        bGroup.add(pillar);
-
-        const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.08, 8, 20), goldMat);
-        ring1.rotation.x = Math.PI / 2;
-        ring1.position.y = 1.2;
-        bGroup.add(ring1);
-
-        const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.08, 8, 20), goldMat);
-        ring2.rotation.x = Math.PI / 2;
-        ring2.position.y = 2.4;
-        bGroup.add(ring2);
-
-        // Monument Sakura Crystal / Flower at Peak
-        const sakuraCrystal = new THREE.Mesh(new THREE.DodecahedronGeometry(0.75, 0), sakuraMat);
-        sakuraCrystal.position.y = 3.35;
-        bGroup.add(sakuraCrystal);
-
-        // 4 Circular Plaza Benches with Gathered Classmates
-        const benchAngles = [0.25, Math.PI / 2 + 0.15, Math.PI + 0.35, (3 * Math.PI) / 2 + 0.25];
-        const studentShirtColors = [0xec4899, 0x10b981, 0x8b5cf6, 0xf59e0b];
-        const studentSkinMat = new THREE.MeshStandardMaterial({ color: 0xfbcfe8, roughness: 0.8 });
-        const studentHairMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
-
-        benchAngles.forEach((angle, idx) => {
-          const bx = Math.cos(angle) * 4.4;
-          const bz = Math.sin(angle) * 4.4;
-
-          // Wooden Bench
-          const bench = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.35, 0.6), benchWoodMat);
-          bench.position.set(bx, 0.25, bz);
-          bench.rotation.y = -angle + Math.PI / 2;
-          bGroup.add(bench);
-
-          // Classmate avatar
-          const cmGroup = new THREE.Group();
-          cmGroup.position.set(bx, 0.45, bz);
-
-          const cmShirtMat = new THREE.MeshStandardMaterial({ color: studentShirtColors[idx], roughness: 0.7 });
-          const cmTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.6, 10), cmShirtMat);
-          cmTorso.position.y = 0.35;
-          cmGroup.add(cmTorso);
-
-          const cmHead = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 12), studentSkinMat);
-          cmHead.position.y = 0.82;
-          cmGroup.add(cmHead);
-
-          const cmHair = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10, 0, Math.PI * 2, 0, Math.PI / 2), studentHairMat);
-          cmHair.position.y = 0.92;
-          cmGroup.add(cmHair);
-
-          bGroup.add(cmGroup);
-        });
-      }
-
-      // Beacon indicator over building for new material / mission
-      const beaconGeo = new THREE.OctahedronGeometry(0.45, 0);
-      const beaconMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, wireframe: false });
-      const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-      beacon.position.y = b.id === 'monumen_warga' ? 5.2 : 7.0;
-      bGroup.add(beacon);
-
-      scene.add(bGroup);
-      buildingMeshes.push({ id: b.id, group: bGroup, beacon });
-    });
-
-    // 3D STUDENT AVATAR - Distinct Models for Male ('L') and Female ('P')
-    const avatarGroup = new THREE.Group();
-    avatarGroup.position.set(0, 0, 3.5);
-
-    const isFemale = studentGender === 'P';
-
-    // Skin & Materials
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xfbcfe8, roughness: 0.8 });
-    const hairMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
-    const shirtMat = new THREE.MeshStandardMaterial({
-      color: isFemale ? 0x0284c7 : 0x2563eb, // DKV cyan-blue for female, vibrant royal blue for male
-      roughness: 0.7,
-    });
-    const bottomMat = new THREE.MeshStandardMaterial({
-      color: 0x1e1b4b, // Deep navy school skirt / trousers
-      roughness: 0.85,
-    });
-    const bagMat = new THREE.MeshStandardMaterial({
-      color: isFemale ? 0xf43f5e : 0xf59e0b, // Rose pink sling bag for female, amber backpack for male
-      roughness: 0.6,
-    });
-    const hijabMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc, // Clean white veil/hijab
-      roughness: 0.65,
-    });
-    const ribbonMat = new THREE.MeshStandardMaterial({
-      color: 0xec4899,
-      roughness: 0.5,
-    });
-
-    // Head
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), skinMat);
-    head.position.y = 1.7;
-    head.castShadow = !isHeadless;
-    avatarGroup.add(head);
-
-    if (isFemale) {
-      // --- PEREMPUAN: Stylized Hijab & School Skirt ---
-      // Hijab crown covering upper head
-      const hijabCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.42, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.75),
-        hijabMat
-      );
-      hijabCap.position.y = 1.75;
-      hijabCap.castShadow = !isHeadless;
-      avatarGroup.add(hijabCap);
-
-      // Hijab cowl/drape covering neck & shoulders
-      const hijabDrape = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.36, 0.48, 0.46, 16),
-        hijabMat
-      );
-      hijabDrape.position.y = 1.45;
-      hijabDrape.castShadow = !isHeadless;
-      avatarGroup.add(hijabDrape);
-
-      // Brooch pin on veil
-      const brooch = new THREE.Mesh(new THREE.DodecahedronGeometry(0.08), ribbonMat);
-      brooch.position.set(0.34, 1.72, 0.2);
-      avatarGroup.add(brooch);
-
-      // Torso - Feminine blouse
-      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.33, 0.75, 12), shirtMat);
-      torso.position.y = 1.1;
-      torso.castShadow = !isHeadless;
-      avatarGroup.add(torso);
-
-      // Skirt (Rok Panjang Sekolah)
-      const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.44, 0.65, 14), bottomMat);
-      skirt.position.y = 0.55;
-      skirt.castShadow = !isHeadless;
-      avatarGroup.add(skirt);
-
-      // Side Sling Bag (Tas Selempang)
-      const slingBag = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.38, 0.16), bagMat);
-      slingBag.position.set(0.34, 0.88, 0);
-      slingBag.rotation.z = -0.15;
-      avatarGroup.add(slingBag);
-
-      // Strap across chest
-      const strap = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.03, 6, 16), bagMat);
-      strap.rotation.x = Math.PI / 3;
-      strap.rotation.y = 0.5;
-      strap.position.set(0, 1.15, 0);
-      avatarGroup.add(strap);
-    } else {
-      // --- LAKI-LAKI: Cropped Hair, Polo Shirt & Backpack ---
-      const hair = new THREE.Mesh(
-        new THREE.SphereGeometry(0.4, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2),
-        hairMat
-      );
-      hair.position.y = 1.82;
-      avatarGroup.add(hair);
-
-      // Torso - Broader shoulders
-      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.36, 0.75, 12), shirtMat);
-      torso.position.y = 1.1;
-      torso.castShadow = !isHeadless;
-      avatarGroup.add(torso);
-
-      // Backpack
-      const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.25), bagMat);
-      backpack.position.set(0, 1.1, -0.32);
-      avatarGroup.add(backpack);
-    }
-
-    // Legs
-    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.7, 8), bottomMat);
-    leftLeg.position.set(-0.16, 0.4, 0);
-    avatarGroup.add(leftLeg);
-
-    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.7, 8), bottomMat);
-    rightLeg.position.set(0.16, 0.4, 0);
-    avatarGroup.add(rightLeg);
-
-    // Soft Contact Shadow Plane under Avatar
-    const shadowGeo = new THREE.CircleGeometry(0.65, 16);
-    const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 });
-    const avatarShadow = new THREE.Mesh(shadowGeo, shadowMat);
-    avatarShadow.rotation.x = -Math.PI / 2;
-    avatarShadow.position.y = 0.02;
-    avatarGroup.add(avatarShadow);
-
-    scene.add(avatarGroup);
-
-    // ---------------------------------------------------------
-    // RANDOM WANDERING CITIZENS / CLASSMATES ("Orang-orang Bergerak Random")
-    // ---------------------------------------------------------
-    interface WanderingStudent {
-      group: THREE.Group;
-      leftLeg: THREE.Mesh;
-      rightLeg: THREE.Mesh;
-      targetPos: THREE.Vector3;
-      speed: number;
-      pauseTimer: number;
-      isPaused: boolean;
-      cycleOffset: number;
-    }
-
-    const wanderingStudents: WanderingStudent[] = [];
-
-    // Helper to generate a random walkable target on town paths and plazas
-    const getNextWalkTarget = (): THREE.Vector3 => {
-      const zone = Math.floor(Math.random() * 5);
-      let tx = 0;
-      let tz = 0;
-      if (zone === 0) {
-        // Plaza around Monument
-        const angle = Math.random() * Math.PI * 2;
-        const rad = 2.2 + Math.random() * 3.8;
-        tx = Math.cos(angle) * rad;
-        tz = Math.sin(angle) * rad;
-      } else if (zone === 1) {
-        // East walkways towards Bengkel & Kantor Pos
-        tx = 5 + Math.random() * 6;
-        tz = -6 + Math.random() * 12;
-      } else if (zone === 2) {
-        // West walkways towards Perpustakaan & Taman Refleksi
-        tx = -11 + Math.random() * 6;
-        tz = -6 + Math.random() * 12;
-      } else if (zone === 3) {
-        // North avenue towards Balai Kota
-        tx = -4 + Math.random() * 8;
-        tz = -11 + Math.random() * 5;
-      } else {
-        // South walkway towards Menara Mentor
-        tx = -4 + Math.random() * 8;
-        tz = 5 + Math.random() * 6;
-      }
-      return new THREE.Vector3(tx, 0, tz);
-    };
-
-    const npcConfigs = [
-      { isFemale: true, shirtColor: 0x06b6d4, x: -3.2, z: 2.2, speed: 1.4 },
-      { isFemale: false, shirtColor: 0xf59e0b, x: 4.2, z: -3.0, speed: 1.7 },
-      { isFemale: true, shirtColor: 0xec4899, x: -6.0, z: -2.5, speed: 1.3 },
-      { isFemale: false, shirtColor: 0x3b82f6, x: 5.5, z: 3.2, speed: 1.6 },
-      { isFemale: true, shirtColor: 0xa855f7, x: 2.0, z: -6.2, speed: 1.5 },
-      { isFemale: false, shirtColor: 0x10b981, x: -4.2, z: 5.2, speed: 1.8 },
-    ];
-
-    npcConfigs.forEach((cfg, idx) => {
-      const npcGroup = new THREE.Group();
-      npcGroup.position.set(cfg.x, 0, cfg.z);
-
-      const npcShirtMat = new THREE.MeshStandardMaterial({ color: cfg.shirtColor, roughness: 0.7 });
-
-      // Head
-      const npcHead = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 12), skinMat);
-      npcHead.position.y = 1.55;
-      npcHead.castShadow = !isHeadless;
-      npcGroup.add(npcHead);
-
-      if (cfg.isFemale) {
-        // Hijab
-        const npcHijab = new THREE.Mesh(
-          new THREE.SphereGeometry(0.36, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.78),
-          hijabMat
+      setTimeout(() => {
+        setActiveNpcBubble((prev) => (prev?.npcId === chosen.id ? null : prev));
+      }, 3500);
+    }, 13000);
+
+    return () => clearInterval(timer);
+  }, [npcList]);
+
+  // Master Animation Loop: Clouds drift, Fireflies hover, Player & NPCs walk smoothly
+  useEffect(() => {
+    let lastTime = performance.now();
+
+    const loop = (now: number) => {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+      const t = now / 1000;
+
+      // 1. Animate Moving Clouds (Day mode)
+      if (!isNight) {
+        setClouds((prev) =>
+          prev.map((c) => {
+            let nextX = c.x + c.speed * dt;
+            if (nextX > 480) nextX = -480;
+            return { ...c, x: nextX };
+          })
         );
-        npcHijab.position.y = 1.58;
-        npcGroup.add(npcHijab);
+      }
 
-        const npcCowl = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.36, 12), hijabMat);
-        npcCowl.position.y = 1.32;
-        npcGroup.add(npcCowl);
-
-        // Blouse
-        const npcTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.29, 0.62, 10), npcShirtMat);
-        npcTorso.position.y = 1.02;
-        npcGroup.add(npcTorso);
-
-        // Skirt
-        const npcSkirt = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.37, 0.52, 12), bottomMat);
-        npcSkirt.position.y = 0.5;
-        npcGroup.add(npcSkirt);
-      } else {
-        // Boy hair
-        const npcHair = new THREE.Mesh(
-          new THREE.SphereGeometry(0.34, 10, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-          hairMat
+      // 2. Animate Fireflies (Night mode)
+      if (isNight) {
+        setFireflyOffsets(
+          fireflyBases.map((f) => ({
+            dx: Math.sin(t * f.speed + f.phase) * 12,
+            dy: Math.cos(t * f.speed * 0.8 + f.phase) * 8,
+            glow: 0.35 + 0.65 * Math.abs(Math.sin(t * 3.5 + f.phase)),
+          }))
         );
-        npcHair.position.y = 1.64;
-        npcGroup.add(npcHair);
-
-        // Torso
-        const npcTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.31, 0.65, 10), npcShirtMat);
-        npcTorso.position.y = 1.02;
-        npcGroup.add(npcTorso);
-
-        // Backpack
-        const npcBag = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.2), bagMat);
-        npcBag.position.set(0, 1.02, -0.25);
-        npcGroup.add(npcBag);
       }
 
-      // Legs
-      const npcLeftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.58, 6), bottomMat);
-      npcLeftLeg.position.set(-0.12, 0.32, 0);
-      npcGroup.add(npcLeftLeg);
+      // 3. Animate Player Movement
+      setPlayerPos((curr) => {
+        const dx = targetPos.x - curr.x;
+        const dy = targetPos.y - curr.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-      const npcRightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.58, 6), bottomMat);
-      npcRightLeg.position.set(0.12, 0.32, 0);
-      npcGroup.add(npcRightLeg);
-
-      // Shadow
-      const npcShadow = new THREE.Mesh(shadowGeo, shadowMat);
-      npcShadow.rotation.x = -Math.PI / 2;
-      npcShadow.position.y = 0.02;
-      npcGroup.add(npcShadow);
-
-      scene.add(npcGroup);
-
-      wanderingStudents.push({
-        group: npcGroup,
-        leftLeg: npcLeftLeg,
-        rightLeg: npcRightLeg,
-        targetPos: getNextWalkTarget(),
-        speed: cfg.speed,
-        pauseTimer: Math.random() * 2,
-        isPaused: false,
-        cycleOffset: idx * 1.5,
-      });
-    });
-
-    // Click / Target Navigation State
-    let targetPos = new THREE.Vector3(0, 0, 3.5);
-    let isMoving = false;
-    let targetBuildingId: BuildingId | null = null;
-
-    // Raycaster
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      const clientX = 'touches' in event ? event.touches[0].clientX : event.clientX;
-      const clientY = 'touches' in event ? event.touches[0].clientY : event.clientY;
-
-      mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-
-      // Check building click first
-      const buildingHit = raycaster.intersectObjects(
-        buildingMeshes.map((b) => b.group),
-        true
-      );
-
-      if (buildingHit.length > 0) {
-        let parent: THREE.Object3D | null = buildingHit[0].object;
-        while (parent && !parent.userData?.buildingId) {
-          parent = parent.parent;
-        }
-        if (parent && parent.userData?.buildingId) {
-          const bId = parent.userData.buildingId as BuildingId;
-          const bInfo = BUILDINGS_INFO.find((b) => b.id === bId);
-          if (bInfo) {
-            if (bId === 'monumen_warga') {
-              targetPos.set(0, 0, 2.8);
-            } else {
-              targetPos.set(bInfo.position[0] * 0.7, 0, bInfo.position[2] * 0.7);
-            }
-            targetBuildingId = bId;
-            isMoving = true;
-            setIsWalking(true);
-            return;
-          }
-        }
-      }
-
-      // Check ground click
-      const groundHit = raycaster.intersectObject(ground);
-      if (groundHit.length > 0) {
-        const point = groundHit[0].point;
-        const clampedX = THREE.MathUtils.clamp(point.x, -22, 22);
-        const clampedZ = THREE.MathUtils.clamp(point.z, -22, 22);
-        targetPos.set(clampedX, 0, clampedZ);
-        targetBuildingId = null;
-        isMoving = true;
-        setIsWalking(true);
-      }
-    };
-
-    const handlePointerMove = (event: MouseEvent) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-      const buildingHit = raycaster.intersectObjects(
-        buildingMeshes.map((b) => b.group),
-        true
-      );
-
-      if (buildingHit.length > 0) {
-        let parent: THREE.Object3D | null = buildingHit[0].object;
-        while (parent && !parent.userData?.buildingId) {
-          parent = parent.parent;
-        }
-        if (parent && parent.userData?.buildingInfo) {
-          setHoveredBuilding(parent.userData.buildingInfo);
-          renderer.domElement.style.cursor = 'pointer';
-          return;
-        }
-      }
-
-      setHoveredBuilding(null);
-      renderer.domElement.style.cursor = 'default';
-    };
-
-    const domElement = renderer.domElement;
-    domElement.addEventListener('click', handlePointerDown);
-    domElement.addEventListener('mousemove', handlePointerMove);
-
-    // Resize handler
-    const handleResize = () => {
-      if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      updateCameraFraming(w, h);
-      renderer.setSize(w, h);
-    };
-    window.addEventListener('resize', handleResize);
-
-    // Day & Night smooth factor
-    let currentNightFactor = 0; // 0 = day, 1 = night
-
-    // Animation Loop
-    let animationFrameId: number;
-    let clock = new THREE.Clock();
-
-    const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
-      const elapsedTime = clock.getElapsedTime();
-
-      // Determine target night factor
-      let targetNightFactor = 0;
-      if (timeOfDayRef.current === 'night') {
-        targetNightFactor = 1.0;
-      } else if (timeOfDayRef.current === 'day') {
-        targetNightFactor = 0.0;
-      } else if (timeOfDayRef.current === 'auto') {
-        // Smooth ~80s day/night sinusoidal cycle
-        targetNightFactor = (Math.sin(elapsedTime * 0.08) + 1) / 2;
-      }
-
-      // Smoothly interpolate night factor
-      currentNightFactor = THREE.MathUtils.damp(currentNightFactor, targetNightFactor, 3.5, delta);
-
-      // 1. Sky & Fog color transition
-      (scene.background as THREE.Color).lerpColors(daySkyColor, nightSkyColor, currentNightFactor);
-      if (scene.fog && scene.fog instanceof THREE.Fog) {
-        scene.fog.color.lerpColors(daySkyColor, nightSkyColor, currentNightFactor);
-        scene.fog.near = THREE.MathUtils.lerp(45, 35, currentNightFactor);
-        scene.fog.far = THREE.MathUtils.lerp(160, 140, currentNightFactor);
-      }
-
-      // 2. Sun to Moon light transition
-      dirLight.color.lerpColors(daySunColor, nightMoonColor, currentNightFactor);
-      dirLight.intensity = THREE.MathUtils.lerp(1.4, 0.42, currentNightFactor);
-
-      // 3. Ambient Hemisphere light
-      hemiLight.color.lerpColors(dayHemiSky, nightHemiSky, currentNightFactor);
-      hemiLight.groundColor.lerpColors(dayHemiGround, nightHemiGround, currentNightFactor);
-      hemiLight.intensity = THREE.MathUtils.lerp(0.85, 0.32, currentNightFactor);
-
-      // 4. Starfield visibility & twinkling
-      starsMat.opacity = currentNightFactor * 0.92;
-      if (currentNightFactor > 0.05) {
-        starsMat.size = 0.8 + Math.sin(elapsedTime * 2.5) * 0.15;
-      }
-
-      // 5. Moving Clouds Animation & Night Dimming ("Efek Awan Berjalan")
-      cloudMat.color.lerpColors(new THREE.Color(0xffffff), new THREE.Color(0x94a3b8), currentNightFactor);
-      cloudsList.forEach((cloud) => {
-        cloud.group.position.x += cloud.speed * delta;
-        cloud.group.position.y = cloud.baseY + Math.sin(elapsedTime * 0.7 + cloud.bobSeed) * 0.35;
-        if (cloud.group.position.x > 68) {
-          cloud.group.position.x = -68;
-          cloud.group.position.z = (Math.random() - 0.5) * 85;
-        }
-      });
-
-      // 6. Street Lamps & Lantern PointLights
-      lampBulbMat.emissiveIntensity = currentNightFactor * 1.6;
-      lampLights.forEach((pl) => {
-        pl.intensity = currentNightFactor * 1.8;
-      });
-
-      // 7. Building Windows glow
-      windowMat.emissiveIntensity = currentNightFactor * 0.85;
-
-      // Animate building beacons & indicators
-      buildingMeshes.forEach((bm) => {
-        const hasNew = newMateriBuildingIdsRef.current.includes(bm.id);
-        bm.beacon.visible = hasNew;
-        if (hasNew) {
-          bm.beacon.rotation.y += delta * 2.5;
-          bm.beacon.position.y = 6.8 + Math.sin(elapsedTime * 4) * 0.35;
-        }
-      });
-
-      // Animate Avatar Movement
-      if (isMoving) {
-        const currentPos = avatarGroup.position;
-        const dist = currentPos.distanceTo(targetPos);
-
-        if (dist > 0.25) {
-          const angle = Math.atan2(targetPos.x - currentPos.x, targetPos.z - currentPos.z);
-          avatarGroup.rotation.y = THREE.MathUtils.damp(avatarGroup.rotation.y, angle, 12, delta);
-
-          currentPos.x = THREE.MathUtils.damp(currentPos.x, targetPos.x, 5, delta);
-          currentPos.z = THREE.MathUtils.damp(currentPos.z, targetPos.z, 5, delta);
-
-          const legAngle = Math.sin(elapsedTime * 14) * 0.6;
-          leftLeg.rotation.x = legAngle;
-          rightLeg.rotation.x = -legAngle;
-          avatarGroup.position.y = Math.abs(Math.sin(elapsedTime * 14)) * 0.08;
-        } else {
-          isMoving = false;
+        if (dist < 2.5) {
           setIsWalking(false);
-          leftLeg.rotation.x = 0;
-          rightLeg.rotation.x = 0;
-          avatarGroup.position.y = 0;
-
-          if (targetBuildingId) {
-            const chosen = targetBuildingId;
-            targetBuildingId = null;
-            onSelectBuildingRef.current(chosen);
-          }
+          return targetPos;
         }
-      }
 
-      // Animate Wandering Citizens / Students moving randomly around town
-      wanderingStudents.forEach((ws) => {
-        if (ws.isPaused) {
-          ws.pauseTimer -= delta;
-          ws.leftLeg.rotation.x = THREE.MathUtils.damp(ws.leftLeg.rotation.x, 0, 8, delta);
-          ws.rightLeg.rotation.x = THREE.MathUtils.damp(ws.rightLeg.rotation.x, 0, 8, delta);
-          ws.group.position.y = THREE.MathUtils.damp(ws.group.position.y, 0, 8, delta);
-          // Look around subtly while paused
-          ws.group.rotation.y += Math.sin(elapsedTime * 0.8 + ws.cycleOffset) * 0.003;
-          if (ws.pauseTimer <= 0) {
-            ws.isPaused = false;
-            ws.targetPos = getNextWalkTarget();
-          }
-        } else {
-          const pos = ws.group.position;
-          const dist = pos.distanceTo(ws.targetPos);
-          if (dist > 0.35) {
-            const angle = Math.atan2(ws.targetPos.x - pos.x, ws.targetPos.z - pos.z);
-            ws.group.rotation.y = THREE.MathUtils.damp(ws.group.rotation.y, angle, 6, delta);
-
-            // Move step
-            const moveStep = Math.min(dist, ws.speed * delta);
-            pos.x += Math.sin(angle) * moveStep;
-            pos.z += Math.cos(angle) * moveStep;
-
-            // Leg swing & subtle walking bob
-            const legSwing = Math.sin(elapsedTime * 11 + ws.cycleOffset) * 0.45;
-            ws.leftLeg.rotation.x = legSwing;
-            ws.rightLeg.rotation.x = -legSwing;
-            ws.group.position.y = Math.abs(Math.sin(elapsedTime * 11 + ws.cycleOffset)) * 0.05;
-          } else {
-            // Reached target -> pause and look around
-            ws.isPaused = true;
-            ws.pauseTimer = 2.0 + Math.random() * 3.5;
-          }
+        setIsWalking(true);
+        if (Math.abs(dx) > 1) {
+          setPlayerFacing(dx > 0 ? 'right' : 'left');
         }
+
+        const speed = 140;
+        const stepDist = Math.min(speed * dt, dist);
+        const ratio = stepDist / dist;
+
+        return {
+          x: curr.x + dx * ratio,
+          y: curr.y + dy * ratio,
+        };
       });
 
-      // Smooth camera focus when visiting Monumen Warga gathering
-      if (activeBuildingRef.current === 'monumen_warga') {
-        camera.position.x = THREE.MathUtils.damp(camera.position.x, 0, 3.5, delta);
-        camera.position.y = THREE.MathUtils.damp(camera.position.y, 9.8, 3.5, delta);
-        camera.position.z = THREE.MathUtils.damp(camera.position.z, 12.8, 3.5, delta);
-        camera.lookAt(0, 1.2, 0);
-      } else if (defaultCamPos.lengthSq() > 0 && camera.position.distanceTo(defaultCamPos) > 0.05) {
-        camera.position.x = THREE.MathUtils.damp(camera.position.x, defaultCamPos.x, 3.2, delta);
-        camera.position.y = THREE.MathUtils.damp(camera.position.y, defaultCamPos.y, 3.2, delta);
-        camera.position.z = THREE.MathUtils.damp(camera.position.z, defaultCamPos.z, 3.2, delta);
-        camera.lookAt(0, 0, 0);
-      }
+      // 4. Animate NPCs Walking
+      setNpcList((prevList) =>
+        prevList.map((npc) => {
+          if (npc.waypoints.length <= 1) return npc;
 
-      renderer.render(scene, camera);
+          if (npc.pauseTimer > 0) {
+            return {
+              ...npc,
+              pauseTimer: npc.pauseTimer - dt,
+            };
+          }
+
+          const target = npc.waypoints[npc.currentWaypointIdx];
+          const dx = target.x - npc.x;
+          const dy = target.y - npc.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 3) {
+            // Reached waypoint: pause and select next
+            const nextIdx = (npc.currentWaypointIdx + 1) % npc.waypoints.length;
+            return {
+              ...npc,
+              x: target.x,
+              y: target.y,
+              currentWaypointIdx: nextIdx,
+              pauseTimer: 3 + Math.random() * 4,
+            };
+          }
+
+          const speed = 32; // relaxed patrol speed
+          const moveStep = Math.min(speed * dt, dist);
+          const ratio = moveStep / dist;
+          const newX = npc.x + dx * ratio;
+          const newY = npc.y + dy * ratio;
+          const facing = dx >= 0 ? 'right' : 'left';
+
+          return {
+            ...npc,
+            x: newX,
+            y: newY,
+            facing,
+          };
+        })
+      );
+
+      animationRef.current = requestAnimationFrame(loop);
     };
 
-    animate();
-
+    animationRef.current = requestAnimationFrame(loop);
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', handleResize);
-      if (renderer) renderer.dispose();
-      if (domElement) {
-        domElement.removeEventListener('click', handlePointerDown);
-        domElement.removeEventListener('mousemove', handlePointerMove);
-        if (container.contains(domElement)) {
-          container.removeChild(domElement);
-        }
-      }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, []);
+  }, [targetPos, isNight, fireflyBases]);
 
-  if (webglError) {
-    return (
-      <div className="relative w-full h-full select-none overflow-y-auto bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 p-4 sm:p-6 flex flex-col items-center justify-center">
-        <div className="max-w-xl w-full text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold border border-indigo-500/30">
-            <span>🏛️</span>
-            <span>Mode Peta 2D Kota Refleksi</span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-black font-display text-white">
-            Peta Gedung Pembelajaran
-          </h2>
-          <p className="text-xs text-slate-400">
-            Pilih gedung di bawah untuk langsung membuka ruang belajar dan refleksi:
-          </p>
+  // Click on island ground to walk
+  const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = e.currentTarget;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const cursorPt = pt.matrixTransform(svg.getScreenCTM()?.inverse());
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-left">
-            {BUILDINGS_INFO.map((b) => (
-              <button
-                key={b.id}
-                onClick={() => onSelectBuilding(b.id)}
-                className="p-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 flex items-center gap-3 transition shadow-lg cursor-pointer hover:border-indigo-500"
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md shrink-0 text-base"
-                  style={{ backgroundColor: '#' + b.color.toString(16).padStart(6, '0') }}
-                >
-                  🏛️
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-white">{b.name}</span>
-                    {newMateriBuildingIds.includes(b.id) && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    )}
-                  </div>
-                  <span className="text-xs text-slate-400">{b.tagline}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+    // Clamp inside island
+    const cx = Math.max(-270, Math.min(270, cursorPt.x));
+    const cy = Math.max(-160, Math.min(160, cursorPt.y));
+    setTargetPos({ x: cx, y: cy });
+  };
+
+  // Quick chat send
+  const handleSendChat = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const newMsg: PublicChatMessage = {
+      id: `pchat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      senderId: 'current-student',
+      senderName: studentName,
+      senderHandle: '@' + (studentName.split(' ')[0] || 'siswa').toLowerCase(),
+      className: 'DKV',
+      roomNumber: 2,
+      content: chatInput.trim(),
+      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(':', '.'),
+      createdAt: new Date().toISOString(),
+    };
+
+    StorageService.addPublicChatMessage(newMsg);
+    setChatMessages(StorageService.getPublicChatMessages());
+    setPlayerSpeechBubble(chatInput.trim());
+    setChatInput('');
+
+    setTimeout(() => {
+      setPlayerSpeechBubble(null);
+    }, 4500);
+  };
+
+  // NPC click interaction
+  const handleNpcClick = (npc: ProfessionNPC, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const quote = npc.quotes[Math.floor(Math.random() * npc.quotes.length)];
+    setActiveNpcBubble({
+      npcId: npc.id,
+      text: quote,
+    });
+    setTimeout(() => {
+      setActiveNpcBubble((prev) => (prev?.npcId === npc.id ? null : prev));
+    }, 3500);
+  };
+
+  const handleCafeOrder = (item: 'Kopi' | 'Roti') => {
+    setCafeFeedback(`☕ Barista menyajikan ${item} hangat untukmu!`);
+    setTimeout(() => setCafeFeedback(null), 3000);
+  };
+
+  const handleFishingClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFishingFeedback('🎣 Kail dilempar... Berhasil memancing ikan mujair!');
+    setTimeout(() => setFishingFeedback(null), 3500);
+  };
 
   return (
-    <div className="relative w-full h-full select-none overflow-hidden" data-testid="threejs-town-canvas">
-      {/* 3D WebGL Canvas Mount Container */}
-      <div ref={mountRef} className="w-full h-full" />
+    <div
+      ref={containerRef}
+      className={`relative w-full h-full select-none overflow-hidden transition-colors duration-700 ${
+        isNight ? 'bg-[#0c1427]' : 'bg-gradient-to-b from-[#38bdf8] via-[#7dd3fc] to-[#bae6fd]'
+      }`}
+      data-testid="vector-town-canvas"
+    >
+      {/* 1. SKY DECORATIONS (CELESTIAL & MOVING CLOUDS / FIREFLIES) */}
+      <div className="absolute inset-0 pointer-events-none">
+        {isNight ? (
+          <>
+            {/* Twinkling Starfield */}
+            <div className="absolute top-8 left-1/4 w-1 h-1 bg-white rounded-full opacity-60 animate-pulse" />
+            <div className="absolute top-16 left-1/3 w-1.5 h-1.5 bg-yellow-100 rounded-full opacity-70" />
+            <div className="absolute top-12 right-1/4 w-1 h-1 bg-white rounded-full opacity-50" />
+            <div className="absolute top-24 right-1/3 w-1 h-1 bg-cyan-100 rounded-full opacity-60 animate-pulse" />
+            <div className="absolute top-36 left-12 w-1.5 h-1.5 bg-white rounded-full opacity-40" />
+            <div className="absolute top-48 right-16 w-1 h-1 bg-white rounded-full opacity-50" />
 
-      {/* Hover Info Badge - Positioned neatly directly ABOVE bottom dock with Liquid Glass styling */}
-      {hoveredBuilding && (
-        <div className="absolute bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 pointer-events-none z-30 animate-fade-in-up max-w-[94vw]">
-          <div className="bg-gradient-to-b from-white/25 via-slate-900/80 to-slate-950/95 backdrop-blur-2xl backdrop-saturate-150 text-white px-4 sm:px-5 py-2.5 rounded-2xl shadow-[0_16px_48px_0_rgba(0,0,0,0.55),inset_0_1px_1px_0_rgba(255,255,255,0.25)] border border-white/25 flex items-center gap-3">
-            <span
-              className="w-3.5 h-3.5 rounded-full inline-block shadow-[0_0_10px_currentColor] shrink-0"
-              style={{
-                backgroundColor: '#' + hoveredBuilding.color.toString(16).padStart(6, '0'),
-                color: '#' + hoveredBuilding.color.toString(16).padStart(6, '0'),
-              }}
-            />
-            <div className="min-w-0">
-              <p className="font-extrabold text-xs sm:text-sm leading-tight text-white truncate">
-                {hoveredBuilding.name}
-              </p>
-              <p className="text-[11px] sm:text-xs text-slate-300 font-medium truncate">
-                {hoveredBuilding.tagline}
-              </p>
+            {/* Crescent Moon */}
+            <div className="absolute top-10 right-28 sm:right-36 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-yellow-200/10 blur-xl absolute" />
+              <div className="relative text-3xl sm:text-4xl filter drop-shadow-[0_0_12px_rgba(254,240,138,0.7)] select-none">
+                🌙
+              </div>
             </div>
-            <span className="text-[10px] sm:text-[11px] bg-white/15 px-2.5 py-1 rounded-full text-white font-mono border border-white/20 shadow-sm ml-1 shrink-0 whitespace-nowrap">
-              Ketuk untuk masuk
-            </span>
+          </>
+        ) : (
+          <>
+            {/* Glowing Day Sun */}
+            <div className="absolute top-8 right-24 sm:right-32 flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full bg-amber-300/30 blur-2xl absolute animate-pulse" />
+              <div className="relative text-4xl sm:text-5xl filter drop-shadow-[0_0_16px_rgba(251,191,36,0.8)] select-none">
+                ☀️
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 2. VECTOR 2D ISOMETRIC SVG MAP */}
+      <svg
+        viewBox="-440 -260 880 520"
+        className="w-full h-full cursor-crosshair transition-transform duration-300"
+        onClick={handleMapClick}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        <defs>
+          {/* Radial light glow for street lamps */}
+          <radialGradient id="lampGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fff3b0" stopOpacity={isNight ? 0.45 : 0.15} />
+            <stop offset="35%" stopColor="#fef08a" stopOpacity={isNight ? 0.25 : 0.08} />
+            <stop offset="70%" stopColor="#eab308" stopOpacity={isNight ? 0.08 : 0.02} />
+            <stop offset="100%" stopColor="#eab308" stopOpacity="0" />
+          </radialGradient>
+
+          {/* Grass Island Top Gradient */}
+          <linearGradient id="grassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={isNight ? '#2c6943' : '#34d399'} />
+            <stop offset="100%" stopColor={isNight ? '#204f32' : '#10b981'} />
+          </linearGradient>
+
+          {/* Under-cliff Gradients */}
+          <linearGradient id="cliffLeft" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#3d2817" />
+            <stop offset="100%" stopColor="#21150c" />
+          </linearGradient>
+          <linearGradient id="cliffRight" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#2f1e11" />
+            <stop offset="100%" stopColor="#170e08" />
+          </linearGradient>
+
+          {/* Fountain Water */}
+          <radialGradient id="fountainWater" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#7dd3fc" />
+            <stop offset="70%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="#1d4ed8" />
+          </radialGradient>
+
+          {/* Firefly Glow Filter */}
+          <filter id="fireflyGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* ------------------------------------------------------------- */}
+        {/* A. MOVING CLOUDS IN DAY MODE ("AWAN BERJALAN")                */}
+        {/* ------------------------------------------------------------- */}
+        {!isNight &&
+          clouds.map((c) => (
+            <g key={c.id} transform={`translate(${c.x}, ${c.y}) scale(${c.scale})`} opacity="0.9">
+              <ellipse cx="0" cy="0" rx="38" ry="16" fill="#ffffff" />
+              <circle cx="-16" cy="-8" r="18" fill="#ffffff" />
+              <circle cx="8" cy="-12" r="22" fill="#ffffff" />
+              <circle cx="26" cy="-4" r="16" fill="#ffffff" />
+            </g>
+          ))}
+
+        {/* ------------------------------------------------------------- */}
+        {/* B. FLOATING ISLAND BEDROCK & CLIFFS                           */}
+        {/* ------------------------------------------------------------- */}
+        {/* Left Cliff */}
+        <polygon points="-360,-10 0,185 0,230 -360,35" fill="url(#cliffLeft)" />
+        {/* Right Cliff */}
+        <polygon points="0,185 360,-10 360,35 0,230" fill="url(#cliffRight)" />
+        {/* Rock striations */}
+        <line x1="-180" y1="87" x2="-180" y2="132" stroke="#1c1109" strokeWidth="3" opacity="0.6" />
+        <line x1="-90" y1="135" x2="-90" y2="180" stroke="#1c1109" strokeWidth="4" opacity="0.6" />
+        <line x1="180" y1="87" x2="180" y2="132" stroke="#120b06" strokeWidth="3" opacity="0.7" />
+        <line x1="90" y1="135" x2="90" y2="180" stroke="#120b06" strokeWidth="4" opacity="0.7" />
+
+        {/* Top Lawn Diamond Slab */}
+        <polygon
+          points="0,-205 360,-10 0,185 -360,-10"
+          fill="url(#grassGrad)"
+          stroke="#397d52"
+          strokeWidth="3"
+        />
+
+        {/* ------------------------------------------------------------- */}
+        {/* C. NEAT & SYMMETRICAL ROADS ("JALANNYA DIRAPIHKAN")          */}
+        {/* ------------------------------------------------------------- */}
+        {/* Road Base Styling: Warm Cobblestone Paving */}
+        <g id="neat-roads">
+          {/* 1. Grand North Boulevard (Balai Kota) */}
+          <polygon
+            points="-22,-38 22,-38 26,-175 -26,-175"
+            fill="#ded8cd"
+            stroke="#b8b09f"
+            strokeWidth="2"
+          />
+          {/* Road center dash */}
+          <line x1="0" y1="-44" x2="0" y2="-170" stroke="#eae5da" strokeWidth="2" strokeDasharray="6 4" />
+
+          {/* 2. North-West Boulevard (Perpustakaan) */}
+          <polygon
+            points="-40,-20 -24,-34 -222,-108 -234,-96"
+            fill="#ded8cd"
+            stroke="#b8b09f"
+            strokeWidth="2"
+          />
+
+          {/* 3. North-East Boulevard (Menara Mentor) */}
+          <polygon
+            points="40,-20 24,-34 222,-108 234,-96"
+            fill="#ded8cd"
+            stroke="#b8b09f"
+            strokeWidth="2"
+          />
+
+          {/* 4. South-West Boulevard (Taman Refleksi) */}
+          <polygon
+            points="-40,20 -24,34 -222,108 -234,96"
+            fill="#ded8cd"
+            stroke="#b8b09f"
+            strokeWidth="2"
+          />
+
+          {/* 5. South-East Boulevard (Bengkel Latihan) */}
+          <polygon
+            points="40,20 24,34 222,108 234,96"
+            fill="#ded8cd"
+            stroke="#b8b09f"
+            strokeWidth="2"
+          />
+
+          {/* 6. South Connector to Kantor Pos & Pasar Prestasi */}
+          <polygon
+            points="-20,38 20,38 126,145 94,155"
+            fill="#ded8cd"
+            stroke="#b8b09f"
+            strokeWidth="1.5"
+          />
+          <polygon
+            points="-20,38 20,38 -94,155 -126,145"
+            fill="#ded8cd"
+            stroke="#b8b09f"
+            strokeWidth="1.5"
+          />
+
+          {/* 7. Walkway Branches to Cafe & Fishing Pier */}
+          <polygon points="-45,-8 -45,-26 -130,-34 -130,-16" fill="#ded8cd" stroke="#b8b09f" strokeWidth="1.5" />
+          <polygon points="45,8 45,26 185,116 185,98" fill="#ded8cd" stroke="#b8b09f" strokeWidth="1.5" />
+
+          {/* Central Fountain Circular Plaza with Concentric Rings */}
+          <ellipse cx="0" cy="0" rx="84" ry="48" fill="#ded8cd" stroke="#b8b09f" strokeWidth="2.5" />
+          <ellipse cx="0" cy="0" rx="72" ry="41" fill="#e8e3d8" stroke="#c4bead" strokeWidth="1" strokeDasharray="8 4" />
+        </g>
+
+        {/* ------------------------------------------------------------- */}
+        {/* D. WARM STREET LANTERNS WITH SOFT GROUND GLOW HALOS          */}
+        {/* ------------------------------------------------------------- */}
+        {[
+          { x: -55, y: -45 },
+          { x: 55, y: -45 },
+          { x: -55, y: 45 },
+          { x: 55, y: 45 },
+          { x: -145, y: -75 },
+          { x: 145, y: -75 },
+          { x: -145, y: 75 },
+          { x: 145, y: 75 },
+          { x: 0, y: -115 },
+          { x: 0, y: 95 },
+        ].map((lamp, i) => (
+          <g key={`lamp-${i}`}>
+            <ellipse cx={lamp.x} cy={lamp.y + 4} rx="44" ry="24" fill="url(#lampGlow)" />
+            <ellipse cx={lamp.x} cy={lamp.y} rx="3" ry="1.5" fill="#1e293b" />
+            <line x1={lamp.x} y1={lamp.y} x2={lamp.x} y2={lamp.y - 18} stroke="#0f172a" strokeWidth="2.5" />
+            <circle cx={lamp.x} cy={lamp.y - 19} r="4" fill="#fffbeb" filter="drop-shadow(0 0 6px #fef08a)" />
+            <circle cx={lamp.x} cy={lamp.y - 19} r="2.2" fill="#ffffff" />
+          </g>
+        ))}
+
+        {/* ------------------------------------------------------------- */}
+        {/* E. CENTRAL PLAZA & PAPAN INFORMASI ("MONUMEN WARGA")          */}
+        {/* ------------------------------------------------------------- */}
+        {/* Central Fountain */}
+        <g id="central-fountain">
+          <ellipse cx="0" cy="0" rx="42" ry="24" fill="#94a3b8" stroke="#475569" strokeWidth="2" />
+          <ellipse cx="0" cy="0" rx="36" ry="20" fill="url(#fountainWater)" />
+          <ellipse cx="0" cy="-4" rx="20" ry="11" fill="#cbd5e1" stroke="#64748b" strokeWidth="1.5" />
+          <ellipse cx="0" cy="-4" rx="16" ry="8" fill="#38bdf8" />
+          <ellipse cx="0" cy="-9" rx="6" ry="3.5" fill="#f8fafc" />
+          <line x1="0" y1="-9" x2="0" y2="-17" stroke="#e0f2fe" strokeWidth="2" strokeDasharray="2 1" />
+
+          {/* Curved Benches */}
+          <path d="M -50,-15 Q -42,-26 -30,-30" stroke="#78350f" strokeWidth="5" strokeLinecap="round" fill="none" />
+          <path d="M 50,-15 Q 42,-26 30,-30" stroke="#78350f" strokeWidth="5" strokeLinecap="round" fill="none" />
+          <path d="M -50,15 Q -42,26 -30,30" stroke="#78350f" strokeWidth="5" strokeLinecap="round" fill="none" />
+          <path d="M 50,15 Q 42,26 30,30" stroke="#78350f" strokeWidth="5" strokeLinecap="round" fill="none" />
+        </g>
+
+        {/* PAPAN INFORMASI KOTA (REPLACED MONUMEN WARGA AS REQUESTED) */}
+        <g
+          className="cursor-pointer group"
+          transform="translate(0, 32)"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectBuilding('monumen_warga');
+          }}
+          onMouseEnter={() =>
+            setHoveredBuilding(BUILDINGS_INFO.find((b) => b.id === 'monumen_warga') || null)
+          }
+          onMouseLeave={() => setHoveredBuilding(null)}
+        >
+          {/* Ground Shadow */}
+          <ellipse cx="0" cy="4" rx="18" ry="7" fill="#143721" opacity="0.6" />
+          {/* Wooden Stand Posts */}
+          <line x1="-12" y1="4" x2="-12" y2="-18" stroke="#78350f" strokeWidth="3" strokeLinecap="round" />
+          <line x1="12" y1="4" x2="12" y2="-18" stroke="#78350f" strokeWidth="3" strokeLinecap="round" />
+          {/* Notice Board */}
+          <rect x="-18" y="-30" width="36" height="20" rx="3" fill="#92400e" stroke="#78350f" strokeWidth="1.5" />
+          <rect x="-15" y="-27" width="30" height="14" rx="1.5" fill="#fef3c7" />
+          {/* Notice Paper Snippets */}
+          <rect x="-13" y="-25" width="11" height="10" fill="#ffffff" rx="1" />
+          <line x1="-11" y1="-22" x2="-4" y2="-22" stroke="#0284c7" strokeWidth="1" />
+          <line x1="-11" y1="-19" x2="-5" y2="-19" stroke="#94a3b8" strokeWidth="0.8" />
+          <line x1="-11" y1="-17" x2="-6" y2="-17" stroke="#94a3b8" strokeWidth="0.8" />
+          <rect x="1" y="-25" width="11" height="10" fill="#fdf2f8" rx="1" />
+          <line x1="3" y1="-22" x2="10" y2="-22" stroke="#db2777" strokeWidth="1" />
+          <line x1="3" y1="-19" x2="9" y2="-19" stroke="#94a3b8" strokeWidth="0.8" />
+          {/* Board Canopy */}
+          <polygon points="-22,-30 22,-30 0,-38" fill="#b45309" stroke="#78350f" strokeWidth="1" />
+
+          {/* Overhead Tag Pill */}
+          <g transform="translate(0, -42)">
+            <rect
+              x="-40"
+              y="-8"
+              width="80"
+              height="16"
+              fill="#0f172a"
+              opacity="0.9"
+              rx="8"
+              stroke="#ec4899"
+              strokeWidth="1.2"
+              filter="drop-shadow(0 2px 6px rgba(236,72,153,0.4))"
+            />
+            <text x="0" y="3" fill="#ffffff" fontSize="6.8" fontWeight="extrabold" textAnchor="middle">
+              📋 Papan Informasi
+            </text>
+          </g>
+        </g>
+
+        {/* ------------------------------------------------------------- */}
+        {/* F. TREES & CHERRY BLOSSOMS                                    */}
+        {/* ------------------------------------------------------------- */}
+        {[
+          { x: -280, y: -40, r: 24, cherry: false },
+          { x: -240, y: 10, r: 22, cherry: false },
+          { x: -170, y: -140, r: 26, cherry: false },
+          { x: -80, y: -160, r: 20, cherry: false },
+          { x: 80, y: -160, r: 20, cherry: false },
+          { x: 170, y: -140, r: 26, cherry: false },
+          { x: 260, y: -50, r: 24, cherry: false },
+          { x: 290, y: 20, r: 22, cherry: false },
+          { x: -270, y: 50, r: 24, cherry: true },
+          { x: -160, y: 130, r: 22, cherry: true },
+          { x: 190, y: -10, r: 20, cherry: true },
+          { x: 240, y: 20, r: 22, cherry: true },
+          { x: 260, y: 60, r: 24, cherry: false },
+          { x: 20, y: 155, r: 20, cherry: false },
+        ].map((t, i) => (
+          <g key={`tree-${i}`}>
+            <ellipse cx={t.x} cy={t.y + 4} rx="6" ry="3" fill="#143721" opacity="0.6" />
+            <line x1={t.x} y1={t.y + 4} x2={t.x} y2={t.y - 12} stroke="#451a03" strokeWidth="4" strokeLinecap="round" />
+            {t.cherry ? (
+              <>
+                <circle cx={t.x} cy={t.y - 18} r={t.r} fill="#db2777" />
+                <circle cx={t.x - 4} cy={t.y - 22} r={t.r * 0.75} fill="#f472b6" />
+                <circle cx={t.x + 5} cy={t.y - 14} r="3" fill="#fdf2f8" />
+                <circle cx={t.x - 5} cy={t.y - 12} r="2.5" fill="#fdf2f8" />
+              </>
+            ) : (
+              <>
+                <circle cx={t.x} cy={t.y - 18} r={t.r} fill="#14532d" />
+                <circle cx={t.x - 4} cy={t.y - 22} r={t.r * 0.78} fill="#15803d" />
+                <circle cx={t.x - 7} cy={t.y - 25} r={t.r * 0.45} fill="#22c55e" opacity="0.85" />
+              </>
+            )}
+          </g>
+        ))}
+
+        {/* ------------------------------------------------------------- */}
+        {/* G. SPECIALTY LANDMARKS (CAFE, KOLAM PANCING, GERBANG)         */}
+        {/* ------------------------------------------------------------- */}
+        {/* Cafe */}
+        <g className="cursor-pointer group" onClick={(e) => { e.stopPropagation(); setIsCafeOpen(true); }}>
+          <ellipse cx="-110" cy="-35" rx="22" ry="12" fill="#143721" opacity="0.6" />
+          <rect x="-124" y="-48" width="28" height="15" fill="#92400e" rx="3" stroke="#78350f" strokeWidth="1.5" />
+          <polygon points="-128,-48 -124,-58 -92,-58 -96,-48" fill="#b91c1c" />
+          <polygon points="-120,-48 -116,-58 -108,-58 -112,-48" fill="#fef3c7" />
+          <polygon points="-104,-48 -100,-58 -92,-58 -96,-48" fill="#fef3c7" />
+          <circle cx="-100" cy="-44" r="2.5" fill="#f8fafc" />
+          <rect x="-120" y="-36" width="20" height="7" fill="#1e293b" rx="2" />
+          <text x="-110" y="-31" fill="#facc15" fontSize="5" fontWeight="bold" textAnchor="middle">CAFE</text>
+        </g>
+
+        {/* Kolam Pancing */}
+        <g className="cursor-pointer group" onClick={handleFishingClick}>
+          <ellipse cx="165" cy="115" rx="36" ry="20" fill="#0284c7" stroke="#38bdf8" strokeWidth="2" />
+          <ellipse cx="165" cy="115" rx="28" ry="15" fill="#0369a1" />
+          <polygon points="135,115 155,105 160,113 140,123" fill="#78350f" stroke="#451a03" strokeWidth="1" />
+          <line x1="152" y1="108" x2="168" y2="102" stroke="#d97706" strokeWidth="1.5" />
+          <rect x="145" y="128" width="38" height="9" fill="#1e293b" rx="2.5" stroke="#475569" strokeWidth="0.8" />
+          <text x="164" y="134.5" fill="#f8fafc" fontSize="5.5" fontWeight="extrabold" textAnchor="middle">KOLAM PANCING</text>
+        </g>
+
+        {/* Thaloria Pergola Gate */}
+        <g>
+          <line x1="175" y1="-30" x2="175" y2="-52" stroke="#78350f" strokeWidth="3" strokeLinecap="round" />
+          <line x1="205" y1="-45" x2="205" y2="-67" stroke="#78350f" strokeWidth="3" strokeLinecap="round" />
+          <line x1="170" y1="-53" x2="210" y2="-68" stroke="#92400e" strokeWidth="4" strokeLinecap="round" />
+          <text x="190" y="-62" fill="#f8fafc" fontSize="6.5" fontWeight="bold" textAnchor="middle" transform="rotate(-20 190 -62)">Thaloria</text>
+        </g>
+
+        {/* ------------------------------------------------------------- */}
+        {/* H. THE 7 REMAINING BUILDINGS (AROUND ROAD TERMINALS)          */}
+        {/* ------------------------------------------------------------- */}
+        {BUILDINGS_INFO.filter((b) => b.id !== 'monumen_warga').map((b) => {
+          const hasNew = newMateriBuildingIds.includes(b.id);
+          const [bx, by] = [b.position[0], b.position[1]];
+
+          return (
+            <g
+              key={b.id}
+              className="cursor-pointer transition-transform duration-200 hover:scale-110"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectBuilding(b.id);
+              }}
+              onMouseEnter={() => setHoveredBuilding(b)}
+              onMouseLeave={() => setHoveredBuilding(null)}
+            >
+              <ellipse cx={bx} cy={by + 6} rx="26" ry="14" fill="#143721" opacity="0.6" />
+
+              {b.id === 'balai_kota' && (
+                <g>
+                  <polygon points={`${bx - 26},${by + 2} ${bx + 26},${by + 2} ${bx + 20},${by - 24} ${bx - 20},${by - 24}`} fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1.5" />
+                  <polygon points={`${bx - 22},${by - 24} ${bx + 22},${by - 24} ${bx},${by - 42}`} fill="#1d4ed8" />
+                  <line x1={bx - 14} y1={by + 2} x2={bx - 14} y2={by - 22} stroke="#cbd5e1" strokeWidth="3" />
+                  <line x1={bx} y1={by + 2} x2={bx} y2={by - 22} stroke="#cbd5e1" strokeWidth="3" />
+                  <line x1={bx + 14} y1={by + 2} x2={bx + 14} y2={by - 22} stroke="#cbd5e1" strokeWidth="3" />
+                  <circle cx={bx} cy={by - 28} r="4" fill="#fbbf24" stroke="#d97706" strokeWidth="1" />
+                </g>
+              )}
+
+              {b.id === 'perpustakaan' && (
+                <g>
+                  <polygon points={`${bx - 22},${by + 2} ${bx + 22},${by + 2} ${bx + 18},${by - 20} ${bx - 18},${by - 20}`} fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.5" />
+                  <polygon points={`${bx - 20},${by - 20} ${bx + 20},${by - 20} ${bx},${by - 36}`} fill="#059669" />
+                  <path d={`M ${bx - 6},${by + 2} A 6 6 0 0 1 ${bx + 6},${by + 2}`} fill="#0f172a" />
+                </g>
+              )}
+
+              {b.id === 'taman_refleksi' && (
+                <g>
+                  <polygon points={`${bx - 18},${by + 2} ${bx + 18},${by + 2} ${bx + 14},${by - 16} ${bx - 14},${by - 16}`} fill="#9a3412" />
+                  <polygon points={`${bx - 22},${by - 16} ${bx + 22},${by - 16} ${bx},${by - 30}`} fill="#db2777" />
+                  <polygon points={`${bx - 15},${by - 28} ${bx + 15},${by - 28} ${bx},${by - 40}`} fill="#db2777" />
+                </g>
+              )}
+
+              {b.id === 'menara_mentor' && (
+                <g>
+                  <polygon points={`${bx - 14},${by + 2} ${bx + 14},${by + 2} ${bx + 10},${by - 28} ${bx - 10},${by - 28}`} fill="#475569" />
+                  <ellipse cx={bx} cy={by - 28} rx="12" ry="7" fill="#7c3aed" />
+                  <circle cx={bx} cy={by - 34} r="10" fill="#7c3aed" />
+                  <line x1={bx + 4} y1={by - 34} x2={bx + 16} y2={by - 44} stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
+                </g>
+              )}
+
+              {b.id === 'bengkel_latihan' && (
+                <g>
+                  <rect x={bx - 20} y={by - 18} width="40" height="20" fill="#b45309" stroke="#78350f" strokeWidth="1.5" rx="2" />
+                  <polygon points={`${bx - 22},${by - 18} ${bx + 22},${by - 18} ${bx},${by - 32}`} fill="#334155" />
+                  <rect x={bx + 10} y={by - 36} width="6" height="16" fill="#78350f" />
+                  <circle cx={bx} cy={by - 8} r="6" fill="#64748b" stroke="#334155" strokeWidth="2" strokeDasharray="3 2" />
+                </g>
+              )}
+
+              {b.id === 'kantor_pos' && (
+                <g>
+                  <rect x={bx - 18} y={by - 16} width="36" height="18" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5" rx="2" />
+                  <polygon points={`${bx - 20},${by - 16} ${bx + 20},${by - 16} ${bx},${by - 28}`} fill="#dc2626" />
+                  <rect x={bx + 10} y={by - 6} width="5" height="8" fill="#facc15" rx="1.5" />
+                </g>
+              )}
+
+              {b.id === 'pasar_prestasi' && (
+                <g>
+                  <rect x={bx - 18} y={by - 14} width="36" height="16" fill="#fef08a" rx="2" />
+                  <polygon points={`${bx - 20},${by - 14} ${bx + 20},${by - 14} ${bx},${by - 32}`} fill="#06b6d4" />
+                  <polygon points={`${bx - 8},${by - 14} ${bx + 8},${by - 14} ${bx},${by - 32}`} fill="#f59e0b" />
+                  <circle cx={bx} cy={by - 34} r="3.5" fill="#fbbf24" filter="drop-shadow(0 0 4px #facc15)" />
+                </g>
+              )}
+
+              <g transform={`translate(${bx}, ${by - 42})`}>
+                <rect x="-38" y="-9" width="76" height="18" fill="#0f172a" opacity="0.88" rx="9" stroke="#ffffff" strokeWidth="1" strokeOpacity="0.3" />
+                <text x="0" y="3.5" fill="#f8fafc" fontSize="7.5" fontWeight="extrabold" textAnchor="middle">
+                  {b.name}
+                </text>
+                {hasNew && (
+                  <circle cx="34" cy="-5" r="4" fill="#fbbf24" stroke="#0f172a" strokeWidth="1.5" className="animate-ping" />
+                )}
+              </g>
+            </g>
+          );
+        })}
+
+        {/* ------------------------------------------------------------- */}
+        {/* I. MOVING PROFESSION NPCS (6+ GURU, POLISI, PENJAGA, DLL)    */}
+        {/* ------------------------------------------------------------- */}
+        {npcList.map((npc) => {
+          const isBubbleActive = activeNpcBubble?.npcId === npc.id;
+
+          return (
+            <g
+              key={npc.id}
+              className="cursor-pointer group"
+              transform={`translate(${npc.x}, ${npc.y})`}
+              onClick={(e) => handleNpcClick(npc, e)}
+            >
+              {/* Shadow */}
+              <ellipse cx="0" cy="2" rx="5.5" ry="2.5" fill="#143721" opacity="0.6" />
+
+              {/* Character Body with Facing Direction */}
+              <g transform={`scale(${npc.facing === 'left' ? -1 : 1}, 1)`}>
+                {/* Head */}
+                <circle cx="0" cy="-12" r="5" fill={npc.skinColor} />
+
+                {/* Hijab / Hair */}
+                {npc.hasHijab ? (
+                  <circle cx="0" cy="-13" r="5.6" fill={npc.hairColor} />
+                ) : (
+                  <path d="M -5,-13 A 5 5 0 0 1 5,-13" fill={npc.hairColor} />
+                )}
+
+                {/* Specific Accessories */}
+                {npc.accessory === 'glasses' && (
+                  <circle cx="2" cy="-12" r="1.8" fill="none" stroke="#0284c7" strokeWidth="0.8" />
+                )}
+                {npc.accessory === 'police_hat' && (
+                  <g transform="translate(0, -16)">
+                    <ellipse cx="0" cy="0" rx="5" ry="2.5" fill="#1e3a8a" />
+                    <circle cx="0" cy="-1" r="1.5" fill="#fbbf24" />
+                  </g>
+                )}
+                {npc.accessory === 'guard_hat' && (
+                  <ellipse cx="0" cy="-16" rx="5.2" ry="2" fill="#3f6212" />
+                )}
+                {npc.accessory === 'stethoscope' && (
+                  <path d="M -2,-8 Q 0,-3 2,-8" stroke="#ef4444" strokeWidth="1" fill="none" />
+                )}
+
+                {/* Torso / Uniform */}
+                <rect x="-4" y="-8" width="8" height="8" rx="2" fill={npc.shirtColor} />
+
+                {npc.accessory === 'broom' && (
+                  <line x1="4" y1="-8" x2="7" y2="4" stroke="#d97706" strokeWidth="1.5" />
+                )}
+
+                {/* Legs with walking animation if moving */}
+                <line x1="-2" y1="0" x2="-2" y2="4" stroke={npc.pantsColor} strokeWidth="2" strokeLinecap="round" />
+                <line x1="2" y1="0" x2="2" y2="4" stroke={npc.pantsColor} strokeWidth="2" strokeLinecap="round" />
+              </g>
+
+              {/* Profession Tag Badge above head */}
+              <g transform="translate(0, -21)">
+                <rect
+                  x="-32"
+                  y="-6.5"
+                  width="64"
+                  height="13"
+                  fill="#0f172a"
+                  opacity="0.88"
+                  rx="6.5"
+                  stroke={npc.badgeBg}
+                  strokeWidth="0.8"
+                />
+                <text x="0" y="2.5" fill="#f1f5f9" fontSize="5.5" fontWeight="extrabold" textAnchor="middle">
+                  {npc.professionBadge}
+                </text>
+              </g>
+
+              {/* Temporary Speech Bubble (Strictly 1 NPC, Disappears automatically) */}
+              {isBubbleActive && (
+                <g transform="translate(0, -38)" className="animate-fade-in-up">
+                  <rect
+                    x="-42"
+                    y="-9"
+                    width="84"
+                    height="18"
+                    fill="#ffffff"
+                    rx="9"
+                    stroke="#cbd5e1"
+                    strokeWidth="1"
+                    filter="drop-shadow(0 2px 8px rgba(0,0,0,0.4))"
+                  />
+                  <polygon points="-3,9 3,9 0,13" fill="#ffffff" />
+                  <text x="0" y="3" fill="#0f172a" fontSize="6.2" fontWeight="bold" textAnchor="middle">
+                    {activeNpcBubble.text}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+
+        {/* ------------------------------------------------------------- */}
+        {/* J. THE PLAYER AVATAR                                          */}
+        {/* ------------------------------------------------------------- */}
+        <g transform={`translate(${playerPos.x}, ${playerPos.y})`}>
+          <ellipse cx="0" cy="3" rx="7" ry="3.5" fill="#143721" opacity="0.75" />
+
+          <g transform={`scale(${playerFacing === 'left' ? -1 : 1}, 1) translate(0, ${isWalking ? -Math.sin(Date.now() / 100) * 2 : 0})`}>
+            <circle cx="0" cy="-14" r="6" fill="#fbcfe8" />
+            {studentGender === 'P' ? (
+              <>
+                <circle cx="0" cy="-15" r="6.8" fill="#f8fafc" />
+                <rect x="-5" y="-9" width="10" height="9" rx="2" fill="#0284c7" />
+                <polygon points="-6,0 6,0 4,-5 -4,-5" fill="#1e1b4b" />
+              </>
+            ) : (
+              <>
+                <path d="M -6,-15 A 6 6 0 0 1 6,-15" fill="#1e293b" />
+                <rect x="-5.5" y="-9" width="11" height="9" rx="2" fill="#2563eb" />
+                <rect x="-7.5" y="-9" width="3" height="7" rx="1" fill="#f59e0b" />
+              </>
+            )}
+
+            <line
+              x1="-2.5"
+              y1="0"
+              x2={isWalking ? -2.5 + Math.sin(Date.now() / 90) * 3 : -2.5}
+              y2="5"
+              stroke="#1e1b4b"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+            <line
+              x1="2.5"
+              y1="0"
+              x2={isWalking ? 2.5 - Math.sin(Date.now() / 90) * 3 : 2.5}
+              y2="5"
+              stroke="#1e1b4b"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+          </g>
+
+          <g transform="translate(0, -26)">
+            <rect
+              x="-36"
+              y="-8"
+              width="72"
+              height="16"
+              fill="#059669"
+              rx="8"
+              stroke="#6ee7b7"
+              strokeWidth="1.2"
+              filter="drop-shadow(0 2px 8px rgba(16,185,129,0.5))"
+            />
+            <text x="0" y="3" fill="#ffffff" fontSize="6.8" fontWeight="extrabold" textAnchor="middle">
+              @{studentName.split(' ')[0].toLowerCase()} (Kamu)
+            </text>
+          </g>
+
+          {playerSpeechBubble && (
+            <g transform="translate(0, -46)" className="animate-fade-in-up">
+              <rect
+                x="-42"
+                y="-10"
+                width="84"
+                height="20"
+                fill="#ffffff"
+                rx="10"
+                stroke="#6ee7b7"
+                strokeWidth="1.5"
+                filter="drop-shadow(0 4px 10px rgba(0,0,0,0.5))"
+              />
+              <polygon points="-4,10 4,10 0,14" fill="#ffffff" />
+              <text x="0" y="3.5" fill="#0f172a" fontSize="7" fontWeight="bold" textAnchor="middle">
+                {playerSpeechBubble}
+              </text>
+            </g>
+          )}
+        </g>
+
+        {/* ------------------------------------------------------------- */}
+        {/* K. ANIMATED FIREFLIES IN NIGHT MODE ("KUNANG-KUNANG")        */}
+        {/* ------------------------------------------------------------- */}
+        {isNight &&
+          fireflyBases.map((base, idx) => {
+            const off = fireflyOffsets[idx] || { dx: 0, dy: 0, glow: 1 };
+            const fx = base.x + off.dx;
+            const fy = base.y + off.dy;
+
+            return (
+              <g key={`firefly-${base.id}`} transform={`translate(${fx}, ${fy})`} opacity={off.glow}>
+                {/* Soft outer lime halo */}
+                <circle cx="0" cy="0" r="6" fill="#a3e635" opacity="0.3" filter="url(#fireflyGlow)" />
+                {/* Bright core dot */}
+                <circle cx="0" cy="0" r="2" fill="#fef08a" />
+              </g>
+            );
+          })}
+      </svg>
+
+      {/* 3. CAFE POPUP CARD */}
+      {isCafeOpen && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 animate-fade-in-up max-w-[280px] w-full">
+          <div className="bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-700/60 mb-3">
+              <div>
+                <h4 className="text-sm font-extrabold text-white flex items-center gap-1.5">
+                  <span>☕</span> Cafe Buka
+                </h4>
+                <p className="text-[11px] text-amber-400 font-medium">Barista @nnisa_0311</p>
+              </div>
+              <button
+                onClick={() => setIsCafeOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+              Selamat datang di Cafe Refleksia! Silakan nikmati hidangan santai bersama kawan-kawan.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                onClick={() => handleCafeOrder('Kopi')}
+                className="p-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-center transition flex flex-col items-center gap-1 active:scale-95"
+              >
+                <span className="text-xl">☕</span>
+                <span className="text-xs font-bold text-emerald-200">Kopi - 2</span>
+              </button>
+              <button
+                onClick={() => handleCafeOrder('Roti')}
+                className="p-2.5 rounded-xl bg-teal-600/30 hover:bg-teal-600/50 border border-teal-500/50 text-center transition flex flex-col items-center gap-1 active:scale-95"
+              >
+                <span className="text-xl">🍞</span>
+                <span className="text-xs font-bold text-teal-200">Roti - 1</span>
+              </button>
+            </div>
+
+            {cafeFeedback && (
+              <p className="mt-3 text-[11px] text-center font-bold text-amber-300 animate-pulse">
+                {cafeFeedback}
+              </p>
+            )}
           </div>
         </div>
       )}
 
-      {/* Walking Status Badge - Elevated above hover popup */}
-      {isWalking && (
-        <div className="absolute bottom-36 left-1/2 -translate-x-1/2 pointer-events-none z-30 animate-fade-in-up">
-          <div className="bg-gradient-to-b from-white/20 via-slate-900/80 to-slate-950/90 backdrop-blur-xl text-white text-xs px-4 py-1.5 rounded-full shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.2)] border border-white/25 flex items-center gap-2">
-            <span className="animate-bounce">🏃</span>
-            <span className="font-semibold text-emerald-300">Murid sedang berjalan...</span>
+      {/* Fishing Feedback Toast */}
+      {fishingFeedback && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 animate-fade-in-up">
+          <div className="bg-blue-900/90 backdrop-blur-xl border border-blue-400/40 text-blue-100 text-xs font-bold px-4 py-2 rounded-full shadow-lg">
+            {fishingFeedback}
+          </div>
+        </div>
+      )}
+
+      {/* 4. FLOATING OBROLAN WINDOW */}
+      <div className="absolute bottom-32 sm:bottom-36 left-3 sm:left-5 z-20 w-[280px] sm:w-[320px] max-w-[calc(100vw-24px)] pointer-events-auto">
+        <div className="bg-slate-950/85 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden transition-all">
+          <div
+            onClick={() => setIsChatWindowOpen(!isChatWindowOpen)}
+            className="px-3.5 py-2.5 bg-slate-900/80 border-b border-white/10 flex items-center justify-between cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-extrabold text-white">Obrolan</span>
+              <span className="text-[10px] text-slate-400">• ruang 2 • {chatMessages.length} pesan</span>
+            </div>
+            <button className="text-slate-400 hover:text-white transition">
+              {isChatWindowOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {isChatWindowOpen && (
+            <div className="p-3 max-h-[160px] overflow-y-auto space-y-2 text-xs divide-y divide-white/5">
+              {chatMessages.slice(0, 25).map((m) => (
+                <div key={m.id} className="pt-1.5 first:pt-0">
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="font-extrabold text-emerald-400 text-[11px] truncate">
+                      {m.senderHandle || '@warga'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 shrink-0 font-mono">
+                      {m.timestamp || m.createdAt.slice(11, 16) || '23.35'}
+                    </span>
+                  </div>
+                  <p className="text-slate-200 text-xs mt-0.5 leading-snug break-words">
+                    {m.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 5. BOTTOM CHAT INPUT BAR */}
+      <div className="absolute bottom-4 sm:bottom-5 left-1/2 -translate-x-1/2 z-30 pointer-events-auto w-[92vw] max-w-[480px]">
+        <form
+          onSubmit={handleSendChat}
+          className="bg-slate-950/85 backdrop-blur-2xl border border-white/25 rounded-full px-3.5 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.55)] flex items-center gap-2.5"
+        >
+          <span className="text-emerald-400 text-base shrink-0">💬</span>
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder="Ngobrol dengan warga di dekatmu..."
+            className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none"
+            maxLength={120}
+          />
+          <button
+            type="submit"
+            disabled={!chatInput.trim()}
+            className="w-8 h-8 rounded-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 flex items-center justify-center transition active:scale-95 shrink-0"
+            title="Kirim Pesan"
+          >
+            <Send className="w-4 h-4 ml-0.5" />
+          </button>
+        </form>
+      </div>
+
+      {/* 6. HOVER BUILDING INFO BADGE */}
+      {hoveredBuilding && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none z-30 animate-fade-in-up">
+          <div className="bg-slate-900/90 backdrop-blur-xl border border-white/25 text-white px-4 py-2 rounded-2xl shadow-xl flex items-center gap-2.5">
+            <span
+              className="w-3 h-3 rounded-full shrink-0"
+              style={{ backgroundColor: '#' + hoveredBuilding.color.toString(16).padStart(6, '0') }}
+            />
+            <div>
+              <p className="font-extrabold text-xs sm:text-sm leading-tight text-white">
+                {hoveredBuilding.name}
+              </p>
+              <p className="text-[10px] sm:text-xs text-slate-300 font-medium">
+                {hoveredBuilding.tagline} • Ketuk untuk masuk
+              </p>
+            </div>
           </div>
         </div>
       )}
