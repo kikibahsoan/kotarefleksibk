@@ -445,16 +445,23 @@ function setupSpreadsheet() {
     'Kelas',
     'Isi Pesan / Pertanyaan Siswa',
     'Balasan Guru',
-    'Status Balasan',
-    'Waktu Dibalas'
+  var headersObrolan = [
+    'Waktu Kirim',
+    'ID Pesan',
+    'Nama Siswa',
+    'Handle Siswa',
+    'Kelas',
+    'Ruang',
+    'Isi Obrolan (Maks 120 Karakter)'
   ];
 
   getOrCreateSheet('Data_Refleksi_Siswa', headersRefleksi, '#0284C7');
   getOrCreateSheet('Pesan_Kantor_Pos', headersPesan, '#DC2626');
+  getOrCreateSheet('Obrolan_Monumen_Warga', headersObrolan, '#0D9488');
 }
 
 /**
- * Endpoint GET: Membaca data refleksi & pesan dari Google Spreadsheet untuk Ruang Guru
+ * Endpoint GET: Membaca data refleksi, pesan, & obrolan monumen dari Google Spreadsheet
  */
 function doGet(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -467,7 +474,8 @@ function doGet(e) {
     time: new Date().toISOString(),
     reflections: [],
     feedbacks: [],
-    messages: []
+    messages: [],
+    chats: []
   };
 
   try {
@@ -566,6 +574,38 @@ function doGet(e) {
           status: mStatus === 'replied' ? 'replied' : 'unread',
           createdAt: mCreated,
           repliedAt: mRepliedAt || undefined
+        });
+      }
+    }
+
+    // 3. Baca Obrolan_Monumen_Warga (hanya ambil obrolan 24 jam terakhir)
+    var cSheet = ss.getSheetByName('Obrolan_Monumen_Warga');
+    if (cSheet && cSheet.getLastRow() > 1) {
+      var cRows = cSheet.getRange(2, 1, cSheet.getLastRow() - 1, Math.max(cSheet.getLastColumn(), 7)).getValues();
+      var nowMillis = new Date().getTime();
+      var twentyFourHours = 24 * 3600 * 1000;
+
+      for (var c = 0; c < cRows.length; c++) {
+        var cr = cRows[c];
+        var cContent = String(cr[6] || '').trim();
+        if (!cContent) continue;
+
+        var cTimeStr = String(cr[0] || '').trim();
+        var cDate = new Date(cTimeStr).getTime();
+        // Lewati obrolan yang sudah lebih dari 24 jam
+        if (!isNaN(cDate) && (nowMillis - cDate > twentyFourHours)) {
+          continue;
+        }
+
+        result.chats.push({
+          id: String(cr[1] || ('pchat-' + (c + 1))).trim(),
+          senderName: String(cr[2] || 'Warga').trim(),
+          senderHandle: String(cr[3] || '@warga').trim(),
+          className: String(cr[4] || 'X DKV SMK').trim(),
+          roomNumber: Number(cr[5]) || 1,
+          content: cContent,
+          timestamp: new Date(cTimeStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          createdAt: cTimeStr || new Date().toISOString()
         });
       }
     }
@@ -720,6 +760,30 @@ function doPost(e) {
         sheetAll.deleteRows(2, sheetAll.getLastRow() - 1);
         result.message = "Seluruh baris refleksi berhasil dikosongkan dari Spreadsheet!";
       }
+
+    } else if (action === 'send_public_chat') {
+      var cMsg = requestData.message || {};
+      var headersObrolan = [
+        'Waktu Kirim',
+        'ID Pesan',
+        'Nama Siswa',
+        'Handle Siswa',
+        'Kelas',
+        'Ruang',
+        'Isi Obrolan (Maks 120 Karakter)'
+      ];
+      var chatSheet = getOrCreateSheet('Obrolan_Monumen_Warga', headersObrolan, '#0D9488');
+
+      chatSheet.appendRow([
+        cMsg.createdAt || new Date().toISOString(),
+        cMsg.id || '',
+        cMsg.senderName || '',
+        cMsg.senderHandle || '',
+        cMsg.className || '',
+        cMsg.roomNumber || 1,
+        cMsg.content || ''
+      ]);
+      result.message = "Obrolan monumen warga berhasil dicatat di Spreadsheet!";
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))

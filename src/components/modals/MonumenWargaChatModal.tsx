@@ -75,17 +75,35 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load and subscribe to chat messages
+  // Load and subscribe to shared chat messages (with 24h automatic purge)
   useEffect(() => {
-    const loadMessages = () => {
-      const all = StorageService.getPublicChatMessages();
-      setMessages(all);
+    let isMounted = true;
+
+    const loadMessages = async () => {
+      // 1. Instantly read local messages (cleaned of expired >24h)
+      const local = StorageService.getPublicChatMessages();
+      if (isMounted) setMessages(local);
+
+      // 2. Fetch shared messages from server API (where all students' chats are pooled)
+      try {
+        const shared = await StorageService.fetchPublicChatMessages();
+        if (isMounted && shared && shared.length > 0) {
+          setMessages(shared);
+        }
+      } catch (err) {
+        // safe fallback
+      }
     };
 
     loadMessages();
 
+    // Poll every 3.5 seconds so messages sent by other classmates appear in real-time
+    const pollInterval = setInterval(() => {
+      loadMessages();
+    }, 3500);
+
     // Listen to storage events and custom events for multi-tab realtime sync
-    const handleStorageUpdate = (e: any) => {
+    const handleStorageUpdate = () => {
       loadMessages();
       if (isSoundOn) {
         playChimeAudio(true);
@@ -96,6 +114,8 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
     window.addEventListener('kota_refleksi_public_chat_updated', handleStorageUpdate);
 
     return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
       window.removeEventListener('storage', handleStorageUpdate);
       window.removeEventListener('kota_refleksi_public_chat_updated', handleStorageUpdate);
     };
@@ -213,7 +233,9 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
             <span className="text-slate-500">•</span>
             <span className="text-slate-200">Ruang {activeRoom}</span>
             <span className="text-slate-500 hidden sm:inline">•</span>
-            <span className="text-slate-300 hidden sm:inline">{activeRoomData.visitorCount} pengunjung</span>
+            <span className="text-amber-300 font-medium hidden sm:inline" title="Seluruh obrolan otomatis dibersihkan setiap 24 jam">
+              🕒 Otomatis Bersih 24 Jam
+            </span>
             <span className="text-slate-500 hidden md:inline">•</span>
             <span className="text-emerald-400 font-medium hidden md:inline">{activeRoomData.memberCount} warga</span>
           </div>
@@ -302,6 +324,9 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
               <MessageCircle className="w-4 h-4 text-cyan-400" />
               <span className="font-extrabold text-xs sm:text-sm text-white">
                 Obrolan • {currentRoomMessages.length} pesan
+              </span>
+              <span className="text-[10px] bg-slate-800 text-amber-300 px-2 py-0.5 rounded-full font-mono border border-slate-700 hidden sm:inline">
+                🕒 Otomatis Bersih 24 Jam
               </span>
             </div>
 

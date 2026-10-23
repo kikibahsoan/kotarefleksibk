@@ -260,6 +260,122 @@ Analisis dan berikan ringkasan pedagogis dalam JSON!`;
   }
 });
 
+// =========================================================================
+// MONUMEN WARGA: REAL-TIME PUBLIC CHAT WITH 24-HOUR AUTOMATIC PURGE
+// =========================================================================
+interface ServerPublicChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderHandle: string;
+  className: string;
+  roomNumber: 1 | 2 | 3;
+  content: string;
+  timestamp: string;
+  createdAt: string;
+  avatarColor?: string;
+  isReported?: boolean;
+}
+
+let serverChatMessages: ServerPublicChatMessage[] = [
+  {
+    id: 'pchat-init-1',
+    senderId: 'std-dkv-101',
+    senderName: 'Budi Santoso',
+    senderHandle: '@budi_dkv',
+    className: 'X DKV 1 (Desain Komunikasi Visual)',
+    roomNumber: 1,
+    content: 'Halo teman-teman DKV 1! Sudah baca materi arsitektur Von Neumann di perpustakaan?',
+    timestamp: '23.10',
+    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+    avatarColor: '#38bdf8',
+  },
+  {
+    id: 'pchat-init-2',
+    senderId: 'std-dkv-102',
+    senderName: 'Siti Rahmawati',
+    senderHandle: '@siti_rahma',
+    className: 'X DKV 2 (Desain Komunikasi Visual)',
+    roomNumber: 1,
+    content: 'Halo Budi! Seru banget analogi meja kerja RAM dan bahan es tehnya hehe 😄',
+    timestamp: '23.12',
+    createdAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+    avatarColor: '#f472b6',
+  },
+  {
+    id: 'pchat-init-3',
+    senderId: 'std-dkv-103',
+    senderName: 'Mohamad Rizki',
+    senderHandle: '@m_rizki',
+    className: 'X DKV 3 (Desain Komunikasi Visual)',
+    roomNumber: 1,
+    content: 'Salam kenal semua! Siapa yang lagi santai kumpul di Monumen Warga sekarang?',
+    timestamp: '23.14',
+    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+    avatarColor: '#4ade80',
+  },
+];
+
+// Automatically purge messages older than 24 hours (86,400,000 ms)
+function purgeExpiredServerChats() {
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+  const cutoffTime = Date.now() - TWENTY_FOUR_HOURS;
+  serverChatMessages = serverChatMessages.filter((msg) => {
+    const time = new Date(msg.createdAt).getTime();
+    return !isNaN(time) && time >= cutoffTime && !msg.isReported;
+  });
+}
+
+// Get chats (filtered by 24-hour expiration)
+app.get('/api/chat/messages', (_req, res) => {
+  purgeExpiredServerChats();
+  const room = _req.query.roomNumber ? Number(_req.query.roomNumber) : undefined;
+  const filtered = room
+    ? serverChatMessages.filter((m) => m.roomNumber === room)
+    : serverChatMessages;
+  res.json({ success: true, data: filtered, ttlHours: 24 });
+});
+
+// Post chat message (shared with all students)
+app.post('/api/chat/messages', (req, res) => {
+  purgeExpiredServerChats();
+  const { senderId, senderName, senderHandle, className, roomNumber, content, avatarColor } = req.body;
+
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    return res.status(400).json({ success: false, error: 'Pesan obrolan tidak boleh kosong.' });
+  }
+
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const timestamp = `${hours}.${minutes}`;
+
+  const newChat: ServerPublicChatMessage = {
+    id: `pchat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    senderId: String(senderId || 'std-anon'),
+    senderName: String(senderName || 'Warga Kota'),
+    senderHandle: String(senderHandle || '@warga'),
+    className: String(className || 'X DKV SMK'),
+    roomNumber: (roomNumber === 2 || roomNumber === 3) ? roomNumber : 1,
+    content: content.trim().slice(0, 120),
+    timestamp,
+    createdAt: now.toISOString(),
+    avatarColor: avatarColor || '#38bdf8',
+  };
+
+  serverChatMessages.unshift(newChat);
+  res.json({ success: true, data: newChat, ttlHours: 24 });
+});
+
+// Report chat message
+app.post('/api/chat/report', (req, res) => {
+  const { messageId } = req.body;
+  serverChatMessages = serverChatMessages.map((m) =>
+    m.id === messageId ? { ...m, isReported: true } : m
+  );
+  res.json({ success: true, message: 'Laporan berhasil dicatat.' });
+});
+
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {

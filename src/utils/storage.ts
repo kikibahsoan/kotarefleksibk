@@ -279,23 +279,83 @@ export const StorageService = {
     this.setMessages(items);
   },
 
+  // Monumen Warga 24-Hour Purge Helper: removes messages older than 24 hours (86,400,000 ms)
+  purgeExpiredPublicChats(items: PublicChatMessage[]): PublicChatMessage[] {
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - TWENTY_FOUR_HOURS;
+    return (items || []).filter((m) => {
+      const time = new Date(m.createdAt).getTime();
+      return !isNaN(time) && time >= cutoff && !m.isReported;
+    });
+  },
+
   getPublicChatMessages(): PublicChatMessage[] {
-    return safeGet<PublicChatMessage[]>(STORAGE_KEYS.PUBLIC_CHAT, INITIAL_PUBLIC_CHAT);
+    const raw = safeGet<PublicChatMessage[]>(STORAGE_KEYS.PUBLIC_CHAT, INITIAL_PUBLIC_CHAT);
+    const cleaned = this.purgeExpiredPublicChats(raw);
+    if (cleaned.length !== raw.length) {
+      safeSet(STORAGE_KEYS.PUBLIC_CHAT, cleaned);
+    }
+    return cleaned;
   },
 
   setPublicChatMessages(items: PublicChatMessage[]): void {
-    safeSet(STORAGE_KEYS.PUBLIC_CHAT, items);
+    const cleaned = this.purgeExpiredPublicChats(items);
+    safeSet(STORAGE_KEYS.PUBLIC_CHAT, cleaned);
     try {
-      window.dispatchEvent(new CustomEvent('kota_refleksi_public_chat_updated', { detail: items }));
+      window.dispatchEvent(new CustomEvent('kota_refleksi_public_chat_updated', { detail: cleaned }));
     } catch (e) {
       // safe fallback
     }
   },
 
-  addPublicChatMessage(msg: PublicChatMessage): void {
+  async fetchPublicChatMessages(): Promise<PublicChatMessage[]> {
+    // 1. Fetch shared messages from server API (where all students' chats are stored)
+    try {
+      const response = await fetch('/api/chat/messages');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && Array.isArray(result.data)) {
+          const serverItems: PublicChatMessage[] = result.data;
+          const localItems = this.getPublicChatMessages();
+
+          // Merge by ID to prevent duplicates
+          const msgMap = new Map<string, PublicChatMessage>();
+          serverItems.forEach((m) => msgMap.set(m.id, m));
+          localItems.forEach((m) => {
+            if (!msgMap.has(m.id)) msgMap.set(m.id, m);
+          });
+
+          const merged = this.purgeExpiredPublicChats(Array.from(msgMap.values()));
+          this.setPublicChatMessages(merged);
+          return merged;
+        }
+      }
+    } catch (err) {
+      // Offline / client-only mode
+    }
+
+    return this.getPublicChatMessages();
+  },
+
+  async addPublicChatMessage(msg: PublicChatMessage): Promise<void> {
     const items = this.getPublicChatMessages();
     const updated = [msg, ...items];
-    this.setPublicChatMessages(updated);
+    const cleaned = this.purgeExpiredPublicChats(updated);
+    this.setPublicChatMessages(cleaned);
+
+    // Broadcast to server API so other students immediately receive it
+    try {
+      fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(msg),
+      }).catch(() => {});
+    } catch (e) {
+      // safe fallback
+    }
+
+    // Sync to Google Apps Script if configured
+    this.syncWithGAS('send_public_chat', { message: msg });
   },
 
   reportChatMessage(msgId: string): void {
@@ -303,6 +363,16 @@ export const StorageService = {
       m.id === msgId ? { ...m, isReported: true } : m
     );
     this.setPublicChatMessages(items);
+
+    try {
+      fetch('/api/chat/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: msgId }),
+      }).catch(() => {});
+    } catch (e) {
+      // safe fallback
+    }
   },
 
   getSettings(): TownSettings {
@@ -372,6 +442,7 @@ export const StorageService = {
     reflections?: Reflection[];
     feedbacks?: MentorFeedback[];
     messages?: Message[];
+    chats?: PublicChatMessage[];
     spreadsheetName?: string;
     needsScriptUpdate?: boolean;
     error?: string;
@@ -398,8 +469,9 @@ export const StorageService = {
 
       const hasReflections = Array.isArray(resData.reflections);
       const hasMessages = Array.isArray(resData.messages);
+      const hasChats = Array.isArray(resData.chats);
 
-      if (hasReflections || hasMessages) {
+      if (hasReflections || hasMessages || hasChats) {
         const deletedIds = new Set(this.getDeletedReflectionIds());
         const validReflections = (resData.reflections || []).filter(
           (r: Reflection) => !deletedIds.has(r.id)
@@ -408,11 +480,24 @@ export const StorageService = {
           (f: MentorFeedback) => !deletedIds.has(f.reflectionId)
         );
 
+        let validChats: PublicChatMessage[] = [];
+        if (hasChats && resData.chats.length > 0) {
+          const currentChats = this.getPublicChatMessages();
+          const chatMap = new Map<string, PublicChatMessage>();
+          resData.chats.forEach((c: PublicChatMessage) => chatMap.set(c.id, c));
+          currentChats.forEach((c) => {
+            if (!chatMap.has(c.id)) chatMap.set(c.id, c);
+          });
+          validChats = this.purgeExpiredPublicChats(Array.from(chatMap.values()));
+          this.setPublicChatMessages(validChats);
+        }
+
         return {
           success: true,
           reflections: validReflections,
           feedbacks: validFeedbacks,
           messages: resData.messages || [],
+          chats: validChats,
           spreadsheetName: resData.spreadsheet || 'Google Spreadsheet',
         };
       }
