@@ -445,6 +445,10 @@ function setupSpreadsheet() {
     'Kelas',
     'Isi Pesan / Pertanyaan Siswa',
     'Balasan Guru',
+    'Status Balasan',
+    'Waktu Dibalas'
+  ];
+
   var headersObrolan = [
     'Waktu Kirim',
     'ID Pesan',
