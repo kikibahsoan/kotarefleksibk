@@ -57,9 +57,13 @@ function safeSet<T>(key: string, val: T): void {
 export const StorageService = {
   getCurrentStudent(): Student | null {
     const student = safeGet<Student | null>(STORAGE_KEYS.CURRENT_USER, null);
-    if (student && !student.className.includes('DKV')) {
-      student.className = 'X DKV 1 (Desain Komunikasi Visual)';
-      safeSet(STORAGE_KEYS.CURRENT_USER, student);
+    if (student && student.className.includes('DKV 1')) {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      } catch (e) {
+        // safe
+      }
+      return null;
     }
     return student;
   },
@@ -133,7 +137,12 @@ export const StorageService = {
   },
 
   getStudents(): Student[] {
-    return safeGet<Student[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
+    const items = safeGet<Student[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
+    if (!items || items.length < 50 || items.some((s) => s.className.includes('DKV 1'))) {
+      safeSet(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
+      return INITIAL_STUDENTS;
+    }
+    return items;
   },
 
   setStudents(items: Student[]): void {

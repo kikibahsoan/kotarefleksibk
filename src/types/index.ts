@@ -27,6 +27,8 @@ export interface Student {
   name: string;
   className: string;
   studentNumber?: string;
+  password?: string;
+  gender?: string;
   points: number;
   badges: string[];
   lastLogin: string;

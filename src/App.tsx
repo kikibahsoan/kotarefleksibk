@@ -68,10 +68,12 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('autostart') === '1' && !student) {
       const demoStudent: Student = {
-        id: 'std-demo',
-        name: 'Budi Santoso',
-        className: 'X DKV 1 (Desain Komunikasi Visual)',
-        studentNumber: '05',
+        id: 'std-dkv2-01',
+        name: 'ABDUL RAZAK SAMAUNA',
+        className: 'X DKV 2 (Desain Komunikasi Visual)',
+        studentNumber: '01',
+        password: '0101315814',
+        gender: 'L',
         points: 120,
         badges: ['reflektor_pertama', 'penjelajah_rajin'],
         lastLogin: new Date().toISOString().slice(0, 10),
@@ -79,6 +81,14 @@ export default function App() {
       };
       setStudent(demoStudent);
       StorageService.setCurrentStudent(demoStudent);
+    }
+  }, [student]);
+
+  // If previous saved student was in removed DKV 1, clear session
+  useEffect(() => {
+    if (student && student.className.includes('DKV 1')) {
+      StorageService.setCurrentStudent(null);
+      setStudent(null);
     }
   }, [student]);
 
@@ -365,7 +375,7 @@ export default function App() {
   const levelInfo = calculateStudentLevel(student.points);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-slate-900 select-none">
+    <div className="relative w-screen h-screen overflow-hidden bg-emerald-950 select-none">
       {/* 3D WebGL Town Canvas */}
       <ThreeTownCanvas
         onSelectBuilding={(buildingId) => setActiveBuilding(buildingId)}

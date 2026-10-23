@@ -23,10 +23,9 @@ interface MonumenWargaChatModalProps {
 }
 
 // Room metadata matching DKV classes
-const ROOMS_CONFIG: { roomNumber: 1 | 2 | 3; name: string; memberCount: number; visitorCount: number }[] = [
-  { roomNumber: 1, name: 'Ruang 1 (X DKV 1)', memberCount: 25, visitorCount: 14 },
-  { roomNumber: 2, name: 'Ruang 2 (X DKV 2)', memberCount: 21, visitorCount: 11 },
-  { roomNumber: 3, name: 'Ruang 3 (X DKV 3)', memberCount: 14, visitorCount: 8 },
+const ROOMS_CONFIG: { roomNumber: 2 | 3; name: string; memberCount: number; visitorCount: number }[] = [
+  { roomNumber: 2, name: 'Ruang 2 (X DKV 2)', memberCount: 26, visitorCount: 14 },
+  { roomNumber: 3, name: 'Ruang 3 (X DKV 3)', memberCount: 27, visitorCount: 12 },
 ];
 
 // Web Audio chime generator (0 external assets required)
@@ -56,14 +55,10 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
   onClose,
   student,
 }) => {
-  // Determine initial room based on student class
-  const initialRoomNumber = student.className.includes('DKV 2')
-    ? 2
-    : student.className.includes('DKV 3')
-    ? 3
-    : 1;
-
-  const [activeRoom, setActiveRoom] = useState<1 | 2 | 3>(initialRoomNumber);
+  // Students are strictly locked to their own class room: Room 2 for X DKV 2, Room 3 for X DKV 3
+  const isClassDkv3 = student.className.includes('DKV 3');
+  const myClassShort = isClassDkv3 ? 'X DKV 3' : 'X DKV 2';
+  const activeRoom: 2 | 3 = isClassDkv3 ? 3 : 2;
   const [messages, setMessages] = useState<PublicChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isSoundOn, setIsSoundOn] = useState(() => {
@@ -265,40 +260,23 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
             <span className="text-pink-400">🌸</span>
             <span className="font-bold text-white">Monumen Warga</span>
             <span className="text-slate-500">•</span>
-            <span className="text-slate-200">Ruang {activeRoom}</span>
+            <span className="text-emerald-400 font-bold">Khusus {myClassShort}</span>
             <span className="text-slate-500 hidden sm:inline">•</span>
             <span className="text-amber-300 font-medium hidden sm:inline" title="Seluruh obrolan otomatis dibersihkan setiap 24 jam">
-              🕒 Otomatis Bersih 24 Jam
+              🕒 Bersih Otomatis 24 Jam
             </span>
             <span className="text-slate-500 hidden md:inline">•</span>
-            <span className="text-emerald-400 font-medium hidden md:inline">{activeRoomData.memberCount} warga</span>
+            <span className="text-teal-300 font-medium hidden md:inline">{activeRoomData.memberCount} Siswa</span>
           </div>
         </div>
 
-        {/* Right: Room Switcher Pills & Sound Toggle */}
+        {/* Right: Class Locked Badge, Manual Sync & Sound Toggle */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Room Pills 1(25), 2(21), 3(14) */}
-          <div className="flex items-center bg-slate-900/90 border border-slate-700/80 p-1 rounded-full shadow-xl gap-1">
-            {ROOMS_CONFIG.map((r) => {
-              const isActive = r.roomNumber === activeRoom;
-              return (
-                <button
-                  key={r.roomNumber}
-                  onClick={() => setActiveRoom(r.roomNumber)}
-                  className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-bold transition flex items-center gap-1 ${
-                    isActive
-                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 shadow-md font-extrabold'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                  title={`${r.name} - ${r.memberCount} Siswa`}
-                >
-                  <span>{r.roomNumber}</span>
-                  <span className={`text-[10px] ${isActive ? 'text-slate-900 font-extrabold' : 'text-slate-400'}`}>
-                    ({r.memberCount})
-                  </span>
-                </button>
-              );
-            })}
+          {/* Class Locked Badge */}
+          <div className="flex items-center bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-full shadow-xl gap-1.5 text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-extrabold text-emerald-300">{myClassShort}</span>
+            <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">(Ruang Saya)</span>
           </div>
 
           {/* Tombol Tarik / Sinkronkan Obrolan Baru */}

@@ -60,35 +60,36 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       (navigator.webdriver || /HeadlessChrome/i.test(navigator.userAgent));
 
     // Scene
+    // Scene - Lush verdant green horizon & night emerald sky
     const scene = new THREE.Scene();
-    const daySkyColor = new THREE.Color(0xdbeafe);
-    const nightSkyColor = new THREE.Color(0x090d1f);
+    const daySkyColor = new THREE.Color(0x86efac); // Lush pastel meadow green
+    const nightSkyColor = new THREE.Color(0x064e3b); // Deep emerald forest night
     const daySunColor = new THREE.Color(0xfffaed);
-    const nightMoonColor = new THREE.Color(0x93c5fd);
-    const dayHemiSky = new THREE.Color(0xffffff);
-    const nightHemiSky = new THREE.Color(0x1e293b);
-    const dayHemiGround = new THREE.Color(0xcfd8dc);
-    const nightHemiGround = new THREE.Color(0x020617);
+    const nightMoonColor = new THREE.Color(0x6ee7b7);
+    const dayHemiSky = new THREE.Color(0xbbf7d0);
+    const nightHemiSky = new THREE.Color(0x064e3b);
+    const dayHemiGround = new THREE.Color(0x22c55e);
+    const nightHemiGround = new THREE.Color(0x022c22);
 
-    scene.background = new THREE.Color(0xdbeafe);
-    // Expand fog range so mobile camera distance doesn't fog out buildings
-    scene.fog = new THREE.Fog(0xdbeafe, 45, 160);
+    scene.background = new THREE.Color(0x86efac);
+    // Expand fog range so mobile camera distance keeps the green atmosphere without fogging buildings
+    scene.fog = new THREE.Fog(0x86efac, 55, 260);
 
     // Camera - Isometric top-down perspective with dynamic mobile framing
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 600;
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 220);
+    const camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 280);
 
     const defaultCamPos = new THREE.Vector3(0, 24, 28);
     const updateCameraFraming = (w: number, h: number) => {
       const aspect = w / h;
       camera.aspect = aspect;
       if (aspect < 1.0) {
-        // Mobile phone portrait: scale camera distance inversely to aspect ratio
-        const mobileFactor = Math.max(1.65, Math.min(2.75, 1.15 / aspect));
+        // Mobile phone portrait: scale camera distance comfortably while keeping town centered in lush green
+        const mobileFactor = Math.max(1.4, Math.min(2.1, 1.05 / aspect));
         camera.fov = 44;
-        camera.position.set(0, 24 * mobileFactor, 28 * mobileFactor);
-        camera.lookAt(0, 0, 1.2);
+        camera.position.set(0, 22 * mobileFactor, 26 * mobileFactor);
+        camera.lookAt(0, 0, -1.8);
       } else {
         camera.fov = 42;
         camera.position.set(0, 24, 28);
@@ -169,18 +170,122 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     const starField = new THREE.Points(starsGeo, starsMat);
     scene.add(starField);
 
-    // Ground Plane with grass
-    const groundGeo = new THREE.PlaneGeometry(80, 80);
+    // =========================================================================
+    // LUSH GREEN GROUND & SURROUNDINGS (Fix Mobile White Horizon)
+    // =========================================================================
+    // Expansive Ground Plane with rich grass green covering all camera angles
+    const groundGeo = new THREE.PlaneGeometry(500, 500);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x86efac,
-      roughness: 0.85,
-      metalness: 0.05,
+      color: 0x4ade80, // Rich vibrant lush spring grass green
+      roughness: 0.88,
+      metalness: 0.04,
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.05;
     ground.receiveShadow = !isHeadless;
     scene.add(ground);
+
+    // Surrounding Rolling Green Hills / Perimeter Mounds
+    const hillMat = new THREE.MeshStandardMaterial({
+      color: 0x22c55e, // Emerald green hill slope
+      roughness: 0.9,
+      metalness: 0.02,
+    });
+    const hillGroup = new THREE.Group();
+    const hillGeo = new THREE.ConeGeometry(9.0, 4.5, 7);
+    const hillPositions: [number, number, number, number][] = [
+      [-38, 1.8, -32, 1.4],
+      [-18, 1.6, -42, 1.6],
+      [12, 1.7, -40, 1.5],
+      [36, 1.9, -35, 1.3],
+      [-42, 1.6, -10, 1.2],
+      [42, 1.8, -8, 1.4],
+      [-40, 1.7, 18, 1.3],
+      [38, 1.9, 22, 1.5],
+      [-25, 1.6, 36, 1.4],
+      [8, 1.8, 38, 1.3],
+      [28, 1.7, 34, 1.2],
+    ];
+    hillPositions.forEach(([hx, hy, hz, hScale]) => {
+      const hill = new THREE.Mesh(hillGeo, hillMat);
+      hill.position.set(hx, hy, hz);
+      hill.scale.set(hScale, hScale * 0.75, hScale);
+      hill.receiveShadow = !isHeadless;
+      hillGroup.add(hill);
+    });
+    scene.add(hillGroup);
+
+    // =========================================================================
+    // MOVING 3D CLOUDS SYSTEM ("Efek Awan Berjalan")
+    // =========================================================================
+    const cloudsList: {
+      group: THREE.Group;
+      speed: number;
+      baseY: number;
+      bobSeed: number;
+    }[] = [];
+
+    const cloudPuffGeo = new THREE.DodecahedronGeometry(1.6, 1);
+    const cloudMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.35,
+      metalness: 0.05,
+      transparent: true,
+      opacity: 0.92,
+      flatShading: true,
+    });
+
+    const createCloud = (x: number, y: number, z: number, scale: number, speed: number) => {
+      const cGroup = new THREE.Group();
+      cGroup.position.set(x, y, z);
+      cGroup.scale.set(scale, scale * 0.65, scale);
+
+      // Puffs inside cloud
+      const puffOffsets: [number, number, number, number][] = [
+        [0, 0, 0, 1.0],
+        [1.3, -0.2, 0.3, 0.78],
+        [-1.3, -0.15, -0.2, 0.82],
+        [0.6, 0.35, 0.1, 0.75],
+        [-0.5, 0.3, 0.2, 0.72],
+        [0.2, -0.25, 0.8, 0.68],
+        [-0.3, -0.2, -0.7, 0.65],
+      ];
+
+      puffOffsets.forEach(([px, py, pz, pScale]) => {
+        const puff = new THREE.Mesh(cloudPuffGeo, cloudMat);
+        puff.position.set(px, py, pz);
+        puff.scale.setScalar(pScale);
+        puff.castShadow = !isHeadless;
+        cGroup.add(puff);
+      });
+
+      scene.add(cGroup);
+      cloudsList.push({
+        group: cGroup,
+        speed,
+        baseY: y,
+        bobSeed: Math.random() * Math.PI * 2,
+      });
+    };
+
+    // Instantiate 10 drifting clouds hovering over the town
+    const initialCloudConfigs = [
+      { x: -50, y: 17, z: -28, scale: 2.2, speed: 1.4 },
+      { x: -25, y: 19, z: -12, scale: 2.6, speed: 1.8 },
+      { x: 0, y: 16, z: -38, scale: 2.0, speed: 1.2 },
+      { x: 26, y: 18, z: -18, scale: 2.4, speed: 1.6 },
+      { x: -38, y: 20, z: 10, scale: 2.5, speed: 1.5 },
+      { x: -10, y: 17, z: 20, scale: 2.1, speed: 1.3 },
+      { x: 16, y: 19, z: 26, scale: 2.3, speed: 1.7 },
+      { x: 40, y: 16, z: 6, scale: 2.7, speed: 1.9 },
+      { x: -60, y: 18, z: -42, scale: 2.8, speed: 1.5 },
+      { x: -12, y: 21, z: -48, scale: 3.0, speed: 1.4 },
+    ];
+
+    initialCloudConfigs.forEach((cfg) => {
+      createCloud(cfg.x, cfg.y, cfg.z, cfg.scale, cfg.speed);
+    });
 
     // Cobblestone Plaza & Pathways
     const plazaGeo = new THREE.CylinderGeometry(7.5, 7.5, 0.06, 32);
@@ -861,13 +966,24 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
         starsMat.size = 0.8 + Math.sin(elapsedTime * 2.5) * 0.15;
       }
 
-      // 5. Street Lamps & Lantern PointLights
+      // 5. Moving Clouds Animation & Night Dimming ("Efek Awan Berjalan")
+      cloudMat.color.lerpColors(new THREE.Color(0xffffff), new THREE.Color(0x94a3b8), currentNightFactor);
+      cloudsList.forEach((cloud) => {
+        cloud.group.position.x += cloud.speed * delta;
+        cloud.group.position.y = cloud.baseY + Math.sin(elapsedTime * 0.7 + cloud.bobSeed) * 0.35;
+        if (cloud.group.position.x > 68) {
+          cloud.group.position.x = -68;
+          cloud.group.position.z = (Math.random() - 0.5) * 85;
+        }
+      });
+
+      // 6. Street Lamps & Lantern PointLights
       lampBulbMat.emissiveIntensity = currentNightFactor * 1.6;
       lampLights.forEach((pl) => {
         pl.intensity = currentNightFactor * 1.8;
       });
 
-      // 6. Building Windows glow
+      // 7. Building Windows glow
       windowMat.emissiveIntensity = currentNightFactor * 0.85;
 
       // Animate building beacons & indicators
