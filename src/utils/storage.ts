@@ -309,32 +309,36 @@ export const StorageService = {
   },
 
   async fetchPublicChatMessages(): Promise<PublicChatMessage[]> {
-    // 1. Fetch shared messages from server API (where all students' chats are stored)
+    const localItems = this.getPublicChatMessages();
+    const msgMap = new Map<string, PublicChatMessage>();
+    localItems.forEach((m) => msgMap.set(m.id, m));
+
+    // 1. Fetch shared messages from server API
     try {
       const response = await fetch('/api/chat/messages');
       if (response.ok) {
         const result = await response.json();
         if (result.success && Array.isArray(result.data)) {
-          const serverItems: PublicChatMessage[] = result.data;
-          const localItems = this.getPublicChatMessages();
-
-          // Merge by ID to prevent duplicates
-          const msgMap = new Map<string, PublicChatMessage>();
-          serverItems.forEach((m) => msgMap.set(m.id, m));
-          localItems.forEach((m) => {
-            if (!msgMap.has(m.id)) msgMap.set(m.id, m);
-          });
-
-          const merged = this.purgeExpiredPublicChats(Array.from(msgMap.values()));
-          this.setPublicChatMessages(merged);
-          return merged;
+          result.data.forEach((m: PublicChatMessage) => msgMap.set(m.id, m));
         }
       }
     } catch (err) {
       // Offline / client-only mode
     }
 
-    return this.getPublicChatMessages();
+    // 2. Fetch shared messages from Google Spreadsheet (device-to-device sync)
+    try {
+      const gasResult = await this.fetchFromGAS();
+      if (gasResult && gasResult.success && Array.isArray(gasResult.chats)) {
+        gasResult.chats.forEach((m: PublicChatMessage) => msgMap.set(m.id, m));
+      }
+    } catch (err) {
+      // Safe fallback
+    }
+
+    const merged = this.purgeExpiredPublicChats(Array.from(msgMap.values()));
+    this.setPublicChatMessages(merged);
+    return merged;
   },
 
   async addPublicChatMessage(msg: PublicChatMessage): Promise<void> {

@@ -13,7 +13,8 @@ import {
   MessageCircle,
   Users,
   Check,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 
 interface MonumenWargaChatModalProps {
@@ -72,8 +73,38 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
   const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
   const [reportSuccessId, setReportSuccessId] = useState<string | null>(null);
 
+  // Auto-sync and manual sync states
+  const [isAutoSyncOn, setIsAutoSyncOn] = useState(() => {
+    return localStorage.getItem('kota_monumen_autosync') !== 'false';
+  });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Manual trigger to pull fresh chats from other devices
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    setSyncFeedback(null);
+    try {
+      const prevLength = messages.length;
+      const shared = await StorageService.fetchPublicChatMessages();
+      setMessages(shared);
+      const diff = shared.length - prevLength;
+      if (diff > 0) {
+        setSyncFeedback(`+${diff} obrolan baru!`);
+        if (isSoundOn) playChimeAudio(true);
+      } else {
+        setSyncFeedback('Obrolan terbaru');
+      }
+    } catch (e) {
+      setSyncFeedback('Tersinkronisasi');
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncFeedback(null), 3000);
+    }
+  };
 
   // Load and subscribe to shared chat messages (with 24h automatic purge)
   useEffect(() => {
@@ -84,7 +115,7 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
       const local = StorageService.getPublicChatMessages();
       if (isMounted) setMessages(local);
 
-      // 2. Fetch shared messages from server API (where all students' chats are pooled)
+      // 2. Fetch shared messages from server API & Google Apps Script
       try {
         const shared = await StorageService.fetchPublicChatMessages();
         if (isMounted && shared && shared.length > 0) {
@@ -97,10 +128,13 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
 
     loadMessages();
 
-    // Poll every 3.5 seconds so messages sent by other classmates appear in real-time
-    const pollInterval = setInterval(() => {
-      loadMessages();
-    }, 3500);
+    // Auto-poll every 4 seconds if isAutoSyncOn is enabled
+    let pollInterval: any = null;
+    if (isAutoSyncOn) {
+      pollInterval = setInterval(() => {
+        loadMessages();
+      }, 4000);
+    }
 
     // Listen to storage events and custom events for multi-tab realtime sync
     const handleStorageUpdate = () => {
@@ -115,11 +149,11 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
 
     return () => {
       isMounted = false;
-      clearInterval(pollInterval);
+      if (pollInterval) clearInterval(pollInterval);
       window.removeEventListener('storage', handleStorageUpdate);
       window.removeEventListener('kota_refleksi_public_chat_updated', handleStorageUpdate);
     };
-  }, [isSoundOn]);
+  }, [isSoundOn, isAutoSyncOn]);
 
   // Filter messages for current room
   const currentRoomMessages = messages
@@ -267,6 +301,17 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
             })}
           </div>
 
+          {/* Tombol Tarik / Sinkronkan Obrolan Baru */}
+          <button
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="w-10 h-10 rounded-full border shadow-xl flex items-center justify-center transition active:scale-95 bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 text-teal-400 hover:text-teal-300 disabled:opacity-50"
+            title={isSyncing ? 'Sedang menarik obrolan baru...' : 'Tarik Obrolan Baru dari Teman di Device Lain'}
+            aria-label="Tarik Obrolan"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-teal-300' : ''}`} />
+          </button>
+
           {/* Audio toggle button */}
           <button
             onClick={handleToggleSound}
@@ -319,23 +364,65 @@ export const MonumenWargaChatModal: React.FC<MonumenWargaChatModalProps> = ({
       <div className="p-3 sm:p-4 max-w-2xl w-full mx-auto pointer-events-auto transition-all duration-300">
         <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
           {/* Tray Header */}
-          <div className="px-4 py-2.5 bg-slate-800/80 border-b border-slate-700/70 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="px-3 sm:px-4 py-2.5 bg-slate-800/80 border-b border-slate-700/70 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <MessageCircle className="w-4 h-4 text-cyan-400" />
               <span className="font-extrabold text-xs sm:text-sm text-white">
                 Obrolan • {currentRoomMessages.length} pesan
               </span>
-              <span className="text-[10px] bg-slate-800 text-amber-300 px-2 py-0.5 rounded-full font-mono border border-slate-700 hidden sm:inline">
-                🕒 Otomatis Bersih 24 Jam
+              <span className="text-[10px] bg-slate-800 text-amber-300 px-2 py-0.5 rounded-full font-mono border border-slate-700 hidden lg:inline">
+                🕒 Bersih 24 Jam
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Feedback toast */}
+              {syncFeedback && (
+                <span className="text-[10px] sm:text-[11px] font-bold text-teal-300 bg-teal-950/80 px-2.5 py-0.5 rounded-full border border-teal-500/40 animate-in fade-in truncate max-w-[130px] sm:max-w-[170px]">
+                  {syncFeedback}
+                </span>
+              )}
+
+              {/* Tombol Tarik Obrolan Baru */}
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="px-2.5 sm:px-3 py-1 rounded-full bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50 shadow-sm"
+                title="Tarik & perbarui obrolan terbaru dari teman-teman di device lain"
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-teal-400' : ''}`} />
+                <span className="hidden sm:inline">{isSyncing ? 'Menarik...' : 'Tarik Obrolan'}</span>
+              </button>
+
+              {/* Tombol Toggle Auto-Sync */}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !isAutoSyncOn;
+                  setIsAutoSyncOn(next);
+                  localStorage.setItem('kota_monumen_autosync', String(next));
+                }}
+                className={`px-2 sm:px-2.5 py-1 rounded-full text-[11px] font-bold border transition flex items-center gap-1.5 cursor-pointer ${
+                  isAutoSyncOn
+                    ? 'bg-emerald-950/50 text-emerald-300 border-emerald-500/40'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+                title={
+                  isAutoSyncOn
+                    ? 'Sinkron Otomatis AKTIF: Otomatis menarik pesan dari teman di device lain setiap 4 detik'
+                    : 'Sinkron Otomatis MATI (klik untuk mengaktifkan)'
+                }
+              >
+                <span className={`w-2 h-2 rounded-full ${isAutoSyncOn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                <span className="hidden sm:inline">Auto-Sync</span>
+              </button>
+
               {/* Pesan Baru button when scrolled up */}
               {hasNewMessagesBelow && (
                 <button
                   onClick={scrollToBottom}
-                  className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[11px] font-extrabold px-3 py-1 rounded-full shadow flex items-center gap-1 animate-bounce transition"
+                  className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[11px] font-extrabold px-2.5 py-1 rounded-full shadow flex items-center gap-1 animate-bounce transition"
                 >
                   <span>Pesan baru</span>
                   <ChevronDown className="w-3 h-3" />
