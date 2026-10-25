@@ -1,216 +1,327 @@
 import React, { useState } from 'react';
-import { Materi, BuildingId } from '../../types/index.ts';
-import { X, BookOpen, ExternalLink, Video, ArrowRight, Search } from 'lucide-react';
+import { X, BookOpen, Send, Sparkles, CheckCircle2, History, FileText, ArrowRight, Video } from 'lucide-react';
+import { Materi, ReflectionEntry } from '../../types/index.ts';
+import { sounds } from '../../utils/audio.ts';
 
 interface PerpustakaanModalProps {
   onClose: () => void;
-  materis: Materi[];
-  onNavigateBuilding: (buildingId: BuildingId) => void;
-  onSelectMateriForReflection?: (materiId: string) => void;
+  materis?: Materi[];
+  onNavigateBuilding?: (id: any) => void;
+  onSelectMateriForReflection?: (mId: any) => void;
+  onAddXp?: (amount: number, reason: string) => void;
+  reflections?: ReflectionEntry[];
+  onSaveReflection?: (entry: ReflectionEntry) => void;
 }
 
 export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
   onClose,
-  materis,
+  materis = [],
   onNavigateBuilding,
   onSelectMateriForReflection,
+  onAddXp,
+  reflections = [],
+  onSaveReflection,
 }) => {
-  const [selectedMateriId, setSelectedMateriId] = useState<string>(materis[0]?.id || '');
-  const [search, setSearch] = useState('');
-
-  const filteredMateris = materis.filter(
-    (m) =>
-      m.title.toLowerCase().includes(search.toLowerCase()) ||
-      m.subject.toLowerCase().includes(search.toLowerCase()) ||
-      m.targetClass.toLowerCase().includes(search.toLowerCase())
+  const [activeTab, setActiveTab] = useState<'materi' | 'write' | 'archive'>(
+    materis.length > 0 ? 'materi' : 'write'
   );
+  const [subject, setSubject] = useState('Informatika (Berpikir Komputasional)');
+  const [title, setTitle] = useState('');
+  const [facts, setFacts] = useState('');
+  const [feelings, setFeelings] = useState('');
+  const [findings, setFindings] = useState('');
+  const [future, setFuture] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
 
-  const activeMateri = materis.find((m) => m.id === selectedMateriId) || filteredMateris[0];
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !facts.trim()) return;
+
+    const newEntry: ReflectionEntry = {
+      id: `ref-${Date.now()}`,
+      title,
+      subject,
+      facts,
+      feelings: feelings || 'Merasa tertantang namun puas setelah berhasil.',
+      findings: findings || 'Memahami pentingnya ketelitian dalam pemecahan masalah.',
+      future: future || 'Akan mendokumentasikan setiap solusi untuk referensi berikutnya.',
+      date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+      xpEarned: 30,
+    };
+
+    if (onSaveReflection) onSaveReflection(newEntry);
+    if (onAddXp) onAddXp(30, 'Menyelesaikan Jurnal 4F di Perpustakaan');
+    sounds.playRewardXp();
+    setIsSuccess(true);
+
+    setTimeout(() => {
+      setIsSuccess(false);
+      setTitle('');
+      setFacts('');
+      setFeelings('');
+      setFindings('');
+      setFuture('');
+      setActiveTab('archive');
+    }, 1500);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-sm animate-backdrop-fade">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100 animate-fade-in-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="liquid-glass-dark rounded-3xl max-w-3xl w-full p-6 shadow-2xl border border-white/20 relative max-h-[92vh] overflow-y-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-green-700 px-6 py-5 text-white flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl shadow-inner">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-3xl shadow-inner">
               📚
             </div>
             <div>
-              <h2 className="text-xl font-extrabold font-display leading-tight">Perpustakaan Kota</h2>
-              <p className="text-xs text-emerald-100 font-medium">Koleksi Modul & Materi Pembelajaran Kejuruan</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  Materi & Jurnal 4F
+                </span>
+                <span className="text-xs text-amber-300 font-semibold flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> Pelajari Materi & Refleksi
+                </span>
+              </div>
+              <h2 className="text-xl font-black text-white font-['Outfit']">Perpustakaan Refleksi</h2>
             </div>
           </div>
           <button
             onClick={onClose}
-            aria-label="Tutup Perpustakaan"
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors"
           >
-            <X className="w-5 h-5 text-white" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content split into sidebar list and detail view */}
-        <div className="grid grid-cols-1 md:grid-cols-12 flex-1 overflow-hidden min-h-0">
-          {/* Sidebar List */}
-          <div className="md:col-span-5 border-r border-slate-800 p-4 flex flex-col overflow-y-auto">
-            {/* Search input */}
-            <div className="relative mb-3">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cari materi atau mapel..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
+        {/* Tab switch */}
+        <div className="mt-4 flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto">
+          {materis.length > 0 && (
+            <button
+              onClick={() => setActiveTab('materi')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                activeTab === 'materi'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <FileText className="w-4 h-4" /> Modul & Materi ({materis.length})
+            </button>
+          )}
+          <button
+            onClick={() => setActiveTab('write')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'write'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'bg-white/5 text-slate-300 hover:bg-white/10'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" /> Tulis Jurnal 4F
+          </button>
+          <button
+            onClick={() => setActiveTab('archive')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'archive'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'bg-white/5 text-slate-300 hover:bg-white/10'
+            }`}
+          >
+            <History className="w-4 h-4" /> Arsip Jurnal ({reflections.length})
+          </button>
+        </div>
 
-            <div className="space-y-2 flex-1">
-              {filteredMateris.map((m) => {
-                const isSelected = activeMateri?.id === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => setSelectedMateriId(m.id)}
-                    className={`w-full text-left p-3 rounded-2xl transition border ${
-                      isSelected
-                        ? 'bg-emerald-950/70 border-emerald-500/80 text-white shadow'
-                        : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <span className="text-[10px] uppercase font-bold text-emerald-400">
-                        {m.subject}
+        {/* Tab Content: Materi */}
+        {activeTab === 'materi' && (
+          <div className="mt-5 space-y-4">
+            <p className="text-xs text-slate-300">
+              Pilih materi pembelajaran Berpikir Komputasional berikut untuk dibaca, lalu klik "Tulis Refleksi" untuk merefleksikan pemahamanmu di Taman Refleksi.
+            </p>
+
+            <div className="space-y-3">
+              {materis.map((m) => (
+                <div
+                  key={m.id}
+                  className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                        {m.targetClass}
                       </span>
                       {m.isNew && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-500 text-slate-950">
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950">
                           BARU
                         </span>
                       )}
                     </div>
-                    <h4 className="text-xs font-bold leading-snug line-clamp-2">{m.title}</h4>
-                    <p className="text-[11px] text-slate-400 mt-1">{m.targetClass}</p>
-                  </button>
-                );
-              })}
-
-              {filteredMateris.length === 0 && (
-                <p className="text-center text-xs text-slate-500 py-6">Materi tidak ditemukan.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Reading Detail Area */}
-          <div className="md:col-span-7 p-6 overflow-y-auto flex flex-col justify-between space-y-6">
-            {activeMateri ? (
-              <>
-                <div className="space-y-4">
-                  <div>
-                    <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold uppercase bg-emerald-950 text-emerald-400 border border-emerald-800/80 mb-2">
-                      {activeMateri.subject}
-                    </span>
-                    <h3 className="text-lg sm:text-xl font-extrabold text-white leading-tight">
-                      {activeMateri.title}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Sasaran: {activeMateri.targetClass} • Ditambahkan: {activeMateri.createdAt}
+                    <h4 className="text-sm font-bold text-white leading-snug">{m.title}</h4>
+                    <p className="text-xs text-slate-300 mt-1 line-clamp-2 leading-relaxed">
+                      {m.content}
                     </p>
                   </div>
 
-                  {/* Body Content */}
-                  <div className="p-4 rounded-2xl bg-slate-800/70 border border-slate-700/70 text-slate-200 text-sm leading-relaxed whitespace-pre-line">
-                    {activeMateri.content}
-                  </div>
-
-                  {/* Modul Ajar PDF Banner & External Links */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/70 to-teal-950/70 border border-emerald-600/50 space-y-2.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                          Dokumen Modul Resmi (Fase E - SMK Negeri 2 Gorontalo)
-                        </span>
-                        <h5 className="text-xs font-bold text-white mt-1">
-                          Materi Ajar Berpikir Komputasional — Abdul Rahman Bahsoan
-                        </h5>
-                        <p className="text-[11px] text-slate-300">
-                          Berpikir Komputasional dalam Ruang Lingkup Bisnis Industri DKV (5 Pertemuan)
-                        </p>
-                      </div>
+                  <div className="flex items-center gap-2 shrink-0 pt-2 md:pt-0">
+                    {m.link && (
                       <a
-                        href="/public/assets/aistudio/Materi_Ajar_Siswa_Berpikir_Komputasional_Abdul_Rahman_Bahsoan_15d54abe.pdf"
+                        href={m.link}
                         target="_blank"
                         rel="noreferrer"
-                        className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 shadow transition"
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-slate-200 border border-white/20 transition flex items-center gap-1.5"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Buka PDF Modul</span>
+                        <FileText className="w-3.5 h-3.5" /> PDF
                       </a>
-                    </div>
-                  </div>
-
-                  {/* Pertanyaan Refleksi Khusus dari Modul */}
-                  {activeMateri.customQuestions && activeMateri.customQuestions.length > 0 && (
-                    <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700/80 space-y-2">
-                      <h5 className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                        <span>📝</span>
-                        <span>Pertanyaan Refleksi Terkait Materi Ini:</span>
-                      </h5>
-                      <ul className="space-y-1 text-xs text-slate-200">
-                        {activeMateri.customQuestions.map((q, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-amber-400 font-bold">{idx + 1}.</span>
-                            <span>{q}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Video Penjelasan Praktik */}
-                  {activeMateri.videoUrl && (
-                    <div className="p-3.5 rounded-2xl bg-slate-800/50 border border-slate-700/50">
+                    )}
+                    {m.videoUrl && (
                       <a
-                        href={activeMateri.videoUrl}
+                        href={m.videoUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-2 text-xs text-sky-400 hover:text-sky-300 underline font-medium"
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-red-600/30 hover:bg-red-600/50 text-red-200 border border-red-500/40 transition flex items-center gap-1.5"
                       >
-                        <Video className="w-3.5 h-3.5" />
-                        <span>Tonton Video Penjelasan Praktik</span>
+                        <Video className="w-3.5 h-3.5" /> Video
                       </a>
-                    </div>
-                  )}
+                    )}
+                    <button
+                      onClick={() => {
+                        sounds.playClick();
+                        if (onSelectMateriForReflection) onSelectMateriForReflection(m.id);
+                        if (onNavigateBuilding) onNavigateBuilding('taman_refleksi');
+                        onClose();
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition flex items-center gap-1.5"
+                    >
+                      <span>Tulis Refleksi</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-                {/* Call to action: Go to Reflection */}
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
-                  <p className="text-xs text-slate-400">
-                    Selesai membaca? Luangkan waktu sejenak untuk refleksi.
-                  </p>
-                  <button
-                    onClick={() => {
-                      if (onSelectMateriForReflection) {
-                        onSelectMateriForReflection(activeMateri.id);
-                      }
-                      onClose();
-                      onNavigateBuilding('taman_refleksi');
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-extrabold text-xs shadow-lg shadow-pink-600/30 flex items-center gap-2 transition"
-                  >
-                    <span>Mulai Refleksi Materi Ini</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+        {/* Tab Content: Write Jurnal */}
+        {activeTab === 'write' && (
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            {isSuccess && (
+              <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center gap-3 animate-in fade-in">
+                <CheckCircle2 className="w-6 h-6 shrink-0" />
+                <div>
+                  <h4 className="font-bold text-sm">Jurnal Berhasil Disimpan!</h4>
+                  <p className="text-xs text-emerald-200">Kamu mendapatkan reward +30 XP ke status Refleksia City.</p>
                 </div>
-              </>
-            ) : (
-              <div className="text-center py-16 text-slate-400">
-                <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Pilih salah satu materi di sebelah kiri untuk membaca.</p>
               </div>
             )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Mata Pelajaran</label>
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/20 text-white text-xs focus:border-purple-400 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Topik Refleksi</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Model IPO Von Neumann"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/20 text-white text-xs focus:border-purple-400 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">1. Facts (Peristiwa konkret yang dialami)</label>
+              <textarea
+                required
+                rows={2}
+                placeholder="Apa yang telah kamu pelajari atau kerjakan hari ini?"
+                value={facts}
+                onChange={(e) => setFacts(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/20 text-white text-xs focus:border-purple-400 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">2. Feelings (Perasaan selama pembelajaran)</label>
+              <textarea
+                rows={2}
+                placeholder="Bagaimana perasaanmu saat menghadapi kendala atau berhasil menyelesaikannya?"
+                value={feelings}
+                onChange={(e) => setFeelings(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/20 text-white text-xs focus:border-purple-400 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">3. Findings (Pembelajaran atau pemahaman baru)</label>
+              <textarea
+                rows={2}
+                placeholder="Pelajaran penting apa yang kamu temukan?"
+                value={findings}
+                onChange={(e) => setFindings(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/20 text-white text-xs focus:border-purple-400 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">4. Future (Rencana aksi masa depan)</label>
+              <textarea
+                rows={2}
+                placeholder="Apa langkah nyata yang akan kamu lakukan selanjutnya?"
+                value={future}
+                onChange={(e) => setFuture(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/20 text-white text-xs focus:border-purple-400 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-600/30 flex items-center gap-2 transition-all active:scale-95"
+              >
+                <Send className="w-4 h-4" /> Simpan Jurnal Refleksi (+30 XP)
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Tab Content: Archive */}
+        {activeTab === 'archive' && (
+          <div className="mt-5 space-y-3">
+            {reflections.length === 0 ? (
+              <div className="text-center py-10 text-slate-400 text-xs">
+                Belum ada arsip jurnal 4F yang tersimpan. Mulai tulis jurnal baru sekarang!
+              </div>
+            ) : (
+              reflections.map((r) => (
+                <div key={r.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
+                        {r.subject}
+                      </span>
+                      <h4 className="text-sm font-bold text-white mt-1">{r.title}</h4>
+                    </div>
+                    <span className="text-[10px] text-slate-400">{r.date}</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-300 pt-1">
+                    <p><strong className="text-purple-300">Facts:</strong> {r.facts}</p>
+                    <p><strong className="text-blue-300">Feelings:</strong> {r.feelings}</p>
+                    <p><strong className="text-emerald-300">Findings:</strong> {r.findings}</p>
+                    <p><strong className="text-amber-300">Future:</strong> {r.future}</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

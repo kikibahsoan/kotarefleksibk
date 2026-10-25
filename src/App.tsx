@@ -30,11 +30,19 @@ import { KantorPosModal } from './components/modals/KantorPosModal.tsx';
 import { PasarPrestasiModal } from './components/modals/PasarPrestasiModal.tsx';
 import { RuangGuruModal } from './components/modals/RuangGuruModal.tsx';
 import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal.tsx';
+import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
+import { PublicChatMessage } from './types/index.ts';
 import {
   LogOut,
   Sparkles,
   Sun,
   Moon,
+  Volume2,
+  VolumeX,
+  Compass,
+  ChevronLeft,
+  Users,
+  Sprout,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -54,6 +62,84 @@ export default function App() {
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
   const [preselectedMateriForReflection, setPreselectedMateriForReflection] = useState<string | undefined>(undefined);
   const [timeOfDay, setTimeOfDay] = useState<'day' | 'night' | 'auto'>('night');
+
+  // Live World Chat State matching screenshot
+  const [publicChats, setPublicChats] = useState<PublicChatMessage[]>(() =>
+    StorageService.getPublicChatMessages()
+  );
+  const [latestChat, setLatestChat] = useState<PublicChatMessage | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+
+  // Sync public chat updates
+  useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setPublicChats(e.detail);
+      }
+    };
+    window.addEventListener('kota_refleksi_public_chat_updated', handleUpdate);
+    return () => window.removeEventListener('kota_refleksi_public_chat_updated', handleUpdate);
+  }, []);
+
+  const playChimeSound = () => {
+    if (!audioEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch (e) {
+      // safe fallback
+    }
+  };
+
+  const handleSendWorldChat = async (text: string) => {
+    if (!student) return;
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+
+    const cleanHandle = student.name
+      .split(' ')
+      .slice(0, 2)
+      .join('_')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '');
+
+    const newMsg: PublicChatMessage = {
+      id: `pchat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      senderId: student.id,
+      senderName: student.name,
+      senderHandle: `@${cleanHandle || 'siswa'}`,
+      className: student.className,
+      roomNumber: (student.className.includes('DKV 3') ? 3 : 2) as 1 | 2 | 3,
+      content: text,
+      timestamp: `${hours}.${minutes}`,
+      createdAt: now.toISOString(),
+      avatarColor: '#38bdf8',
+    };
+
+    const updated = [newMsg, ...publicChats.filter((m) => m.id !== newMsg.id)].slice(0, 25);
+    setPublicChats(updated);
+    setLatestChat(newMsg);
+    await StorageService.addPublicChatMessage(newMsg);
+    playChimeSound();
+  };
+
+  const handleReportMessage = (msgId: string) => {
+    StorageService.reportChatMessage(msgId);
+    setPublicChats((prev) => prev.filter((m) => m.id !== msgId));
+  };
 
   // Check ?autostart=1 for headless testing & fast access
   useEffect(() => {
@@ -366,9 +452,22 @@ export default function App() {
 
   const levelInfo = calculateStudentLevel(student.points);
 
+  const cleanHandle = student.name
+    .split(' ')
+    .slice(0, 2)
+    .join('_')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '');
+  const studentHandle = `@${cleanHandle || 'siswa'}`;
+  const roomNum = student.className.includes('DKV 3') ? 3 : 2;
+
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-emerald-950 select-none">
-      {/* 3D WebGL Town Canvas */}
+    <div
+      className={`relative w-screen h-screen overflow-hidden ${
+        timeOfDay === 'day' ? 'bg-[#38bdf8]' : 'bg-[#0c1527]'
+      } select-none transition-colors duration-500`}
+    >
+      {/* 2D Isometric Town Canvas */}
       <ThreeTownCanvas
         onSelectBuilding={(buildingId) => setActiveBuilding(buildingId)}
         activeBuilding={activeBuilding}
@@ -376,120 +475,124 @@ export default function App() {
         studentName={student.name}
         studentGender={student.gender}
         timeOfDay={timeOfDay}
+        latestMessage={latestChat}
       />
 
-      {/* TOP HEADER OVERLAY (Hidden when inside building modals or 2D menu) - Liquid Glass */}
+      {/* TOP HEADER OVERLAY (Matching Reference Screenshot) */}
       {!activeBuilding && !isQuickNavOpen && (
-        <header className="absolute top-4 sm:top-5 left-3 sm:left-4 right-3 sm:right-4 flex items-center justify-between pointer-events-none z-20 gap-2">
-          {/* Left: Refleksia City • Nama • Kelas • XP • Level */}
-          <div className="flex items-center gap-2 sm:gap-3 bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/25 px-3.5 py-2 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] pointer-events-auto max-w-[75vw] sm:max-w-none overflow-x-auto">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-base shadow-sm shrink-0">
-              🏛️
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 text-xs whitespace-nowrap">
-              <span className="font-extrabold text-white font-display text-xs sm:text-sm tracking-tight">
-                Refleksia City
+        <header className="absolute top-3 sm:top-4 left-3 sm:left-5 right-3 sm:right-5 flex items-center justify-between pointer-events-none z-20 gap-2">
+          {/* Left: Back Arrow < and Profile Capsule (@username • 🪙 616,88 saldo) */}
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {/* Back / Navigation button */}
+            <button
+              onClick={() => setIsQuickNavOpen(true)}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121c27]/90 hover:bg-[#1a2634] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95"
+              title="Jelajah Bangunan & Peta Kota"
+              aria-label="Peta Kota"
+            >
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+
+            {/* Profile Capsule */}
+            <div className="bg-[#121c27]/90 backdrop-blur-md border border-slate-700/70 rounded-full px-3 py-1 sm:py-1.5 flex items-center gap-2 sm:gap-2.5 shadow-xl">
+              {/* Circular Avatar */}
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-300 flex items-center justify-center text-slate-950 font-black text-[11px] shadow-sm shrink-0">
+                {student.gender === 'P' ? '👧' : '👦'}
+              </div>
+
+              {/* Username Handle */}
+              <span className="font-extrabold text-xs sm:text-sm text-white max-w-[110px] sm:max-w-[180px] truncate">
+                {studentHandle}
               </span>
-              <span className="text-slate-400 font-bold">•</span>
-              <span className="font-bold text-slate-100 max-w-[120px] sm:max-w-[200px] truncate" title={student.name}>
-                {student.name}
-              </span>
-              <span className="text-slate-400 font-bold">•</span>
-              <span className="px-2 py-0.5 rounded-lg bg-blue-900/60 text-blue-200 font-bold border border-blue-400/40 text-[11px] backdrop-blur-sm">
-                {student.className}
-              </span>
-              <span className="text-slate-400 font-bold">•</span>
-              <span className="px-2 py-0.5 rounded-lg bg-amber-900/60 text-amber-200 font-bold border border-amber-400/40 text-[11px] flex items-center gap-1 backdrop-blur-sm">
-                ⭐ {student.points} XP
-              </span>
-              <span className="text-slate-400 font-bold hidden md:inline">•</span>
-              <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-lg bg-emerald-900/60 text-emerald-200 font-bold border border-emerald-400/40 text-[11px] backdrop-blur-sm">
-                Lv. {levelInfo.level} ({levelInfo.title})
-              </span>
+
+              {/* Gold Coin & Saldo */}
+              <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                <span className="text-xs sm:text-sm">🪙</span>
+                <span className="font-bold text-[11px] sm:text-xs text-amber-300 font-mono">
+                  {student.points},88 <span className="font-sans text-[10px] text-amber-200/80">saldo</span>
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Right: ONLY Siang/Malam and Keluar - Liquid Glass */}
+          {/* Right: Sprout 12m • Ruang 2 • Sound • Night • Logout */}
           <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
-            {/* Day / Night Cycle Button */}
+            {/* Seedling / Study Progress Capsule */}
+            <div className="hidden sm:flex items-center gap-2 bg-[#121c27]/90 backdrop-blur-md border border-slate-700/70 rounded-full px-3 py-1.5 shadow-xl text-xs font-bold text-amber-300">
+              <Sprout className="w-3.5 h-3.5 text-amber-400" />
+              <div className="w-12 h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700/60">
+                <div className="h-full bg-amber-400 w-3/4 rounded-full" />
+              </div>
+              <span className="text-[11px] text-white font-mono">12m</span>
+            </div>
+
+            {/* Room Capsule */}
+            <div
+              className="bg-[#121c27]/90 backdrop-blur-md border border-slate-700/70 rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-xl text-xs font-bold text-slate-200"
+              title={`Sedang berada di Ruang ${roomNum} (${student.className})`}
+            >
+              <Users className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Ruang {roomNum}</span>
+            </div>
+
+            {/* Audio Toggle */}
+            <button
+              onClick={() => setAudioEnabled(!audioEnabled)}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121c27]/90 hover:bg-[#1a2634] text-slate-300 hover:text-white border border-slate-700/70 shadow-lg flex items-center justify-center transition active:scale-95"
+              title={audioEnabled ? 'Matikan Suara Chime' : 'Nyalakan Suara Chime'}
+              aria-label="Toggle Suara"
+            >
+              {audioEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+            </button>
+
+            {/* Day / Night Toggle (Pagi / Malam) */}
             <button
               onClick={() => {
-                if (timeOfDay === 'day') setTimeOfDay('night');
-                else if (timeOfDay === 'night') setTimeOfDay('auto');
-                else setTimeOfDay('day');
+                setTimeOfDay((prev) => (prev === 'day' ? 'night' : 'day'));
               }}
-              className="bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl backdrop-saturate-150 text-slate-100 border border-white/25 hover:border-white/50 px-3 py-2 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
-              title="Ganti Waktu Kota: Siang / Malam / Otomatis"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121c27]/90 hover:bg-[#1a2634] text-slate-300 hover:text-white border border-slate-700/70 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer"
+              title={timeOfDay === 'day' ? 'Waktu Pagi (Klik untuk ganti ke Malam)' : 'Waktu Malam (Klik untuk ganti ke Pagi)'}
+              aria-label="Waktu Kota (Pagi / Malam)"
             >
-              {timeOfDay === 'day' && (
-                <>
-                  <Sun className="w-4 h-4 text-amber-400" />
-                  <span className="hidden sm:inline">Siang</span>
-                </>
-              )}
-              {timeOfDay === 'night' && (
-                <>
-                  <Moon className="w-4 h-4 text-indigo-300" />
-                  <span className="hidden sm:inline">Malam</span>
-                </>
-              )}
-              {timeOfDay === 'auto' && (
-                <>
-                  <Sparkles className="w-4 h-4 text-cyan-400" />
-                  <span className="hidden sm:inline">Auto</span>
-                </>
+              {timeOfDay === 'day' ? (
+                <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+              ) : (
+                <Moon className="w-4 h-4 text-indigo-300" />
               )}
             </button>
 
-            {/* Logout / Switch User */}
+            {/* Quick Map / Jelajah */}
+            <button
+              onClick={() => setIsQuickNavOpen(true)}
+              className="hidden md:flex items-center gap-1.5 bg-[#121c27]/90 hover:bg-[#1a2634] text-slate-200 hover:text-white border border-slate-700/70 rounded-full px-3 py-1.5 text-xs font-bold shadow-xl transition active:scale-95"
+              title="Daftar Gedung & Belajar"
+            >
+              <Compass className="w-3.5 h-3.5 text-blue-400" />
+              <span>Gedung</span>
+            </button>
+
+            {/* Logout */}
             <button
               onClick={handleLogout}
-              className="bg-gradient-to-b from-white/20 via-slate-900/70 to-slate-950/85 backdrop-blur-2xl backdrop-saturate-150 hover:from-red-900/40 text-slate-200 hover:text-red-300 border border-white/25 hover:border-red-400/50 px-3 py-2 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.4),inset_0_1px_1px_0_rgba(255,255,255,0.25)] text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121c27]/90 hover:bg-red-950/60 text-slate-300 hover:text-red-300 border border-slate-700/70 hover:border-red-400/50 shadow-lg flex items-center justify-center transition active:scale-95"
               title="Keluar / Ganti Siswa"
+              aria-label="Keluar"
             >
-              <LogOut className="w-4 h-4" />
-              <span>Keluar</span>
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
         </header>
       )}
 
-      {/* BOTTOM DOCK - ICON ONLY MENU - Liquid Glass (Elevated above chat bar) */}
+      {/* FLOATING IN-WORLD CHAT (Bottom-left panel & Bottom-center input matching screenshot) */}
       {!activeBuilding && !isQuickNavOpen && (
-        <footer className="absolute bottom-16 sm:bottom-18 left-1/2 -translate-x-1/2 z-20 flex items-center pointer-events-auto max-w-[96vw]">
-          <div className="bg-gradient-to-b from-white/25 via-slate-900/75 to-slate-950/90 backdrop-blur-2xl backdrop-saturate-150 border border-white/25 rounded-full px-2.5 sm:px-3.5 py-2 sm:py-2.5 shadow-[0_16px_48px_0_rgba(0,0,0,0.55),inset_0_1px_1px_0_rgba(255,255,255,0.25)] flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto">
-            {BUILDINGS_INFO.map((b) => {
-              const hasNew = newMateriBuildingIds.includes(b.id);
-              const icons: Record<BuildingId, string> = {
-                balai_kota: '🏛️',
-                perpustakaan: '📚',
-                taman_refleksi: '🌸',
-                menara_mentor: '🔭',
-                bengkel_latihan: '🛠️',
-                kantor_pos: '📮',
-                pasar_prestasi: '🎪',
-                monumen_warga: '📋',
-              };
-
-              return (
-                <button
-                  key={b.id}
-                  onClick={() => setActiveBuilding(b.id)}
-                  className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 hover:border-white/45 flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-sm group shrink-0"
-                  title={`${b.name} — ${b.tagline}`}
-                  aria-label={b.name}
-                >
-                  <span className="text-lg sm:text-xl select-none transition-transform group-hover:scale-110">
-                    {icons[b.id]}
-                  </span>
-                  {hasNew && (
-                    <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-amber-400 rounded-full border-2 border-slate-900 animate-pulse" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </footer>
+        <FloatingWorldChat
+          messages={publicChats}
+          roomNumber={roomNum}
+          onSendMessage={handleSendWorldChat}
+          onReportMessage={handleReportMessage}
+          studentHandle={studentHandle}
+        />
       )}
 
       {/* BUILDING MODALS */}

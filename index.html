@@ -2,62 +2,18 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#166534" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>Refleksia City - Belajar & Refleksi Interaktif</title>
-    <meta name="description" content="Aplikasi web refleksi pembelajaran murid SMK dengan dunia 3D interaktif, AI Mentor Kota, dan Ruang Guru." />
-    <meta property="og:title" content="Refleksia City - Belajar & Refleksi Interaktif" />
-    <meta property="og:description" content="Aplikasi web refleksi pembelajaran murid SMK dengan dunia 3D interaktif, AI Mentor Kota, dan Ruang Guru." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏙️</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Refleksia City</title>
+    <meta name="description" content="Kota Refleksi Pembelajaran Geometris Melayang di Atas Awan dengan Karakter Warga, Kolam Pancing, Papan Informasi, dan Jurnal Refleksi" />
+    <meta property="og:title" content="Refleksia City" />
+    <meta property="og:description" content="Kota Refleksi Pembelajaran Geometris Melayang di Atas Awan dengan Karakter Warga, Kolam Pancing, Papan Informasi, dan Jurnal Refleksi" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-    <script>
-      // Fix trailing slash on GitHub Pages so relative assets load without 404
-      (function() {
-        var host = window.location.hostname;
-        var path = window.location.pathname;
-        if (host.includes('github.io')) {
-          if (!path.endsWith('/') && !path.split('/').pop().includes('.')) {
-            window.location.replace(path + '/' + window.location.search + window.location.hash);
-          }
-        }
-      })();
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-emerald-950 text-slate-100 overflow-x-hidden antialiased">
-    <div id="root">
-      <div id="app-loader" style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #090d1f; color: #f1f5f9; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; padding: 20px; text-align: center;">
-        <div style="width: 52px; height: 52px; border: 4px solid rgba(99, 102, 241, 0.2); border-top-color: #6366f1; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;"></div>
-        <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0 0 8px 0; color: #ffffff;">Refleksia City</h2>
-        <p style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 16px 0;">Memuat dunia pembelajaran & refleksi...</p>
-        <div id="fallback-redirect" style="display: none; margin-top: 12px; background: rgba(30, 41, 59, 0.85); border: 1px solid #334155; padding: 14px 18px; border-radius: 14px; max-width: 360px;">
-          <p style="font-size: 0.75rem; color: #cbd5e1; margin: 0 0 10px 0;">Menghubungkan ke versi web GitHub Pages...</p>
-          <a href="./docs/" style="display: inline-block; background: #6366f1; color: #ffffff; text-decoration: none; font-size: 0.75rem; font-weight: bold; padding: 8px 16px; border-radius: 8px;">Buka Versi Produksi (/docs)</a>
-        </div>
-      </div>
-      <style>
-        @keyframes spin { to { transform: rotate(360deg); } }
-      </style>
-    </div>
-    <script>
-      function onSourceScriptError() {
-        if (window.location.hostname.includes('github.io')) {
-          console.warn('Gagal memuat /src/main.tsx di hosting statis. Mengalihkan ke /docs/...');
-          window.location.replace('./docs/' + window.location.search + window.location.hash);
-        }
-      }
-      setTimeout(function() {
-        var root = document.getElementById('root');
-        if (root && root.getAttribute('data-react-mounted') !== 'true') {
-          var fb = document.getElementById('fallback-redirect');
-          if (fb) fb.style.display = 'block';
-        }
-      }, 3000);
-    </script>
-    <script type="module" src="/src/main.tsx" onerror="onSourceScriptError()"></script>
+  <body class="bg-slate-900 text-slate-100 font-['Plus_Jakarta_Sans',sans-serif] antialiased overflow-hidden select-none">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -58,9 +58,15 @@ export interface LearningObjective {
 }
 
 export interface ReflectionAnswers {
-  understood: string;
-  difficult: string;
-  actionPlan: string;
+  understood?: string;
+  difficult?: string;
+  actionPlan?: string;
+  facts?: string;
+  feelings?: string;
+  findings?: string;
+  future?: string;
+  materiTitle?: string;
+  mood?: string;
   customAnswers?: Record<string, string>;
 }
 
@@ -68,25 +74,46 @@ export interface Reflection {
   id: string;
   studentId: string;
   studentName: string;
-  className: string;
   studentNumber?: string;
+  className: string;
   materiId: string;
   materiTitle?: string;
+  scale: number;
+  moodEmoji?: string;
   answers: ReflectionAnswers;
-  scale: number; // 1 to 5
-  moodEmoji: string;
+  rating?: number;
   createdAt: string;
+  status?: 'pending' | 'reviewed';
+}
+
+export interface ReflectionEntry {
+  id: string;
+  title: string;
+  subject: string;
+  facts: string;
+  feelings: string;
+  findings: string;
+  future: string;
+  date: string;
+  xpEarned: number;
 }
 
 export interface MentorFeedback {
   id: string;
   reflectionId: string;
-  apresiasi: string;
-  sudah_dikuasai: string[];
-  perlu_diperkuat: string[];
-  saran: string[];
-  pertanyaan_pemantik: string;
-  rencana_belajar: string[];
+  studentId?: string;
+  apresiasi?: string;
+  saran?: string | string[];
+  rekomendasiTindakan?: string;
+  pertanyaanLanjutan?: string;
+  skorRefleksi?: number;
+  sudah_dikuasai?: string[];
+  perlu_diperkuat?: string[];
+  pertanyaan_pemantik?: string;
+  rencana_belajar?: string[];
+  createdAt?: string;
+  kategoriFeedback?: 'pemula' | 'berkembang' | 'mahir';
+  tindakLanjutSiswa?: string;
   perlu_perhatian_guru: boolean;
   completedSteps?: boolean[];
 }
@@ -127,4 +154,21 @@ export interface TownSettings {
   academicYear: string;
   teacherPin: string;
   gasWebAppUrl?: string;
+}
+
+export interface BuildingInfo {
+  id: BuildingId;
+  name: string;
+  tagline: string;
+  category?: string;
+  description?: string;
+  icon: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  accentColor?: string;
+  color?: number;
+  position?: [number, number, number];
+  badge?: string;
 }

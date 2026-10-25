@@ -1,62 +1,123 @@
 @import "tailwindcss";
 
-@layer base {
-  body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #0f172a;
-    color: #f8fafc;
-    overflow: hidden;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
+@layer utilities {
+  /* Liquid Glass Frosted Aesthetic requested by user */
+  .liquid-glass {
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25), inset 0 1px 1px 0 rgba(255, 255, 255, 0.4);
+  }
+  
+  .liquid-glass-dark {
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(20px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 12px 36px -4px rgba(0, 0, 0, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.2);
   }
 
-  .font-display {
-    font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  .liquid-glass-card {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   }
 }
 
-/* Custom minimal scrollbar */
+/* Floating animation for the geometric island */
+@keyframes island-hover {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-9px) rotate(0.15deg);
+  }
+}
+
+.floating-island {
+  animation: island-hover 6s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+/* Drifting clouds */
+@keyframes cloud-drift-slow {
+  0% {
+    transform: translateX(-15%);
+  }
+  100% {
+    transform: translateX(115%);
+  }
+}
+
+@keyframes cloud-drift-fast {
+  0% {
+    transform: translateX(-25%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+.animate-cloud-slow {
+  animation: cloud-drift-slow 75s linear infinite;
+}
+
+.animate-cloud-fast {
+  animation: cloud-drift-fast 48s linear infinite;
+}
+
+/* Floating mini rocks around the perimeter */
+@keyframes rock-float-1 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(3px, -12px); }
+}
+
+@keyframes rock-float-2 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-4px, -15px); }
+}
+
+.animate-rock-1 {
+  animation: rock-float-1 4.5s ease-in-out infinite;
+}
+
+.animate-rock-2 {
+  animation: rock-float-2 6.5s ease-in-out infinite;
+}
+
+/* Fireflies glowing & pulsing */
+@keyframes firefly-glow {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(0.8) translate(0, 0);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.3) translate(6px, -8px);
+    filter: drop-shadow(0 0 6px #fef08a);
+  }
+}
+
+.firefly {
+  animation: firefly-glow 3.5s ease-in-out infinite alternate;
+}
+
+/* Smooth custom scrollbars for chat and modals */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.5);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.8);
+  background: rgba(255, 255, 255, 0.4);
 }
-
-/* Modal fade-in-up animation */
-@keyframes modalFadeInUp {
-  0% {
-    opacity: 0;
-    transform: translateY(22px) scale(0.97);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes modalBackdropFadeIn {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-.animate-fade-in-up {
-  animation: modalFadeInUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.animate-backdrop-fade {
-  animation: modalBackdropFadeIn 0.22s ease-out both;
-}
-

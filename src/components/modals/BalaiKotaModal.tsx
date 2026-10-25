@@ -1,157 +1,160 @@
 import React from 'react';
-import { Materi, LearningObjective, BuildingId } from '../../types/index.ts';
-import { X, Calendar, Flag, Sparkles, ArrowRight, Award, Compass, Bell } from 'lucide-react';
+import { X, CheckCircle2, Award, Calendar, Target, Sparkles } from 'lucide-react';
+import { sounds } from '../../utils/audio';
 
 interface BalaiKotaModalProps {
-  onClose: () => void;
-  onNavigateBuilding: (buildingId: BuildingId) => void;
-  objectives: LearningObjective[];
-  materis: Materi[];
   studentName?: string;
+  studentXp?: number;
+  onClose: () => void;
+  onOpenBuilding?: (id: any) => void;
+  onNavigateBuilding?: (id: any) => void;
+  objectives?: any[];
+  materis?: any[];
 }
 
 export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
+  studentName = 'Siswa',
+  studentXp = 100,
   onClose,
+  onOpenBuilding,
   onNavigateBuilding,
-  objectives,
-  materis,
-  studentName,
 }) => {
+  const openTarget = onNavigateBuilding || onOpenBuilding || (() => {});
+  const dailyMissions = [
+    {
+      id: 'm-1',
+      title: 'Tulis Jurnal Refleksi 4F',
+      desc: 'Isi Facts, Feelings, Findings, Future di Perpustakaan',
+      xp: 30,
+      targetId: 'perpustakaan',
+      icon: '📚',
+      done: studentXp >= 30,
+    },
+    {
+      id: 'm-2',
+      title: 'Mancing Ide Refleksi',
+      desc: 'Tangkap inspirasi mindful di Kolam Pancing samping Balai Kota',
+      xp: 25,
+      targetId: 'kolam-pancing',
+      icon: '🎣',
+      done: studentXp >= 55,
+    },
+    {
+      id: 'm-3',
+      title: 'Sapa Warga di Kafe Refleksi',
+      desc: 'Kirim insight belajarmu ke chat warga kota (maks 25 obrolan)',
+      xp: 15,
+      targetId: 'kafe-refleksi',
+      icon: '☕',
+      done: studentXp >= 70,
+    },
+    {
+      id: 'm-4',
+      title: 'Cek Pengumuman di Papan Info',
+      desc: 'Pelajari tips metakognisi dan lihat posisimu di Leaderboard',
+      xp: 10,
+      targetId: 'papan-informasi',
+      icon: '📋',
+      done: true,
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-backdrop-fade">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-slate-100 animate-fade-in-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="liquid-glass-dark rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-white/20 relative max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-sky-700 px-6 py-5 text-white flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl shadow-inner">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-3xl shadow-inner">
               🏛️
             </div>
             <div>
-              <h2 className="text-xl font-extrabold font-display leading-tight">Balai Kota Refleksia</h2>
-              <p className="text-xs text-blue-100 font-medium">Pusat Informasi & Misi Pembelajaran Aktif</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                  Pusat Kota Refleksia
+                </span>
+                <span className="text-xs text-slate-400">Gedung Utama</span>
+              </div>
+              <h2 className="text-xl font-black text-white font-['Outfit']">Balai Kota Refleksia</h2>
             </div>
           </div>
           <button
             onClick={onClose}
-            aria-label="Tutup Balai Kota"
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors"
           >
-            <X className="w-5 h-5 text-white" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
-          {/* Welcome Announcement */}
-          <div className="p-4 rounded-2xl bg-blue-950/50 border border-blue-500/30 flex items-start gap-3.5">
-            <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-400 mt-0.5">
-              <Bell className="w-5 h-5" />
+        {/* Civic Status Card */}
+        <div className="mt-5 p-4 rounded-2xl bg-gradient-to-r from-blue-900/40 via-indigo-900/40 to-slate-900/40 border border-blue-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="text-xs text-blue-200 font-semibold flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Status Warga Teladan
             </div>
+            <h4 className="text-lg font-bold text-white mt-0.5">{studentName}</h4>
+            <p className="text-xs text-slate-300">
+              Tercatat aktif dalam membangun kebiasaan refleksi metakognitif harian.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 bg-black/30 px-4 py-2 rounded-xl border border-white/10">
+            <Award className="w-7 h-7 text-amber-400" />
             <div>
-              <h3 className="font-bold text-sm text-blue-300">
-                Pengumuman Balai Kota {studentName ? `untuk ${studentName}` : ''}
-              </h3>
-              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                Selamat datang di Refleksia City! Selesaikan pembelajaran hari ini, tulis refleksimu secara jujur di Taman Refleksi, dan dengarkan masukan dari AI Mentor Kota di Menara Mentor.
-              </p>
+              <div className="text-[11px] text-slate-300 font-medium">Total Akumulasi XP</div>
+              <div className="text-base font-black text-amber-300">⭐ {studentXp} XP</div>
             </div>
           </div>
+        </div>
 
-          {/* Active Learning Objectives (Tujuan Pembelajaran) */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <Flag className="w-4 h-4 text-emerald-400" />
-                <span>Tujuan Pembelajaran & Misi Aktif</span>
-              </h3>
-              <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full font-mono">
-                {objectives.length} Misi
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {objectives.map((tp) => {
-                const relatedMateri = materis.find((m) => m.id === tp.materiId);
-                return (
-                  <div
-                    key={tp.id}
-                    className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700/80 hover:border-slate-600 transition"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-950 text-emerald-400 border border-emerald-800 mb-1.5">
-                          {relatedMateri?.subject || 'Kejuruan SMK'}
-                        </span>
-                        <h4 className="font-bold text-sm text-white">
-                          {tp.goalStatement}
-                        </h4>
-                        <p className="text-xs text-slate-400 mt-1">
-                          <strong className="text-slate-300">Indikator:</strong> {tp.indicator}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs">
-                      <span className="text-slate-400 flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                        Tenggat: <strong className="text-slate-200">{tp.deadline}</strong>
-                      </span>
-                      <button
-                        onClick={() => {
-                          onClose();
-                          onNavigateBuilding('taman_refleksi');
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center gap-1 transition"
-                      >
-                        <span>Refleksi Misi Ini</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Quick Town Shortcuts */}
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-              <Compass className="w-4 h-4 text-sky-400" />
-              <span>Jelajah Bangunan Penting</span>
+        {/* Daily Missions */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Target className="w-4 h-4 text-cyan-400" /> Misi Harian Refleksi
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                onClick={() => {
-                  onClose();
-                  onNavigateBuilding('perpustakaan');
-                }}
-                className="p-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center gap-3"
-              >
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
-                  📚
-                </div>
-                <div>
-                  <p className="font-bold text-sm text-white">Perpustakaan</p>
-                  <p className="text-xs text-slate-400">Baca materi & rangkuman</p>
-                </div>
-              </button>
+            <span className="text-xs text-cyan-300 font-medium">Batas reset: 24 Jam</span>
+          </div>
 
-              <button
-                onClick={() => {
-                  onClose();
-                  onNavigateBuilding('taman_refleksi');
-                }}
-                className="p-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center gap-3"
+          <div className="space-y-2.5">
+            {dailyMissions.map((mission) => (
+              <div
+                key={mission.id}
+                className="p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-between gap-3"
               >
-                <div className="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-lg">
-                  🌸
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl">
+                    {mission.icon}
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-white flex items-center gap-2">
+                      {mission.title}
+                      {mission.done && (
+                        <span className="text-[10px] font-semibold text-emerald-400 flex items-center gap-0.5">
+                          <CheckCircle2 className="w-3 h-3" /> Selesai
+                        </span>
+                      )}
+                    </h5>
+                    <p className="text-xs text-slate-300">{mission.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-bold text-sm text-white">Taman Refleksi</p>
-                  <p className="text-xs text-slate-400">Tulis evaluasi belajarmu</p>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-amber-300 bg-amber-400/20 px-2 py-1 rounded-lg border border-amber-400/30">
+                    +{mission.xp} XP
+                  </span>
+                  <button
+                    onClick={() => {
+                      sounds.playClick();
+                      onClose();
+                      openTarget(mission.targetId);
+                    }}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-sm"
+                  >
+                    Buka
+                  </button>
                 </div>
-              </button>
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

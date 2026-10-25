@@ -1,12 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BuildingId, PublicChatMessage } from '../types/index.ts';
-import { StorageService } from '../utils/storage.ts';
-import {
-  Send,
-  X,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react';
+import { sounds } from '../utils/audio.ts';
+import { X } from 'lucide-react';
 
 interface ThreeTownCanvasProps {
   onSelectBuilding: (buildingId: BuildingId) => void;
@@ -15,1319 +10,1481 @@ interface ThreeTownCanvasProps {
   studentName?: string;
   studentGender?: string;
   timeOfDay?: 'day' | 'night' | 'auto';
+  latestMessage?: PublicChatMessage | null;
 }
 
 export interface BuildingInfo {
   id: BuildingId;
   name: string;
   tagline: string;
-  position: [number, number, number];
+  position: [number, number, number]; // [worldX, y, worldY]
   color: number;
+  icon: string;
 }
 
 export const BUILDINGS_INFO: BuildingInfo[] = [
-  { id: 'balai_kota', name: 'Balai Kota', tagline: 'Misi & Pengumuman Utama', position: [0, -165, 0], color: 0x3b82f6 },
-  { id: 'perpustakaan', name: 'Perpustakaan', tagline: 'Materi & Video Ajar', position: [-210, -95, 0], color: 0x10b981 },
-  { id: 'taman_refleksi', name: 'Taman Refleksi', tagline: 'Tulis Refleksi Harian', position: [-210, 85, 0], color: 0xec4899 },
-  { id: 'menara_mentor', name: 'Menara Mentor', tagline: 'Umpan Balik AI Mentor', position: [210, -95, 0], color: 0x8b5cf6 },
-  { id: 'bengkel_latihan', name: 'Bengkel Latihan', tagline: 'Kuis & Tantangan', position: [210, 85, 0], color: 0xf59e0b },
-  { id: 'kantor_pos', name: 'Kantor Pos', tagline: 'Kirim Pesan ke Guru', position: [-110, 145, 0], color: 0xef4444 },
-  { id: 'pasar_prestasi', name: 'Pasar Prestasi', tagline: 'Lencana & Poin XP', position: [110, 145, 0], color: 0x06b6d4 },
-  { id: 'monumen_warga', name: 'Papan Informasi', tagline: 'Pusat Pengumuman & Berita Kota', position: [0, 0, 0], color: 0xec4899 },
+  { id: 'balai_kota', name: 'Balai Kota', tagline: 'Misi & Pengumuman', position: [0, 0, -13], color: 0x3b82f6, icon: '🏛️' },
+  { id: 'perpustakaan', name: 'Perpustakaan', tagline: 'Materi & Video', position: [-12, 0, -7], color: 0x10b981, icon: '📚' },
+  { id: 'menara_mentor', name: 'Menara Mentor', tagline: 'Umpan Balik AI', position: [12, 0, -7], color: 0x8b5cf6, icon: '🔭' },
+  { id: 'taman_refleksi', name: 'Taman Refleksi', tagline: 'Tulis Refleksi', position: [-11, 0, 7], color: 0xec4899, icon: '🌸' },
+  { id: 'bengkel_latihan', name: 'Bengkel Latihan', tagline: 'Kuis & Tantangan', position: [12, 0, 7], color: 0xf59e0b, icon: '🛠️' },
+  { id: 'kantor_pos', name: 'Kantor Pos', tagline: 'Kirim Pesan ke Guru', position: [-7, 0, 13], color: 0xef4444, icon: '📮' },
+  { id: 'pasar_prestasi', name: 'Pasar Prestasi', tagline: 'Lencana & Poin', position: [7, 0, 13], color: 0x06b6d4, icon: '🎪' },
+  { id: 'monumen_warga', name: 'Monumen Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0xec4899, icon: '💬' },
 ];
 
-interface ProfessionNPC {
+interface AvatarData {
   id: string;
-  name: string;
+  role: 'siswa' | 'guru' | 'polisi' | 'petugas_kebersihan' | 'kurir' | 'barista';
   handle: string;
-  gender: 'L' | 'P';
-  profession: string;
-  professionBadge: string;
-  badgeBg: string;
-  shirtColor: string;
-  pantsColor: string;
-  skinColor: string;
-  hairColor: string;
-  hasHijab?: boolean;
-  accessory?: 'glasses' | 'police_hat' | 'guard_hat' | 'broom' | 'stethoscope' | 'apron' | 'fishing_rod';
-  waypoints: { x: number; y: number }[];
-  currentWaypointIdx: number;
+  roleLabel: string;
+  wx: number;
+  wy: number;
+  targetWx: number;
+  targetWy: number;
+  speed: number;
+  color: string;
+  isMoving: boolean;
+  pauseTimer: number;
+  walkFrame: number;
+  facing: 'down-left' | 'down-right' | 'up-left' | 'up-right';
+  speechText?: string;
+  speechTimer?: number;
+}
+
+interface Cloud {
   x: number;
   y: number;
-  facing: 'left' | 'right';
-  pauseTimer: number;
-  quotes: string[];
+  size: number;
+  speed: number;
+  opacity: number;
+}
+
+interface Firefly {
+  baseX: number;
+  baseY: number;
+  x: number;
+  y: number;
+  radiusX: number;
+  radiusY: number;
+  speed: number;
+  phase: number;
+  blinkSpeed: number;
+}
+
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  twinkleSpeed: number;
+  phase: number;
 }
 
 export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
   onSelectBuilding,
   activeBuilding,
   newMateriBuildingIds,
-  studentName = 'Murid Refleksia',
+  studentName = 'Siswa',
   studentGender = 'L',
   timeOfDay = 'night',
+  latestMessage,
 }) => {
-  // Player state
-  const [playerPos, setPlayerPos] = useState({ x: 0, y: 55 });
-  const [targetPos, setTargetPos] = useState({ x: 0, y: 55 });
-  const [isWalking, setIsWalking] = useState(false);
-  const [playerFacing, setPlayerFacing] = useState<'left' | 'right'>('right');
-  const [playerSpeechBubble, setPlayerSpeechBubble] = useState<string | null>(null);
-
-  // Active temporary NPC bubble (only 1 or at most 2, automatically disappears)
-  const [activeNpcBubble, setActiveNpcBubble] = useState<{
-    npcId: string;
-    text: string;
-  } | null>(null);
-
-  // Hovered building info
-  const [hoveredBuilding, setHoveredBuilding] = useState<BuildingInfo | null>(null);
-
-  // Cafe popup modal state
-  const [isCafeOpen, setIsCafeOpen] = useState(false);
-  const [cafeFeedback, setCafeFeedback] = useState<string | null>(null);
-
-  // Kolam pancing feedback
-  const [fishingFeedback, setFishingFeedback] = useState<string | null>(null);
-
-  // Chat bar & Obrolan window state
-  const [chatInput, setChatInput] = useState('');
-  const [isChatWindowOpen, setIsChatWindowOpen] = useState(true);
-  const [chatMessages, setChatMessages] = useState<PublicChatMessage[]>(() =>
-    StorageService.getPublicChatMessages()
-  );
-
-  // Day / Night state calculation
-  const isNight = timeOfDay === 'night' || (timeOfDay === 'auto' && new Date().getHours() >= 18);
-
-  // Moving Clouds State for Day Mode ("awan berjalan")
-  const [clouds, setClouds] = useState([
-    { id: 1, x: -350, y: -210, speed: 14, scale: 1.1 },
-    { id: 2, x: -180, y: -160, speed: 22, scale: 0.85 },
-    { id: 3, x: 20, y: -230, speed: 10, scale: 1.35 },
-    { id: 4, x: 190, y: -180, speed: 18, scale: 0.95 },
-    { id: 5, x: 380, y: -140, speed: 25, scale: 0.75 },
-  ]);
-
-  // Animated Fireflies for Night Mode ("kunang-kunang")
-  const fireflyBases = useMemo(() => [
-    { id: 1, x: -160, y: -40, phase: 0.2, speed: 1.8 },
-    { id: 2, x: -90, y: -110, phase: 1.4, speed: 2.2 },
-    { id: 3, x: -40, y: -30, phase: 2.8, speed: 1.6 },
-    { id: 4, x: 50, y: -50, phase: 4.1, speed: 2.0 },
-    { id: 5, x: 120, y: -70, phase: 0.9, speed: 1.7 },
-    { id: 6, x: -180, y: 50, phase: 3.3, speed: 2.1 },
-    { id: 7, x: -80, y: 80, phase: 5.0, speed: 1.5 },
-    { id: 8, x: 70, y: 40, phase: 2.1, speed: 1.9 },
-    { id: 9, x: 140, y: 70, phase: 0.5, speed: 2.3 },
-    { id: 10, x: 170, y: 140, phase: 4.4, speed: 1.6 },
-    { id: 11, x: -220, y: 20, phase: 1.8, speed: 2.0 },
-    { id: 12, x: 20, y: -130, phase: 3.7, speed: 1.7 },
-    { id: 13, x: 0, y: 90, phase: 2.5, speed: 2.2 },
-    { id: 14, x: 90, y: 120, phase: 1.1, speed: 1.8 },
-  ], []);
-
-  const [fireflyOffsets, setFireflyOffsets] = useState(
-    fireflyBases.map(() => ({ dx: 0, dy: 0, glow: 1 }))
-  );
-
-  // 6+ Moving NPCs with Professions (Guru, Polisi, Penjaga Kota, Tukang Bersih, Petugas Medis, Barista, Pemancing)
-  const [npcList, setNpcList] = useState<ProfessionNPC[]>([
-    {
-      id: 'npc-guru',
-      name: 'Pak Rahman',
-      handle: '@guru_rahman',
-      gender: 'L',
-      profession: 'Guru DKV',
-      professionBadge: '👨‍🏫 GURU DKV',
-      badgeBg: '#059669',
-      shirtColor: '#10b981',
-      pantsColor: '#1e293b',
-      skinColor: '#fbcfe8',
-      hairColor: '#1e293b',
-      accessory: 'glasses',
-      x: 0,
-      y: -100,
-      facing: 'right',
-      pauseTimer: 2,
-      currentWaypointIdx: 0,
-      waypoints: [
-        { x: 0, y: -140 },
-        { x: -120, y: -65 },
-        { x: 0, y: -45 },
-        { x: 0, y: -100 },
-      ],
-      quotes: [
-        'Sudah memahami konsep IPO Von Neumann? Yuk refleksi!',
-        'Semangat belajarnya ya anak-anak!',
-        'Karya desain DKV yang baik dimulai dari logika yang teratur.',
-      ],
-    },
-    {
-      id: 'npc-polisi',
-      name: 'Bripka Dimas',
-      handle: '@polisi_dimas',
-      gender: 'L',
-      profession: 'Polisi Kota',
-      professionBadge: '👮 POLISI KOTA',
-      badgeBg: '#2563eb',
-      shirtColor: '#1d4ed8',
-      pantsColor: '#0f172a',
-      skinColor: '#fed7aa',
-      hairColor: '#0f172a',
-      accessory: 'police_hat',
-      x: 100,
-      y: -40,
-      facing: 'right',
-      pauseTimer: 3,
-      currentWaypointIdx: 0,
-      waypoints: [
-        { x: 170, y: -75 },
-        { x: 60, y: -25 },
-        { x: 120, y: 40 },
-        { x: 180, y: 70 },
-      ],
-      quotes: [
-        'Situasi Refleksia City aman dan tertib!',
-        'Silakan belajar dengan fokus dan tenang ya!',
-        'Patroli kota berjalan lancar.',
-      ],
-    },
-    {
-      id: 'npc-penjaga',
-      name: 'Pak Hendra',
-      handle: '@penjaga_hendra',
-      gender: 'L',
-      profession: 'Penjaga Kota',
-      professionBadge: '🛡️ PENJAGA KOTA',
-      badgeBg: '#d97706',
-      shirtColor: '#65a30d',
-      pantsColor: '#365314',
-      skinColor: '#fbcfe8',
-      hairColor: '#1e293b',
-      accessory: 'guard_hat',
-      x: -60,
-      y: 20,
-      facing: 'left',
-      pauseTimer: 1,
-      currentWaypointIdx: 0,
-      waypoints: [
-        { x: 0, y: 35 },
-        { x: -60, y: 20 },
-        { x: -120, y: 45 },
-        { x: -50, y: -20 },
-      ],
-      quotes: [
-        'Fasilitas kota terjaga rapi untuk murid SMK!',
-        'Jaga kebersihan dan ketertiban kota kita bersama.',
-        'Papan informasi di tengah plaza siap dibaca.',
-      ],
-    },
-    {
-      id: 'npc-kebersihan',
-      name: 'Ibu Siti',
-      handle: '@kebersihan_siti',
-      gender: 'P',
-      profession: 'Petugas Kebersihan',
-      professionBadge: '🧹 TUKANG BERSIH',
-      badgeBg: '#0d9488',
-      shirtColor: '#f97316',
-      pantsColor: '#1e293b',
-      skinColor: '#fed7aa',
-      hairColor: '#f8fafc',
-      hasHijab: true,
-      accessory: 'broom',
-      x: -140,
-      y: -50,
-      facing: 'right',
-      pauseTimer: 4,
-      currentWaypointIdx: 0,
-      waypoints: [
-        { x: -120, y: -25 },
-        { x: -160, y: 60 },
-        { x: -80, y: -20 },
-        { x: -140, y: -50 },
-      ],
-      quotes: [
-        'Kota yang asri dan bersih membuat pikiran segar berefleksi!',
-        'Ayo jaga taman dan jalan tetap bersih ya.',
-        'Sapu dulu area sekitar kafe dan taman.',
-      ],
-    },
-    {
-      id: 'npc-medis',
-      name: 'dr. Maya',
-      handle: '@medis_maya',
-      gender: 'P',
-      profession: 'Petugas Medis',
-      professionBadge: '🩺 DOKTER UKS',
-      badgeBg: '#e11d48',
-      shirtColor: '#f8fafc',
-      pantsColor: '#475569',
-      skinColor: '#fbcfe8',
-      hairColor: '#f8fafc',
-      hasHijab: true,
-      accessory: 'stethoscope',
-      x: -40,
-      y: -70,
-      facing: 'left',
-      pauseTimer: 2,
-      currentWaypointIdx: 0,
-      waypoints: [
-        { x: 0, y: -60 },
-        { x: -120, y: -65 },
-        { x: -60, y: 30 },
-        { x: -40, y: -70 },
-      ],
-      quotes: [
-        'Jaga kesehatan dan cukup minum air saat belajar!',
-        'Kesehatan mental dan fisik sangat penting untuk murid.',
-        'Ada yang butuh vitamin atau istirahat sejenak?',
-      ],
-    },
-    {
-      id: 'npc-barista',
-      name: 'Nnisa',
-      handle: '@nnisa_0311',
-      gender: 'P',
-      profession: 'Barista Cafe',
-      professionBadge: '☕ BARISTA',
-      badgeBg: '#b45309',
-      shirtColor: '#b45309',
-      pantsColor: '#1e1b4b',
-      skinColor: '#fde047',
-      hairColor: '#1e293b',
-      accessory: 'apron',
-      x: -115,
-      y: -25,
-      facing: 'right',
-      pauseTimer: 99999, // Stationary at cafe
-      currentWaypointIdx: 0,
-      waypoints: [{ x: -115, y: -25 }],
-      quotes: [
-        'Cafe buka! Kopi dan roti siap disajikan ☕',
-        'Nikmati aroma kopi di Refleksia City.',
-      ],
-    },
-    {
-      id: 'npc-pancing',
-      name: 'Kiky',
-      handle: '@kikybahsoan',
-      gender: 'L',
-      profession: 'Pemancing',
-      professionBadge: '🎣 PEMANCING',
-      badgeBg: '#0284c7',
-      shirtColor: '#0284c7',
-      pantsColor: '#1e293b',
-      skinColor: '#fbcfe8',
-      hairColor: '#1e293b',
-      accessory: 'fishing_rod',
-      x: 165,
-      y: 110,
-      facing: 'left',
-      pauseTimer: 99999, // Stationary at pier
-      currentWaypointIdx: 0,
-      waypoints: [{ x: 165, y: 110 }],
-      quotes: [
-        'Asyik memancing di kolam Refleksia! Dapet ikan mujair 🐟',
-        'Menunggu kail sambil santai sejenak.',
-      ],
-    },
-  ]);
-
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number | null>(null);
 
-  // Periodic random single speech bubble (strictly 1 NPC occasionally, auto disappearing)
+  const [hoveredBuilding, setHoveredBuilding] = useState<BuildingInfo | null>(null);
+  const [isCafeMenuOpen, setIsCafeMenuOpen] = useState(false);
+  const [cafeToast, setCafeToast] = useState<string | null>(null);
+  const [cafeScreenPos, setCafeScreenPos] = useState<{ x: number; y: number; visible: boolean }>({
+    x: 0,
+    y: 0,
+    visible: false,
+  });
+
+  // Active comic speech bubbles
+  const playerSpeechRef = useRef<{ text: string; expiresAt: number } | null>(null);
+  const baristaSpeechRef = useRef<{ text: string; expiresAt: number } | null>(null);
+
+  // References for render loop
+  const onSelectBuildingRef = useRef(onSelectBuilding);
+  onSelectBuildingRef.current = onSelectBuilding;
+  const timeOfDayRef = useRef(timeOfDay);
+  timeOfDayRef.current = timeOfDay;
+
+  // React to incoming public chat messages
   useEffect(() => {
-    const timer = setInterval(() => {
-      const activeCandidates = npcList.filter((n) => n.quotes.length > 0);
-      const chosen = activeCandidates[Math.floor(Math.random() * activeCandidates.length)];
-      const text = chosen.quotes[Math.floor(Math.random() * chosen.quotes.length)];
+    if (latestMessage && latestMessage.content) {
+      playerSpeechRef.current = {
+        text: latestMessage.content.slice(0, 36) + (latestMessage.content.length > 36 ? '...' : ''),
+        expiresAt: Date.now() + 6000,
+      };
+    }
+  }, [latestMessage]);
 
-      setActiveNpcBubble({
-        npcId: chosen.id,
-        text,
-      });
-
-      setTimeout(() => {
-        setActiveNpcBubble((prev) => (prev?.npcId === chosen.id ? null : prev));
-      }, 3500);
-    }, 13000);
-
-    return () => clearInterval(timer);
-  }, [npcList]);
-
-  // Master Animation Loop: Clouds drift, Fireflies hover, Player & NPCs walk smoothly
   useEffect(() => {
-    let lastTime = performance.now();
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
-    const loop = (now: number) => {
-      const dt = Math.min((now - lastTime) / 1000, 0.1);
-      lastTime = now;
-      const t = now / 1000;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
 
-      // 1. Animate Moving Clouds (Day mode)
-      if (!isNight) {
-        setClouds((prev) =>
-          prev.map((c) => {
-            let nextX = c.x + c.speed * dt;
-            if (nextX > 480) nextX = -480;
-            return { ...c, x: nextX };
-          })
-        );
-      }
+    let width = (canvas.width = container.clientWidth || 800);
+    let height = (canvas.height = container.clientHeight || 600);
 
-      // 2. Animate Fireflies (Night mode)
-      if (isNight) {
-        setFireflyOffsets(
-          fireflyBases.map((f) => ({
-            dx: Math.sin(t * f.speed + f.phase) * 12,
-            dy: Math.cos(t * f.speed * 0.8 + f.phase) * 8,
-            glow: 0.35 + 0.65 * Math.abs(Math.sin(t * 3.5 + f.phase)),
-          }))
-        );
-      }
+    const handleResize = () => {
+      if (!container || !canvas) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = container.clientWidth || 800;
+      height = container.clientHeight || 600;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
 
-      // 3. Animate Player Movement
-      setPlayerPos((curr) => {
-        const dx = targetPos.x - curr.x;
-        const dy = targetPos.y - curr.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+    // -----------------------------------------------------------
+    // ISOMETRIC PROJECTION CONSTANTS
+    // -----------------------------------------------------------
+    const TILE_W = 44;
+    const TILE_H = 22;
 
-        if (dist < 2.5) {
-          setIsWalking(false);
-          return targetPos;
-        }
-
-        setIsWalking(true);
-        if (Math.abs(dx) > 1) {
-          setPlayerFacing(dx > 0 ? 'right' : 'left');
-        }
-
-        const speed = 140;
-        const stepDist = Math.min(speed * dt, dist);
-        const ratio = stepDist / dist;
-
-        return {
-          x: curr.x + dx * ratio,
-          y: curr.y + dy * ratio,
-        };
-      });
-
-      // 4. Animate NPCs Walking
-      setNpcList((prevList) =>
-        prevList.map((npc) => {
-          if (npc.waypoints.length <= 1) return npc;
-
-          if (npc.pauseTimer > 0) {
-            return {
-              ...npc,
-              pauseTimer: npc.pauseTimer - dt,
-            };
-          }
-
-          const target = npc.waypoints[npc.currentWaypointIdx];
-          const dx = target.x - npc.x;
-          const dy = target.y - npc.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
-          if (dist < 3) {
-            // Reached waypoint: pause and select next
-            const nextIdx = (npc.currentWaypointIdx + 1) % npc.waypoints.length;
-            return {
-              ...npc,
-              x: target.x,
-              y: target.y,
-              currentWaypointIdx: nextIdx,
-              pauseTimer: 3 + Math.random() * 4,
-            };
-          }
-
-          const speed = 32; // relaxed patrol speed
-          const moveStep = Math.min(speed * dt, dist);
-          const ratio = moveStep / dist;
-          const newX = npc.x + dx * ratio;
-          const newY = npc.y + dy * ratio;
-          const facing = dx >= 0 ? 'right' : 'left';
-
-          return {
-            ...npc,
-            x: newX,
-            y: newY,
-            facing,
-          };
-        })
-      );
-
-      animationRef.current = requestAnimationFrame(loop);
+    const toScreen = (wx: number, wy: number, altitude = 0, camX: number, camY: number) => {
+      const isoX = (wx - wy) * TILE_W;
+      const isoY = (wx + wy) * TILE_H - altitude;
+      return {
+        x: width / 2 + (isoX - camX),
+        y: height / 2 + (isoY - camY),
+      };
     };
 
-    animationRef.current = requestAnimationFrame(loop);
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
-  }, [targetPos, isNight, fireflyBases]);
-
-  // Click on island ground to walk
-  const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const cursorPt = pt.matrixTransform(svg.getScreenCTM()?.inverse());
-
-    // Clamp inside island
-    const cx = Math.max(-270, Math.min(270, cursorPt.x));
-    const cy = Math.max(-160, Math.min(160, cursorPt.y));
-    setTargetPos({ x: cx, y: cy });
-  };
-
-  // Quick chat send
-  const handleSendChat = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!chatInput.trim()) return;
-
-    const newMsg: PublicChatMessage = {
-      id: `pchat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      senderId: 'current-student',
-      senderName: studentName,
-      senderHandle: '@' + (studentName.split(' ')[0] || 'siswa').toLowerCase(),
-      className: 'DKV',
-      roomNumber: 2,
-      content: chatInput.trim(),
-      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(':', '.'),
-      createdAt: new Date().toISOString(),
+    const toWorld = (sx: number, sy: number, camX: number, camY: number) => {
+      const isoX = sx - width / 2 + camX;
+      const isoY = sy - height / 2 + camY;
+      const wx = (isoX / TILE_W + isoY / TILE_H) / 2;
+      const wy = (isoY / TILE_H - isoX / TILE_W) / 2;
+      return { wx, wy };
     };
 
-    StorageService.addPublicChatMessage(newMsg);
-    setChatMessages(StorageService.getPublicChatMessages());
-    setPlayerSpeechBubble(chatInput.trim());
-    setChatInput('');
+    // -----------------------------------------------------------
+    // CAMERA STATE (Smooth Follow Avatar)
+    // -----------------------------------------------------------
+    const camera = {
+      x: 0,
+      y: 0,
+      targetX: 0,
+      targetY: 0,
+    };
 
-    setTimeout(() => {
-      setPlayerSpeechBubble(null);
-    }, 4500);
-  };
+    // -----------------------------------------------------------
+    // AVATARS (Strictly: Siswa, Guru, Polisi, Petugas Kebersihan, Kurir, Barista)
+    // -----------------------------------------------------------
+    const studentHandle = studentName.split(' ')[0].toLowerCase();
 
-  // NPC click interaction
-  const handleNpcClick = (npc: ProfessionNPC, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const quote = npc.quotes[Math.floor(Math.random() * npc.quotes.length)];
-    setActiveNpcBubble({
-      npcId: npc.id,
-      text: quote,
+    // 1. Player (Siswa)
+    const player: AvatarData = {
+      id: 'siswa',
+      role: 'siswa',
+      handle: studentHandle,
+      roleLabel: 'Siswa',
+      wx: 0,
+      wy: 3.5,
+      targetWx: 0,
+      targetWy: 3.5,
+      speed: 4.8,
+      color: studentGender === 'P' ? '#f43f5e' : '#38bdf8',
+      isMoving: false,
+      pauseTimer: 0,
+      walkFrame: 0,
+      facing: 'down-left',
+    };
+
+    // 2. Guru
+    const guru: AvatarData = {
+      id: 'guru',
+      role: 'guru',
+      handle: 'guru_ahmad',
+      roleLabel: 'Guru Pembimbing',
+      wx: -6,
+      wy: -6,
+      targetWx: -6,
+      targetWy: -6,
+      speed: 2.2,
+      color: '#b45309',
+      isMoving: false,
+      pauseTimer: 2,
+      walkFrame: 0,
+      facing: 'down-right',
+      speechText: 'Selamat belajar dan terus berefleksi!',
+      speechTimer: 5,
+    };
+
+    // 3. Polisi
+    const polisi: AvatarData = {
+      id: 'polisi',
+      role: 'polisi',
+      handle: 'polisi_jaya',
+      roleLabel: 'Polisi Kota',
+      wx: 6,
+      wy: 3,
+      targetWx: 6,
+      targetWy: 3,
+      speed: 2.5,
+      color: '#1d4ed8',
+      isMoving: false,
+      pauseTimer: 1.5,
+      walkFrame: 0,
+      facing: 'up-left',
+      speechText: 'Kota Refleksi aman dan tertib!',
+      speechTimer: 6,
+    };
+
+    // 4. Petugas Kebersihan
+    const petugas: AvatarData = {
+      id: 'petugas_kebersihan',
+      role: 'petugas_kebersihan',
+      handle: 'petugas_kebersihan',
+      roleLabel: 'Petugas Kebersihan',
+      wx: -7,
+      wy: 5,
+      targetWx: -7,
+      targetWy: 5,
+      speed: 2.0,
+      color: '#16a34a',
+      isMoving: false,
+      pauseTimer: 3,
+      walkFrame: 0,
+      facing: 'down-left',
+      speechText: 'Mari jaga kebersihan pulau kita!',
+      speechTimer: 7,
+    };
+
+    // 5. Kurir
+    const kurir: AvatarData = {
+      id: 'kurir',
+      role: 'kurir',
+      handle: 'kurir_kilat',
+      roleLabel: 'Kurir Paket',
+      wx: -3,
+      wy: 10,
+      targetWx: -3,
+      targetWy: 10,
+      speed: 3.2,
+      color: '#ea580c',
+      isMoving: false,
+      pauseTimer: 2,
+      walkFrame: 0,
+      facing: 'up-right',
+      speechText: 'Materi dan umpan balik baru siap diantar!',
+      speechTimer: 4,
+    };
+
+    // Barista at the cafe
+    const barista: AvatarData = {
+      id: 'barista',
+      role: 'barista',
+      handle: 'nnisa_0311',
+      roleLabel: 'Barista Kafe',
+      wx: -4.5,
+      wy: 2.2,
+      targetWx: -4.5,
+      targetWy: 2.2,
+      speed: 0,
+      color: '#059669',
+      isMoving: false,
+      pauseTimer: 99999,
+      walkFrame: 0,
+      facing: 'down-right',
+      speechText: 'Kopi, roti, dan eskrim siap disajikan!',
+      speechTimer: 6,
+    };
+
+    const npcs: AvatarData[] = [guru, polisi, petugas, kurir, barista];
+
+    // Cafe stall coordinates
+    const cafeWx = -4.5;
+    const cafeWy = 2.2;
+
+    // -----------------------------------------------------------
+    // SKY ELEMENTS: Clouds (Pagi) & Stars/Fireflies (Malam)
+    // -----------------------------------------------------------
+    const clouds: Cloud[] = Array.from({ length: 7 }, (_, i) => ({
+      x: (i / 7) * width + Math.random() * 80,
+      y: 40 + (i % 4) * 45 + Math.random() * 20,
+      size: 45 + Math.random() * 35,
+      speed: 12 + Math.random() * 15,
+      opacity: 0.75 + Math.random() * 0.2,
+    }));
+
+    const stars: Star[] = Array.from({ length: 90 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * (height * 0.75),
+      size: 1 + Math.random() * 2.2,
+      twinkleSpeed: 1.5 + Math.random() * 3.5,
+      phase: Math.random() * Math.PI * 2,
+    }));
+
+    const fireflies: Firefly[] = Array.from({ length: 38 }, () => {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 3 + Math.random() * 12;
+      return {
+        baseX: Math.cos(angle) * dist,
+        baseY: Math.sin(angle) * dist,
+        x: 0,
+        y: 0,
+        radiusX: 0.8 + Math.random() * 1.6,
+        radiusY: 0.6 + Math.random() * 1.2,
+        speed: 0.8 + Math.random() * 1.5,
+        phase: Math.random() * Math.PI * 2,
+        blinkSpeed: 1.8 + Math.random() * 2.6,
+      };
     });
-    setTimeout(() => {
-      setActiveNpcBubble((prev) => (prev?.npcId === npc.id ? null : prev));
-    }, 3500);
+
+    // Street Lamps positions along cobblestone paths
+    const streetLamps: [number, number][] = [
+      [0, -7],
+      [-5, -4],
+      [5, -4],
+      [-7, 2],
+      [7, 2],
+      [-4, 7],
+      [4, 7],
+      [0, 10],
+    ];
+
+    let pendingBuildingId: BuildingId | null = null;
+    let hoveredBuildingRef: BuildingInfo | null = null;
+
+    // -----------------------------------------------------------
+    // INTERACTION HANDLERS (Click & Touch)
+    // -----------------------------------------------------------
+    const getPointerWorldPos = (clientX: number, clientY: number) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = clientX - rect.left;
+      const sy = clientY - rect.top;
+      return { sx, sy, ...toWorld(sx, sy, camera.x, camera.y) };
+    };
+
+    const handlePointerAction = (clientX: number, clientY: number) => {
+      const { wx, wy } = getPointerWorldPos(clientX, clientY);
+
+      // 1. Check Click on Cafe Stall
+      const cafeDist = Math.hypot(wx - cafeWx, wy - cafeWy);
+      if (cafeDist < 2.4) {
+        sounds.playClick();
+        setIsCafeMenuOpen(true);
+        player.targetWx = -3.2;
+        player.targetWy = 2.8;
+        player.isMoving = true;
+        pendingBuildingId = null;
+        return;
+      }
+
+      // 2. Check Click on Buildings
+      for (const b of BUILDINGS_INFO) {
+        const [bx, , by] = b.position;
+        const dist = Math.hypot(wx - bx, wy - by);
+        // Generous hit test threshold for isometric roofs/walls
+        if (dist < 2.8 || (Math.abs(wx - bx) < 2.5 && Math.abs(wy - by) < 2.5)) {
+          sounds.playClick();
+          player.targetWx = bx;
+          player.targetWy = by + 2.2;
+          player.isMoving = true;
+          pendingBuildingId = b.id;
+          return;
+        }
+      }
+
+      // 3. Click on ground to walk
+      sounds.playClick();
+      player.targetWx = Math.max(-15, Math.min(15, wx));
+      player.targetWy = Math.max(-15, Math.min(15, wy));
+      player.isMoving = true;
+      pendingBuildingId = null;
+    };
+
+    let lastTouchTime = 0;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const now = performance.now();
+      if (now - lastTouchTime < 180) return;
+      lastTouchTime = now;
+
+      let clientX = (e as MouseEvent).clientX;
+      let clientY = (e as MouseEvent).clientY;
+      if ('touches' in e && e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      }
+      handlePointerAction(clientX, clientY);
+    };
+
+    const onPointerMove = (e: MouseEvent) => {
+      const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
+
+      // Check Cafe hover
+      if (Math.hypot(wx - cafeWx, wy - cafeWy) < 2.4) {
+        canvas.style.cursor = 'pointer';
+        hoveredBuildingRef = null;
+        setHoveredBuilding(null);
+        return;
+      }
+
+      // Check Building hover
+      let found: BuildingInfo | null = null;
+      for (const b of BUILDINGS_INFO) {
+        const [bx, , by] = b.position;
+        if (Math.hypot(wx - bx, wy - by) < 2.6) {
+          found = b;
+          break;
+        }
+      }
+
+      hoveredBuildingRef = found;
+      setHoveredBuilding(found);
+      canvas.style.cursor = found ? 'pointer' : 'default';
+    };
+
+    canvas.addEventListener('click', onPointerDown);
+    canvas.addEventListener('mousemove', onPointerMove);
+
+    // Initial camera position centered on student
+    camera.x = (player.wx - player.wy) * TILE_W;
+    camera.y = (player.wx + player.wy) * TILE_H;
+
+    // -----------------------------------------------------------
+    // MAIN ANIMATION LOOP (Lightweight 60 FPS Canvas 2D)
+    // -----------------------------------------------------------
+    let animId: number;
+    let lastTime = performance.now();
+    let sunRaysAngle = 0;
+
+    const render = (currentTime: number) => {
+      animId = requestAnimationFrame(render);
+      const delta = Math.min((currentTime - lastTime) / 1000, 0.1);
+      lastTime = currentTime;
+      const elapsed = currentTime / 1000;
+
+      // Determine daytime or nighttime
+      const isNight =
+        timeOfDayRef.current === 'night' ||
+        (timeOfDayRef.current === 'auto' && (new Date().getHours() >= 18 || new Date().getHours() < 6));
+
+      // ---------------------------------------------------------
+      // FEATURE 4: CAMERA SMOOTH FOLLOW AVATAR
+      // ---------------------------------------------------------
+      camera.targetX = (player.wx - player.wy) * TILE_W;
+      camera.targetY = (player.wx + player.wy) * TILE_H;
+      camera.x += (camera.targetX - camera.x) * (delta * 4.5);
+      camera.y += (camera.targetY - camera.y) * (delta * 4.5);
+
+      // ---------------------------------------------------------
+      // UPDATE AVATAR POSITIONS & ANIMATIONS
+      // ---------------------------------------------------------
+      // Update Player
+      if (player.isMoving) {
+        const dx = player.targetWx - player.wx;
+        const dy = player.targetWy - player.wy;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > 0.15) {
+          const step = Math.min(dist, player.speed * delta);
+          player.wx += (dx / dist) * step;
+          player.wy += (dy / dist) * step;
+          player.walkFrame += delta * 12;
+
+          if (dx >= 0 && dy >= 0) player.facing = 'down-right';
+          else if (dx < 0 && dy >= 0) player.facing = 'down-left';
+          else if (dx >= 0 && dy < 0) player.facing = 'up-right';
+          else player.facing = 'up-left';
+        } else {
+          player.isMoving = false;
+          player.walkFrame = 0;
+          if (pendingBuildingId) {
+            const chosen = pendingBuildingId;
+            pendingBuildingId = null;
+            onSelectBuildingRef.current(chosen);
+          }
+        }
+      }
+
+      // Update NPCs (Guru, Polisi, Petugas Kebersihan, Kurir)
+      npcs.forEach((npc) => {
+        if (npc.speed === 0) return; // Barista stays at counter
+
+        if (npc.speechTimer && npc.speechTimer > 0) {
+          npc.speechTimer -= delta;
+          if (npc.speechTimer <= 0) npc.speechText = undefined;
+        }
+
+        if (!npc.isMoving) {
+          npc.pauseTimer -= delta;
+          if (npc.pauseTimer <= 0) {
+            npc.isMoving = true;
+            // Wander around town within bounds
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 2 + Math.random() * 6;
+            npc.targetWx = Math.max(-12, Math.min(12, npc.wx + Math.cos(angle) * dist));
+            npc.targetWy = Math.max(-12, Math.min(12, npc.wy + Math.sin(angle) * dist));
+          }
+        } else {
+          const dx = npc.targetWx - npc.wx;
+          const dy = npc.targetWy - npc.wy;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist > 0.2) {
+            const step = Math.min(dist, npc.speed * delta);
+            npc.wx += (dx / dist) * step;
+            npc.wy += (dy / dist) * step;
+            npc.walkFrame += delta * 10;
+            if (dx >= 0) npc.facing = 'down-right';
+            else npc.facing = 'down-left';
+          } else {
+            npc.isMoving = false;
+            npc.walkFrame = 0;
+            npc.pauseTimer = 3 + Math.random() * 5;
+          }
+        }
+      });
+
+      // ---------------------------------------------------------
+      // 1. SKY BACKGROUND (Pagi: Cerah & Sinar Matahari / Malam: Nebula Bintang)
+      // ---------------------------------------------------------
+      ctx.clearRect(0, 0, width, height);
+
+      if (!isNight) {
+        // PAGI (Daytime Sky Gradient: Fresh azure to warm golden morning sun)
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+        skyGrad.addColorStop(0, '#38bdf8'); // Sky blue
+        skyGrad.addColorStop(0.5, '#7dd3fc');
+        skyGrad.addColorStop(1, '#bae6fd'); // Horizon haze
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // FEATURE 1: PAGI - SINAR MATAHARI (Golden Sun & Radiating Rays)
+        const sunX = width * 0.82;
+        const sunY = height * 0.18;
+        const sunRadius = Math.min(width, height) * 0.085;
+
+        // Radiating Sun Rays
+        sunRaysAngle += delta * 0.08;
+        ctx.save();
+        ctx.translate(sunX, sunY);
+        ctx.rotate(sunRaysAngle);
+
+        const rayCount = 12;
+        for (let r = 0; r < rayCount; r++) {
+          const angle = (r / rayCount) * Math.PI * 2;
+          const rayLen = sunRadius * (2.8 + Math.sin(elapsed * 2 + r) * 0.4);
+          const rayGrad = ctx.createLinearGradient(0, 0, Math.cos(angle) * rayLen, Math.sin(angle) * rayLen);
+          rayGrad.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
+          rayGrad.addColorStop(0.7, 'rgba(253, 224, 71, 0.15)');
+          rayGrad.addColorStop(1, 'rgba(253, 224, 71, 0)');
+
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(angle - 0.14) * rayLen, Math.sin(angle - 0.14) * rayLen);
+          ctx.lineTo(Math.cos(angle + 0.14) * rayLen, Math.sin(angle + 0.14) * rayLen);
+          ctx.closePath();
+          ctx.fillStyle = rayGrad;
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // Golden Sun Glow & Core
+        const sunGlow = ctx.createRadialGradient(sunX, sunY, sunRadius * 0.2, sunX, sunY, sunRadius * 2.2);
+        sunGlow.addColorStop(0, '#fffbeb');
+        sunGlow.addColorStop(0.35, '#fef08a');
+        sunGlow.addColorStop(0.7, 'rgba(250, 204, 21, 0.35)');
+        sunGlow.addColorStop(1, 'rgba(250, 204, 21, 0)');
+        ctx.fillStyle = sunGlow;
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, sunRadius * 2.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Sun Sphere
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // FEATURE 1: PAGI - AWAN BERGERAK (Drifting 2D Cumulus Clouds)
+        clouds.forEach((cloud) => {
+          cloud.x += cloud.speed * delta;
+          if (cloud.x > width + cloud.size * 2) {
+            cloud.x = -cloud.size * 2;
+            cloud.y = 30 + Math.random() * (height * 0.35);
+          }
+
+          ctx.fillStyle = `rgba(255, 255, 255, ${cloud.opacity})`;
+          const cx = cloud.x;
+          const cy = cloud.y + Math.sin(elapsed * 0.8 + cloud.x * 0.01) * 6;
+          const s = cloud.size;
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, s * 0.5, 0, Math.PI * 2);
+          ctx.arc(cx + s * 0.35, cy - s * 0.2, s * 0.45, 0, Math.PI * 2);
+          ctx.arc(cx + s * 0.7, cy, s * 0.4, 0, Math.PI * 2);
+          ctx.arc(cx + s * 0.35, cy + s * 0.1, s * 0.35, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else {
+        // MALAM (Night Sky Gradient matching screenshot)
+        const nightGrad = ctx.createLinearGradient(0, 0, 0, height);
+        nightGrad.addColorStop(0, '#070e1c');
+        nightGrad.addColorStop(0.6, '#0f172a');
+        nightGrad.addColorStop(1, '#1e293b');
+        ctx.fillStyle = nightGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Twinkling Stars
+        stars.forEach((star) => {
+          const alpha = 0.35 + 0.65 * Math.abs(Math.sin(elapsed * star.twinkleSpeed + star.phase));
+          ctx.fillStyle = `rgba(241, 245, 249, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // Glowing Crescent Moon
+        const moonX = width * 0.82;
+        const moonY = height * 0.16;
+        const moonR = 26;
+
+        const moonGlow = ctx.createRadialGradient(moonX, moonY, moonR * 0.5, moonX, moonY, moonR * 2.2);
+        moonGlow.addColorStop(0, 'rgba(224, 231, 255, 0.45)');
+        moonGlow.addColorStop(1, 'rgba(224, 231, 255, 0)');
+        ctx.fillStyle = moonGlow;
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, moonR * 2.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Moon cutout to make crescent
+        ctx.fillStyle = '#0a1222';
+        ctx.beginPath();
+        ctx.arc(moonX + 9, moonY - 4, moonR * 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // ---------------------------------------------------------
+      // 2. FLOATING ISLAND GEOMETRY (Cliff layers & Grassy Plateau)
+      // ---------------------------------------------------------
+      const islandPoints: [number, number][] = [];
+      const segs = 28;
+      for (let i = 0; i < segs; i++) {
+        const theta = (i / segs) * Math.PI * 2;
+        const r = 17.5 + Math.sin(theta * 3) * 0.8;
+        islandPoints.push([Math.cos(theta) * r, Math.sin(theta) * r]);
+      }
+
+      // Draw Island Rocky Cliff Underneath (Earth strata)
+      for (let layer = 5; layer >= 1; layer--) {
+        const cliffDepth = layer * 14;
+        const shrink = 1 - layer * 0.08;
+        ctx.fillStyle = isNight
+          ? `rgb(${16 + layer * 3}, ${22 + layer * 4}, ${36 + layer * 6})`
+          : `rgb(${75 - layer * 5}, ${55 - layer * 4}, ${40 - layer * 3})`;
+
+        ctx.beginPath();
+        islandPoints.forEach(([ix, iy], idx) => {
+          const pt = toScreen(ix * shrink, iy * shrink, -cliffDepth, camera.x, camera.y);
+          if (idx === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        });
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Draw Top Grass Plateau
+      ctx.fillStyle = isNight ? '#064e3b' : '#15803d'; // Night emerald vs Day lush green
+      ctx.beginPath();
+      islandPoints.forEach(([ix, iy], idx) => {
+        const pt = toScreen(ix, iy, 0, camera.x, camera.y);
+        if (idx === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.closePath();
+      ctx.fill();
+
+      // Grass Rim Border highlight
+      ctx.strokeStyle = isNight ? '#059669' : '#22c55e';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // ---------------------------------------------------------
+      // 3. COBBLESTONE ROADS & PLAZA
+      // ---------------------------------------------------------
+      const plazaCenter = toScreen(0, 0, 0, camera.x, camera.y);
+      const plazaR = TILE_W * 3.4;
+      ctx.save();
+      ctx.translate(plazaCenter.x, plazaCenter.y);
+      ctx.scale(1, TILE_H / TILE_W);
+      ctx.beginPath();
+      ctx.arc(0, 0, plazaR, 0, Math.PI * 2);
+      ctx.fillStyle = isNight ? '#1e293b' : '#e2e8f0';
+      ctx.fill();
+      ctx.strokeStyle = isNight ? '#334155' : '#cbd5e1';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.restore();
+
+      // Cobblestone path lines connecting plaza to each building
+      ctx.strokeStyle = isNight ? 'rgba(51, 65, 85, 0.85)' : 'rgba(203, 213, 225, 0.95)';
+      ctx.lineWidth = 14;
+      ctx.lineCap = 'round';
+
+      BUILDINGS_INFO.forEach((b) => {
+        if (b.id === 'monumen_warga') return;
+        const [bx, , by] = b.position;
+        const bScreen = toScreen(bx, by, 0, camera.x, camera.y);
+        ctx.beginPath();
+        ctx.moveTo(plazaCenter.x, plazaCenter.y);
+        ctx.lineTo(bScreen.x, bScreen.y);
+        ctx.stroke();
+      });
+
+      // Cobblestone path to Cafe
+      const cafeScreen = toScreen(cafeWx, cafeWy, 0, camera.x, camera.y);
+      ctx.beginPath();
+      ctx.moveTo(plazaCenter.x, plazaCenter.y);
+      ctx.lineTo(cafeScreen.x, cafeScreen.y);
+      ctx.stroke();
+
+      // ---------------------------------------------------------
+      // NIGHT STREET LAMPS (Warm Pools of Light)
+      // ---------------------------------------------------------
+      if (isNight) {
+        streetLamps.forEach(([lx, ly]) => {
+          const lScreen = toScreen(lx, ly, 0, camera.x, camera.y);
+          const lampGlow = ctx.createRadialGradient(lScreen.x, lScreen.y, 4, lScreen.x, lScreen.y, 48);
+          lampGlow.addColorStop(0, 'rgba(251, 191, 36, 0.42)');
+          lampGlow.addColorStop(0.5, 'rgba(251, 191, 36, 0.18)');
+          lampGlow.addColorStop(1, 'rgba(251, 191, 36, 0)');
+          ctx.fillStyle = lampGlow;
+          ctx.beginPath();
+          ctx.arc(lScreen.x, lScreen.y, 48, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Lamp post stick & glowing bulb
+          const bulbScreen = toScreen(lx, ly, 24, camera.x, camera.y);
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(lScreen.x, lScreen.y);
+          ctx.lineTo(bulbScreen.x, bulbScreen.y);
+          ctx.stroke();
+
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath();
+          ctx.arc(bulbScreen.x, bulbScreen.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      // ---------------------------------------------------------
+      // 4. DRAW ENTITIES (Buildings, Cafe, Avatars, Trees)
+      // Sorted by depth (wx + wy) for true 2.5D Isometric Z-Ordering
+      // ---------------------------------------------------------
+      type DrawItem =
+        | { type: 'building'; info: BuildingInfo; depth: number }
+        | { type: 'cafe'; depth: number }
+        | { type: 'avatar'; data: AvatarData; isPlayer: boolean; depth: number }
+        | { type: 'tree'; wx: number; wy: number; kind: 'cherry' | 'pine'; depth: number };
+
+      const drawItems: DrawItem[] = [];
+
+      BUILDINGS_INFO.forEach((b) => {
+        drawItems.push({
+          type: 'building',
+          info: b,
+          depth: b.position[0] + b.position[2],
+        });
+      });
+
+      drawItems.push({
+        type: 'cafe',
+        depth: cafeWx + cafeWy,
+      });
+
+      // Avatars: Player + NPCs (Guru, Polisi, Petugas Kebersihan, Kurir, Barista)
+      drawItems.push({
+        type: 'avatar',
+        data: player,
+        isPlayer: true,
+        depth: player.wx + player.wy,
+      });
+
+      npcs.forEach((npc) => {
+        drawItems.push({
+          type: 'avatar',
+          data: npc,
+          isPlayer: false,
+          depth: npc.wx + npc.wy,
+        });
+      });
+
+      // Decorative Island Trees
+      const trees: { wx: number; wy: number; kind: 'cherry' | 'pine' }[] = [
+        { wx: -13, wy: 4, kind: 'cherry' },
+        { wx: -10, wy: 10, kind: 'cherry' },
+        { wx: 13, wy: -4, kind: 'pine' },
+        { wx: 10, wy: -11, kind: 'pine' },
+        { wx: -5, wy: -13, kind: 'pine' },
+        { wx: 5, wy: -13, kind: 'pine' },
+        { wx: 11, wy: 11, kind: 'pine' },
+      ];
+
+      trees.forEach((t) => {
+        drawItems.push({
+          type: 'tree',
+          wx: t.wx,
+          wy: t.wy,
+          kind: t.kind,
+          depth: t.wx + t.wy,
+        });
+      });
+
+      // Sort back-to-front
+      drawItems.sort((a, b) => a.depth - b.depth);
+
+      // Render each sorted item
+      drawItems.forEach((item) => {
+        if (item.type === 'tree') {
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          // Tree Trunk
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(pt.x - 3, pt.y - 14, 6, 14);
+
+          // Foliage
+          if (item.kind === 'cherry') {
+            ctx.fillStyle = isNight ? '#be185d' : '#f472b6';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 24, 16, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = isNight ? '#9d174d' : '#fbcfe8';
+            ctx.beginPath();
+            ctx.arc(pt.x + 4, pt.y - 28, 11, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.fillStyle = isNight ? '#064e3b' : '#15803d';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 42);
+            ctx.lineTo(pt.x + 14, pt.y - 14);
+            ctx.lineTo(pt.x - 14, pt.y - 14);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = isNight ? '#047857' : '#22c55e';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 32);
+            ctx.lineTo(pt.x + 11, pt.y - 10);
+            ctx.lineTo(pt.x - 11, pt.y - 10);
+            ctx.closePath();
+            ctx.fill();
+          }
+        } else if (item.type === 'building') {
+          const b = item.info;
+          const [bx, , by] = b.position;
+          const pt = toScreen(bx, by, 0, camera.x, camera.y);
+
+          // Building Ground Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 4, 38, 18, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Check if hovered
+          const isHovered = hoveredBuildingRef?.id === b.id;
+          const hoverLift = isHovered ? Math.sin(elapsed * 6) * 3 : 0;
+          const bY = pt.y - hoverLift;
+
+          // Distinct Architectural Geometry for each building
+          if (b.id === 'balai_kota') {
+            // Balai Kota: Grand City Hall
+            ctx.fillStyle = isNight ? '#1e293b' : '#f8fafc';
+            ctx.fillRect(pt.x - 36, bY - 60, 72, 60);
+
+            // Roof
+            ctx.fillStyle = isNight ? '#1d4ed8' : '#2563eb';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 42, bY - 60);
+            ctx.lineTo(pt.x, bY - 96);
+            ctx.lineTo(pt.x + 42, bY - 60);
+            ctx.closePath();
+            ctx.fill();
+
+            // Columns
+            ctx.fillStyle = '#e2e8f0';
+            for (let c = -28; c <= 28; c += 18) {
+              ctx.fillRect(pt.x + c - 2, bY - 56, 5, 54);
+            }
+          } else if (b.id === 'perpustakaan') {
+            // Perpustakaan: Emerald Library
+            ctx.fillStyle = isNight ? '#064e3b' : '#059669';
+            ctx.fillRect(pt.x - 32, bY - 54, 64, 54);
+
+            // Roof
+            ctx.fillStyle = isNight ? '#047857' : '#10b981';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 36, bY - 54);
+            ctx.lineTo(pt.x, bY - 84);
+            ctx.lineTo(pt.x + 36, bY - 54);
+            ctx.closePath();
+            ctx.fill();
+
+            // Big arched window
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(pt.x, bY - 30, 14, Math.PI, 0);
+            ctx.fillRect(pt.x - 14, bY - 30, 28, 20);
+            ctx.fill();
+          } else if (b.id === 'menara_mentor') {
+            // Menara Mentor: Violet Observatory Tower
+            ctx.fillStyle = isNight ? '#312e81' : '#4338ca';
+            ctx.fillRect(pt.x - 22, bY - 76, 44, 76);
+
+            // Dome
+            ctx.fillStyle = isNight ? '#6d28d9' : '#8b5cf6';
+            ctx.beginPath();
+            ctx.arc(pt.x, bY - 76, 22, Math.PI, 0);
+            ctx.fill();
+
+            // Telescope lens & sparkle
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 8, bY - 88);
+            ctx.lineTo(pt.x + 28, bY - 108);
+            ctx.stroke();
+          } else if (b.id === 'taman_refleksi') {
+            // Taman Refleksi: Pagoda
+            ctx.fillStyle = isNight ? '#831843' : '#db2777';
+            ctx.fillRect(pt.x - 20, bY - 45, 40, 45);
+
+            // Pagoda Roof 1
+            ctx.fillStyle = isNight ? '#be185d' : '#ec4899';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 34, bY - 26);
+            ctx.lineTo(pt.x, bY - 48);
+            ctx.lineTo(pt.x + 34, bY - 26);
+            ctx.closePath();
+            ctx.fill();
+
+            // Pagoda Roof 2 (Upper)
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 26, bY - 50);
+            ctx.lineTo(pt.x, bY - 74);
+            ctx.lineTo(pt.x + 26, bY - 50);
+            ctx.closePath();
+            ctx.fill();
+          } else if (b.id === 'bengkel_latihan') {
+            // Bengkel Latihan: Industrial Workshop
+            ctx.fillStyle = isNight ? '#78350f' : '#b45309';
+            ctx.fillRect(pt.x - 30, bY - 52, 60, 52);
+
+            // Slanted roof
+            ctx.fillStyle = isNight ? '#92400e' : '#d97706';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 34, bY - 52);
+            ctx.lineTo(pt.x - 10, bY - 80);
+            ctx.lineTo(pt.x + 34, bY - 60);
+            ctx.closePath();
+            ctx.fill();
+
+            // Chimney with steam
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(pt.x - 24, bY - 90, 8, 20);
+          } else if (b.id === 'kantor_pos') {
+            // Kantor Pos: Red Mailbox Post
+            ctx.fillStyle = isNight ? '#7f1d1d' : '#b91c1c';
+            ctx.fillRect(pt.x - 28, bY - 48, 56, 48);
+
+            // Roof
+            ctx.fillStyle = isNight ? '#991b1b' : '#dc2626';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 32, bY - 48);
+            ctx.lineTo(pt.x, bY - 72);
+            ctx.lineTo(pt.x + 32, bY - 48);
+            ctx.closePath();
+            ctx.fill();
+
+            // Letter emblem
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(pt.x - 8, bY - 32, 16, 12);
+          } else if (b.id === 'pasar_prestasi') {
+            // Pasar Prestasi: Festive Cyan Circus Tent
+            ctx.fillStyle = isNight ? '#0e7490' : '#0891b2';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 32, bY - 30);
+            ctx.lineTo(pt.x, bY - 80);
+            ctx.lineTo(pt.x + 32, bY - 30);
+            ctx.closePath();
+            ctx.fill();
+
+            // Striped panels
+            ctx.fillStyle = '#f8fafc';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 10, bY - 30);
+            ctx.lineTo(pt.x, bY - 80);
+            ctx.lineTo(pt.x + 10, bY - 30);
+            ctx.closePath();
+            ctx.fill();
+
+            // Golden trophy topper
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath();
+            ctx.arc(pt.x, bY - 84, 5, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (b.id === 'monumen_warga') {
+            // Monumen Warga: Center Plaza Fountain & Obelisk
+            ctx.fillStyle = isNight ? '#334155' : '#94a3b8';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, bY - 6, 28, 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Water
+            ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, bY - 8, 22, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Center Obelisk Crystal
+            ctx.fillStyle = '#ec4899';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, bY - 46);
+            ctx.lineTo(pt.x + 8, bY - 14);
+            ctx.lineTo(pt.x - 8, bY - 14);
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          // Animated Beacon atop building
+          const beaconY = bY - (b.id === 'balai_kota' ? 104 : b.id === 'menara_mentor' ? 116 : 90);
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath();
+          ctx.arc(pt.x, beaconY + Math.sin(elapsed * 4) * 3, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Pulsing Beacon Halo
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(pt.x, beaconY + Math.sin(elapsed * 4) * 3, 8 + Math.sin(elapsed * 4) * 3, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Floating Building Name Tag
+          const tagY = beaconY - 14;
+          const labelText = `${b.icon} ${b.name}`;
+          ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+          const textMetrics = ctx.measureText(labelText);
+          const tagW = textMetrics.width + 16;
+          const tagH = 22;
+
+          ctx.fillStyle = isHovered ? '#1e293b' : 'rgba(15, 23, 42, 0.88)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - tagW / 2, tagY - tagH / 2, tagW, tagH, 11);
+          ctx.fill();
+          ctx.strokeStyle = isHovered ? '#38bdf8' : 'rgba(100, 116, 139, 0.6)';
+          ctx.lineWidth = isHovered ? 2 : 1;
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(labelText, pt.x, tagY);
+        } else if (item.type === 'cafe') {
+          // FEATURE 3: KAFE WARGA (Stall with awning, coffee, bread, ice cream)
+          const pt = toScreen(cafeWx, cafeWy, 0, camera.x, camera.y);
+
+          // Update Screen Pos for HTML menu overlay
+          setCafeScreenPos({
+            x: pt.x,
+            y: pt.y - 56,
+            visible: true,
+          });
+
+          // Ground shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 4, 32, 14, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Wooden Counter
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(pt.x - 26, pt.y - 24, 52, 24);
+
+          // Green & White Striped Canvas Awning
+          const stripeW = 52 / 6;
+          for (let s = 0; s < 6; s++) {
+            ctx.fillStyle = s % 2 === 0 ? '#059669' : '#f8fafc';
+            ctx.fillRect(pt.x - 26 + s * stripeW, pt.y - 48, stripeW, 24);
+          }
+
+          // Awning roof slant
+          ctx.fillStyle = '#047857';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 28, pt.y - 48);
+          ctx.lineTo(pt.x, pt.y - 62);
+          ctx.lineTo(pt.x + 28, pt.y - 48);
+          ctx.closePath();
+          ctx.fill();
+
+          // Mini items on counter: ☕ Kopi, 🍞 Roti, 🍦 Eskrim
+          // ☕ Coffee Cup
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(pt.x - 18, pt.y - 28, 6, 8);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(pt.x - 17, pt.y - 26, 4, 4);
+
+          // 🍞 Bread Loaf
+          ctx.fillStyle = '#d97706';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 4, pt.y - 28, 10, 7, 3);
+          ctx.fill();
+
+          // 🍦 Ice cream cone
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.moveTo(pt.x + 12, pt.y - 22);
+          ctx.lineTo(pt.x + 16, pt.y - 22);
+          ctx.lineTo(pt.x + 14, pt.y - 16);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#f472b6';
+          ctx.beginPath();
+          ctx.arc(pt.x + 14, pt.y - 24, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Floating Cafe Badge
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 38, pt.y - 78, 76, 20, 10);
+          ctx.fill();
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.fillStyle = '#34d399';
+          ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('☕ Kafe Warga', pt.x, pt.y - 68);
+        } else if (item.type === 'avatar') {
+          // FEATURE 3 & 4: AVATARS (Siswa, Guru, Polisi, Petugas Kebersihan, Kurir, Barista)
+          const av = item.data;
+          const pt = toScreen(av.wx, av.wy, 0, camera.x, camera.y);
+
+          // Avatar Ground Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 2, 10, 5, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Walking legs animation
+          const legSwing = av.isMoving ? Math.sin(av.walkFrame) * 6 : 0;
+          const bodyBob = av.isMoving ? Math.abs(Math.sin(av.walkFrame * 2)) * 2 : 0;
+          const avY = pt.y - bodyBob;
+
+          // Legs
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 3.5;
+          ctx.lineCap = 'round';
+          // Left Leg
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 3, avY - 8);
+          ctx.lineTo(pt.x - 3 + legSwing, avY);
+          ctx.stroke();
+          // Right Leg
+          ctx.beginPath();
+          ctx.moveTo(pt.x + 3, avY - 8);
+          ctx.lineTo(pt.x + 3 - legSwing, avY);
+          ctx.stroke();
+
+          // Torso / Attire based on Role
+          ctx.fillStyle = av.color;
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 6, avY - 22, 12, 14, 3);
+          ctx.fill();
+
+          // Head / Face
+          ctx.fillStyle = '#fed7aa'; // Skin tone
+          ctx.beginPath();
+          ctx.arc(pt.x, avY - 27, 6, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Hair / Headgear based on role
+          if (av.role === 'polisi') {
+            // Police Cap (Blue with gold badge)
+            ctx.fillStyle = '#1e3a8a';
+            ctx.fillRect(pt.x - 7, avY - 34, 14, 5);
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 32, 2, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (av.role === 'petugas_kebersihan') {
+            // High-vis vest stripes & Green Cap
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(pt.x - 6, avY - 18, 12, 3);
+            ctx.fillStyle = '#15803d';
+            ctx.fillRect(pt.x - 6, avY - 34, 12, 5);
+            // Broom in hand
+            ctx.strokeStyle = '#a16207';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 7, avY - 24);
+            ctx.lineTo(pt.x + 11, avY + 2);
+            ctx.stroke();
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(pt.x + 8, avY, 6, 4);
+          } else if (av.role === 'kurir') {
+            // Delivery Cap & Backpack parcel
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(pt.x - 6, avY - 34, 12, 5);
+            // Delivery parcel backpack
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x - 11, avY - 22, 5, 10);
+          } else if (av.role === 'guru') {
+            // Glasses & neat dark hair
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(pt.x - 6, avY - 34, 12, 5);
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(pt.x - 4, avY - 28, 8, 3);
+          } else if (av.role === 'barista') {
+            // Apron
+            ctx.fillStyle = '#065f46';
+            ctx.fillRect(pt.x - 4, avY - 20, 8, 11);
+          } else {
+            // Siswa (Player) Hair
+            ctx.fillStyle = studentGender === 'P' ? '#7c2d12' : '#0f172a';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 31, 6.5, Math.PI, 0);
+            ctx.fill();
+          }
+
+          // Floating Username Pill Tag
+          const tagText = `@${av.handle}`;
+          ctx.font = 'bold 9.5px system-ui, -apple-system, sans-serif';
+          const tMetrics = ctx.measureText(tagText);
+          const tW = tMetrics.width + 12;
+          const tH = 17;
+          const tagPosY = avY - 42;
+
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - tW / 2, tagPosY - tH / 2, tW, tH, 8);
+          ctx.fill();
+          ctx.strokeStyle = item.isPlayer ? '#38bdf8' : 'rgba(148, 163, 184, 0.5)';
+          ctx.lineWidth = item.isPlayer ? 1.5 : 1;
+          ctx.stroke();
+
+          ctx.fillStyle = item.isPlayer ? '#7dd3fc' : '#f1f5f9';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(tagText, pt.x, tagPosY);
+
+          // Comic Speech Bubble (if any)
+          let speech: string | undefined = av.speechText;
+          if (item.isPlayer && playerSpeechRef.current && Date.now() < playerSpeechRef.current.expiresAt) {
+            speech = playerSpeechRef.current.text;
+          }
+          if (av.role === 'barista' && baristaSpeechRef.current && Date.now() < baristaSpeechRef.current.expiresAt) {
+            speech = baristaSpeechRef.current.text;
+          }
+
+          if (speech) {
+            ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
+            const sMetrics = ctx.measureText(speech);
+            const sW = sMetrics.width + 16;
+            const sH = 22;
+            const bubbleY = tagPosY - 22;
+
+            // White comic bubble
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - sW / 2, bubbleY - sH / 2, sW, sH, 11);
+            ctx.fill();
+
+            // Little speech arrow pointing down
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 4, bubbleY + sH / 2);
+            ctx.lineTo(pt.x + 4, bubbleY + sH / 2);
+            ctx.lineTo(pt.x, bubbleY + sH / 2 + 5);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#0f172a';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(speech, pt.x, bubbleY);
+          }
+        }
+      });
+
+      // ---------------------------------------------------------
+      // FEATURE 2: MALAM - KUNANG-KUNANG BERPENDAR (Animated Fireflies)
+      // ---------------------------------------------------------
+      if (isNight) {
+        fireflies.forEach((f) => {
+          f.x = f.baseX + Math.sin(elapsed * f.speed + f.phase) * f.radiusX;
+          f.y = f.baseY + Math.cos(elapsed * (f.speed * 0.9) + f.phase * 1.5) * f.radiusY;
+          const fScreen = toScreen(f.x, f.y, 6 + Math.sin(elapsed * 2 + f.phase) * 4, camera.x, camera.y);
+
+          const blink = 0.35 + 0.65 * Math.max(0, Math.sin(elapsed * f.blinkSpeed + f.phase));
+
+          // Soft green-yellow glow
+          const glow = ctx.createRadialGradient(fScreen.x, fScreen.y, 1, fScreen.x, fScreen.y, 8);
+          glow.addColorStop(0, `rgba(163, 230, 53, ${blink})`);
+          glow.addColorStop(0.6, `rgba(234, 179, 8, ${blink * 0.45})`);
+          glow.addColorStop(1, 'rgba(234, 179, 8, 0)');
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(fScreen.x, fScreen.y, 8, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Firefly core
+          ctx.fillStyle = `rgba(254, 240, 138, ${blink})`;
+          ctx.beginPath();
+          ctx.arc(fScreen.x, fScreen.y, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+    };
+
+    animId = requestAnimationFrame(render);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', handleResize);
+      canvas.removeEventListener('click', onPointerDown);
+      canvas.removeEventListener('mousemove', onPointerMove);
+    };
+  }, [studentName, studentGender]);
+
+  // -------------------------------------------------------------
+  // FEATURE 3: KAFE WARGA ITEM PURCHASES (Kopi, Roti, Eskrim)
+  // -------------------------------------------------------------
+  const handleBuyCoffee = () => {
+    sounds.playRewardXp();
+    setCafeToast('☕ Menikmati kopi hangat nikmat! Barista @nnisa_0311 tersenyum ramah.');
+    baristaSpeechRef.current = {
+      text: 'Kopi hangat siap, selamat menikmati! ☕',
+      expiresAt: Date.now() + 5000,
+    };
+    playerSpeechRef.current = {
+      text: 'Mantap kopinya! ☕',
+      expiresAt: Date.now() + 5000,
+    };
+    setTimeout(() => setCafeToast(null), 3500);
   };
 
-  const handleCafeOrder = (item: 'Kopi' | 'Roti') => {
-    setCafeFeedback(`☕ Barista menyajikan ${item} hangat untukmu!`);
-    setTimeout(() => setCafeFeedback(null), 3000);
+  const handleBuyBread = () => {
+    sounds.playRewardXp();
+    setCafeToast('🍞 Roti panggang gurih disantap di taman kota!');
+    baristaSpeechRef.current = {
+      text: 'Roti hangat baru dipanggang! 🍞',
+      expiresAt: Date.now() + 5000,
+    };
+    playerSpeechRef.current = {
+      text: 'Enak banget rotinya! 🍞',
+      expiresAt: Date.now() + 5000,
+    };
+    setTimeout(() => setCafeToast(null), 3500);
   };
 
-  const handleFishingClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setFishingFeedback('🎣 Kail dilempar... Berhasil memancing ikan mujair!');
-    setTimeout(() => setFishingFeedback(null), 3500);
+  const handleBuyIceCream = () => {
+    sounds.playRewardXp();
+    setCafeToast('🍦 Eskrim vanila strawberry manis menyegarkan harimu di Kota Refleksi!');
+    baristaSpeechRef.current = {
+      text: 'Eskrim manis spesial untuk warga teladan! 🍦',
+      expiresAt: Date.now() + 5000,
+    };
+    playerSpeechRef.current = {
+      text: 'Segar banget eskrimnya! 🍦',
+      expiresAt: Date.now() + 5000,
+    };
+    setTimeout(() => setCafeToast(null), 3500);
   };
 
   return (
     <div
       ref={containerRef}
-      className={`relative w-full h-full select-none overflow-hidden transition-colors duration-700 ${
-        isNight ? 'bg-[#0c1427]' : 'bg-gradient-to-b from-[#38bdf8] via-[#7dd3fc] to-[#bae6fd]'
-      }`}
-      data-testid="vector-town-canvas"
+      className="relative w-full h-full select-none overflow-hidden touch-none"
+      data-testid="town-canvas-2d"
     >
-      {/* 1. SKY DECORATIONS (CELESTIAL & MOVING CLOUDS / FIREFLIES) */}
-      <div className="absolute inset-0 pointer-events-none">
-        {isNight ? (
-          <>
-            {/* Twinkling Starfield */}
-            <div className="absolute top-8 left-1/4 w-1 h-1 bg-white rounded-full opacity-60 animate-pulse" />
-            <div className="absolute top-16 left-1/3 w-1.5 h-1.5 bg-yellow-100 rounded-full opacity-70" />
-            <div className="absolute top-12 right-1/4 w-1 h-1 bg-white rounded-full opacity-50" />
-            <div className="absolute top-24 right-1/3 w-1 h-1 bg-cyan-100 rounded-full opacity-60 animate-pulse" />
-            <div className="absolute top-36 left-12 w-1.5 h-1.5 bg-white rounded-full opacity-40" />
-            <div className="absolute top-48 right-16 w-1 h-1 bg-white rounded-full opacity-50" />
+      {/* 2D High Performance Canvas */}
+      <canvas ref={canvasRef} className="block w-full h-full" />
 
-            {/* Crescent Moon */}
-            <div className="absolute top-10 right-28 sm:right-36 flex items-center justify-center">
-              <div className="w-14 h-14 rounded-full bg-yellow-200/10 blur-xl absolute" />
-              <div className="relative text-3xl sm:text-4xl filter drop-shadow-[0_0_12px_rgba(254,240,138,0.7)] select-none">
-                🌙
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Glowing Day Sun */}
-            <div className="absolute top-8 right-24 sm:right-32 flex items-center justify-center">
-              <div className="w-20 h-20 rounded-full bg-amber-300/30 blur-2xl absolute animate-pulse" />
-              <div className="relative text-4xl sm:text-5xl filter drop-shadow-[0_0_16px_rgba(251,191,36,0.8)] select-none">
-                ☀️
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* 2. VECTOR 2D ISOMETRIC SVG MAP */}
-      <svg
-        viewBox="-440 -260 880 520"
-        className="w-full h-full cursor-crosshair transition-transform duration-300"
-        onClick={handleMapClick}
-        preserveAspectRatio="xMidYMid meet"
-      >
-        <defs>
-          {/* Radial light glow for street lamps */}
-          <radialGradient id="lampGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#fff3b0" stopOpacity={isNight ? 0.45 : 0.15} />
-            <stop offset="35%" stopColor="#fef08a" stopOpacity={isNight ? 0.25 : 0.08} />
-            <stop offset="70%" stopColor="#eab308" stopOpacity={isNight ? 0.08 : 0.02} />
-            <stop offset="100%" stopColor="#eab308" stopOpacity="0" />
-          </radialGradient>
-
-          {/* Grass Island Top Gradient */}
-          <linearGradient id="grassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={isNight ? '#2c6943' : '#34d399'} />
-            <stop offset="100%" stopColor={isNight ? '#204f32' : '#10b981'} />
-          </linearGradient>
-
-          {/* Under-cliff Gradients */}
-          <linearGradient id="cliffLeft" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#3d2817" />
-            <stop offset="100%" stopColor="#21150c" />
-          </linearGradient>
-          <linearGradient id="cliffRight" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#2f1e11" />
-            <stop offset="100%" stopColor="#170e08" />
-          </linearGradient>
-
-          {/* Fountain Water */}
-          <radialGradient id="fountainWater" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#7dd3fc" />
-            <stop offset="70%" stopColor="#2563eb" />
-            <stop offset="100%" stopColor="#1d4ed8" />
-          </radialGradient>
-
-          {/* Firefly Glow Filter */}
-          <filter id="fireflyGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/* ------------------------------------------------------------- */}
-        {/* A. MOVING CLOUDS IN DAY MODE ("AWAN BERJALAN")                */}
-        {/* ------------------------------------------------------------- */}
-        {!isNight &&
-          clouds.map((c) => (
-            <g key={c.id} transform={`translate(${c.x}, ${c.y}) scale(${c.scale})`} opacity="0.9">
-              <ellipse cx="0" cy="0" rx="38" ry="16" fill="#ffffff" />
-              <circle cx="-16" cy="-8" r="18" fill="#ffffff" />
-              <circle cx="8" cy="-12" r="22" fill="#ffffff" />
-              <circle cx="26" cy="-4" r="16" fill="#ffffff" />
-            </g>
-          ))}
-
-        {/* ------------------------------------------------------------- */}
-        {/* B. FLOATING ISLAND BEDROCK & CLIFFS                           */}
-        {/* ------------------------------------------------------------- */}
-        {/* Left Cliff */}
-        <polygon points="-360,-10 0,185 0,230 -360,35" fill="url(#cliffLeft)" />
-        {/* Right Cliff */}
-        <polygon points="0,185 360,-10 360,35 0,230" fill="url(#cliffRight)" />
-        {/* Rock striations */}
-        <line x1="-180" y1="87" x2="-180" y2="132" stroke="#1c1109" strokeWidth="3" opacity="0.6" />
-        <line x1="-90" y1="135" x2="-90" y2="180" stroke="#1c1109" strokeWidth="4" opacity="0.6" />
-        <line x1="180" y1="87" x2="180" y2="132" stroke="#120b06" strokeWidth="3" opacity="0.7" />
-        <line x1="90" y1="135" x2="90" y2="180" stroke="#120b06" strokeWidth="4" opacity="0.7" />
-
-        {/* Top Lawn Diamond Slab */}
-        <polygon
-          points="0,-205 360,-10 0,185 -360,-10"
-          fill="url(#grassGrad)"
-          stroke="#397d52"
-          strokeWidth="3"
-        />
-
-        {/* ------------------------------------------------------------- */}
-        {/* C. NEAT & SYMMETRICAL ROADS ("JALANNYA DIRAPIHKAN")          */}
-        {/* ------------------------------------------------------------- */}
-        {/* Road Base Styling: Warm Cobblestone Paving */}
-        <g id="neat-roads">
-          {/* 1. Grand North Boulevard (Balai Kota) */}
-          <polygon
-            points="-22,-38 22,-38 26,-175 -26,-175"
-            fill="#ded8cd"
-            stroke="#b8b09f"
-            strokeWidth="2"
-          />
-          {/* Road center dash */}
-          <line x1="0" y1="-44" x2="0" y2="-170" stroke="#eae5da" strokeWidth="2" strokeDasharray="6 4" />
-
-          {/* 2. North-West Boulevard (Perpustakaan) */}
-          <polygon
-            points="-40,-20 -24,-34 -222,-108 -234,-96"
-            fill="#ded8cd"
-            stroke="#b8b09f"
-            strokeWidth="2"
-          />
-
-          {/* 3. North-East Boulevard (Menara Mentor) */}
-          <polygon
-            points="40,-20 24,-34 222,-108 234,-96"
-            fill="#ded8cd"
-            stroke="#b8b09f"
-            strokeWidth="2"
-          />
-
-          {/* 4. South-West Boulevard (Taman Refleksi) */}
-          <polygon
-            points="-40,20 -24,34 -222,108 -234,96"
-            fill="#ded8cd"
-            stroke="#b8b09f"
-            strokeWidth="2"
-          />
-
-          {/* 5. South-East Boulevard (Bengkel Latihan) */}
-          <polygon
-            points="40,20 24,34 222,108 234,96"
-            fill="#ded8cd"
-            stroke="#b8b09f"
-            strokeWidth="2"
-          />
-
-          {/* 6. South Connector to Kantor Pos & Pasar Prestasi */}
-          <polygon
-            points="-20,38 20,38 126,145 94,155"
-            fill="#ded8cd"
-            stroke="#b8b09f"
-            strokeWidth="1.5"
-          />
-          <polygon
-            points="-20,38 20,38 -94,155 -126,145"
-            fill="#ded8cd"
-            stroke="#b8b09f"
-            strokeWidth="1.5"
-          />
-
-          {/* 7. Walkway Branches to Cafe & Fishing Pier */}
-          <polygon points="-45,-8 -45,-26 -130,-34 -130,-16" fill="#ded8cd" stroke="#b8b09f" strokeWidth="1.5" />
-          <polygon points="45,8 45,26 185,116 185,98" fill="#ded8cd" stroke="#b8b09f" strokeWidth="1.5" />
-
-          {/* Central Fountain Circular Plaza with Concentric Rings */}
-          <ellipse cx="0" cy="0" rx="84" ry="48" fill="#ded8cd" stroke="#b8b09f" strokeWidth="2.5" />
-          <ellipse cx="0" cy="0" rx="72" ry="41" fill="#e8e3d8" stroke="#c4bead" strokeWidth="1" strokeDasharray="8 4" />
-        </g>
-
-        {/* ------------------------------------------------------------- */}
-        {/* D. WARM STREET LANTERNS WITH SOFT GROUND GLOW HALOS          */}
-        {/* ------------------------------------------------------------- */}
-        {[
-          { x: -55, y: -45 },
-          { x: 55, y: -45 },
-          { x: -55, y: 45 },
-          { x: 55, y: 45 },
-          { x: -145, y: -75 },
-          { x: 145, y: -75 },
-          { x: -145, y: 75 },
-          { x: 145, y: 75 },
-          { x: 0, y: -115 },
-          { x: 0, y: 95 },
-        ].map((lamp, i) => (
-          <g key={`lamp-${i}`}>
-            <ellipse cx={lamp.x} cy={lamp.y + 4} rx="44" ry="24" fill="url(#lampGlow)" />
-            <ellipse cx={lamp.x} cy={lamp.y} rx="3" ry="1.5" fill="#1e293b" />
-            <line x1={lamp.x} y1={lamp.y} x2={lamp.x} y2={lamp.y - 18} stroke="#0f172a" strokeWidth="2.5" />
-            <circle cx={lamp.x} cy={lamp.y - 19} r="4" fill="#fffbeb" filter="drop-shadow(0 0 6px #fef08a)" />
-            <circle cx={lamp.x} cy={lamp.y - 19} r="2.2" fill="#ffffff" />
-          </g>
-        ))}
-
-        {/* ------------------------------------------------------------- */}
-        {/* E. CENTRAL PLAZA & PAPAN INFORMASI ("MONUMEN WARGA")          */}
-        {/* ------------------------------------------------------------- */}
-        {/* Central Fountain */}
-        <g id="central-fountain">
-          <ellipse cx="0" cy="0" rx="42" ry="24" fill="#94a3b8" stroke="#475569" strokeWidth="2" />
-          <ellipse cx="0" cy="0" rx="36" ry="20" fill="url(#fountainWater)" />
-          <ellipse cx="0" cy="-4" rx="20" ry="11" fill="#cbd5e1" stroke="#64748b" strokeWidth="1.5" />
-          <ellipse cx="0" cy="-4" rx="16" ry="8" fill="#38bdf8" />
-          <ellipse cx="0" cy="-9" rx="6" ry="3.5" fill="#f8fafc" />
-          <line x1="0" y1="-9" x2="0" y2="-17" stroke="#e0f2fe" strokeWidth="2" strokeDasharray="2 1" />
-
-          {/* Curved Benches */}
-          <path d="M -50,-15 Q -42,-26 -30,-30" stroke="#78350f" strokeWidth="5" strokeLinecap="round" fill="none" />
-          <path d="M 50,-15 Q 42,-26 30,-30" stroke="#78350f" strokeWidth="5" strokeLinecap="round" fill="none" />
-          <path d="M -50,15 Q -42,26 -30,30" stroke="#78350f" strokeWidth="5" strokeLinecap="round" fill="none" />
-          <path d="M 50,15 Q 42,26 30,30" stroke="#78350f" strokeWidth="5" strokeLinecap="round" fill="none" />
-        </g>
-
-        {/* PAPAN INFORMASI KOTA (REPLACED MONUMEN WARGA AS REQUESTED) */}
-        <g
-          className="cursor-pointer group"
-          transform="translate(0, 32)"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectBuilding('monumen_warga');
-          }}
-          onMouseEnter={() =>
-            setHoveredBuilding(BUILDINGS_INFO.find((b) => b.id === 'monumen_warga') || null)
-          }
-          onMouseLeave={() => setHoveredBuilding(null)}
+      {/* Floating Cafe Card ONLY when Touched/Clicked */}
+      {isCafeMenuOpen && cafeScreenPos.visible && (
+        <div
+          className="absolute transform -translate-x-1/2 -translate-y-full pointer-events-auto transition-transform animate-fade-in-up z-30"
+          style={{ left: `${cafeScreenPos.x}px`, top: `${cafeScreenPos.y}px` }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
-          {/* Ground Shadow */}
-          <ellipse cx="0" cy="4" rx="18" ry="7" fill="#143721" opacity="0.6" />
-          {/* Wooden Stand Posts */}
-          <line x1="-12" y1="4" x2="-12" y2="-18" stroke="#78350f" strokeWidth="3" strokeLinecap="round" />
-          <line x1="12" y1="4" x2="12" y2="-18" stroke="#78350f" strokeWidth="3" strokeLinecap="round" />
-          {/* Notice Board */}
-          <rect x="-18" y="-30" width="36" height="20" rx="3" fill="#92400e" stroke="#78350f" strokeWidth="1.5" />
-          <rect x="-15" y="-27" width="30" height="14" rx="1.5" fill="#fef3c7" />
-          {/* Notice Paper Snippets */}
-          <rect x="-13" y="-25" width="11" height="10" fill="#ffffff" rx="1" />
-          <line x1="-11" y1="-22" x2="-4" y2="-22" stroke="#0284c7" strokeWidth="1" />
-          <line x1="-11" y1="-19" x2="-5" y2="-19" stroke="#94a3b8" strokeWidth="0.8" />
-          <line x1="-11" y1="-17" x2="-6" y2="-17" stroke="#94a3b8" strokeWidth="0.8" />
-          <rect x="1" y="-25" width="11" height="10" fill="#fdf2f8" rx="1" />
-          <line x1="3" y1="-22" x2="10" y2="-22" stroke="#db2777" strokeWidth="1" />
-          <line x1="3" y1="-19" x2="9" y2="-19" stroke="#94a3b8" strokeWidth="0.8" />
-          {/* Board Canopy */}
-          <polygon points="-22,-30 22,-30 0,-38" fill="#b45309" stroke="#78350f" strokeWidth="1" />
-
-          {/* Overhead Tag Pill */}
-          <g transform="translate(0, -42)">
-            <rect
-              x="-40"
-              y="-8"
-              width="80"
-              height="16"
-              fill="#0f172a"
-              opacity="0.9"
-              rx="8"
-              stroke="#ec4899"
-              strokeWidth="1.2"
-              filter="drop-shadow(0 2px 6px rgba(236,72,153,0.4))"
-            />
-            <text x="0" y="3" fill="#ffffff" fontSize="6.8" fontWeight="extrabold" textAnchor="middle">
-              📋 Papan Informasi
-            </text>
-          </g>
-        </g>
-
-        {/* ------------------------------------------------------------- */}
-        {/* F. TREES & CHERRY BLOSSOMS                                    */}
-        {/* ------------------------------------------------------------- */}
-        {[
-          { x: -280, y: -40, r: 24, cherry: false },
-          { x: -240, y: 10, r: 22, cherry: false },
-          { x: -170, y: -140, r: 26, cherry: false },
-          { x: -80, y: -160, r: 20, cherry: false },
-          { x: 80, y: -160, r: 20, cherry: false },
-          { x: 170, y: -140, r: 26, cherry: false },
-          { x: 260, y: -50, r: 24, cherry: false },
-          { x: 290, y: 20, r: 22, cherry: false },
-          { x: -270, y: 50, r: 24, cherry: true },
-          { x: -160, y: 130, r: 22, cherry: true },
-          { x: 190, y: -10, r: 20, cherry: true },
-          { x: 240, y: 20, r: 22, cherry: true },
-          { x: 260, y: 60, r: 24, cherry: false },
-          { x: 20, y: 155, r: 20, cherry: false },
-        ].map((t, i) => (
-          <g key={`tree-${i}`}>
-            <ellipse cx={t.x} cy={t.y + 4} rx="6" ry="3" fill="#143721" opacity="0.6" />
-            <line x1={t.x} y1={t.y + 4} x2={t.x} y2={t.y - 12} stroke="#451a03" strokeWidth="4" strokeLinecap="round" />
-            {t.cherry ? (
-              <>
-                <circle cx={t.x} cy={t.y - 18} r={t.r} fill="#db2777" />
-                <circle cx={t.x - 4} cy={t.y - 22} r={t.r * 0.75} fill="#f472b6" />
-                <circle cx={t.x + 5} cy={t.y - 14} r="3" fill="#fdf2f8" />
-                <circle cx={t.x - 5} cy={t.y - 12} r="2.5" fill="#fdf2f8" />
-              </>
-            ) : (
-              <>
-                <circle cx={t.x} cy={t.y - 18} r={t.r} fill="#14532d" />
-                <circle cx={t.x - 4} cy={t.y - 22} r={t.r * 0.78} fill="#15803d" />
-                <circle cx={t.x - 7} cy={t.y - 25} r={t.r * 0.45} fill="#22c55e" opacity="0.85" />
-              </>
-            )}
-          </g>
-        ))}
-
-        {/* ------------------------------------------------------------- */}
-        {/* G. SPECIALTY LANDMARKS (CAFE, KOLAM PANCING, GERBANG)         */}
-        {/* ------------------------------------------------------------- */}
-        {/* Cafe */}
-        <g className="cursor-pointer group" onClick={(e) => { e.stopPropagation(); setIsCafeOpen(true); }}>
-          <ellipse cx="-110" cy="-35" rx="22" ry="12" fill="#143721" opacity="0.6" />
-          <rect x="-124" y="-48" width="28" height="15" fill="#92400e" rx="3" stroke="#78350f" strokeWidth="1.5" />
-          <polygon points="-128,-48 -124,-58 -92,-58 -96,-48" fill="#b91c1c" />
-          <polygon points="-120,-48 -116,-58 -108,-58 -112,-48" fill="#fef3c7" />
-          <polygon points="-104,-48 -100,-58 -92,-58 -96,-48" fill="#fef3c7" />
-          <circle cx="-100" cy="-44" r="2.5" fill="#f8fafc" />
-          <rect x="-120" y="-36" width="20" height="7" fill="#1e293b" rx="2" />
-          <text x="-110" y="-31" fill="#facc15" fontSize="5" fontWeight="bold" textAnchor="middle">CAFE</text>
-        </g>
-
-        {/* Kolam Pancing */}
-        <g className="cursor-pointer group" onClick={handleFishingClick}>
-          <ellipse cx="165" cy="115" rx="36" ry="20" fill="#0284c7" stroke="#38bdf8" strokeWidth="2" />
-          <ellipse cx="165" cy="115" rx="28" ry="15" fill="#0369a1" />
-          <polygon points="135,115 155,105 160,113 140,123" fill="#78350f" stroke="#451a03" strokeWidth="1" />
-          <line x1="152" y1="108" x2="168" y2="102" stroke="#d97706" strokeWidth="1.5" />
-          <rect x="145" y="128" width="38" height="9" fill="#1e293b" rx="2.5" stroke="#475569" strokeWidth="0.8" />
-          <text x="164" y="134.5" fill="#f8fafc" fontSize="5.5" fontWeight="extrabold" textAnchor="middle">KOLAM PANCING</text>
-        </g>
-
-        {/* Thaloria Pergola Gate */}
-        <g>
-          <line x1="175" y1="-30" x2="175" y2="-52" stroke="#78350f" strokeWidth="3" strokeLinecap="round" />
-          <line x1="205" y1="-45" x2="205" y2="-67" stroke="#78350f" strokeWidth="3" strokeLinecap="round" />
-          <line x1="170" y1="-53" x2="210" y2="-68" stroke="#92400e" strokeWidth="4" strokeLinecap="round" />
-          <text x="190" y="-62" fill="#f8fafc" fontSize="6.5" fontWeight="bold" textAnchor="middle" transform="rotate(-20 190 -62)">Thaloria</text>
-        </g>
-
-        {/* ------------------------------------------------------------- */}
-        {/* H. THE 7 REMAINING BUILDINGS (AROUND ROAD TERMINALS)          */}
-        {/* ------------------------------------------------------------- */}
-        {BUILDINGS_INFO.filter((b) => b.id !== 'monumen_warga').map((b) => {
-          const hasNew = newMateriBuildingIds.includes(b.id);
-          const [bx, by] = [b.position[0], b.position[1]];
-
-          return (
-            <g
-              key={b.id}
-              className="cursor-pointer transition-transform duration-200 hover:scale-110"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectBuilding(b.id);
-              }}
-              onMouseEnter={() => setHoveredBuilding(b)}
-              onMouseLeave={() => setHoveredBuilding(null)}
-            >
-              <ellipse cx={bx} cy={by + 6} rx="26" ry="14" fill="#143721" opacity="0.6" />
-
-              {b.id === 'balai_kota' && (
-                <g>
-                  <polygon points={`${bx - 26},${by + 2} ${bx + 26},${by + 2} ${bx + 20},${by - 24} ${bx - 20},${by - 24}`} fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1.5" />
-                  <polygon points={`${bx - 22},${by - 24} ${bx + 22},${by - 24} ${bx},${by - 42}`} fill="#1d4ed8" />
-                  <line x1={bx - 14} y1={by + 2} x2={bx - 14} y2={by - 22} stroke="#cbd5e1" strokeWidth="3" />
-                  <line x1={bx} y1={by + 2} x2={bx} y2={by - 22} stroke="#cbd5e1" strokeWidth="3" />
-                  <line x1={bx + 14} y1={by + 2} x2={bx + 14} y2={by - 22} stroke="#cbd5e1" strokeWidth="3" />
-                  <circle cx={bx} cy={by - 28} r="4" fill="#fbbf24" stroke="#d97706" strokeWidth="1" />
-                </g>
-              )}
-
-              {b.id === 'perpustakaan' && (
-                <g>
-                  <polygon points={`${bx - 22},${by + 2} ${bx + 22},${by + 2} ${bx + 18},${by - 20} ${bx - 18},${by - 20}`} fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.5" />
-                  <polygon points={`${bx - 20},${by - 20} ${bx + 20},${by - 20} ${bx},${by - 36}`} fill="#059669" />
-                  <path d={`M ${bx - 6},${by + 2} A 6 6 0 0 1 ${bx + 6},${by + 2}`} fill="#0f172a" />
-                </g>
-              )}
-
-              {b.id === 'taman_refleksi' && (
-                <g>
-                  <polygon points={`${bx - 18},${by + 2} ${bx + 18},${by + 2} ${bx + 14},${by - 16} ${bx - 14},${by - 16}`} fill="#9a3412" />
-                  <polygon points={`${bx - 22},${by - 16} ${bx + 22},${by - 16} ${bx},${by - 30}`} fill="#db2777" />
-                  <polygon points={`${bx - 15},${by - 28} ${bx + 15},${by - 28} ${bx},${by - 40}`} fill="#db2777" />
-                </g>
-              )}
-
-              {b.id === 'menara_mentor' && (
-                <g>
-                  <polygon points={`${bx - 14},${by + 2} ${bx + 14},${by + 2} ${bx + 10},${by - 28} ${bx - 10},${by - 28}`} fill="#475569" />
-                  <ellipse cx={bx} cy={by - 28} rx="12" ry="7" fill="#7c3aed" />
-                  <circle cx={bx} cy={by - 34} r="10" fill="#7c3aed" />
-                  <line x1={bx + 4} y1={by - 34} x2={bx + 16} y2={by - 44} stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
-                </g>
-              )}
-
-              {b.id === 'bengkel_latihan' && (
-                <g>
-                  <rect x={bx - 20} y={by - 18} width="40" height="20" fill="#b45309" stroke="#78350f" strokeWidth="1.5" rx="2" />
-                  <polygon points={`${bx - 22},${by - 18} ${bx + 22},${by - 18} ${bx},${by - 32}`} fill="#334155" />
-                  <rect x={bx + 10} y={by - 36} width="6" height="16" fill="#78350f" />
-                  <circle cx={bx} cy={by - 8} r="6" fill="#64748b" stroke="#334155" strokeWidth="2" strokeDasharray="3 2" />
-                </g>
-              )}
-
-              {b.id === 'kantor_pos' && (
-                <g>
-                  <rect x={bx - 18} y={by - 16} width="36" height="18" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5" rx="2" />
-                  <polygon points={`${bx - 20},${by - 16} ${bx + 20},${by - 16} ${bx},${by - 28}`} fill="#dc2626" />
-                  <rect x={bx + 10} y={by - 6} width="5" height="8" fill="#facc15" rx="1.5" />
-                </g>
-              )}
-
-              {b.id === 'pasar_prestasi' && (
-                <g>
-                  <rect x={bx - 18} y={by - 14} width="36" height="16" fill="#fef08a" rx="2" />
-                  <polygon points={`${bx - 20},${by - 14} ${bx + 20},${by - 14} ${bx},${by - 32}`} fill="#06b6d4" />
-                  <polygon points={`${bx - 8},${by - 14} ${bx + 8},${by - 14} ${bx},${by - 32}`} fill="#f59e0b" />
-                  <circle cx={bx} cy={by - 34} r="3.5" fill="#fbbf24" filter="drop-shadow(0 0 4px #facc15)" />
-                </g>
-              )}
-
-              <g transform={`translate(${bx}, ${by - 42})`}>
-                <rect x="-38" y="-9" width="76" height="18" fill="#0f172a" opacity="0.88" rx="9" stroke="#ffffff" strokeWidth="1" strokeOpacity="0.3" />
-                <text x="0" y="3.5" fill="#f8fafc" fontSize="7.5" fontWeight="extrabold" textAnchor="middle">
-                  {b.name}
-                </text>
-                {hasNew && (
-                  <circle cx="34" cy="-5" r="4" fill="#fbbf24" stroke="#0f172a" strokeWidth="1.5" className="animate-ping" />
-                )}
-              </g>
-            </g>
-          );
-        })}
-
-        {/* ------------------------------------------------------------- */}
-        {/* I. MOVING PROFESSION NPCS (6+ GURU, POLISI, PENJAGA, DLL)    */}
-        {/* ------------------------------------------------------------- */}
-        {npcList.map((npc) => {
-          const isBubbleActive = activeNpcBubble?.npcId === npc.id;
-
-          return (
-            <g
-              key={npc.id}
-              className="cursor-pointer group"
-              transform={`translate(${npc.x}, ${npc.y})`}
-              onClick={(e) => handleNpcClick(npc, e)}
-            >
-              {/* Shadow */}
-              <ellipse cx="0" cy="2" rx="5.5" ry="2.5" fill="#143721" opacity="0.6" />
-
-              {/* Character Body with Facing Direction */}
-              <g transform={`scale(${npc.facing === 'left' ? -1 : 1}, 1)`}>
-                {/* Head */}
-                <circle cx="0" cy="-12" r="5" fill={npc.skinColor} />
-
-                {/* Hijab / Hair */}
-                {npc.hasHijab ? (
-                  <circle cx="0" cy="-13" r="5.6" fill={npc.hairColor} />
-                ) : (
-                  <path d="M -5,-13 A 5 5 0 0 1 5,-13" fill={npc.hairColor} />
-                )}
-
-                {/* Specific Accessories */}
-                {npc.accessory === 'glasses' && (
-                  <circle cx="2" cy="-12" r="1.8" fill="none" stroke="#0284c7" strokeWidth="0.8" />
-                )}
-                {npc.accessory === 'police_hat' && (
-                  <g transform="translate(0, -16)">
-                    <ellipse cx="0" cy="0" rx="5" ry="2.5" fill="#1e3a8a" />
-                    <circle cx="0" cy="-1" r="1.5" fill="#fbbf24" />
-                  </g>
-                )}
-                {npc.accessory === 'guard_hat' && (
-                  <ellipse cx="0" cy="-16" rx="5.2" ry="2" fill="#3f6212" />
-                )}
-                {npc.accessory === 'stethoscope' && (
-                  <path d="M -2,-8 Q 0,-3 2,-8" stroke="#ef4444" strokeWidth="1" fill="none" />
-                )}
-
-                {/* Torso / Uniform */}
-                <rect x="-4" y="-8" width="8" height="8" rx="2" fill={npc.shirtColor} />
-
-                {npc.accessory === 'broom' && (
-                  <line x1="4" y1="-8" x2="7" y2="4" stroke="#d97706" strokeWidth="1.5" />
-                )}
-
-                {/* Legs with walking animation if moving */}
-                <line x1="-2" y1="0" x2="-2" y2="4" stroke={npc.pantsColor} strokeWidth="2" strokeLinecap="round" />
-                <line x1="2" y1="0" x2="2" y2="4" stroke={npc.pantsColor} strokeWidth="2" strokeLinecap="round" />
-              </g>
-
-              {/* Profession Tag Badge above head */}
-              <g transform="translate(0, -21)">
-                <rect
-                  x="-32"
-                  y="-6.5"
-                  width="64"
-                  height="13"
-                  fill="#0f172a"
-                  opacity="0.88"
-                  rx="6.5"
-                  stroke={npc.badgeBg}
-                  strokeWidth="0.8"
-                />
-                <text x="0" y="2.5" fill="#f1f5f9" fontSize="5.5" fontWeight="extrabold" textAnchor="middle">
-                  {npc.professionBadge}
-                </text>
-              </g>
-
-              {/* Temporary Speech Bubble (Strictly 1 NPC, Disappears automatically) */}
-              {isBubbleActive && (
-                <g transform="translate(0, -38)" className="animate-fade-in-up">
-                  <rect
-                    x="-42"
-                    y="-9"
-                    width="84"
-                    height="18"
-                    fill="#ffffff"
-                    rx="9"
-                    stroke="#cbd5e1"
-                    strokeWidth="1"
-                    filter="drop-shadow(0 2px 8px rgba(0,0,0,0.4))"
-                  />
-                  <polygon points="-3,9 3,9 0,13" fill="#ffffff" />
-                  <text x="0" y="3" fill="#0f172a" fontSize="6.2" fontWeight="bold" textAnchor="middle">
-                    {activeNpcBubble.text}
-                  </text>
-                </g>
-              )}
-            </g>
-          );
-        })}
-
-        {/* ------------------------------------------------------------- */}
-        {/* J. THE PLAYER AVATAR                                          */}
-        {/* ------------------------------------------------------------- */}
-        <g transform={`translate(${playerPos.x}, ${playerPos.y})`}>
-          <ellipse cx="0" cy="3" rx="7" ry="3.5" fill="#143721" opacity="0.75" />
-
-          <g transform={`scale(${playerFacing === 'left' ? -1 : 1}, 1) translate(0, ${isWalking ? -Math.sin(Date.now() / 100) * 2 : 0})`}>
-            <circle cx="0" cy="-14" r="6" fill="#fbcfe8" />
-            {studentGender === 'P' ? (
-              <>
-                <circle cx="0" cy="-15" r="6.8" fill="#f8fafc" />
-                <rect x="-5" y="-9" width="10" height="9" rx="2" fill="#0284c7" />
-                <polygon points="-6,0 6,0 4,-5 -4,-5" fill="#1e1b4b" />
-              </>
-            ) : (
-              <>
-                <path d="M -6,-15 A 6 6 0 0 1 6,-15" fill="#1e293b" />
-                <rect x="-5.5" y="-9" width="11" height="9" rx="2" fill="#2563eb" />
-                <rect x="-7.5" y="-9" width="3" height="7" rx="1" fill="#f59e0b" />
-              </>
-            )}
-
-            <line
-              x1="-2.5"
-              y1="0"
-              x2={isWalking ? -2.5 + Math.sin(Date.now() / 90) * 3 : -2.5}
-              y2="5"
-              stroke="#1e1b4b"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
-            <line
-              x1="2.5"
-              y1="0"
-              x2={isWalking ? 2.5 - Math.sin(Date.now() / 90) * 3 : 2.5}
-              y2="5"
-              stroke="#1e1b4b"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
-          </g>
-
-          <g transform="translate(0, -26)">
-            <rect
-              x="-36"
-              y="-8"
-              width="72"
-              height="16"
-              fill="#059669"
-              rx="8"
-              stroke="#6ee7b7"
-              strokeWidth="1.2"
-              filter="drop-shadow(0 2px 8px rgba(16,185,129,0.5))"
-            />
-            <text x="0" y="3" fill="#ffffff" fontSize="6.8" fontWeight="extrabold" textAnchor="middle">
-              @{studentName.split(' ')[0].toLowerCase()} (Kamu)
-            </text>
-          </g>
-
-          {playerSpeechBubble && (
-            <g transform="translate(0, -46)" className="animate-fade-in-up">
-              <rect
-                x="-42"
-                y="-10"
-                width="84"
-                height="20"
-                fill="#ffffff"
-                rx="10"
-                stroke="#6ee7b7"
-                strokeWidth="1.5"
-                filter="drop-shadow(0 4px 10px rgba(0,0,0,0.5))"
-              />
-              <polygon points="-4,10 4,10 0,14" fill="#ffffff" />
-              <text x="0" y="3.5" fill="#0f172a" fontSize="7" fontWeight="bold" textAnchor="middle">
-                {playerSpeechBubble}
-              </text>
-            </g>
-          )}
-        </g>
-
-        {/* ------------------------------------------------------------- */}
-        {/* K. ANIMATED FIREFLIES IN NIGHT MODE ("KUNANG-KUNANG")        */}
-        {/* ------------------------------------------------------------- */}
-        {isNight &&
-          fireflyBases.map((base, idx) => {
-            const off = fireflyOffsets[idx] || { dx: 0, dy: 0, glow: 1 };
-            const fx = base.x + off.dx;
-            const fy = base.y + off.dy;
-
-            return (
-              <g key={`firefly-${base.id}`} transform={`translate(${fx}, ${fy})`} opacity={off.glow}>
-                {/* Soft outer lime halo */}
-                <circle cx="0" cy="0" r="6" fill="#a3e635" opacity="0.3" filter="url(#fireflyGlow)" />
-                {/* Bright core dot */}
-                <circle cx="0" cy="0" r="2" fill="#fef08a" />
-              </g>
-            );
-          })}
-      </svg>
-
-      {/* 3. CAFE POPUP CARD */}
-      {isCafeOpen && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 animate-fade-in-up max-w-[280px] w-full">
-          <div className="bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl text-white">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-700/60 mb-3">
-              <div>
-                <h4 className="text-sm font-extrabold text-white flex items-center gap-1.5">
-                  <span>☕</span> Cafe Buka
-                </h4>
-                <p className="text-[11px] text-amber-400 font-medium">Barista @nnisa_0311</p>
+          <div className="bg-[#1a2530]/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-slate-700/80 shadow-[0_12px_36px_0_rgba(0,0,0,0.65)] flex flex-col items-center gap-2.5 min-w-[260px]">
+            {/* Header with Close Button */}
+            <div className="w-full flex items-center justify-between border-b border-slate-700/70 pb-1.5">
+              <div className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+                <span className="font-extrabold text-white">Cafe buka</span>
+                <span className="text-slate-500">•</span>
+                <span className="text-emerald-300 font-semibold">barista @nnisa_0311</span>
               </div>
               <button
-                onClick={() => setIsCafeOpen(false)}
-                className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition"
+                onClick={() => setIsCafeMenuOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                title="Tutup Menu Kafe"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 mb-3 leading-relaxed">
-              Selamat datang di Cafe Refleksia! Silakan nikmati hidangan santai bersama kawan-kawan.
-            </p>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                onClick={() => handleCafeOrder('Kopi')}
-                className="p-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-center transition flex flex-col items-center gap-1 active:scale-95"
-              >
-                <span className="text-xl">☕</span>
-                <span className="text-xs font-bold text-emerald-200">Kopi - 2</span>
-              </button>
-              <button
-                onClick={() => handleCafeOrder('Roti')}
-                className="p-2.5 rounded-xl bg-teal-600/30 hover:bg-teal-600/50 border border-teal-500/50 text-center transition flex flex-col items-center gap-1 active:scale-95"
-              >
-                <span className="text-xl">🍞</span>
-                <span className="text-xs font-bold text-teal-200">Roti - 1</span>
-              </button>
-            </div>
-
-            {cafeFeedback && (
-              <p className="mt-3 text-[11px] text-center font-bold text-amber-300 animate-pulse">
-                {cafeFeedback}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Fishing Feedback Toast */}
-      {fishingFeedback && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 animate-fade-in-up">
-          <div className="bg-blue-900/90 backdrop-blur-xl border border-blue-400/40 text-blue-100 text-xs font-bold px-4 py-2 rounded-full shadow-lg">
-            {fishingFeedback}
-          </div>
-        </div>
-      )}
-
-      {/* 4. FLOATING OBROLAN WINDOW */}
-      <div className="absolute bottom-32 sm:bottom-36 left-3 sm:left-5 z-20 w-[280px] sm:w-[320px] max-w-[calc(100vw-24px)] pointer-events-auto">
-        <div className="bg-slate-950/85 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden transition-all">
-          <div
-            onClick={() => setIsChatWindowOpen(!isChatWindowOpen)}
-            className="px-3.5 py-2.5 bg-slate-900/80 border-b border-white/10 flex items-center justify-between cursor-pointer"
-          >
+            {/* 3 Menu Items: Kopi, Roti, and Eskrim */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-extrabold text-white">Obrolan</span>
-              <span className="text-[10px] text-slate-400">• ruang 2 • {chatMessages.length} pesan</span>
+              <button
+                onClick={handleBuyCoffee}
+                className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                title="Beli Kopi Hangat"
+              >
+                <span className="text-base">☕</span>
+                <span className="text-[10px] mt-0.5">Kopi - 2</span>
+              </button>
+              <button
+                onClick={handleBuyBread}
+                className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                title="Beli Roti Panggang"
+              >
+                <span className="text-base">🍞</span>
+                <span className="text-[10px] mt-0.5">Roti - 1</span>
+              </button>
+              <button
+                onClick={handleBuyIceCream}
+                className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                title="Beli Eskrim Manis Segar"
+              >
+                <span className="text-base">🍦</span>
+                <span className="text-[10px] mt-0.5">Eskrim - 1</span>
+              </button>
             </div>
-            <button className="text-slate-400 hover:text-white transition">
-              {isChatWindowOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-            </button>
           </div>
-
-          {isChatWindowOpen && (
-            <div className="p-3 max-h-[160px] overflow-y-auto space-y-2 text-xs divide-y divide-white/5">
-              {chatMessages.slice(0, 25).map((m) => (
-                <div key={m.id} className="pt-1.5 first:pt-0">
-                  <div className="flex items-baseline justify-between gap-1">
-                    <span className="font-extrabold text-emerald-400 text-[11px] truncate">
-                      {m.senderHandle || '@warga'}
-                    </span>
-                    <span className="text-[10px] text-slate-400 shrink-0 font-mono">
-                      {m.timestamp || m.createdAt.slice(11, 16) || '23.35'}
-                    </span>
-                  </div>
-                  <p className="text-slate-200 text-xs mt-0.5 leading-snug break-words">
-                    {m.content}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
-      {/* 5. BOTTOM CHAT INPUT BAR */}
-      <div className="absolute bottom-4 sm:bottom-5 left-1/2 -translate-x-1/2 z-30 pointer-events-auto w-[92vw] max-w-[480px]">
-        <form
-          onSubmit={handleSendChat}
-          className="bg-slate-950/85 backdrop-blur-2xl border border-white/25 rounded-full px-3.5 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.55)] flex items-center gap-2.5"
-        >
-          <span className="text-emerald-400 text-base shrink-0">💬</span>
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            placeholder="Ngobrol dengan warga di dekatmu..."
-            className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none"
-            maxLength={120}
-          />
-          <button
-            type="submit"
-            disabled={!chatInput.trim()}
-            className="w-8 h-8 rounded-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 flex items-center justify-center transition active:scale-95 shrink-0"
-            title="Kirim Pesan"
-          >
-            <Send className="w-4 h-4 ml-0.5" />
-          </button>
-        </form>
-      </div>
-
-      {/* 6. HOVER BUILDING INFO BADGE */}
-      {hoveredBuilding && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none z-30 animate-fade-in-up">
-          <div className="bg-slate-900/90 backdrop-blur-xl border border-white/25 text-white px-4 py-2 rounded-2xl shadow-xl flex items-center gap-2.5">
-            <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: '#' + hoveredBuilding.color.toString(16).padStart(6, '0') }}
-            />
-            <div>
-              <p className="font-extrabold text-xs sm:text-sm leading-tight text-white">
-                {hoveredBuilding.name}
-              </p>
-              <p className="text-[10px] sm:text-xs text-slate-300 font-medium">
-                {hoveredBuilding.tagline} • Ketuk untuk masuk
-              </p>
-            </div>
-          </div>
+      {/* Floating Cafe Toast Notification */}
+      {cafeToast && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-[#1e293b]/95 backdrop-blur-md text-emerald-300 font-bold text-xs sm:text-sm px-4 py-2 rounded-full border border-emerald-500/40 shadow-2xl animate-fade-in-up flex items-center gap-2">
+          <span>✨</span>
+          <span>{cafeToast}</span>
         </div>
       )}
     </div>

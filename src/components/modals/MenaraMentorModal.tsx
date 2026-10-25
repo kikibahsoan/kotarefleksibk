@@ -141,7 +141,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                       <span>Yang Sudah Kamu Kuasai</span>
                     </h5>
                     <ul className="space-y-1.5">
-                      {displayedFeedback.sudah_dikuasai?.map((item, idx) => (
+                      {(displayedFeedback.sudah_dikuasai || []).map((item: string, idx: number) => (
                         <li key={idx} className="text-xs text-slate-200 flex items-start gap-2">
                           <span className="text-emerald-400 font-bold">•</span>
                           <span>{item}</span>
@@ -157,7 +157,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                       <span>Area Perlu Diperkuat</span>
                     </h5>
                     <ul className="space-y-1.5">
-                      {displayedFeedback.perlu_diperkuat?.map((item, idx) => (
+                      {(displayedFeedback.perlu_diperkuat || []).map((item: string, idx: number) => (
                         <li key={idx} className="text-xs text-slate-200 flex items-start gap-2">
                           <span className="text-amber-400 font-bold">•</span>
                           <span>{item}</span>
@@ -174,7 +174,12 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                     <span>Saran Konkret untuk Belajar Berikutnya</span>
                   </h5>
                   <div className="space-y-2">
-                    {displayedFeedback.saran?.map((s, idx) => (
+                    {(Array.isArray(displayedFeedback.saran)
+                      ? displayedFeedback.saran
+                      : displayedFeedback.saran
+                      ? [displayedFeedback.saran]
+                      : []
+                    ).map((s: string, idx: number) => (
                       <div key={idx} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/50 text-xs text-slate-200 flex items-start gap-2">
                         <span className="w-5 h-5 rounded-full bg-purple-600/30 text-purple-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
                           {idx + 1}
@@ -211,7 +216,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                   </div>
 
                   <div className="space-y-2.5">
-                    {displayedFeedback.rencana_belajar?.map((step, idx) => {
+                    {(displayedFeedback.rencana_belajar || []).map((step: string, idx: number) => {
                       const isChecked = displayedFeedback.completedSteps?.[idx] || false;
                       return (
                         <button
