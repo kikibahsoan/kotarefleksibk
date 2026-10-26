@@ -128,6 +128,8 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
 
   // Center camera trigger ref
   const resetCameraRequestedRef = useRef(false);
+  // Auto-opened building touch tracker to prevent redundant triggers while standing still
+  const lastTouchedIdRef = useRef<string | null>(null);
 
   const handleZoomIn = () => {
     setZoomLevel((prev) => Math.min(1.5, Number((prev + 0.15).toFixed(2))));
@@ -218,7 +220,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       wy: 1.8,
       targetWx: 1.5,
       targetWy: 1.8,
-      speed: 4.5,
+      speed: 2.2, // Natural, relaxed walking pace
       shirtColor: '#3b82f6', // Blue shirt
       pantsColor: '#1e293b', // Dark pants
       hairColor: studentGender === 'P' ? '#78350f' : '#0f172a',
@@ -403,6 +405,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
         player.targetWy = cafeWy + 1.2;
         player.isMoving = true;
         pendingBuildingId = null;
+        lastTouchedIdRef.current = 'cafe';
         return;
       }
 
@@ -416,6 +419,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           player.targetWy = by * 0.75;
           player.isMoving = true;
           pendingBuildingId = b.id;
+          lastTouchedIdRef.current = null;
           return;
         }
       }
@@ -426,6 +430,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       player.targetWy = Math.max(-5.2, Math.min(5.2, wy));
       player.isMoving = true;
       pendingBuildingId = null;
+      lastTouchedIdRef.current = null;
     };
 
     let lastTouchTime = 0;
@@ -538,28 +543,74 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       camera.x += (camera.targetX - camera.x) * (delta * 4.5);
       camera.y += (camera.targetY - camera.y) * (delta * 4.5);
 
-      // Update Player Movement
+      // Update Player Movement (Natural relaxed cadence and touch trigger)
       if (player.isMoving) {
         const dx = player.targetWx - player.wx;
         const dy = player.targetWy - player.wy;
         const dist = Math.hypot(dx, dy);
 
-        if (dist > 0.15) {
+        if (dist > 0.12) {
           const step = Math.min(dist, player.speed * delta);
           player.wx += (dx / dist) * step;
           player.wy += (dy / dist) * step;
-          player.walkFrame += delta * 12;
+          player.walkFrame += delta * 7.5; // Natural step frequency matching speed 2.2
 
           if (dx >= 0 && dy >= 0) player.facing = 'down-right';
           else if (dx < 0 && dy >= 0) player.facing = 'down-left';
           else if (dx >= 0 && dy < 0) player.facing = 'up-right';
           else player.facing = 'up-left';
+
+          // Proximity touch check: auto-open modal when avatar touches building doorstep
+          let touchedBuilding: BuildingId | null = null;
+          for (const b of BUILDINGS_INFO) {
+            const [bx, , by] = b.position;
+            const bDist = Math.hypot(player.wx - bx, player.wy - by);
+            const threshold = b.id === 'monumen_warga' ? 1.15 : 1.4;
+            if (bDist < threshold) {
+              touchedBuilding = b.id;
+              break;
+            }
+          }
+
+          const cafeDist = Math.hypot(player.wx - cafeWx, player.wy - cafeWy);
+          if (cafeDist < 1.3) {
+            if (lastTouchedIdRef.current !== 'cafe') {
+              lastTouchedIdRef.current = 'cafe';
+              player.isMoving = false;
+              player.walkFrame = 0;
+              pendingBuildingId = null;
+              sounds.playClick();
+              setIsCafeMenuOpen(true);
+            }
+          } else if (touchedBuilding) {
+            if (lastTouchedIdRef.current !== touchedBuilding) {
+              lastTouchedIdRef.current = touchedBuilding;
+              player.isMoving = false;
+              player.walkFrame = 0;
+              pendingBuildingId = null;
+              sounds.playClick();
+              onSelectBuildingRef.current(touchedBuilding);
+            }
+          } else if (lastTouchedIdRef.current) {
+            // Player has moved away, allow re-trigger on next contact
+            const prevId = lastTouchedIdRef.current;
+            if (prevId === 'cafe') {
+              if (cafeDist > 1.8) lastTouchedIdRef.current = null;
+            } else {
+              const prevB = BUILDINGS_INFO.find((b) => b.id === prevId);
+              if (prevB) {
+                const d = Math.hypot(player.wx - prevB.position[0], player.wy - prevB.position[2]);
+                if (d > 1.8) lastTouchedIdRef.current = null;
+              }
+            }
+          }
         } else {
           player.isMoving = false;
           player.walkFrame = 0;
           if (pendingBuildingId) {
             const chosen = pendingBuildingId;
             pendingBuildingId = null;
+            lastTouchedIdRef.current = chosen;
             onSelectBuildingRef.current(chosen);
           }
         }
@@ -820,30 +871,51 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       // Render Each Item
       drawItems.forEach((item) => {
         if (item.type === 'tree') {
-          // Double-Sphere Tree (Matching Screenshot Exactly)
+          // Double-Sphere Tree (Noticeably Enlarged, Lush & Sculpted matching screenshot)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
-          // Ground shadow
+          // Ground shadow (enlarged)
           ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
           ctx.beginPath();
-          ctx.ellipse(pt.x + 2, pt.y + 2, 14 * z, 7 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x + 2, pt.y + 2, 22 * z, 11 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // Brown slender trunk
-          ctx.fillStyle = isNight ? '#451a03' : '#78350f';
-          ctx.fillRect(pt.x - 2.5 * z, pt.y - 18 * z, 5 * z, 18 * z);
+          // Brown sturdy trunk with depth shading
+          ctx.fillStyle = isNight ? '#381602' : '#6a2f0c';
+          ctx.fillRect(pt.x - 3.5 * z, pt.y - 24 * z, 7 * z, 24 * z);
+          // Trunk shadow side
+          ctx.fillStyle = isNight ? '#240e01' : '#451a03';
+          ctx.fillRect(pt.x + 0.5 * z, pt.y - 24 * z, 3 * z, 24 * z);
 
-          // Lower large sphere (Teal/Emerald green)
-          ctx.fillStyle = isNight ? '#064e3b' : '#10b981';
+          // Lower large sphere (Teal/Emerald green with isometric shading)
+          ctx.fillStyle = isNight ? '#064e3b' : '#059669';
           ctx.beginPath();
-          ctx.arc(pt.x, pt.y - 24 * z, 14 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x, pt.y - 32 * z, 22 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Lower sphere highlight
+          ctx.fillStyle = isNight ? '#047857' : '#10b981';
+          ctx.beginPath();
+          ctx.arc(pt.x - 4 * z, pt.y - 36 * z, 16 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Upper overlapping bright mint/lime sphere
-          ctx.fillStyle = isNight ? '#047857' : '#34d399';
+          ctx.fillStyle = isNight ? '#047857' : '#10b981';
           ctx.beginPath();
-          ctx.arc(pt.x + 1 * z, pt.y - 32 * z, 11 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x + 1 * z, pt.y - 48 * z, 16 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Upper sphere soft top highlight
+          ctx.fillStyle = isNight ? '#059669' : '#34d399';
+          ctx.beginPath();
+          ctx.arc(pt.x - 2 * z, pt.y - 52 * z, 11 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Top foliage bud
+          ctx.fillStyle = isNight ? '#10b981' : '#6ee7b7';
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y - 59 * z, 6 * z, 0, Math.PI * 2);
           ctx.fill();
         } else if (item.type === 'building') {
           const b = item.info;
@@ -852,250 +924,589 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           const z = zoomLevelRef.current;
           const isHovered = hoveredBuildingRef?.id === b.id;
 
-          // Shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+          // Realistic building shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
           ctx.beginPath();
-          ctx.ellipse(pt.x + 4, pt.y + 4, 38 * z, 18 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x + 5, pt.y + 6, 44 * z, 22 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
           if (b.id === 'balai_kota') {
-            // NORTH: GEDUNG KUBAH EMAS (Balai Kota)
-            // Main white building
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.moveTo(pt.x - 34 * z, pt.y - 20 * z);
-            ctx.lineTo(pt.x, pt.y - 36 * z);
-            ctx.lineTo(pt.x + 34 * z, pt.y - 20 * z);
-            ctx.lineTo(pt.x + 34 * z, pt.y + 20 * z);
-            ctx.lineTo(pt.x, pt.y + 36 * z);
-            ctx.lineTo(pt.x - 34 * z, pt.y + 20 * z);
-            ctx.closePath();
-            ctx.fill();
-
-            // Left vertical fluting/pillars
-            ctx.fillStyle = '#e2e8f0';
-            for (let col = -26; col <= -4; col += 7) {
-              ctx.fillRect(pt.x + col * z, pt.y - 12 * z, 4 * z, 30 * z);
-            }
-
-            // Right wall white windows
+            // NORTH: GEDUNG KUBAH EMAS (Balai Kota - High Architectural Detail)
+            // 3-step marble plinth base
             ctx.fillStyle = '#cbd5e1';
-            for (let r = 0; r < 2; r++) {
-              for (let c = 8; c <= 26; c += 9) {
-                ctx.fillRect(pt.x + c * z, pt.y - (4 - r * 14) * z, 5 * z, 8 * z);
-              }
-            }
-
-            // Golden Dome on top
-            ctx.fillStyle = '#f59e0b';
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 36 * z, 18 * z, Math.PI, 0);
+            ctx.moveTo(pt.x - 40 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x, pt.y + 36 * z);
+            ctx.lineTo(pt.x + 40 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x + 40 * z, pt.y + 24 * z);
+            ctx.lineTo(pt.x, pt.y + 44 * z);
+            ctx.lineTo(pt.x - 40 * z, pt.y + 24 * z);
+            ctx.closePath();
             ctx.fill();
 
-            // Gold spire
-            ctx.strokeStyle = '#fde047';
-            ctx.lineWidth = 2.5 * z;
+            // Main white neoclassical structure
+            ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y - 54 * z);
-            ctx.lineTo(pt.x, pt.y - 66 * z);
-            ctx.stroke();
+            ctx.moveTo(pt.x - 36 * z, pt.y - 22 * z);
+            ctx.lineTo(pt.x, pt.y - 40 * z);
+            ctx.lineTo(pt.x + 36 * z, pt.y - 22 * z);
+            ctx.lineTo(pt.x + 36 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x, pt.y + 36 * z);
+            ctx.lineTo(pt.x - 36 * z, pt.y + 18 * z);
+            ctx.closePath();
+            ctx.fill();
 
-            // Flagpole on left
+            // Left shaded wall
+            ctx.fillStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 36 * z, pt.y - 22 * z);
+            ctx.lineTo(pt.x, pt.y - 40 * z);
+            ctx.lineTo(pt.x, pt.y + 36 * z);
+            ctx.lineTo(pt.x - 36 * z, pt.y + 18 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Neoclassical fluted columns on entrance facade
+            ctx.fillStyle = '#ffffff';
             ctx.strokeStyle = '#94a3b8';
-            ctx.lineWidth = 2 * z;
-            ctx.beginPath();
-            ctx.moveTo(pt.x - 30 * z, pt.y + 10 * z);
-            ctx.lineTo(pt.x - 30 * z, pt.y - 25 * z);
-            ctx.stroke();
-            ctx.fillStyle = '#ef4444';
-            ctx.fillRect(pt.x - 29 * z, pt.y - 25 * z, 8 * z, 5 * z);
-
-            // Black sign in front
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(pt.x - 14 * z, pt.y + 28 * z, 28 * z, 8 * z);
-            ctx.fillStyle = '#facc15';
-            ctx.font = `bold ${Math.round(6 * z)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.fillText('BALAI KOTA', pt.x, pt.y + 34 * z);
-          } else if (b.id === 'menara_mentor') {
-            // EAST: DEWAN KOTA & TELECOM TRANSMISSION TOWER
-            // Main white council hall
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.moveTo(pt.x - 28 * z, pt.y - 16 * z);
-            ctx.lineTo(pt.x, pt.y - 30 * z);
-            ctx.lineTo(pt.x + 28 * z, pt.y - 16 * z);
-            ctx.lineTo(pt.x + 28 * z, pt.y + 16 * z);
-            ctx.lineTo(pt.x, pt.y + 30 * z);
-            ctx.lineTo(pt.x - 28 * z, pt.y + 16 * z);
-            ctx.closePath();
-            ctx.fill();
-
-            // Two green watermelon/capsule roof arches
-            ctx.fillStyle = '#10b981';
-            ctx.beginPath();
-            ctx.arc(pt.x - 8 * z, pt.y - 28 * z, 10 * z, Math.PI, 0);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(pt.x + 8 * z, pt.y - 28 * z, 10 * z, Math.PI, 0);
-            ctx.fill();
-
-            // Blue arch doors
-            ctx.strokeStyle = '#0284c7';
-            ctx.lineWidth = 2 * z;
-            ctx.beginPath();
-            ctx.arc(pt.x - 10 * z, pt.y + 16 * z, 4 * z, Math.PI, 0);
-            ctx.arc(pt.x + 2 * z, pt.y + 20 * z, 4 * z, Math.PI, 0);
-            ctx.stroke();
-
-            // Red badge "ON AIR"
-            ctx.fillStyle = '#ef4444';
-            ctx.beginPath();
-            ctx.roundRect(pt.x + 8 * z, pt.y - 10 * z, 18 * z, 8 * z, 3 * z);
-            ctx.fill();
-            ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.round(5 * z)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.fillText('ON AIR', pt.x + 17 * z, pt.y - 4 * z);
-
-            // Telecom Radio Lattice Tower beside it (Grey steel frame)
-            const towerX = pt.x + 36 * z;
-            const towerY = pt.y + 10 * z;
-            ctx.strokeStyle = '#64748b';
-            ctx.lineWidth = 2 * z;
-            ctx.beginPath();
-            ctx.moveTo(towerX - 10 * z, towerY);
-            ctx.lineTo(towerX, towerY - 60 * z);
-            ctx.lineTo(towerX + 10 * z, towerY);
-            ctx.stroke();
-            // Cross bars
-            for (let b = 1; b <= 4; b++) {
-              const ty = towerY - b * 12 * z;
-              const halfW = (1 - b / 5) * 10 * z;
-              ctx.beginPath();
-              ctx.moveTo(towerX - halfW, ty);
-              ctx.lineTo(towerX + halfW, ty);
-              ctx.stroke();
+            ctx.lineWidth = 0.8 * z;
+            for (let c = -30; c <= -6; c += 8) {
+              ctx.fillRect(pt.x + c * z, pt.y - 14 * z, 5 * z, 34 * z);
+              ctx.strokeRect(pt.x + c * z, pt.y - 14 * z, 5 * z, 34 * z);
+              // Column capitals
+              ctx.fillStyle = '#cbd5e1';
+              ctx.fillRect(pt.x + (c - 1) * z, pt.y - 16 * z, 7 * z, 3 * z);
+              ctx.fillRect(pt.x + (c - 1) * z, pt.y + 18 * z, 7 * z, 3 * z);
+              ctx.fillStyle = '#ffffff';
             }
-            // Blinking red beacon on top
-            ctx.fillStyle = Math.floor(beaconBlink) % 2 === 0 ? '#ef4444' : '#fee2e2';
-            ctx.beginPath();
-            ctx.arc(towerX, towerY - 62 * z, 3.5 * z, 0, Math.PI * 2);
-            ctx.fill();
 
-            // Transformer box
-            ctx.fillStyle = '#1e293b';
-            ctx.fillRect(towerX - 22 * z, towerY - 14 * z, 14 * z, 14 * z);
-          } else if (b.id === 'perpustakaan') {
-            // WEST: GEDUNG BIRU (Perpustakaan)
-            ctx.fillStyle = '#ffffff';
+            // Arched grand double doors in center
+            ctx.fillStyle = '#78350f';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 28 * z, pt.y - 18 * z);
-            ctx.lineTo(pt.x, pt.y - 32 * z);
-            ctx.lineTo(pt.x + 28 * z, pt.y - 18 * z);
-            ctx.lineTo(pt.x + 28 * z, pt.y + 16 * z);
-            ctx.lineTo(pt.x, pt.y + 30 * z);
-            ctx.lineTo(pt.x - 28 * z, pt.y + 16 * z);
-            ctx.closePath();
+            ctx.arc(pt.x - 17 * z, pt.y + 4 * z, 6 * z, Math.PI, 0);
+            ctx.rect(pt.x - 23 * z, pt.y + 4 * z, 12 * z, 16 * z);
             ctx.fill();
-
-            // Blue roof rim
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 3.5 * z;
-            ctx.beginPath();
-            ctx.moveTo(pt.x - 28 * z, pt.y - 18 * z);
-            ctx.lineTo(pt.x, pt.y - 32 * z);
-            ctx.lineTo(pt.x + 28 * z, pt.y - 18 * z);
+            // Door frame & gold brass knobs
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 1 * z;
             ctx.stroke();
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(pt.x - 19 * z, pt.y + 12 * z, 1.2 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 15 * z, pt.y + 12 * z, 1.2 * z, 0, Math.PI * 2);
+            ctx.fill();
 
-            // Blue square grid windows (4x2 on front, 4x2 on side)
+            // Right wall multi-pane reflective windows
             ctx.fillStyle = '#38bdf8';
             for (let r = 0; r < 2; r++) {
-              for (let c = -20; c <= -6; c += 7) {
-                ctx.fillRect(pt.x + c * z, pt.y - (4 - r * 12) * z, 5 * z, 6 * z);
-              }
-              for (let c = 6; c <= 20; c += 7) {
-                ctx.fillRect(pt.x + c * z, pt.y - (4 - r * 12) * z, 5 * z, 6 * z);
+              for (let col = 7; col <= 27; col += 10) {
+                const wx = pt.x + col * z;
+                const wy = pt.y - (6 - r * 16) * z;
+                ctx.fillRect(wx, wy, 6 * z, 10 * z);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 0.8 * z;
+                ctx.strokeRect(wx, wy, 6 * z, 10 * z);
               }
             }
-          } else if (b.id === 'pasar_prestasi') {
-            // SOUTH-WEST: TOKO POIN
-            ctx.fillStyle = '#ffffff';
+
+            // Pediment triangular gable
+            ctx.fillStyle = '#f1f5f9';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 24 * z, pt.y - 16 * z);
-            ctx.lineTo(pt.x, pt.y - 28 * z);
-            ctx.lineTo(pt.x + 24 * z, pt.y - 16 * z);
-            ctx.lineTo(pt.x + 24 * z, pt.y + 16 * z);
-            ctx.lineTo(pt.x, pt.y + 26 * z);
-            ctx.lineTo(pt.x - 24 * z, pt.y + 16 * z);
+            ctx.moveTo(pt.x - 34 * z, pt.y - 20 * z);
+            ctx.lineTo(pt.x - 16 * z, pt.y - 34 * z);
+            ctx.lineTo(pt.x, pt.y - 20 * z);
             ctx.closePath();
             ctx.fill();
 
-            // Red roof trim
-            ctx.strokeStyle = '#ef4444';
+            // Golden Dome on top with embossed ribs
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 40 * z, 20 * z, Math.PI, 0);
+            ctx.fill();
+
+            // Golden dome highlight sheen
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(pt.x - 5 * z, pt.y - 44 * z, 13 * z, Math.PI, 0);
+            ctx.fill();
+
+            // Vertical ribs on dome
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 1.5 * z;
+            for (const offset of [-14, -7, 0, 7, 14]) {
+              ctx.beginPath();
+              ctx.moveTo(pt.x + offset * z, pt.y - 40 * z);
+              ctx.quadraticCurveTo(
+                pt.x + offset * 0.4 * z,
+                pt.y - 54 * z,
+                pt.x,
+                pt.y - 60 * z
+              );
+              ctx.stroke();
+            }
+
+            // Grand Golden Spire with finial ball
+            ctx.strokeStyle = '#fde047';
             ctx.lineWidth = 3 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x - 24 * z, pt.y - 16 * z);
-            ctx.lineTo(pt.x, pt.y - 28 * z);
-            ctx.lineTo(pt.x + 24 * z, pt.y - 16 * z);
+            ctx.moveTo(pt.x, pt.y - 60 * z);
+            ctx.lineTo(pt.x, pt.y - 74 * z);
             ctx.stroke();
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 75 * z, 3 * z, 0, Math.PI * 2);
+            ctx.fill();
 
-            // Red & white striped awning
-            const awningW = 44 * z;
-            for (let a = 0; a < 6; a++) {
-              ctx.fillStyle = a % 2 === 0 ? '#ef4444' : '#ffffff';
-              ctx.fillRect(pt.x - 22 * z + a * (awningW / 6), pt.y + 8 * z, awningW / 6, 8 * z);
-            }
-          } else if (b.id === 'bengkel_latihan') {
-            // SOUTH-EAST: LAB DKV & CONTROL TOWER
-            // Modern blue/white building
+            // Red-and-White Flag on Left Post
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 34 * z, pt.y + 12 * z);
+            ctx.lineTo(pt.x - 34 * z, pt.y - 28 * z);
+            ctx.stroke();
+            // Flag cloth
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(pt.x - 33 * z, pt.y - 28 * z, 10 * z, 5 * z);
             ctx.fillStyle = '#ffffff';
-            ctx.fillRect(pt.x - 26 * z, pt.y - 10 * z, 36 * z, 26 * z);
+            ctx.fillRect(pt.x - 33 * z, pt.y - 23 * z, 10 * z, 5 * z);
 
-            ctx.fillStyle = '#3b82f6';
-            ctx.fillRect(pt.x - 26 * z, pt.y - 16 * z, 36 * z, 6 * z);
-
-            // Round cylindrical control tower with blue dome
+            // Gilded Brass Plaque in front
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 16 * z, pt.y + 32 * z, 32 * z, 9 * z);
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 1 * z;
+            ctx.strokeRect(pt.x - 16 * z, pt.y + 32 * z, 32 * z, 9 * z);
+            ctx.fillStyle = '#facc15';
+            ctx.font = `bold ${Math.round(6.5 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('BALAI KOTA', pt.x, pt.y + 39 * z);
+          } else if (b.id === 'menara_mentor') {
+            // EAST: DEWAN KOTA & TELECOM TRANSMISSION TOWER
+            // Base hall
             ctx.fillStyle = '#f8fafc';
-            ctx.fillRect(pt.x + 12 * z, pt.y - 24 * z, 14 * z, 40 * z);
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 30 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 34 * z);
+            ctx.lineTo(pt.x + 30 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x + 30 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x, pt.y + 34 * z);
+            ctx.lineTo(pt.x - 30 * z, pt.y + 18 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Shaded left wall
+            ctx.fillStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 30 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 34 * z);
+            ctx.lineTo(pt.x, pt.y + 34 * z);
+            ctx.lineTo(pt.x - 30 * z, pt.y + 18 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Two green ribbed vaulted roof arches
+            ctx.fillStyle = '#059669';
+            ctx.beginPath();
+            ctx.arc(pt.x - 10 * z, pt.y - 30 * z, 11 * z, Math.PI, 0);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(pt.x + 10 * z, pt.y - 30 * z, 11 * z, Math.PI, 0);
+            ctx.fill();
+
+            // Rib stripes on green roofs
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1.5 * z;
+            for (let ro = -5; ro <= 5; ro += 4) {
+              ctx.beginPath();
+              ctx.arc(pt.x - 10 * z, pt.y - 30 * z, 11 * z, Math.PI + (ro * 0.1), -(ro * 0.1));
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.arc(pt.x + 10 * z, pt.y - 30 * z, 11 * z, Math.PI + (ro * 0.1), -(ro * 0.1));
+              ctx.stroke();
+            }
+
+            // Blue arched glass portal doors
             ctx.fillStyle = '#0284c7';
             ctx.beginPath();
-            ctx.arc(pt.x + 19 * z, pt.y - 24 * z, 7 * z, Math.PI, 0);
+            ctx.arc(pt.x - 12 * z, pt.y + 16 * z, 5 * z, Math.PI, 0);
+            ctx.rect(pt.x - 17 * z, pt.y + 16 * z, 10 * z, 12 * z);
             ctx.fill();
 
-            // Antenna
-            ctx.strokeStyle = '#94a3b8';
-            ctx.lineWidth = 1.5 * z;
+            // Illuminated Red "● ON AIR" Badge
+            ctx.fillStyle = '#dc2626';
             ctx.beginPath();
-            ctx.moveTo(pt.x + 19 * z, pt.y - 31 * z);
-            ctx.lineTo(pt.x + 19 * z, pt.y - 39 * z);
+            ctx.roundRect(pt.x + 6 * z, pt.y - 12 * z, 22 * z, 9 * z, 3 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#fca5a5';
+            ctx.lineWidth = 1 * z;
             ctx.stroke();
-          } else {
-            // Other pavilions (Taman Refleksi / Kantor Pos)
+            // Blinking neon text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.round(5.5 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('● ON AIR', pt.x + 17 * z, pt.y - 5.5 * z);
+
+            // Tall 4-tier Telecom Transmission Lattice Tower
+            const towerX = pt.x + 38 * z;
+            const towerY = pt.y + 12 * z;
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 2.5 * z;
+            ctx.beginPath();
+            ctx.moveTo(towerX - 12 * z, towerY);
+            ctx.lineTo(towerX, towerY - 68 * z);
+            ctx.lineTo(towerX + 12 * z, towerY);
+            ctx.stroke();
+
+            // Tower horizontal bars and diagonal X-braces
+            ctx.lineWidth = 1.2 * z;
+            for (let b = 1; b <= 5; b++) {
+              const ty1 = towerY - (b - 1) * 13 * z;
+              const ty2 = towerY - b * 13 * z;
+              const w1 = (1 - (b - 1) / 6) * 12 * z;
+              const w2 = (1 - b / 6) * 12 * z;
+              ctx.beginPath();
+              ctx.moveTo(towerX - w2, ty2);
+              ctx.lineTo(towerX + w2, ty2);
+              // X brace
+              ctx.moveTo(towerX - w1, ty1);
+              ctx.lineTo(towerX + w2, ty2);
+              ctx.moveTo(towerX + w1, ty1);
+              ctx.lineTo(towerX - w2, ty2);
+              ctx.stroke();
+            }
+
+            // Blinking Red Aviation Beacon with Pulsed Glow Aura
+            const beaconIsOn = Math.floor(beaconBlink) % 2 === 0;
+            if (beaconIsOn) {
+              ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+              ctx.beginPath();
+              ctx.arc(towerX, towerY - 70 * z, 8 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.fillStyle = beaconIsOn ? '#ef4444' : '#7f1d1d';
+            ctx.beginPath();
+            ctx.arc(towerX, towerY - 70 * z, 4 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Parabolic satellite dish mounted on tower
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2 * z;
+            ctx.beginPath();
+            ctx.arc(towerX - 6 * z, towerY - 42 * z, 6 * z, -0.6, 1.8);
+            ctx.stroke();
+
+            // Power Transformer box with warning diagonal hazard stripes
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(towerX - 24 * z, towerY - 14 * z, 15 * z, 14 * z);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(towerX - 22 * z, towerY - 12 * z, 11 * z, 4 * z);
+          } else if (b.id === 'perpustakaan') {
+            // WEST: PERPUSTAKAAN KAMPUS (Detailed Modern Blue Facade)
+            // Main structure
+            ctx.fillStyle = '#f8fafc';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 32 * z, pt.y - 20 * z);
+            ctx.lineTo(pt.x, pt.y - 36 * z);
+            ctx.lineTo(pt.x + 32 * z, pt.y - 20 * z);
+            ctx.lineTo(pt.x + 32 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x, pt.y + 34 * z);
+            ctx.lineTo(pt.x - 32 * z, pt.y + 18 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Shaded left wall
+            ctx.fillStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 32 * z, pt.y - 20 * z);
+            ctx.lineTo(pt.x, pt.y - 36 * z);
+            ctx.lineTo(pt.x, pt.y + 34 * z);
+            ctx.lineTo(pt.x - 32 * z, pt.y + 18 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Stepped deep sapphire blue parapet cornice
+            ctx.fillStyle = '#1d4ed8';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 34 * z, pt.y - 20 * z);
+            ctx.lineTo(pt.x, pt.y - 38 * z);
+            ctx.lineTo(pt.x + 34 * z, pt.y - 20 * z);
+            ctx.lineTo(pt.x + 34 * z, pt.y - 15 * z);
+            ctx.lineTo(pt.x, pt.y - 33 * z);
+            ctx.lineTo(pt.x - 34 * z, pt.y - 15 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Blue square grid windows (4x2 on front, 4x2 on side) with book spine silhouettes
+            ctx.fillStyle = '#38bdf8';
+            for (let r = 0; r < 2; r++) {
+              for (let c = -24; c <= -8; c += 8) {
+                const wx = pt.x + c * z;
+                const wy = pt.y - (4 - r * 14) * z;
+                ctx.fillRect(wx, wy, 6 * z, 8 * z);
+                // Glass frame
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 0.8 * z;
+                ctx.strokeRect(wx, wy, 6 * z, 8 * z);
+              }
+              for (let c = 8; c <= 24; c += 8) {
+                const wx = pt.x + c * z;
+                const wy = pt.y - (4 - r * 14) * z;
+                ctx.fillRect(wx, wy, 6 * z, 8 * z);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 0.8 * z;
+                ctx.strokeRect(wx, wy, 6 * z, 8 * z);
+              }
+            }
+
+            // Arched portico entrance with blue awning
+            ctx.fillStyle = '#2563eb';
+            ctx.fillRect(pt.x - 8 * z, pt.y + 16 * z, 16 * z, 6 * z);
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 6 * z, pt.y + 22 * z, 12 * z, 11 * z);
+
+            // Planter box with green shrubs at entrance
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(pt.x - 22 * z, pt.y + 24 * z, 10 * z, 4 * z);
+            ctx.fillRect(pt.x + 12 * z, pt.y + 24 * z, 10 * z, 4 * z);
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.arc(pt.x - 17 * z, pt.y + 23 * z, 5 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 17 * z, pt.y + 23 * z, 5 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (b.id === 'pasar_prestasi') {
+            // SOUTH-WEST: TOKO POIN (PASAR PRESTASI)
+            // Boutique store body
+            ctx.fillStyle = '#f8fafc';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 28 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 32 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x, pt.y + 30 * z);
+            ctx.lineTo(pt.x - 28 * z, pt.y + 18 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Shaded left wall
+            ctx.fillStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 28 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 32 * z);
+            ctx.lineTo(pt.x, pt.y + 30 * z);
+            ctx.lineTo(pt.x - 28 * z, pt.y + 18 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Festive Red & White Scalloped Awning
+            const awnW = 50 * z;
+            for (let a = 0; a < 8; a++) {
+              ctx.fillStyle = a % 2 === 0 ? '#ef4444' : '#ffffff';
+              const ax = pt.x - 25 * z + a * (awnW / 8);
+              ctx.fillRect(ax, pt.y + 6 * z, awnW / 8, 9 * z);
+              // Scallop bottom curve
+              ctx.beginPath();
+              ctx.arc(ax + (awnW / 16), pt.y + 15 * z, awnW / 16, 0, Math.PI);
+              ctx.fill();
+            }
+
+            // Large glass bay showcase window
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(pt.x - 20 * z, pt.y + 16 * z, 16 * z, 11 * z);
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.strokeRect(pt.x - 20 * z, pt.y + 16 * z, 16 * z, 11 * z);
+
+            // Golden Trophy Cup inside display
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(pt.x - 12 * z, pt.y + 20 * z, 3 * z, 0, Math.PI);
+            ctx.rect(pt.x - 13 * z, pt.y + 23 * z, 2 * z, 3 * z);
+            ctx.fill();
+
+            // Entrance door
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x + 2 * z, pt.y + 16 * z, 12 * z, 13 * z);
+
+            // Golden star badge above
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 8 * z, 5 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (b.id === 'bengkel_latihan') {
+            // SOUTH-EAST: LAB DKV & TEFA (Modern Creative Workshop & Control Tower)
+            // Workshop hangar with sawtooth industrial roof
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(pt.x - 30 * z, pt.y - 12 * z, 42 * z, 30 * z);
+
+            // Blue top roof trim & sawtooth skylight
+            ctx.fillStyle = '#2563eb';
+            ctx.fillRect(pt.x - 30 * z, pt.y - 18 * z, 42 * z, 6 * z);
+
+            // Sawtooth triangles
+            ctx.fillStyle = '#1d4ed8';
+            for (let st = -28; st <= 2; st += 10) {
+              ctx.beginPath();
+              ctx.moveTo(pt.x + st * z, pt.y - 18 * z);
+              ctx.lineTo(pt.x + (st + 8) * z, pt.y - 25 * z);
+              ctx.lineTo(pt.x + (st + 8) * z, pt.y - 18 * z);
+              ctx.closePath();
+              ctx.fill();
+            }
+
+            // Hazard-striped roll-up shutter garage door
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x - 26 * z, pt.y + 2 * z, 24 * z, 15 * z);
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1 * z;
+            for (let hz = 0; hz < 5; hz++) {
+              ctx.beginPath();
+              ctx.moveTo(pt.x - 26 * z, pt.y + (3 + hz * 3) * z);
+              ctx.lineTo(pt.x - 2 * z, pt.y + (3 + hz * 3) * z);
+              ctx.stroke();
+            }
+
+            // Cylindrical Glass Control Tower with Blue Dome
+            ctx.fillStyle = '#e2e8f0';
+            ctx.fillRect(pt.x + 14 * z, pt.y - 26 * z, 16 * z, 44 * z);
+            // Glass observation windows on tower
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(pt.x + 15 * z, pt.y - 20 * z, 14 * z, 8 * z);
+
+            // Dome on tower
+            ctx.fillStyle = '#0284c7';
+            ctx.beginPath();
+            ctx.arc(pt.x + 22 * z, pt.y - 26 * z, 8 * z, Math.PI, 0);
+            ctx.fill();
+
+            // Rotating radar dish / antenna on tower
+            const dishAngle = elapsed * 2;
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 22 * z, pt.y - 34 * z);
+            ctx.lineTo(pt.x + 22 * z, pt.y - 44 * z);
+            ctx.stroke();
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y, 16 * z, 0, Math.PI * 2);
+            ctx.ellipse(
+              pt.x + 22 * z,
+              pt.y - 44 * z,
+              6 * z,
+              2.5 * z,
+              dishAngle,
+              0,
+              Math.PI * 2
+            );
             ctx.fill();
-            ctx.fillStyle = b.id === 'taman_refleksi' ? '#ec4899' : '#ef4444';
+            ctx.stroke();
+          } else if (b.id === 'kantor_pos') {
+            // NORTH-EAST: KANTOR POS KILAT (Post Office)
+            ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y, 12 * z, 0, Math.PI * 2);
+            ctx.moveTo(pt.x - 26 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x, pt.y - 30 * z);
+            ctx.lineTo(pt.x + 26 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x + 26 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x, pt.y + 30 * z);
+            ctx.lineTo(pt.x - 26 * z, pt.y + 16 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Classic crimson postal roof
+            ctx.fillStyle = '#dc2626';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 28 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x, pt.y - 34 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x, pt.y - 24 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Pediment Town Clock
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 14 * z, 6 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1 * z;
+            ctx.stroke();
+            // Clock hands
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 14 * z);
+            ctx.lineTo(pt.x + 3 * z, pt.y - 14 * z);
+            ctx.moveTo(pt.x, pt.y - 14 * z);
+            ctx.lineTo(pt.x, pt.y - 17 * z);
+            ctx.stroke();
+
+            // Red pillar postbox in front
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.roundRect(pt.x + 14 * z, pt.y + 16 * z, 7 * z, 12 * z, 3 * z);
+            ctx.fill();
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x + 15 * z, pt.y + 19 * z, 5 * z, 1.5 * z); // mail slot
+
+            // Service counter windows
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(pt.x - 18 * z, pt.y + 8 * z, 10 * z, 8 * z);
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 4 * z, pt.y + 16 * z, 10 * z, 13 * z);
+          } else if (b.id === 'taman_refleksi') {
+            // NORTH-WEST: TAMAN REFLEKSI (Rose Gazebo & Lotus Pond)
+            // Octagonal rose marble gazebo platform
+            ctx.fillStyle = '#fce7f3';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 20 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Lotus reflection pool
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 14 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Lotus flower in center
+            ctx.fillStyle = '#ec4899';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 4 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 1.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Gazebo trellis pillars
+            ctx.fillStyle = '#db2777';
+            for (let a = 0; a < 4; a++) {
+              const ang = (a * Math.PI) / 2 + 0.4;
+              const px = pt.x + Math.cos(ang) * 16 * z;
+              const py = pt.y + Math.sin(ang) * 16 * z;
+              ctx.fillRect(px - 1.5 * z, py - 18 * z, 3 * z, 18 * z);
+            }
+
+            // Rose pagoda roof canopy
+            ctx.fillStyle = '#f43f5e';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 20 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 32 * z);
+            ctx.lineTo(pt.x + 20 * z, pt.y - 18 * z);
+            ctx.closePath();
             ctx.fill();
           }
 
-          // Floating Building Label
-          const tagY = pt.y - 48 * z;
+          // Floating Building Label with icon & smooth rounded badge
+          const tagY = pt.y - 54 * z;
           const labelText = `${b.icon} ${b.name}`;
-          ctx.font = `bold ${Math.round(9.5 * z)}px sans-serif`;
+          ctx.font = `bold ${Math.round(10 * z)}px sans-serif`;
           const tMetrics = ctx.measureText(labelText);
-          const tagW = tMetrics.width + 14 * z;
-          const tagH = 18 * z;
+          const tagW = tMetrics.width + 16 * z;
+          const tagH = 20 * z;
 
-          ctx.fillStyle = isHovered ? '#1e293b' : 'rgba(15, 23, 42, 0.85)';
+          ctx.fillStyle = isHovered ? '#0f172a' : 'rgba(15, 23, 42, 0.88)';
           ctx.beginPath();
-          ctx.roundRect(pt.x - tagW / 2, tagY - tagH / 2, tagW, tagH, 9 * z);
+          ctx.roundRect(pt.x - tagW / 2, tagY - tagH / 2, tagW, tagH, 10 * z);
           ctx.fill();
-          ctx.strokeStyle = isHovered ? '#38bdf8' : 'rgba(148, 163, 184, 0.5)';
-          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = isHovered ? '#38bdf8' : 'rgba(148, 163, 184, 0.6)';
+          ctx.lineWidth = isHovered ? 2 : 1.2;
           ctx.stroke();
 
           ctx.fillStyle = '#ffffff';
@@ -1103,46 +1514,122 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           ctx.textBaseline = 'middle';
           ctx.fillText(labelText, pt.x, tagY);
         } else if (item.type === 'cafe') {
-          // SOUTH: TOKO ROTI & KAFE WARGA (Exact Match to Screenshot)
+          // SOUTH: TOKO ROTI & KAFE WARGA (Enriched Bakery & Espresso Stall)
           const pt = toScreen(cafeWx, cafeWy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
           setCafeScreenPos({
             x: pt.x,
-            y: pt.y - 40 * z,
+            y: pt.y - 44 * z,
             visible: true,
           });
 
-          // Stall body (Warm wood/cream)
-          ctx.fillStyle = '#d97706';
-          ctx.fillRect(pt.x - 22 * z, pt.y - 12 * z, 44 * z, 20 * z);
+          // Ground shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x + 2, pt.y + 6, 28 * z, 14 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
 
-          // Striped red-white awning
-          for (let s = 0; s < 5; s++) {
-            ctx.fillStyle = s % 2 === 0 ? '#ef4444' : '#ffffff';
-            ctx.fillRect(pt.x - 22 * z + s * (44 * z / 5), pt.y - 20 * z, 44 * z / 5, 8 * z);
+          // Stall body (Warm wood planks)
+          ctx.fillStyle = '#d97706';
+          ctx.fillRect(pt.x - 24 * z, pt.y - 14 * z, 48 * z, 22 * z);
+          // Horizontal timber grain lines
+          ctx.strokeStyle = '#b45309';
+          ctx.lineWidth = 1 * z;
+          for (let pl = -10; pl <= 6; pl += 4) {
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 24 * z, pt.y + pl * z);
+            ctx.lineTo(pt.x + 24 * z, pt.y + pl * z);
+            ctx.stroke();
           }
 
-          // Signboard "TOKO ROTI"
+          // Striped red-white awning with scalloped drape
+          for (let s = 0; s < 6; s++) {
+            ctx.fillStyle = s % 2 === 0 ? '#ef4444' : '#ffffff';
+            const ax = pt.x - 24 * z + s * (48 * z / 6);
+            ctx.fillRect(ax, pt.y - 24 * z, 48 * z / 6, 10 * z);
+            // Scallop bottom
+            ctx.beginPath();
+            ctx.arc(ax + (4 * z), pt.y - 14 * z, 4 * z, 0, Math.PI);
+            ctx.fill();
+          }
+
+          // Glass pastry display case on counter
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+          ctx.fillRect(pt.x - 20 * z, pt.y - 12 * z, 18 * z, 8 * z);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.8 * z;
+          ctx.strokeRect(pt.x - 20 * z, pt.y - 12 * z, 18 * z, 8 * z);
+
+          // Miniature croissants inside display
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.arc(pt.x - 15 * z, pt.y - 8 * z, 2.5 * z, 0, Math.PI);
+          ctx.arc(pt.x - 7 * z, pt.y - 8 * z, 2.5 * z, 0, Math.PI);
+          ctx.fill();
+
+          // Espresso machine on right counter
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(pt.x + 6 * z, pt.y - 14 * z, 10 * z, 10 * z);
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(pt.x + 8 * z, pt.y - 12 * z, 6 * z, 3 * z);
+
+          // Animated rising steam wisps from espresso machine
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+          ctx.lineWidth = 1.2 * z;
+          for (let st = 0; st < 2; st++) {
+            const steamY = pt.y - (16 + ((elapsed * 12 + st * 10) % 18)) * z;
+            const steamX = pt.x + (11 + st * 4) * z + Math.sin(elapsed * 4 + st) * 3 * z;
+            ctx.beginPath();
+            ctx.moveTo(steamX, steamY);
+            ctx.lineTo(steamX + 1.5 * z, steamY - 4 * z);
+            ctx.stroke();
+          }
+
+          // Signboard "TOKO ROTI & KAFE"
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(pt.x - 16 * z, pt.y - 8 * z, 32 * z, 8 * z);
+          ctx.fillRect(pt.x - 18 * z, pt.y - 2 * z, 36 * z, 9 * z);
+          ctx.strokeStyle = '#b45309';
+          ctx.strokeRect(pt.x - 18 * z, pt.y - 2 * z, 36 * z, 9 * z);
           ctx.fillStyle = '#b45309';
           ctx.font = `bold ${Math.round(6 * z)}px sans-serif`;
           ctx.textAlign = 'center';
-          ctx.fillText('TOKO ROTI', pt.x, pt.y - 2 * z);
+          ctx.fillText('TOKO ROTI & KAFE', pt.x, pt.y + 5 * z);
+
+          // Outdoor cafe bistro table with parasol umbrella on left
+          const tableX = pt.x - 36 * z;
+          const tableY = pt.y + 4 * z;
+          // Parasol umbrella
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(tableX, tableY - 18 * z, 12 * z, Math.PI, 0);
+          ctx.fill();
+          // Parasol pole
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 1.5 * z;
+          ctx.beginPath();
+          ctx.moveTo(tableX, tableY - 18 * z);
+          ctx.lineTo(tableX, tableY);
+          ctx.stroke();
+          // Small round wooden tabletop
+          ctx.fillStyle = '#78350f';
+          ctx.beginPath();
+          ctx.ellipse(tableX, tableY - 6 * z, 8 * z, 4 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
         } else if (item.type === 'avatar') {
-          // AVATARS MATCHING SCREENSHOT EXACTLY
+          // AVATARS (Smooth, Natural Leg Swing, Arm Swing, and Gentle Bobbing)
           const av = item.data;
           const pt = toScreen(av.wx, av.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
-          // Shadow
+          // Soft ground shadow
           ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
           ctx.beginPath();
-          ctx.ellipse(pt.x + 1, pt.y + 1, 7 * z, 3.5 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x + 1, pt.y + 1, 8 * z, 4 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          const legSwing = av.isMoving ? Math.sin(av.walkFrame) * 4 * z : 0;
+          // Natural leg swing & gentle bobbing matching slow walking speed
+          const legSwing = av.isMoving ? Math.sin(av.walkFrame) * 3.5 * z : 0;
           const avY = pt.y - (av.isMoving ? Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0);
 
           // Legs
@@ -1150,11 +1637,27 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           ctx.fillRect(pt.x - 3.5 * z, avY - 5 * z + legSwing, 3 * z, 6 * z);
           ctx.fillRect(pt.x + 0.5 * z, avY - 5 * z - legSwing, 3 * z, 6 * z);
 
-          // Shirt
+          // Shoes
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing, 3.5 * z, 2.5 * z);
+          ctx.fillRect(pt.x, avY + 1 * z - legSwing, 3.5 * z, 2.5 * z);
+
+          // Shirt / Torso
           ctx.fillStyle = av.shirtColor;
           ctx.beginPath();
-          ctx.roundRect(pt.x - 5 * z, avY - 14 * z, 10 * z, 9 * z, 2 * z);
+          ctx.roundRect(pt.x - 5 * z, avY - 14 * z, 10 * z, 9.5 * z, 2.2 * z);
           ctx.fill();
+
+          // Natural arm swing opposing leg movement
+          const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0;
+          ctx.fillStyle = av.shirtColor;
+          ctx.fillRect(pt.x - 7.2 * z, avY - 13 * z - armSwing, 2.2 * z, 7 * z);
+          ctx.fillRect(pt.x + 5 * z, avY - 13 * z + armSwing, 2.2 * z, 7 * z);
+
+          // Hands
+          ctx.fillStyle = '#fed7aa';
+          ctx.fillRect(pt.x - 7.2 * z, avY - 6 * z - armSwing, 2.2 * z, 2.2 * z);
+          ctx.fillRect(pt.x + 5 * z, avY - 6 * z + armSwing, 2.2 * z, 2.2 * z);
 
           // Head & Face
           ctx.fillStyle = '#fed7aa';
@@ -1401,8 +1904,8 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
         </div>
       )}
 
-      {/* BOTTOM-RIGHT ZOOM & CAMERA CONTROLS (Exact Match to Screenshot) */}
-      <div className="absolute bottom-6 right-4 sm:right-6 z-20 flex flex-col items-center gap-2 pointer-events-auto">
+      {/* BOTTOM-RIGHT ZOOM & CAMERA CONTROLS (Positioned above mobile input bar) */}
+      <div className="absolute bottom-16 sm:bottom-6 right-3 sm:right-6 z-20 flex flex-col items-center gap-2 pointer-events-auto">
         <button
           onClick={handleZoomIn}
           className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95"

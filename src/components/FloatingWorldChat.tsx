@@ -40,12 +40,12 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
   return (
     <>
       {/* ------------------------------------------------------------- */}
-      {/* 1. BOTTOM-LEFT FLOATING CHAT PANEL (Matches Reference Image) */}
+      {/* 1. FLOATING CHAT PANEL (Slides up above input on mobile & desktop) */}
       {/* ------------------------------------------------------------- */}
       {isOpen ? (
-        <div className="absolute bottom-16 sm:bottom-24 left-2.5 sm:left-6 z-30 w-[95vw] sm:w-[360px] max-h-[46vh] sm:h-80 bg-[#121c27]/95 backdrop-blur-md border border-slate-700/70 rounded-2xl shadow-[0_12px_40px_0_rgba(0,0,0,0.7)] flex flex-col overflow-hidden pointer-events-auto transition-all animate-fade-in-up">
+        <div className="absolute bottom-[4.75rem] sm:bottom-24 left-2.5 right-2.5 sm:right-auto sm:left-6 z-40 sm:w-[360px] max-h-[46vh] sm:h-80 bg-[#121c27]/95 backdrop-blur-md border border-slate-700/70 rounded-2xl shadow-[0_12px_40px_0_rgba(0,0,0,0.7)] flex flex-col overflow-hidden pointer-events-auto transition-all animate-fade-in-up">
           {/* Header */}
-          <div className="flex items-center justify-between px-3.5 py-2 border-b border-slate-800/80 bg-slate-900/70 shrink-0">
+          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-800/80 bg-slate-900/70 shrink-0">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
               <span className="font-bold text-white">Obrolan</span>
               <span className="text-slate-500">•</span>
@@ -69,7 +69,7 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
             className="flex-1 overflow-y-auto px-3.5 py-2 space-y-2 text-xs scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
           >
             {messages.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-slate-500 text-xs italic">
+              <div className="h-full flex items-center justify-center text-slate-500 text-xs italic py-6">
                 Belum ada pesan. Sapa temanmu di bawah!
               </div>
             ) : (
@@ -115,28 +115,28 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
           </div>
         </div>
       ) : (
-        /* Minimized Chat Pill matching screenshot */
+        /* Minimized Chat Pill: Placed on bottom-left, cleanly above bottom input on mobile */
         <button
           onClick={() => setIsOpen(true)}
-          className="absolute bottom-6 left-4 sm:left-6 z-20 bg-[#121e2c]/95 hover:bg-[#1a293b] text-white border border-slate-700/60 px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 pointer-events-auto transition transform hover:scale-105 active:scale-95 text-xs font-bold"
+          className="absolute bottom-16 sm:bottom-6 left-3 sm:left-6 z-30 bg-[#121e2c]/95 hover:bg-[#1a293b] text-white border border-slate-700/60 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full shadow-xl flex items-center gap-1.5 sm:gap-2 pointer-events-auto transition transform hover:scale-105 active:scale-95 text-xs font-bold"
           title="Buka Obrolan Warga"
         >
-          <MessageSquare className="w-4 h-4 text-slate-200" />
+          <MessageSquare className="w-4 h-4 text-emerald-400" />
           <span>Obrolan ({messages.length})</span>
         </button>
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* 2. BOTTOM-CENTER CHAT INPUT BAR (Matches Reference Image)     */}
+      {/* 2. BOTTOM CHAT INPUT BAR (Dedicated bottom bar on mobile & desktop) */}
       {/* ------------------------------------------------------------- */}
-      <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 w-[92vw] max-w-lg pointer-events-auto">
+      <div className="absolute bottom-2.5 sm:bottom-6 left-3 right-3 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-30 sm:w-[90vw] sm:max-w-lg pointer-events-auto">
         <form
           onSubmit={handleSend}
-          className="bg-[#121c27]/95 backdrop-blur-xl border border-slate-700/70 rounded-full px-4 py-2 sm:py-2.5 flex items-center gap-3 shadow-[0_12px_40px_0_rgba(0,0,0,0.65)] hover:border-emerald-500/50 transition-colors"
+          className="bg-[#121c27]/95 backdrop-blur-xl border border-slate-700/70 rounded-full px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center gap-2.5 sm:gap-3 shadow-[0_12px_40px_0_rgba(0,0,0,0.7)] hover:border-emerald-500/50 transition-colors w-full"
         >
           {/* Chat Icon */}
           <div className="text-emerald-400 shrink-0">
-            <MessageSquare className="w-5 h-5" />
+            <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
 
           {/* Input field */}
@@ -153,7 +153,7 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
           <button
             type="submit"
             disabled={!inputText.trim()}
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition shadow-md shrink-0 ${
+            className={`w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition shadow-md shrink-0 ${
               inputText.trim()
                 ? 'bg-[#10b981] hover:bg-[#059669] text-slate-950 active:scale-90 cursor-pointer'
                 : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
@@ -161,7 +161,7 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
             title="Kirim Pesan (Enter)"
             aria-label="Kirim Pesan"
           >
-            <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 transform translate-x-px -translate-y-px" />
+            <Send className="w-3 h-3 sm:w-4 sm:h-4 transform translate-x-px -translate-y-px" />
           </button>
         </form>
       </div>
