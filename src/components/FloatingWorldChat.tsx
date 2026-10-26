@@ -17,7 +17,8 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
   onReportMessage,
   studentHandle,
 }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  // On mobile screens, collapse chat by default so the town map is visible
+  const [isOpen, setIsOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 640 : false));
   const [inputText, setInputText] = useState('');
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
@@ -42,15 +43,15 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
       {/* 1. BOTTOM-LEFT FLOATING CHAT PANEL (Matches Reference Image) */}
       {/* ------------------------------------------------------------- */}
       {isOpen ? (
-        <div className="absolute bottom-20 sm:bottom-24 left-3 sm:left-6 z-20 w-[90vw] max-w-[340px] sm:max-w-[360px] h-72 sm:h-80 bg-[#121c27]/95 backdrop-blur-md border border-slate-700/60 rounded-2xl shadow-[0_12px_40px_0_rgba(0,0,0,0.6)] flex flex-col overflow-hidden pointer-events-auto transition-all animate-fade-in-up">
+        <div className="absolute bottom-16 sm:bottom-24 left-2.5 sm:left-6 z-30 w-[95vw] sm:w-[360px] max-h-[46vh] sm:h-80 bg-[#121c27]/95 backdrop-blur-md border border-slate-700/70 rounded-2xl shadow-[0_12px_40px_0_rgba(0,0,0,0.7)] flex flex-col overflow-hidden pointer-events-auto transition-all animate-fade-in-up">
           {/* Header */}
-          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-800/80 bg-slate-900/60 shrink-0">
+          <div className="flex items-center justify-between px-3.5 py-2 border-b border-slate-800/80 bg-slate-900/70 shrink-0">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
               <span className="font-bold text-white">Obrolan</span>
               <span className="text-slate-500">•</span>
-              <span className="text-slate-400">ruang {roomNumber}</span>
+              <span className="text-slate-400">Ruang {roomNumber}</span>
               <span className="text-slate-500">•</span>
-              <span className="text-slate-400">{messages.length} pesan</span>
+              <span className="text-emerald-400 font-mono text-[11px]">{messages.length} pesan</span>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -58,7 +59,7 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
               title="Tutup obrolan"
               aria-label="Tutup obrolan"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
@@ -114,13 +115,13 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
           </div>
         </div>
       ) : (
-        /* Minimized Chat Pill */
+        /* Minimized Chat Pill matching screenshot */
         <button
           onClick={() => setIsOpen(true)}
-          className="absolute bottom-20 sm:bottom-24 left-3 sm:left-6 z-20 bg-[#121c27]/90 hover:bg-[#1a2634] text-white border border-slate-700/60 px-4 py-2 rounded-full shadow-xl flex items-center gap-2 pointer-events-auto transition transform hover:scale-105 active:scale-95 text-xs font-bold"
+          className="absolute bottom-6 left-4 sm:left-6 z-20 bg-[#121e2c]/95 hover:bg-[#1a293b] text-white border border-slate-700/60 px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 pointer-events-auto transition transform hover:scale-105 active:scale-95 text-xs font-bold"
           title="Buka Obrolan Warga"
         >
-          <MessageSquare className="w-4 h-4 text-emerald-400" />
+          <MessageSquare className="w-4 h-4 text-slate-200" />
           <span>Obrolan ({messages.length})</span>
         </button>
       )}

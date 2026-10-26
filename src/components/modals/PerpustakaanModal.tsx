@@ -94,6 +94,38 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
           </button>
         </div>
 
+        {/* Studio Ghibli Watercolor Miniature Showcase Banner */}
+        <div className="mt-4 rounded-2xl overflow-hidden border border-emerald-500/30 bg-gradient-to-r from-emerald-950/40 via-slate-900/40 to-amber-950/30 p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-4 shadow-xl">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-xl overflow-hidden border-2 border-emerald-400/40 shadow-lg relative group">
+            <img
+              src="/ghibli_perpustakaan.jpg"
+              alt="Perpustakaan Studio Ghibli Aesthetic"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-1">
+              <span className="text-[9px] font-bold text-amber-200 bg-black/60 px-1 py-0.5 rounded backdrop-blur-xs">
+                🌿 Ghibli Art
+              </span>
+            </div>
+          </div>
+          <div className="flex-1 text-center sm:text-left">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 mb-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/30">
+                Studio Ghibli Aesthetic
+              </span>
+              <span className="text-[10px] text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-400/30">
+                🌾 Anime Watercolor
+              </span>
+            </div>
+            <h3 className="text-sm sm:text-base font-bold text-white leading-tight">
+              Perpustakaan Miniatur di Blok Tanah Melayang
+            </h3>
+            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+              Arsitektur kayu pedesaan yang nyaman dengan menara lonceng, kincir air, tanaman rambat rimbun, dan palet warna bumi alami di atas fondasi tanah bersudut membulat.
+            </p>
+          </div>
+        </div>
+
         {/* Tab switch */}
         <div className="mt-4 flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto">
           {materis.length > 0 && (

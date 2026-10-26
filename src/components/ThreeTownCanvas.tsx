@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BuildingId, PublicChatMessage } from '../types/index.ts';
 import { sounds } from '../utils/audio.ts';
-import { X } from 'lucide-react';
+import { X, Plus, Minus, MapPin } from 'lucide-react';
 
 interface ThreeTownCanvasProps {
   onSelectBuilding: (buildingId: BuildingId) => void;
@@ -23,14 +23,14 @@ export interface BuildingInfo {
 }
 
 export const BUILDINGS_INFO: BuildingInfo[] = [
-  { id: 'balai_kota', name: 'Balai Kota', tagline: 'Misi & Pengumuman', position: [0, 0, -13], color: 0x3b82f6, icon: '🏛️' },
-  { id: 'perpustakaan', name: 'Perpustakaan', tagline: 'Materi & Video', position: [-12, 0, -7], color: 0x10b981, icon: '📚' },
-  { id: 'menara_mentor', name: 'Menara Mentor', tagline: 'Umpan Balik AI', position: [12, 0, -7], color: 0x8b5cf6, icon: '🔭' },
-  { id: 'taman_refleksi', name: 'Taman Refleksi', tagline: 'Tulis Refleksi', position: [-11, 0, 7], color: 0xec4899, icon: '🌸' },
-  { id: 'bengkel_latihan', name: 'Bengkel Latihan', tagline: 'Kuis & Tantangan', position: [12, 0, 7], color: 0xf59e0b, icon: '🛠️' },
-  { id: 'kantor_pos', name: 'Kantor Pos', tagline: 'Kirim Pesan ke Guru', position: [-7, 0, 13], color: 0xef4444, icon: '📮' },
-  { id: 'pasar_prestasi', name: 'Pasar Prestasi', tagline: 'Lencana & Poin', position: [7, 0, 13], color: 0x06b6d4, icon: '🎪' },
-  { id: 'monumen_warga', name: 'Monumen Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0xec4899, icon: '💬' },
+  { id: 'balai_kota', name: 'Balai Kota', tagline: 'Kubah Emas & Misi', position: [0, 0, -4.2], color: 0x3b82f6, icon: '🏛️' },
+  { id: 'menara_mentor', name: 'Dewan Kota & Tower', tagline: 'Studio ON AIR & AI', position: [4.2, 0, 0], color: 0x8b5cf6, icon: '📡' },
+  { id: 'perpustakaan', name: 'Perpustakaan Kampus', tagline: 'Gedung Biru & Materi', position: [-4.2, 0, 0], color: 0x10b981, icon: '📚' },
+  { id: 'pasar_prestasi', name: 'Toko Poin', tagline: 'Lencana & Hadiah', position: [-2.8, 0, 2.8], color: 0x06b6d4, icon: '🎪' },
+  { id: 'kantor_pos', name: 'Kantor Pos Kilat', tagline: 'Kirim Pesan ke Guru', position: [2.8, 0, -2.8], color: 0xef4444, icon: '📮' },
+  { id: 'taman_refleksi', name: 'Taman Refleksi', tagline: 'Tulis Jurnal Refleksi', position: [-2.8, 0, -2.8], color: 0xec4899, icon: '🌸' },
+  { id: 'bengkel_latihan', name: 'Lab DKV & Tefa', tagline: 'Tower Kontrol & Kuis', position: [2.8, 0, 2.8], color: 0xf59e0b, icon: '🛠️' },
+  { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
 ];
 
 interface AvatarData {
@@ -43,7 +43,9 @@ interface AvatarData {
   targetWx: number;
   targetWy: number;
   speed: number;
-  color: string;
+  shirtColor: string;
+  pantsColor: string;
+  hairColor: string;
   isMoving: boolean;
   pauseTimer: number;
   walkFrame: number;
@@ -55,9 +57,9 @@ interface AvatarData {
 interface Cloud {
   x: number;
   y: number;
-  size: number;
+  w: number;
+  h: number;
   speed: number;
-  opacity: number;
 }
 
 interface Firefly {
@@ -65,8 +67,7 @@ interface Firefly {
   baseY: number;
   x: number;
   y: number;
-  radiusX: number;
-  radiusY: number;
+  radius: number;
   speed: number;
   phase: number;
   blinkSpeed: number;
@@ -76,8 +77,7 @@ interface Star {
   x: number;
   y: number;
   size: number;
-  twinkleSpeed: number;
-  phase: number;
+  alpha: number;
 }
 
 export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
@@ -101,6 +101,11 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     visible: false,
   });
 
+  // User Camera Zoom State (+ / -)
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const zoomLevelRef = useRef(zoomLevel);
+  zoomLevelRef.current = zoomLevel;
+
   // Active comic speech bubbles
   const playerSpeechRef = useRef<{ text: string; expiresAt: number } | null>(null);
   const baristaSpeechRef = useRef<{ text: string; expiresAt: number } | null>(null);
@@ -120,6 +125,22 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       };
     }
   }, [latestMessage]);
+
+  // Center camera trigger ref
+  const resetCameraRequestedRef = useRef(false);
+
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => Math.min(1.5, Number((prev + 0.15).toFixed(2))));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => Math.max(0.65, Number((prev - 0.15).toFixed(2))));
+  };
+
+  const handleCenterOnPlayer = () => {
+    resetCameraRequestedRef.current = true;
+    sounds.playClick();
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -148,14 +169,16 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     window.addEventListener('resize', handleResize);
 
     // -----------------------------------------------------------
-    // ISOMETRIC PROJECTION CONSTANTS
+    // EXACT ISOMETRIC RATIO & PROJECTION MATCHING REFERENCE
     // -----------------------------------------------------------
-    const TILE_W = 44;
-    const TILE_H = 22;
+    const BASE_TILE_W = 60;
+    const BASE_TILE_H = 30; // 2:1 isometric ratio
 
     const toScreen = (wx: number, wy: number, altitude = 0, camX: number, camY: number) => {
-      const isoX = (wx - wy) * TILE_W;
-      const isoY = (wx + wy) * TILE_H - altitude;
+      const currentTileW = BASE_TILE_W * zoomLevelRef.current;
+      const currentTileH = BASE_TILE_H * zoomLevelRef.current;
+      const isoX = (wx - wy) * currentTileW;
+      const isoY = (wx + wy) * currentTileH - altitude * zoomLevelRef.current;
       return {
         x: width / 2 + (isoX - camX),
         y: height / 2 + (isoY - camY),
@@ -163,16 +186,16 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     };
 
     const toWorld = (sx: number, sy: number, camX: number, camY: number) => {
+      const currentTileW = BASE_TILE_W * zoomLevelRef.current;
+      const currentTileH = BASE_TILE_H * zoomLevelRef.current;
       const isoX = sx - width / 2 + camX;
       const isoY = sy - height / 2 + camY;
-      const wx = (isoX / TILE_W + isoY / TILE_H) / 2;
-      const wy = (isoY / TILE_H - isoX / TILE_W) / 2;
+      const wx = (isoX / currentTileW + isoY / currentTileH) / 2;
+      const wy = (isoY / currentTileH - isoX / currentTileW) / 2;
       return { wx, wy };
     };
 
-    // -----------------------------------------------------------
-    // CAMERA STATE (Smooth Follow Avatar)
-    // -----------------------------------------------------------
+    // Camera state
     const camera = {
       x: 0,
       y: 0,
@@ -181,120 +204,132 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     };
 
     // -----------------------------------------------------------
-    // AVATARS (Strictly: Siswa, Guru, Polisi, Petugas Kebersihan, Kurir, Barista)
+    // CITIZENS & AVATARS MATCHING SCREENSHOT
     // -----------------------------------------------------------
     const studentHandle = studentName.split(' ')[0].toLowerCase();
 
-    // 1. Player (Siswa)
+    // 1. Player (Andi Pratama / Siswa)
     const player: AvatarData = {
       id: 'siswa',
       role: 'siswa',
-      handle: studentHandle,
-      roleLabel: 'Siswa',
-      wx: 0,
-      wy: 3.5,
-      targetWx: 0,
-      targetWy: 3.5,
-      speed: 4.8,
-      color: studentGender === 'P' ? '#f43f5e' : '#38bdf8',
+      handle: studentHandle || 'andi_pratama',
+      roleLabel: 'Kamu',
+      wx: 1.5,
+      wy: 1.8,
+      targetWx: 1.5,
+      targetWy: 1.8,
+      speed: 4.5,
+      shirtColor: '#3b82f6', // Blue shirt
+      pantsColor: '#1e293b', // Dark pants
+      hairColor: studentGender === 'P' ? '#78350f' : '#0f172a',
       isMoving: false,
       pauseTimer: 0,
       walkFrame: 0,
       facing: 'down-left',
     };
 
-    // 2. Guru
+    // 2. Guru (@ibu_rahmawati [GURU])
     const guru: AvatarData = {
       id: 'guru',
       role: 'guru',
-      handle: 'guru_ahmad',
-      roleLabel: 'Guru Pembimbing',
-      wx: -6,
-      wy: -6,
-      targetWx: -6,
-      targetWy: -6,
-      speed: 2.2,
-      color: '#b45309',
-      isMoving: false,
-      pauseTimer: 2,
-      walkFrame: 0,
-      facing: 'down-right',
-      speechText: 'Selamat belajar dan terus berefleksi!',
-      speechTimer: 5,
-    };
-
-    // 3. Polisi
-    const polisi: AvatarData = {
-      id: 'polisi',
-      role: 'polisi',
-      handle: 'polisi_jaya',
-      roleLabel: 'Polisi Kota',
-      wx: 6,
-      wy: 3,
-      targetWx: 6,
-      targetWy: 3,
-      speed: 2.5,
-      color: '#1d4ed8',
-      isMoving: false,
-      pauseTimer: 1.5,
-      walkFrame: 0,
-      facing: 'up-left',
-      speechText: 'Kota Refleksi aman dan tertib!',
-      speechTimer: 6,
-    };
-
-    // 4. Petugas Kebersihan
-    const petugas: AvatarData = {
-      id: 'petugas_kebersihan',
-      role: 'petugas_kebersihan',
-      handle: 'petugas_kebersihan',
-      roleLabel: 'Petugas Kebersihan',
-      wx: -7,
-      wy: 5,
-      targetWx: -7,
-      targetWy: 5,
+      handle: 'ibu_rahmawati',
+      roleLabel: 'GURU',
+      wx: 1.8,
+      wy: -1.5,
+      targetWx: 1.8,
+      targetWy: -1.5,
       speed: 2.0,
-      color: '#16a34a',
+      shirtColor: '#059669', // Teal green batik/blazer
+      pantsColor: '#0f172a',
+      hairColor: '#0f172a',
       isMoving: false,
       pauseTimer: 3,
       walkFrame: 0,
       facing: 'down-left',
-      speechText: 'Mari jaga kebersihan pulau kita!',
-      speechTimer: 7,
+      speechText: 'Semangat belajar dan terus berefleksi!',
+      speechTimer: 5,
     };
 
-    // 5. Kurir
-    const kurir: AvatarData = {
-      id: 'kurir',
-      role: 'kurir',
-      handle: 'kurir_kilat',
-      roleLabel: 'Kurir Paket',
-      wx: -3,
-      wy: 10,
-      targetWx: -3,
-      targetWy: 10,
-      speed: 3.2,
-      color: '#ea580c',
+    // 3. Siswa Lain (@bima_satria)
+    const bima: AvatarData = {
+      id: 'bima',
+      role: 'polisi',
+      handle: 'bima_satria',
+      roleLabel: 'Warga',
+      wx: -1.8,
+      wy: 1.2,
+      targetWx: -1.8,
+      targetWy: 1.2,
+      speed: 2.2,
+      shirtColor: '#10b981', // Emerald shirt
+      pantsColor: '#1e293b',
+      hairColor: '#78350f',
       isMoving: false,
       pauseTimer: 2,
       walkFrame: 0,
+      facing: 'down-right',
+      speechText: 'Peta Kota Refleksi sangat rapi!',
+      speechTimer: 6,
+    };
+
+    // 4. Siswa Lain (@siti_nurhaliza)
+    const siti: AvatarData = {
+      id: 'siti',
+      role: 'petugas_kebersihan',
+      handle: 'siti_nurhaliza',
+      roleLabel: 'Warga',
+      wx: 0,
+      wy: -1.6,
+      targetWx: 0,
+      targetWy: -1.6,
+      speed: 2.0,
+      shirtColor: '#06b6d4', // Cyan shirt
+      pantsColor: '#0f172a',
+      hairColor: '#7c2d12',
+      isMoving: false,
+      pauseTimer: 4,
+      walkFrame: 0,
+      facing: 'down-left',
+      speechText: 'Air mancur di tengah sangat segar!',
+      speechTimer: 7,
+    };
+
+    // 5. Siswa Lain (@dia_putri)
+    const dia: AvatarData = {
+      id: 'dia',
+      role: 'kurir',
+      handle: 'dia_putri',
+      roleLabel: 'Warga',
+      wx: 0,
+      wy: 1.5,
+      targetWx: 0,
+      targetWy: 1.5,
+      speed: 2.4,
+      shirtColor: '#ec4899', // Pink shirt
+      pantsColor: '#1e293b',
+      hairColor: '#0f172a',
+      isMoving: false,
+      pauseTimer: 2.5,
+      walkFrame: 0,
       facing: 'up-right',
-      speechText: 'Materi dan umpan balik baru siap diantar!',
+      speechText: 'Mau pesan roti dan kopi di kafe!',
       speechTimer: 4,
     };
 
-    // Barista at the cafe
+    // 6. Barista Toko Roti & Kafe Warga
     const barista: AvatarData = {
       id: 'barista',
       role: 'barista',
-      handle: 'nnisa_0311',
-      roleLabel: 'Barista Kafe',
-      wx: -4.5,
-      wy: 2.2,
-      targetWx: -4.5,
-      targetWy: 2.2,
+      handle: 'barista_kiki',
+      roleLabel: 'Barista',
+      wx: -0.8,
+      wy: 2.5,
+      targetWx: -0.8,
+      targetWy: 2.5,
       speed: 0,
-      color: '#059669',
+      shirtColor: '#ea580c',
+      pantsColor: '#1e293b',
+      hairColor: '#0f172a',
       isMoving: false,
       pauseTimer: 99999,
       walkFrame: 0,
@@ -303,64 +338,51 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       speechTimer: 6,
     };
 
-    const npcs: AvatarData[] = [guru, polisi, petugas, kurir, barista];
+    const npcs: AvatarData[] = [guru, bima, siti, dia, barista];
 
-    // Cafe stall coordinates
-    const cafeWx = -4.5;
-    const cafeWy = 2.2;
+    // Cafe coordinates (Toko Roti & Kafe)
+    const cafeWx = -0.5;
+    const cafeWy = 2.4;
 
     // -----------------------------------------------------------
-    // SKY ELEMENTS: Clouds (Pagi) & Stars/Fireflies (Malam)
+    // SKY & WEATHER ELEMENTS MATCHING SCREENSHOT
     // -----------------------------------------------------------
-    const clouds: Cloud[] = Array.from({ length: 7 }, (_, i) => ({
-      x: (i / 7) * width + Math.random() * 80,
-      y: 40 + (i % 4) * 45 + Math.random() * 20,
-      size: 45 + Math.random() * 35,
-      speed: 12 + Math.random() * 15,
-      opacity: 0.75 + Math.random() * 0.2,
+    // Puffy horizontal flat cumulus clouds in daytime
+    const clouds: Cloud[] = [
+      { x: width * 0.22, y: 110, w: 120, h: 36, speed: 8 },
+      { x: width * 0.58, y: 60, w: 90, h: 28, speed: 10 },
+      { x: width * 0.85, y: 130, w: 140, h: 42, speed: 7 },
+    ];
+
+    // Constellation / Diagonal star trails in nighttime matching screenshot
+    const stars: Star[] = Array.from({ length: 60 }, (_, i) => ({
+      x: (i * 24) % width + Math.random() * 20,
+      y: (i * 14) % (height * 0.65) + Math.random() * 15,
+      size: 1.5 + (i % 3) * 0.8,
+      alpha: 0.4 + (i % 4) * 0.18,
     }));
 
-    const stars: Star[] = Array.from({ length: 90 }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * (height * 0.75),
-      size: 1 + Math.random() * 2.2,
-      twinkleSpeed: 1.5 + Math.random() * 3.5,
-      phase: Math.random() * Math.PI * 2,
-    }));
-
-    const fireflies: Firefly[] = Array.from({ length: 38 }, () => {
+    // Floating glowing fireflies in nighttime
+    const fireflies: Firefly[] = Array.from({ length: 24 }, () => {
       const angle = Math.random() * Math.PI * 2;
-      const dist = 3 + Math.random() * 12;
+      const dist = 1.5 + Math.random() * 4.5;
       return {
         baseX: Math.cos(angle) * dist,
         baseY: Math.sin(angle) * dist,
         x: 0,
         y: 0,
-        radiusX: 0.8 + Math.random() * 1.6,
-        radiusY: 0.6 + Math.random() * 1.2,
-        speed: 0.8 + Math.random() * 1.5,
+        radius: 4 + Math.random() * 5,
+        speed: 0.8 + Math.random() * 1.2,
         phase: Math.random() * Math.PI * 2,
-        blinkSpeed: 1.8 + Math.random() * 2.6,
+        blinkSpeed: 1.5 + Math.random() * 2.5,
       };
     });
-
-    // Street Lamps positions along cobblestone paths
-    const streetLamps: [number, number][] = [
-      [0, -7],
-      [-5, -4],
-      [5, -4],
-      [-7, 2],
-      [7, 2],
-      [-4, 7],
-      [4, 7],
-      [0, 10],
-    ];
 
     let pendingBuildingId: BuildingId | null = null;
     let hoveredBuildingRef: BuildingInfo | null = null;
 
     // -----------------------------------------------------------
-    // INTERACTION HANDLERS (Click & Touch)
+    // POINTER INTERACTIONS (Click / Touch)
     // -----------------------------------------------------------
     const getPointerWorldPos = (clientX: number, clientY: number) => {
       const rect = canvas.getBoundingClientRect();
@@ -372,13 +394,13 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     const handlePointerAction = (clientX: number, clientY: number) => {
       const { wx, wy } = getPointerWorldPos(clientX, clientY);
 
-      // 1. Check Click on Cafe Stall
+      // 1. Check Click on Cafe Stall (Toko Roti & Kafe)
       const cafeDist = Math.hypot(wx - cafeWx, wy - cafeWy);
-      if (cafeDist < 2.4) {
+      if (cafeDist < 1.8) {
         sounds.playClick();
         setIsCafeMenuOpen(true);
-        player.targetWx = -3.2;
-        player.targetWy = 2.8;
+        player.targetWx = cafeWx;
+        player.targetWy = cafeWy + 1.2;
         player.isMoving = true;
         pendingBuildingId = null;
         return;
@@ -388,11 +410,10 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
         const dist = Math.hypot(wx - bx, wy - by);
-        // Generous hit test threshold for isometric roofs/walls
-        if (dist < 2.8 || (Math.abs(wx - bx) < 2.5 && Math.abs(wy - by) < 2.5)) {
+        if (dist < 2.0 || (Math.abs(wx - bx) < 1.7 && Math.abs(wy - by) < 1.7)) {
           sounds.playClick();
-          player.targetWx = bx;
-          player.targetWy = by + 2.2;
+          player.targetWx = bx * 0.75;
+          player.targetWy = by * 0.75;
           player.isMoving = true;
           pendingBuildingId = b.id;
           return;
@@ -401,8 +422,8 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
 
       // 3. Click on ground to walk
       sounds.playClick();
-      player.targetWx = Math.max(-15, Math.min(15, wx));
-      player.targetWy = Math.max(-15, Math.min(15, wy));
+      player.targetWx = Math.max(-5.2, Math.min(5.2, wx));
+      player.targetWy = Math.max(-5.2, Math.min(5.2, wy));
       player.isMoving = true;
       pendingBuildingId = null;
     };
@@ -425,19 +446,17 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     const onPointerMove = (e: MouseEvent) => {
       const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
 
-      // Check Cafe hover
-      if (Math.hypot(wx - cafeWx, wy - cafeWy) < 2.4) {
+      if (Math.hypot(wx - cafeWx, wy - cafeWy) < 1.8) {
         canvas.style.cursor = 'pointer';
         hoveredBuildingRef = null;
         setHoveredBuilding(null);
         return;
       }
 
-      // Check Building hover
       let found: BuildingInfo | null = null;
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
-        if (Math.hypot(wx - bx, wy - by) < 2.6) {
+        if (Math.hypot(wx - bx, wy - by) < 1.8) {
           found = b;
           break;
         }
@@ -452,39 +471,74 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     canvas.addEventListener('mousemove', onPointerMove);
 
     // Initial camera position centered on student
-    camera.x = (player.wx - player.wy) * TILE_W;
-    camera.y = (player.wx + player.wy) * TILE_H;
+    camera.x = (player.wx - player.wy) * BASE_TILE_W * zoomLevelRef.current;
+    camera.y = (player.wx + player.wy) * BASE_TILE_H * zoomLevelRef.current;
 
     // -----------------------------------------------------------
-    // MAIN ANIMATION LOOP (Lightweight 60 FPS Canvas 2D)
+    // TREE POSITIONS MATCHING SCREENSHOT EXACTLY
+    // (Lush double-sphere trees along outer perimeter and plaza edges)
+    // -----------------------------------------------------------
+    const trees: [number, number][] = [
+      // Top corner (North)
+      [0, -5.4],
+      [-1.8, -5.2],
+      [1.8, -5.2],
+      // Left edge (West)
+      [-5.2, -1.8],
+      [-5.4, 0],
+      [-5.2, 1.8],
+      [-3.8, 3.8],
+      // Bottom corner (South)
+      [-1.8, 5.2],
+      [0, 5.4],
+      [1.8, 5.2],
+      // Right edge (East)
+      [5.2, -1.8],
+      [5.4, 0],
+      [5.2, 1.8],
+      [3.8, 3.8],
+      // Center park trees
+      [-1.4, -1.4],
+      [1.4, -1.4],
+      [-1.4, 1.4],
+      [1.4, 1.4],
+    ];
+
+    // -----------------------------------------------------------
+    // MAIN RENDER LOOP
     // -----------------------------------------------------------
     let animId: number;
     let lastTime = performance.now();
-    let sunRaysAngle = 0;
+    let beaconBlink = 0;
 
     const render = (currentTime: number) => {
       animId = requestAnimationFrame(render);
       const delta = Math.min((currentTime - lastTime) / 1000, 0.1);
       lastTime = currentTime;
       const elapsed = currentTime / 1000;
+      beaconBlink += delta * 4;
 
-      // Determine daytime or nighttime
       const isNight =
         timeOfDayRef.current === 'night' ||
         (timeOfDayRef.current === 'auto' && (new Date().getHours() >= 18 || new Date().getHours() < 6));
 
-      // ---------------------------------------------------------
-      // FEATURE 4: CAMERA SMOOTH FOLLOW AVATAR
-      // ---------------------------------------------------------
-      camera.targetX = (player.wx - player.wy) * TILE_W;
-      camera.targetY = (player.wx + player.wy) * TILE_H;
+      const currentTileW = BASE_TILE_W * zoomLevelRef.current;
+      const currentTileH = BASE_TILE_H * zoomLevelRef.current;
+
+      // Handle Reset Camera to Player
+      if (resetCameraRequestedRef.current) {
+        resetCameraRequestedRef.current = false;
+        camera.x = (player.wx - player.wy) * currentTileW;
+        camera.y = (player.wx + player.wy) * currentTileH;
+      }
+
+      // Smooth camera follow avatar
+      camera.targetX = (player.wx - player.wy) * currentTileW;
+      camera.targetY = (player.wx + player.wy) * currentTileH;
       camera.x += (camera.targetX - camera.x) * (delta * 4.5);
       camera.y += (camera.targetY - camera.y) * (delta * 4.5);
 
-      // ---------------------------------------------------------
-      // UPDATE AVATAR POSITIONS & ANIMATIONS
-      // ---------------------------------------------------------
-      // Update Player
+      // Update Player Movement
       if (player.isMoving) {
         const dx = player.targetWx - player.wx;
         const dy = player.targetWy - player.wy;
@@ -511,9 +565,9 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
         }
       }
 
-      // Update NPCs (Guru, Polisi, Petugas Kebersihan, Kurir)
+      // Update NPCs
       npcs.forEach((npc) => {
-        if (npc.speed === 0) return; // Barista stays at counter
+        if (npc.speed === 0) return;
 
         if (npc.speechTimer && npc.speechTimer > 0) {
           npc.speechTimer -= delta;
@@ -524,18 +578,17 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           npc.pauseTimer -= delta;
           if (npc.pauseTimer <= 0) {
             npc.isMoving = true;
-            // Wander around town within bounds
             const angle = Math.random() * Math.PI * 2;
-            const dist = 2 + Math.random() * 6;
-            npc.targetWx = Math.max(-12, Math.min(12, npc.wx + Math.cos(angle) * dist));
-            npc.targetWy = Math.max(-12, Math.min(12, npc.wy + Math.sin(angle) * dist));
+            const dist = 1.0 + Math.random() * 2.5;
+            npc.targetWx = Math.max(-4.5, Math.min(4.5, npc.wx + Math.cos(angle) * dist));
+            npc.targetWy = Math.max(-4.5, Math.min(4.5, npc.wy + Math.sin(angle) * dist));
           }
         } else {
           const dx = npc.targetWx - npc.wx;
           const dy = npc.targetWy - npc.wy;
           const dist = Math.hypot(dx, dy);
 
-          if (dist > 0.2) {
+          if (dist > 0.15) {
             const step = Math.min(dist, npc.speed * delta);
             npc.wx += (dx / dist) * step;
             npc.wy += (dy / dist) * step;
@@ -545,555 +598,504 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           } else {
             npc.isMoving = false;
             npc.walkFrame = 0;
-            npc.pauseTimer = 3 + Math.random() * 5;
+            npc.pauseTimer = 3 + Math.random() * 4;
           }
         }
       });
 
       // ---------------------------------------------------------
-      // 1. SKY BACKGROUND (Pagi: Cerah & Sinar Matahari / Malam: Nebula Bintang)
+      // 1. SKY BACKGROUND (Matching Screenshot Colors)
       // ---------------------------------------------------------
       ctx.clearRect(0, 0, width, height);
 
       if (!isNight) {
-        // PAGI (Daytime Sky Gradient: Fresh azure to warm golden morning sun)
-        const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
-        skyGrad.addColorStop(0, '#38bdf8'); // Sky blue
-        skyGrad.addColorStop(0.5, '#7dd3fc');
-        skyGrad.addColorStop(1, '#bae6fd'); // Horizon haze
-        ctx.fillStyle = skyGrad;
+        // DAYTIME: Clean sky blue `#7ec8f8`
+        ctx.fillStyle = '#87ceeb';
         ctx.fillRect(0, 0, width, height);
 
-        // FEATURE 1: PAGI - SINAR MATAHARI (Golden Sun & Radiating Rays)
-        const sunX = width * 0.82;
-        const sunY = height * 0.18;
-        const sunRadius = Math.min(width, height) * 0.085;
+        // Fluffy pill cumulus clouds
+        clouds.forEach((cloud) => {
+          cloud.x += cloud.speed * delta;
+          if (cloud.x > width + 100) cloud.x = -150;
 
-        // Radiating Sun Rays
-        sunRaysAngle += delta * 0.08;
-        ctx.save();
-        ctx.translate(sunX, sunY);
-        ctx.rotate(sunRaysAngle);
-
-        const rayCount = 12;
-        for (let r = 0; r < rayCount; r++) {
-          const angle = (r / rayCount) * Math.PI * 2;
-          const rayLen = sunRadius * (2.8 + Math.sin(elapsed * 2 + r) * 0.4);
-          const rayGrad = ctx.createLinearGradient(0, 0, Math.cos(angle) * rayLen, Math.sin(angle) * rayLen);
-          rayGrad.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
-          rayGrad.addColorStop(0.7, 'rgba(253, 224, 71, 0.15)');
-          rayGrad.addColorStop(1, 'rgba(253, 224, 71, 0)');
-
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
           ctx.beginPath();
-          ctx.moveTo(0, 0);
-          ctx.lineTo(Math.cos(angle - 0.14) * rayLen, Math.sin(angle - 0.14) * rayLen);
-          ctx.lineTo(Math.cos(angle + 0.14) * rayLen, Math.sin(angle + 0.14) * rayLen);
-          ctx.closePath();
-          ctx.fillStyle = rayGrad;
+          ctx.roundRect(cloud.x, cloud.y, cloud.w, cloud.h, cloud.h / 2);
           ctx.fill();
-        }
-        ctx.restore();
+        });
 
-        // Golden Sun Glow & Core
-        const sunGlow = ctx.createRadialGradient(sunX, sunY, sunRadius * 0.2, sunX, sunY, sunRadius * 2.2);
-        sunGlow.addColorStop(0, '#fffbeb');
-        sunGlow.addColorStop(0.35, '#fef08a');
-        sunGlow.addColorStop(0.7, 'rgba(250, 204, 21, 0.35)');
-        sunGlow.addColorStop(1, 'rgba(250, 204, 21, 0)');
-        ctx.fillStyle = sunGlow;
-        ctx.beginPath();
-        ctx.arc(sunX, sunY, sunRadius * 2.2, 0, Math.PI * 2);
-        ctx.fill();
+        // Cartoon Sun in Top-Right with Triangular Rays (Exact Match)
+        const sunX = width - 90;
+        const sunY = 75;
+        const sunRadius = 26;
 
-        // Sun Sphere
-        ctx.fillStyle = '#fef08a';
+        ctx.fillStyle = '#facc15';
         ctx.beginPath();
         ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        // FEATURE 1: PAGI - AWAN BERGERAK (Drifting 2D Cumulus Clouds)
-        clouds.forEach((cloud) => {
-          cloud.x += cloud.speed * delta;
-          if (cloud.x > width + cloud.size * 2) {
-            cloud.x = -cloud.size * 2;
-            cloud.y = 30 + Math.random() * (height * 0.35);
-          }
-
-          ctx.fillStyle = `rgba(255, 255, 255, ${cloud.opacity})`;
-          const cx = cloud.x;
-          const cy = cloud.y + Math.sin(elapsed * 0.8 + cloud.x * 0.01) * 6;
-          const s = cloud.size;
+        // 10 Triangular Radiating Sun Rays
+        ctx.fillStyle = '#fde047';
+        for (let r = 0; r < 10; r++) {
+          const angle = (r / 10) * Math.PI * 2 + elapsed * 0.1;
+          const rInner = sunRadius + 4;
+          const rOuter = sunRadius + 16;
+          const p1x = sunX + Math.cos(angle - 0.12) * rInner;
+          const p1y = sunY + Math.sin(angle - 0.12) * rInner;
+          const p2x = sunX + Math.cos(angle) * rOuter;
+          const p2y = sunY + Math.sin(angle) * rOuter;
+          const p3x = sunX + Math.cos(angle + 0.12) * rInner;
+          const p3y = sunY + Math.sin(angle + 0.12) * rInner;
 
           ctx.beginPath();
-          ctx.arc(cx, cy, s * 0.5, 0, Math.PI * 2);
-          ctx.arc(cx + s * 0.35, cy - s * 0.2, s * 0.45, 0, Math.PI * 2);
-          ctx.arc(cx + s * 0.7, cy, s * 0.4, 0, Math.PI * 2);
-          ctx.arc(cx + s * 0.35, cy + s * 0.1, s * 0.35, 0, Math.PI * 2);
+          ctx.moveTo(p1x, p1y);
+          ctx.lineTo(p2x, p2y);
+          ctx.lineTo(p3x, p3y);
+          ctx.closePath();
           ctx.fill();
-        });
+        }
       } else {
-        // MALAM (Night Sky Gradient matching screenshot)
-        const nightGrad = ctx.createLinearGradient(0, 0, 0, height);
-        nightGrad.addColorStop(0, '#070e1c');
-        nightGrad.addColorStop(0.6, '#0f172a');
-        nightGrad.addColorStop(1, '#1e293b');
-        ctx.fillStyle = nightGrad;
+        // NIGHTTIME: Solid pitch dark space `#0b101b`
+        ctx.fillStyle = '#0b101b';
         ctx.fillRect(0, 0, width, height);
 
-        // Twinkling Stars
+        // Diagonal constellation star trail (Exact Match to Screenshot 2)
         stars.forEach((star) => {
-          const alpha = 0.35 + 0.65 * Math.abs(Math.sin(elapsed * star.twinkleSpeed + star.phase));
-          ctx.fillStyle = `rgba(241, 245, 249, ${alpha})`;
+          ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
           ctx.beginPath();
           ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
           ctx.fill();
         });
 
-        // Glowing Crescent Moon
-        const moonX = width * 0.82;
-        const moonY = height * 0.16;
-        const moonR = 26;
+        // Bright Crescent Moon in Top-Right
+        const moonX = width - 85;
+        const moonY = 65;
+        const moonR = 24;
 
-        const moonGlow = ctx.createRadialGradient(moonX, moonY, moonR * 0.5, moonX, moonY, moonR * 2.2);
-        moonGlow.addColorStop(0, 'rgba(224, 231, 255, 0.45)');
-        moonGlow.addColorStop(1, 'rgba(224, 231, 255, 0)');
-        ctx.fillStyle = moonGlow;
-        ctx.beginPath();
-        ctx.arc(moonX, moonY, moonR * 2.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#f8fafc';
+        ctx.fillStyle = '#fef08a';
         ctx.beginPath();
         ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
         ctx.fill();
 
-        // Moon cutout to make crescent
-        ctx.fillStyle = '#0a1222';
+        ctx.fillStyle = '#0b101b';
         ctx.beginPath();
-        ctx.arc(moonX + 9, moonY - 4, moonR * 0.9, 0, Math.PI * 2);
+        ctx.arc(moonX + 8, moonY - 3, moonR * 0.9, 0, Math.PI * 2);
         ctx.fill();
       }
 
       // ---------------------------------------------------------
-      // 2. FLOATING ISLAND GEOMETRY (Cliff layers & Grassy Plateau)
+      // 2. ISOMETRIC CHECKERBOARD / TILE GRID PLATFORM
+      // (11x11 Grid, Green Lawn & Cream Paved Pathways)
       // ---------------------------------------------------------
-      const islandPoints: [number, number][] = [];
-      const segs = 28;
-      for (let i = 0; i < segs; i++) {
-        const theta = (i / segs) * Math.PI * 2;
-        const r = 17.5 + Math.sin(theta * 3) * 0.8;
-        islandPoints.push([Math.cos(theta) * r, Math.sin(theta) * r]);
-      }
+      const GRID_RADIUS = 5; // -5 to +5 tiles
 
-      // Draw Island Rocky Cliff Underneath (Earth strata)
-      for (let layer = 5; layer >= 1; layer--) {
-        const cliffDepth = layer * 14;
-        const shrink = 1 - layer * 0.08;
-        ctx.fillStyle = isNight
-          ? `rgb(${16 + layer * 3}, ${22 + layer * 4}, ${36 + layer * 6})`
-          : `rgb(${75 - layer * 5}, ${55 - layer * 4}, ${40 - layer * 3})`;
+      const grassColor = isNight ? '#163323' : '#4a7c52';
+      const grassBorder = isNight ? '#0f241a' : '#3d6944';
+      const pathColor = isNight ? '#334155' : '#fcfaf2';
+      const pathBorder = isNight ? '#475569' : '#e5dfd0';
 
-        ctx.beginPath();
-        islandPoints.forEach(([ix, iy], idx) => {
-          const pt = toScreen(ix * shrink, iy * shrink, -cliffDepth, camera.x, camera.y);
-          if (idx === 0) ctx.moveTo(pt.x, pt.y);
-          else ctx.lineTo(pt.x, pt.y);
-        });
-        ctx.closePath();
-        ctx.fill();
-      }
+      // Helper to check if tile (gx, gy) is a paved walkway
+      const isPathway = (gx: number, gy: number) => {
+        // Outer loop road at |gx| == 3 or |gy| == 3
+        if (Math.abs(gx) === 3 && Math.abs(gy) <= 3) return true;
+        if (Math.abs(gy) === 3 && Math.abs(gx) <= 3) return true;
+        // Connecting central spokes to north/south/east/west
+        if (gx === 0 && Math.abs(gy) <= 4) return true;
+        if (gy === 0 && Math.abs(gx) <= 4) return true;
+        // Central ring
+        if (Math.abs(gx) <= 1 && Math.abs(gy) <= 1) return true;
+        return false;
+      };
 
-      // Draw Top Grass Plateau
-      ctx.fillStyle = isNight ? '#064e3b' : '#15803d'; // Night emerald vs Day lush green
-      ctx.beginPath();
-      islandPoints.forEach(([ix, iy], idx) => {
-        const pt = toScreen(ix, iy, 0, camera.x, camera.y);
-        if (idx === 0) ctx.moveTo(pt.x, pt.y);
-        else ctx.lineTo(pt.x, pt.y);
-      });
-      ctx.closePath();
-      ctx.fill();
+      // Draw all isometric base tiles
+      for (let gy = -GRID_RADIUS; gy <= GRID_RADIUS; gy++) {
+        for (let gx = -GRID_RADIUS; gx <= GRID_RADIUS; gx++) {
+          const pN = toScreen(gx - 0.5, gy - 0.5, 0, camera.x, camera.y);
+          const pE = toScreen(gx + 0.5, gy - 0.5, 0, camera.x, camera.y);
+          const pS = toScreen(gx + 0.5, gy + 0.5, 0, camera.x, camera.y);
+          const pW = toScreen(gx - 0.5, gy + 0.5, 0, camera.x, camera.y);
 
-      // Grass Rim Border highlight
-      ctx.strokeStyle = isNight ? '#059669' : '#22c55e';
-      ctx.lineWidth = 3;
-      ctx.stroke();
+          const isRoad = isPathway(gx, gy);
+          ctx.fillStyle = isRoad ? pathColor : grassColor;
+          ctx.strokeStyle = isRoad ? pathBorder : grassBorder;
+          ctx.lineWidth = 1;
 
-      // ---------------------------------------------------------
-      // 3. COBBLESTONE ROADS & PLAZA
-      // ---------------------------------------------------------
-      const plazaCenter = toScreen(0, 0, 0, camera.x, camera.y);
-      const plazaR = TILE_W * 3.4;
-      ctx.save();
-      ctx.translate(plazaCenter.x, plazaCenter.y);
-      ctx.scale(1, TILE_H / TILE_W);
-      ctx.beginPath();
-      ctx.arc(0, 0, plazaR, 0, Math.PI * 2);
-      ctx.fillStyle = isNight ? '#1e293b' : '#e2e8f0';
-      ctx.fill();
-      ctx.strokeStyle = isNight ? '#334155' : '#cbd5e1';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      ctx.restore();
-
-      // Cobblestone path lines connecting plaza to each building
-      ctx.strokeStyle = isNight ? 'rgba(51, 65, 85, 0.85)' : 'rgba(203, 213, 225, 0.95)';
-      ctx.lineWidth = 14;
-      ctx.lineCap = 'round';
-
-      BUILDINGS_INFO.forEach((b) => {
-        if (b.id === 'monumen_warga') return;
-        const [bx, , by] = b.position;
-        const bScreen = toScreen(bx, by, 0, camera.x, camera.y);
-        ctx.beginPath();
-        ctx.moveTo(plazaCenter.x, plazaCenter.y);
-        ctx.lineTo(bScreen.x, bScreen.y);
-        ctx.stroke();
-      });
-
-      // Cobblestone path to Cafe
-      const cafeScreen = toScreen(cafeWx, cafeWy, 0, camera.x, camera.y);
-      ctx.beginPath();
-      ctx.moveTo(plazaCenter.x, plazaCenter.y);
-      ctx.lineTo(cafeScreen.x, cafeScreen.y);
-      ctx.stroke();
-
-      // ---------------------------------------------------------
-      // NIGHT STREET LAMPS (Warm Pools of Light)
-      // ---------------------------------------------------------
-      if (isNight) {
-        streetLamps.forEach(([lx, ly]) => {
-          const lScreen = toScreen(lx, ly, 0, camera.x, camera.y);
-          const lampGlow = ctx.createRadialGradient(lScreen.x, lScreen.y, 4, lScreen.x, lScreen.y, 48);
-          lampGlow.addColorStop(0, 'rgba(251, 191, 36, 0.42)');
-          lampGlow.addColorStop(0.5, 'rgba(251, 191, 36, 0.18)');
-          lampGlow.addColorStop(1, 'rgba(251, 191, 36, 0)');
-          ctx.fillStyle = lampGlow;
           ctx.beginPath();
-          ctx.arc(lScreen.x, lScreen.y, 48, 0, Math.PI * 2);
+          ctx.moveTo(pN.x, pN.y);
+          ctx.lineTo(pE.x, pE.y);
+          ctx.lineTo(pS.x, pS.y);
+          ctx.lineTo(pW.x, pW.y);
+          ctx.closePath();
           ctx.fill();
-
-          // Lamp post stick & glowing bulb
-          const bulbScreen = toScreen(lx, ly, 24, camera.x, camera.y);
-          ctx.strokeStyle = '#64748b';
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          ctx.moveTo(lScreen.x, lScreen.y);
-          ctx.lineTo(bulbScreen.x, bulbScreen.y);
           ctx.stroke();
-
-          ctx.fillStyle = '#fde047';
-          ctx.beginPath();
-          ctx.arc(bulbScreen.x, bulbScreen.y, 4, 0, Math.PI * 2);
-          ctx.fill();
-        });
+        }
       }
 
+      // Outer platform border line
+      const cornerN = toScreen(-GRID_RADIUS - 0.5, -GRID_RADIUS - 0.5, 0, camera.x, camera.y);
+      const cornerE = toScreen(GRID_RADIUS + 0.5, -GRID_RADIUS - 0.5, 0, camera.x, camera.y);
+      const cornerS = toScreen(GRID_RADIUS + 0.5, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
+      const cornerW = toScreen(-GRID_RADIUS - 0.5, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
+
+      ctx.strokeStyle = isNight ? '#0a1610' : '#2d4e33';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(cornerN.x, cornerN.y);
+      ctx.lineTo(cornerE.x, cornerE.y);
+      ctx.lineTo(cornerS.x, cornerS.y);
+      ctx.lineTo(cornerW.x, cornerW.y);
+      ctx.closePath();
+      ctx.stroke();
+
       // ---------------------------------------------------------
-      // 4. DRAW ENTITIES (Buildings, Cafe, Avatars, Trees)
-      // Sorted by depth (wx + wy) for true 2.5D Isometric Z-Ordering
+      // 3. CENTER PLAZA FOUNTAIN (Circular Stepped Pool)
+      // ---------------------------------------------------------
+      const centerPt = toScreen(0, 0, 0, camera.x, camera.y);
+      const poolRadiusX = 48 * zoomLevelRef.current;
+      const poolRadiusY = 24 * zoomLevelRef.current;
+
+      // Outer stone rim
+      ctx.fillStyle = isNight ? '#475569' : '#e2e8f0';
+      ctx.beginPath();
+      ctx.ellipse(centerPt.x, centerPt.y, poolRadiusX + 8, poolRadiusY + 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Clear cyan water pool
+      ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
+      ctx.beginPath();
+      ctx.ellipse(centerPt.x, centerPt.y, poolRadiusX, poolRadiusY, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Concentric water ripple
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(
+        centerPt.x,
+        centerPt.y,
+        (poolRadiusX * 0.5) + Math.sin(elapsed * 3) * 6,
+        (poolRadiusY * 0.5) + Math.sin(elapsed * 3) * 3,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.stroke();
+
+      // Center fountain spout
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(centerPt.x, centerPt.y - 4, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // ---------------------------------------------------------
+      // 4. DRAW 3D ISOMETRIC BUILDINGS, TREES, AVATARS (Depth-Sorted)
       // ---------------------------------------------------------
       type DrawItem =
         | { type: 'building'; info: BuildingInfo; depth: number }
         | { type: 'cafe'; depth: number }
         | { type: 'avatar'; data: AvatarData; isPlayer: boolean; depth: number }
-        | { type: 'tree'; wx: number; wy: number; kind: 'cherry' | 'pine'; depth: number };
+        | { type: 'tree'; wx: number; wy: number; depth: number };
 
       const drawItems: DrawItem[] = [];
 
       BUILDINGS_INFO.forEach((b) => {
-        drawItems.push({
-          type: 'building',
-          info: b,
-          depth: b.position[0] + b.position[2],
-        });
+        if (b.id === 'monumen_warga') return; // drawn as fountain
+        drawItems.push({ type: 'building', info: b, depth: b.position[0] + b.position[2] });
       });
 
-      drawItems.push({
-        type: 'cafe',
-        depth: cafeWx + cafeWy,
-      });
+      drawItems.push({ type: 'cafe', depth: cafeWx + cafeWy });
 
-      // Avatars: Player + NPCs (Guru, Polisi, Petugas Kebersihan, Kurir, Barista)
-      drawItems.push({
-        type: 'avatar',
-        data: player,
-        isPlayer: true,
-        depth: player.wx + player.wy,
-      });
+      drawItems.push({ type: 'avatar', data: player, isPlayer: true, depth: player.wx + player.wy });
 
       npcs.forEach((npc) => {
-        drawItems.push({
-          type: 'avatar',
-          data: npc,
-          isPlayer: false,
-          depth: npc.wx + npc.wy,
-        });
+        drawItems.push({ type: 'avatar', data: npc, isPlayer: false, depth: npc.wx + npc.wy });
       });
 
-      // Decorative Island Trees
-      const trees: { wx: number; wy: number; kind: 'cherry' | 'pine' }[] = [
-        { wx: -13, wy: 4, kind: 'cherry' },
-        { wx: -10, wy: 10, kind: 'cherry' },
-        { wx: 13, wy: -4, kind: 'pine' },
-        { wx: 10, wy: -11, kind: 'pine' },
-        { wx: -5, wy: -13, kind: 'pine' },
-        { wx: 5, wy: -13, kind: 'pine' },
-        { wx: 11, wy: 11, kind: 'pine' },
-      ];
-
-      trees.forEach((t) => {
-        drawItems.push({
-          type: 'tree',
-          wx: t.wx,
-          wy: t.wy,
-          kind: t.kind,
-          depth: t.wx + t.wy,
-        });
+      trees.forEach(([tx, ty]) => {
+        drawItems.push({ type: 'tree', wx: tx, wy: ty, depth: tx + ty });
       });
 
-      // Sort back-to-front
       drawItems.sort((a, b) => a.depth - b.depth);
 
-      // Render each sorted item
+      // Render Each Item
       drawItems.forEach((item) => {
         if (item.type === 'tree') {
+          // Double-Sphere Tree (Matching Screenshot Exactly)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
-          // Tree Trunk
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(pt.x - 3, pt.y - 14, 6, 14);
+          const z = zoomLevelRef.current;
 
-          // Foliage
-          if (item.kind === 'cherry') {
-            ctx.fillStyle = isNight ? '#be185d' : '#f472b6';
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 24, 16, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = isNight ? '#9d174d' : '#fbcfe8';
-            ctx.beginPath();
-            ctx.arc(pt.x + 4, pt.y - 28, 11, 0, Math.PI * 2);
-            ctx.fill();
-          } else {
-            ctx.fillStyle = isNight ? '#064e3b' : '#15803d';
-            ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y - 42);
-            ctx.lineTo(pt.x + 14, pt.y - 14);
-            ctx.lineTo(pt.x - 14, pt.y - 14);
-            ctx.closePath();
-            ctx.fill();
+          // Ground shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x + 2, pt.y + 2, 14 * z, 7 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
 
-            ctx.fillStyle = isNight ? '#047857' : '#22c55e';
-            ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y - 32);
-            ctx.lineTo(pt.x + 11, pt.y - 10);
-            ctx.lineTo(pt.x - 11, pt.y - 10);
-            ctx.closePath();
-            ctx.fill();
-          }
+          // Brown slender trunk
+          ctx.fillStyle = isNight ? '#451a03' : '#78350f';
+          ctx.fillRect(pt.x - 2.5 * z, pt.y - 18 * z, 5 * z, 18 * z);
+
+          // Lower large sphere (Teal/Emerald green)
+          ctx.fillStyle = isNight ? '#064e3b' : '#10b981';
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y - 24 * z, 14 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Upper overlapping bright mint/lime sphere
+          ctx.fillStyle = isNight ? '#047857' : '#34d399';
+          ctx.beginPath();
+          ctx.arc(pt.x + 1 * z, pt.y - 32 * z, 11 * z, 0, Math.PI * 2);
+          ctx.fill();
         } else if (item.type === 'building') {
           const b = item.info;
           const [bx, , by] = b.position;
           const pt = toScreen(bx, by, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          const isHovered = hoveredBuildingRef?.id === b.id;
 
-          // Building Ground Shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+          // Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
           ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y + 4, 38, 18, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x + 4, pt.y + 4, 38 * z, 18 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // Check if hovered
-          const isHovered = hoveredBuildingRef?.id === b.id;
-          const hoverLift = isHovered ? Math.sin(elapsed * 6) * 3 : 0;
-          const bY = pt.y - hoverLift;
-
-          // Distinct Architectural Geometry for each building
           if (b.id === 'balai_kota') {
-            // Balai Kota: Grand City Hall
-            ctx.fillStyle = isNight ? '#1e293b' : '#f8fafc';
-            ctx.fillRect(pt.x - 36, bY - 60, 72, 60);
-
-            // Roof
-            ctx.fillStyle = isNight ? '#1d4ed8' : '#2563eb';
+            // NORTH: GEDUNG KUBAH EMAS (Balai Kota)
+            // Main white building
+            ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 42, bY - 60);
-            ctx.lineTo(pt.x, bY - 96);
-            ctx.lineTo(pt.x + 42, bY - 60);
+            ctx.moveTo(pt.x - 34 * z, pt.y - 20 * z);
+            ctx.lineTo(pt.x, pt.y - 36 * z);
+            ctx.lineTo(pt.x + 34 * z, pt.y - 20 * z);
+            ctx.lineTo(pt.x + 34 * z, pt.y + 20 * z);
+            ctx.lineTo(pt.x, pt.y + 36 * z);
+            ctx.lineTo(pt.x - 34 * z, pt.y + 20 * z);
             ctx.closePath();
             ctx.fill();
 
-            // Columns
+            // Left vertical fluting/pillars
             ctx.fillStyle = '#e2e8f0';
-            for (let c = -28; c <= 28; c += 18) {
-              ctx.fillRect(pt.x + c - 2, bY - 56, 5, 54);
+            for (let col = -26; col <= -4; col += 7) {
+              ctx.fillRect(pt.x + col * z, pt.y - 12 * z, 4 * z, 30 * z);
             }
-          } else if (b.id === 'perpustakaan') {
-            // Perpustakaan: Emerald Library
-            ctx.fillStyle = isNight ? '#064e3b' : '#059669';
-            ctx.fillRect(pt.x - 32, bY - 54, 64, 54);
 
-            // Roof
-            ctx.fillStyle = isNight ? '#047857' : '#10b981';
+            // Right wall white windows
+            ctx.fillStyle = '#cbd5e1';
+            for (let r = 0; r < 2; r++) {
+              for (let c = 8; c <= 26; c += 9) {
+                ctx.fillRect(pt.x + c * z, pt.y - (4 - r * 14) * z, 5 * z, 8 * z);
+              }
+            }
+
+            // Golden Dome on top
+            ctx.fillStyle = '#f59e0b';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 36, bY - 54);
-            ctx.lineTo(pt.x, bY - 84);
-            ctx.lineTo(pt.x + 36, bY - 54);
-            ctx.closePath();
+            ctx.arc(pt.x, pt.y - 36 * z, 18 * z, Math.PI, 0);
             ctx.fill();
 
-            // Big arched window
-            ctx.fillStyle = '#fef08a';
+            // Gold spire
+            ctx.strokeStyle = '#fde047';
+            ctx.lineWidth = 2.5 * z;
             ctx.beginPath();
-            ctx.arc(pt.x, bY - 30, 14, Math.PI, 0);
-            ctx.fillRect(pt.x - 14, bY - 30, 28, 20);
-            ctx.fill();
-          } else if (b.id === 'menara_mentor') {
-            // Menara Mentor: Violet Observatory Tower
-            ctx.fillStyle = isNight ? '#312e81' : '#4338ca';
-            ctx.fillRect(pt.x - 22, bY - 76, 44, 76);
-
-            // Dome
-            ctx.fillStyle = isNight ? '#6d28d9' : '#8b5cf6';
-            ctx.beginPath();
-            ctx.arc(pt.x, bY - 76, 22, Math.PI, 0);
-            ctx.fill();
-
-            // Telescope lens & sparkle
-            ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(pt.x + 8, bY - 88);
-            ctx.lineTo(pt.x + 28, bY - 108);
+            ctx.moveTo(pt.x, pt.y - 54 * z);
+            ctx.lineTo(pt.x, pt.y - 66 * z);
             ctx.stroke();
-          } else if (b.id === 'taman_refleksi') {
-            // Taman Refleksi: Pagoda
-            ctx.fillStyle = isNight ? '#831843' : '#db2777';
-            ctx.fillRect(pt.x - 20, bY - 45, 40, 45);
 
-            // Pagoda Roof 1
-            ctx.fillStyle = isNight ? '#be185d' : '#ec4899';
+            // Flagpole on left
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x - 34, bY - 26);
-            ctx.lineTo(pt.x, bY - 48);
-            ctx.lineTo(pt.x + 34, bY - 26);
+            ctx.moveTo(pt.x - 30 * z, pt.y + 10 * z);
+            ctx.lineTo(pt.x - 30 * z, pt.y - 25 * z);
+            ctx.stroke();
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(pt.x - 29 * z, pt.y - 25 * z, 8 * z, 5 * z);
+
+            // Black sign in front
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 14 * z, pt.y + 28 * z, 28 * z, 8 * z);
+            ctx.fillStyle = '#facc15';
+            ctx.font = `bold ${Math.round(6 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('BALAI KOTA', pt.x, pt.y + 34 * z);
+          } else if (b.id === 'menara_mentor') {
+            // EAST: DEWAN KOTA & TELECOM TRANSMISSION TOWER
+            // Main white council hall
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 28 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x, pt.y - 30 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x, pt.y + 30 * z);
+            ctx.lineTo(pt.x - 28 * z, pt.y + 16 * z);
             ctx.closePath();
             ctx.fill();
 
-            // Pagoda Roof 2 (Upper)
+            // Two green watermelon/capsule roof arches
+            ctx.fillStyle = '#10b981';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 26, bY - 50);
-            ctx.lineTo(pt.x, bY - 74);
-            ctx.lineTo(pt.x + 26, bY - 50);
-            ctx.closePath();
+            ctx.arc(pt.x - 8 * z, pt.y - 28 * z, 10 * z, Math.PI, 0);
             ctx.fill();
-          } else if (b.id === 'bengkel_latihan') {
-            // Bengkel Latihan: Industrial Workshop
-            ctx.fillStyle = isNight ? '#78350f' : '#b45309';
-            ctx.fillRect(pt.x - 30, bY - 52, 60, 52);
-
-            // Slanted roof
-            ctx.fillStyle = isNight ? '#92400e' : '#d97706';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 34, bY - 52);
-            ctx.lineTo(pt.x - 10, bY - 80);
-            ctx.lineTo(pt.x + 34, bY - 60);
-            ctx.closePath();
+            ctx.arc(pt.x + 8 * z, pt.y - 28 * z, 10 * z, Math.PI, 0);
             ctx.fill();
 
-            // Chimney with steam
-            ctx.fillStyle = '#475569';
-            ctx.fillRect(pt.x - 24, bY - 90, 8, 20);
-          } else if (b.id === 'kantor_pos') {
-            // Kantor Pos: Red Mailbox Post
-            ctx.fillStyle = isNight ? '#7f1d1d' : '#b91c1c';
-            ctx.fillRect(pt.x - 28, bY - 48, 56, 48);
-
-            // Roof
-            ctx.fillStyle = isNight ? '#991b1b' : '#dc2626';
+            // Blue arch doors
+            ctx.strokeStyle = '#0284c7';
+            ctx.lineWidth = 2 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x - 32, bY - 48);
-            ctx.lineTo(pt.x, bY - 72);
-            ctx.lineTo(pt.x + 32, bY - 48);
+            ctx.arc(pt.x - 10 * z, pt.y + 16 * z, 4 * z, Math.PI, 0);
+            ctx.arc(pt.x + 2 * z, pt.y + 20 * z, 4 * z, Math.PI, 0);
+            ctx.stroke();
+
+            // Red badge "ON AIR"
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.roundRect(pt.x + 8 * z, pt.y - 10 * z, 18 * z, 8 * z, 3 * z);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.round(5 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('ON AIR', pt.x + 17 * z, pt.y - 4 * z);
+
+            // Telecom Radio Lattice Tower beside it (Grey steel frame)
+            const towerX = pt.x + 36 * z;
+            const towerY = pt.y + 10 * z;
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 2 * z;
+            ctx.beginPath();
+            ctx.moveTo(towerX - 10 * z, towerY);
+            ctx.lineTo(towerX, towerY - 60 * z);
+            ctx.lineTo(towerX + 10 * z, towerY);
+            ctx.stroke();
+            // Cross bars
+            for (let b = 1; b <= 4; b++) {
+              const ty = towerY - b * 12 * z;
+              const halfW = (1 - b / 5) * 10 * z;
+              ctx.beginPath();
+              ctx.moveTo(towerX - halfW, ty);
+              ctx.lineTo(towerX + halfW, ty);
+              ctx.stroke();
+            }
+            // Blinking red beacon on top
+            ctx.fillStyle = Math.floor(beaconBlink) % 2 === 0 ? '#ef4444' : '#fee2e2';
+            ctx.beginPath();
+            ctx.arc(towerX, towerY - 62 * z, 3.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Transformer box
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(towerX - 22 * z, towerY - 14 * z, 14 * z, 14 * z);
+          } else if (b.id === 'perpustakaan') {
+            // WEST: GEDUNG BIRU (Perpustakaan)
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 28 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 32 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x, pt.y + 30 * z);
+            ctx.lineTo(pt.x - 28 * z, pt.y + 16 * z);
             ctx.closePath();
             ctx.fill();
 
-            // Letter emblem
-            ctx.fillStyle = '#fef08a';
-            ctx.fillRect(pt.x - 8, bY - 32, 16, 12);
+            // Blue roof rim
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 3.5 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 28 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 32 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y - 18 * z);
+            ctx.stroke();
+
+            // Blue square grid windows (4x2 on front, 4x2 on side)
+            ctx.fillStyle = '#38bdf8';
+            for (let r = 0; r < 2; r++) {
+              for (let c = -20; c <= -6; c += 7) {
+                ctx.fillRect(pt.x + c * z, pt.y - (4 - r * 12) * z, 5 * z, 6 * z);
+              }
+              for (let c = 6; c <= 20; c += 7) {
+                ctx.fillRect(pt.x + c * z, pt.y - (4 - r * 12) * z, 5 * z, 6 * z);
+              }
+            }
           } else if (b.id === 'pasar_prestasi') {
-            // Pasar Prestasi: Festive Cyan Circus Tent
-            ctx.fillStyle = isNight ? '#0e7490' : '#0891b2';
+            // SOUTH-WEST: TOKO POIN
+            ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 32, bY - 30);
-            ctx.lineTo(pt.x, bY - 80);
-            ctx.lineTo(pt.x + 32, bY - 30);
+            ctx.moveTo(pt.x - 24 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x, pt.y - 28 * z);
+            ctx.lineTo(pt.x + 24 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x + 24 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x, pt.y + 26 * z);
+            ctx.lineTo(pt.x - 24 * z, pt.y + 16 * z);
             ctx.closePath();
             ctx.fill();
 
-            // Striped panels
+            // Red roof trim
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 3 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 24 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x, pt.y - 28 * z);
+            ctx.lineTo(pt.x + 24 * z, pt.y - 16 * z);
+            ctx.stroke();
+
+            // Red & white striped awning
+            const awningW = 44 * z;
+            for (let a = 0; a < 6; a++) {
+              ctx.fillStyle = a % 2 === 0 ? '#ef4444' : '#ffffff';
+              ctx.fillRect(pt.x - 22 * z + a * (awningW / 6), pt.y + 8 * z, awningW / 6, 8 * z);
+            }
+          } else if (b.id === 'bengkel_latihan') {
+            // SOUTH-EAST: LAB DKV & CONTROL TOWER
+            // Modern blue/white building
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 26 * z, pt.y - 10 * z, 36 * z, 26 * z);
+
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(pt.x - 26 * z, pt.y - 16 * z, 36 * z, 6 * z);
+
+            // Round cylindrical control tower with blue dome
             ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(pt.x + 12 * z, pt.y - 24 * z, 14 * z, 40 * z);
+            ctx.fillStyle = '#0284c7';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 10, bY - 30);
-            ctx.lineTo(pt.x, bY - 80);
-            ctx.lineTo(pt.x + 10, bY - 30);
-            ctx.closePath();
+            ctx.arc(pt.x + 19 * z, pt.y - 24 * z, 7 * z, Math.PI, 0);
             ctx.fill();
 
-            // Golden trophy topper
-            ctx.fillStyle = '#fde047';
+            // Antenna
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.5 * z;
             ctx.beginPath();
-            ctx.arc(pt.x, bY - 84, 5, 0, Math.PI * 2);
+            ctx.moveTo(pt.x + 19 * z, pt.y - 31 * z);
+            ctx.lineTo(pt.x + 19 * z, pt.y - 39 * z);
+            ctx.stroke();
+          } else {
+            // Other pavilions (Taman Refleksi / Kantor Pos)
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 16 * z, 0, Math.PI * 2);
             ctx.fill();
-          } else if (b.id === 'monumen_warga') {
-            // Monumen Warga: Center Plaza Fountain & Obelisk
-            ctx.fillStyle = isNight ? '#334155' : '#94a3b8';
+            ctx.fillStyle = b.id === 'taman_refleksi' ? '#ec4899' : '#ef4444';
             ctx.beginPath();
-            ctx.ellipse(pt.x, bY - 6, 28, 14, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Water
-            ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
-            ctx.beginPath();
-            ctx.ellipse(pt.x, bY - 8, 22, 10, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Center Obelisk Crystal
-            ctx.fillStyle = '#ec4899';
-            ctx.beginPath();
-            ctx.moveTo(pt.x, bY - 46);
-            ctx.lineTo(pt.x + 8, bY - 14);
-            ctx.lineTo(pt.x - 8, bY - 14);
-            ctx.closePath();
+            ctx.arc(pt.x, pt.y, 12 * z, 0, Math.PI * 2);
             ctx.fill();
           }
 
-          // Animated Beacon atop building
-          const beaconY = bY - (b.id === 'balai_kota' ? 104 : b.id === 'menara_mentor' ? 116 : 90);
-          ctx.fillStyle = '#38bdf8';
-          ctx.beginPath();
-          ctx.arc(pt.x, beaconY + Math.sin(elapsed * 4) * 3, 4.5, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Pulsing Beacon Halo
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(pt.x, beaconY + Math.sin(elapsed * 4) * 3, 8 + Math.sin(elapsed * 4) * 3, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Floating Building Name Tag
-          const tagY = beaconY - 14;
+          // Floating Building Label
+          const tagY = pt.y - 48 * z;
           const labelText = `${b.icon} ${b.name}`;
-          ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-          const textMetrics = ctx.measureText(labelText);
-          const tagW = textMetrics.width + 16;
-          const tagH = 22;
+          ctx.font = `bold ${Math.round(9.5 * z)}px sans-serif`;
+          const tMetrics = ctx.measureText(labelText);
+          const tagW = tMetrics.width + 14 * z;
+          const tagH = 18 * z;
 
-          ctx.fillStyle = isHovered ? '#1e293b' : 'rgba(15, 23, 42, 0.88)';
+          ctx.fillStyle = isHovered ? '#1e293b' : 'rgba(15, 23, 42, 0.85)';
           ctx.beginPath();
-          ctx.roundRect(pt.x - tagW / 2, tagY - tagH / 2, tagW, tagH, 11);
+          ctx.roundRect(pt.x - tagW / 2, tagY - tagH / 2, tagW, tagH, 9 * z);
           ctx.fill();
-          ctx.strokeStyle = isHovered ? '#38bdf8' : 'rgba(100, 116, 139, 0.6)';
-          ctx.lineWidth = isHovered ? 2 : 1;
+          ctx.strokeStyle = isHovered ? '#38bdf8' : 'rgba(148, 163, 184, 0.5)';
+          ctx.lineWidth = 1.2;
           ctx.stroke();
 
           ctx.fillStyle = '#ffffff';
@@ -1101,197 +1103,117 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           ctx.textBaseline = 'middle';
           ctx.fillText(labelText, pt.x, tagY);
         } else if (item.type === 'cafe') {
-          // FEATURE 3: KAFE WARGA (Stall with awning, coffee, bread, ice cream)
+          // SOUTH: TOKO ROTI & KAFE WARGA (Exact Match to Screenshot)
           const pt = toScreen(cafeWx, cafeWy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
 
-          // Update Screen Pos for HTML menu overlay
           setCafeScreenPos({
             x: pt.x,
-            y: pt.y - 56,
+            y: pt.y - 40 * z,
             visible: true,
           });
 
-          // Ground shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-          ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y + 4, 32, 14, 0, 0, Math.PI * 2);
-          ctx.fill();
+          // Stall body (Warm wood/cream)
+          ctx.fillStyle = '#d97706';
+          ctx.fillRect(pt.x - 22 * z, pt.y - 12 * z, 44 * z, 20 * z);
 
-          // Wooden Counter
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(pt.x - 26, pt.y - 24, 52, 24);
-
-          // Green & White Striped Canvas Awning
-          const stripeW = 52 / 6;
-          for (let s = 0; s < 6; s++) {
-            ctx.fillStyle = s % 2 === 0 ? '#059669' : '#f8fafc';
-            ctx.fillRect(pt.x - 26 + s * stripeW, pt.y - 48, stripeW, 24);
+          // Striped red-white awning
+          for (let s = 0; s < 5; s++) {
+            ctx.fillStyle = s % 2 === 0 ? '#ef4444' : '#ffffff';
+            ctx.fillRect(pt.x - 22 * z + s * (44 * z / 5), pt.y - 20 * z, 44 * z / 5, 8 * z);
           }
 
-          // Awning roof slant
-          ctx.fillStyle = '#047857';
-          ctx.beginPath();
-          ctx.moveTo(pt.x - 28, pt.y - 48);
-          ctx.lineTo(pt.x, pt.y - 62);
-          ctx.lineTo(pt.x + 28, pt.y - 48);
-          ctx.closePath();
-          ctx.fill();
-
-          // Mini items on counter: ☕ Kopi, 🍞 Roti, 🍦 Eskrim
-          // ☕ Coffee Cup
+          // Signboard "TOKO ROTI"
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(pt.x - 18, pt.y - 28, 6, 8);
-          ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(pt.x - 17, pt.y - 26, 4, 4);
-
-          // 🍞 Bread Loaf
-          ctx.fillStyle = '#d97706';
-          ctx.beginPath();
-          ctx.roundRect(pt.x - 4, pt.y - 28, 10, 7, 3);
-          ctx.fill();
-
-          // 🍦 Ice cream cone
-          ctx.fillStyle = '#f59e0b';
-          ctx.beginPath();
-          ctx.moveTo(pt.x + 12, pt.y - 22);
-          ctx.lineTo(pt.x + 16, pt.y - 22);
-          ctx.lineTo(pt.x + 14, pt.y - 16);
-          ctx.closePath();
-          ctx.fill();
-          ctx.fillStyle = '#f472b6';
-          ctx.beginPath();
-          ctx.arc(pt.x + 14, pt.y - 24, 3.5, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Floating Cafe Badge
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-          ctx.beginPath();
-          ctx.roundRect(pt.x - 38, pt.y - 78, 76, 20, 10);
-          ctx.fill();
-          ctx.strokeStyle = '#10b981';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-
-          ctx.fillStyle = '#34d399';
-          ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
+          ctx.fillRect(pt.x - 16 * z, pt.y - 8 * z, 32 * z, 8 * z);
+          ctx.fillStyle = '#b45309';
+          ctx.font = `bold ${Math.round(6 * z)}px sans-serif`;
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('☕ Kafe Warga', pt.x, pt.y - 68);
+          ctx.fillText('TOKO ROTI', pt.x, pt.y - 2 * z);
         } else if (item.type === 'avatar') {
-          // FEATURE 3 & 4: AVATARS (Siswa, Guru, Polisi, Petugas Kebersihan, Kurir, Barista)
+          // AVATARS MATCHING SCREENSHOT EXACTLY
           const av = item.data;
           const pt = toScreen(av.wx, av.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
 
-          // Avatar Ground Shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          // Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
           ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y + 2, 10, 5, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x + 1, pt.y + 1, 7 * z, 3.5 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // Walking legs animation
-          const legSwing = av.isMoving ? Math.sin(av.walkFrame) * 6 : 0;
-          const bodyBob = av.isMoving ? Math.abs(Math.sin(av.walkFrame * 2)) * 2 : 0;
-          const avY = pt.y - bodyBob;
+          const legSwing = av.isMoving ? Math.sin(av.walkFrame) * 4 * z : 0;
+          const avY = pt.y - (av.isMoving ? Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0);
 
           // Legs
-          ctx.strokeStyle = '#334155';
-          ctx.lineWidth = 3.5;
-          ctx.lineCap = 'round';
-          // Left Leg
-          ctx.beginPath();
-          ctx.moveTo(pt.x - 3, avY - 8);
-          ctx.lineTo(pt.x - 3 + legSwing, avY);
-          ctx.stroke();
-          // Right Leg
-          ctx.beginPath();
-          ctx.moveTo(pt.x + 3, avY - 8);
-          ctx.lineTo(pt.x + 3 - legSwing, avY);
-          ctx.stroke();
+          ctx.fillStyle = av.pantsColor;
+          ctx.fillRect(pt.x - 3.5 * z, avY - 5 * z + legSwing, 3 * z, 6 * z);
+          ctx.fillRect(pt.x + 0.5 * z, avY - 5 * z - legSwing, 3 * z, 6 * z);
 
-          // Torso / Attire based on Role
-          ctx.fillStyle = av.color;
+          // Shirt
+          ctx.fillStyle = av.shirtColor;
           ctx.beginPath();
-          ctx.roundRect(pt.x - 6, avY - 22, 12, 14, 3);
+          ctx.roundRect(pt.x - 5 * z, avY - 14 * z, 10 * z, 9 * z, 2 * z);
           ctx.fill();
 
-          // Head / Face
-          ctx.fillStyle = '#fed7aa'; // Skin tone
+          // Head & Face
+          ctx.fillStyle = '#fed7aa';
           ctx.beginPath();
-          ctx.arc(pt.x, avY - 27, 6, 0, Math.PI * 2);
+          ctx.arc(pt.x, avY - 18 * z, 5 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Hair / Headgear based on role
-          if (av.role === 'polisi') {
-            // Police Cap (Blue with gold badge)
-            ctx.fillStyle = '#1e3a8a';
-            ctx.fillRect(pt.x - 7, avY - 34, 14, 5);
-            ctx.fillStyle = '#fde047';
-            ctx.beginPath();
-            ctx.arc(pt.x, avY - 32, 2, 0, Math.PI * 2);
-            ctx.fill();
-          } else if (av.role === 'petugas_kebersihan') {
-            // High-vis vest stripes & Green Cap
-            ctx.fillStyle = '#facc15';
-            ctx.fillRect(pt.x - 6, avY - 18, 12, 3);
-            ctx.fillStyle = '#15803d';
-            ctx.fillRect(pt.x - 6, avY - 34, 12, 5);
-            // Broom in hand
-            ctx.strokeStyle = '#a16207';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(pt.x + 7, avY - 24);
-            ctx.lineTo(pt.x + 11, avY + 2);
-            ctx.stroke();
-            ctx.fillStyle = '#fef08a';
-            ctx.fillRect(pt.x + 8, avY, 6, 4);
-          } else if (av.role === 'kurir') {
-            // Delivery Cap & Backpack parcel
-            ctx.fillStyle = '#dc2626';
-            ctx.fillRect(pt.x - 6, avY - 34, 12, 5);
-            // Delivery parcel backpack
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillRect(pt.x - 11, avY - 22, 5, 10);
-          } else if (av.role === 'guru') {
-            // Glasses & neat dark hair
-            ctx.fillStyle = '#1e293b';
-            ctx.fillRect(pt.x - 6, avY - 34, 12, 5);
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(pt.x - 4, avY - 28, 8, 3);
-          } else if (av.role === 'barista') {
-            // Apron
-            ctx.fillStyle = '#065f46';
-            ctx.fillRect(pt.x - 4, avY - 20, 8, 11);
-          } else {
-            // Siswa (Player) Hair
-            ctx.fillStyle = studentGender === 'P' ? '#7c2d12' : '#0f172a';
-            ctx.beginPath();
-            ctx.arc(pt.x, avY - 31, 6.5, Math.PI, 0);
-            ctx.fill();
+          // Hair
+          ctx.fillStyle = av.hairColor;
+          ctx.beginPath();
+          ctx.arc(pt.x, avY - 21 * z, 5.2 * z, Math.PI, 0);
+          ctx.fill();
+
+          // Floating Username Tag Pill (Exact Match)
+          const tagPosY = avY - 29 * z;
+          let labelText = `@${av.handle}`;
+          if (item.isPlayer) {
+            labelText = `@${av.handle} (Kamu)`;
           }
 
-          // Floating Username Pill Tag
-          const tagText = `@${av.handle}`;
-          ctx.font = 'bold 9.5px system-ui, -apple-system, sans-serif';
-          const tMetrics = ctx.measureText(tagText);
-          const tW = tMetrics.width + 12;
-          const tH = 17;
-          const tagPosY = avY - 42;
+          ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+          const tM = ctx.measureText(labelText);
+          const tW = tM.width + 10 * z;
+          const tH = 15 * z;
 
+          // Tag Pill background
           ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
           ctx.beginPath();
-          ctx.roundRect(pt.x - tW / 2, tagPosY - tH / 2, tW, tH, 8);
+          ctx.roundRect(pt.x - tW / 2, tagPosY - tH / 2, tW, tH, 7 * z);
           ctx.fill();
-          ctx.strokeStyle = item.isPlayer ? '#38bdf8' : 'rgba(148, 163, 184, 0.5)';
-          ctx.lineWidth = item.isPlayer ? 1.5 : 1;
-          ctx.stroke();
 
-          ctx.fillStyle = item.isPlayer ? '#7dd3fc' : '#f1f5f9';
+          if (item.isPlayer) {
+            ctx.strokeStyle = '#facc15'; // Gold highlight for player!
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = '#fde047'; // Yellow text
+          } else {
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+          }
+
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(tagText, pt.x, tagPosY);
+          ctx.fillText(labelText, pt.x, tagPosY);
 
-          // Comic Speech Bubble (if any)
+          // GURU Badge if Guru
+          if (av.role === 'guru') {
+            ctx.fillStyle = '#ea580c';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 14 * z, tagPosY + 10 * z, 28 * z, 10 * z, 4 * z);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.round(6.5 * z)}px sans-serif`;
+            ctx.fillText('GURU', pt.x, tagPosY + 15 * z);
+          }
+
+          // Comic Speech Bubble
           let speech: string | undefined = av.speechText;
           if (item.isPlayer && playerSpeechRef.current && Date.now() < playerSpeechRef.current.expiresAt) {
             speech = playerSpeechRef.current.text;
@@ -1301,23 +1223,21 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           }
 
           if (speech) {
-            ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
+            ctx.font = `bold ${Math.round(9 * z)}px sans-serif`;
             const sMetrics = ctx.measureText(speech);
-            const sW = sMetrics.width + 16;
-            const sH = 22;
-            const bubbleY = tagPosY - 22;
+            const sW = sMetrics.width + 14 * z;
+            const sH = 20 * z;
+            const bubbleY = tagPosY - 18 * z;
 
-            // White comic bubble
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.roundRect(pt.x - sW / 2, bubbleY - sH / 2, sW, sH, 11);
+            ctx.roundRect(pt.x - sW / 2, bubbleY - sH / 2, sW, sH, 10 * z);
             ctx.fill();
 
-            // Little speech arrow pointing down
             ctx.beginPath();
-            ctx.moveTo(pt.x - 4, bubbleY + sH / 2);
-            ctx.lineTo(pt.x + 4, bubbleY + sH / 2);
-            ctx.lineTo(pt.x, bubbleY + sH / 2 + 5);
+            ctx.moveTo(pt.x - 3, bubbleY + sH / 2);
+            ctx.lineTo(pt.x + 3, bubbleY + sH / 2);
+            ctx.lineTo(pt.x, bubbleY + sH / 2 + 4 * z);
             ctx.closePath();
             ctx.fill();
 
@@ -1330,28 +1250,26 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       });
 
       // ---------------------------------------------------------
-      // FEATURE 2: MALAM - KUNANG-KUNANG BERPENDAR (Animated Fireflies)
+      // 5. NOCTURNAL GLOWING FIREFLIES (Malam)
       // ---------------------------------------------------------
       if (isNight) {
         fireflies.forEach((f) => {
-          f.x = f.baseX + Math.sin(elapsed * f.speed + f.phase) * f.radiusX;
-          f.y = f.baseY + Math.cos(elapsed * (f.speed * 0.9) + f.phase * 1.5) * f.radiusY;
-          const fScreen = toScreen(f.x, f.y, 6 + Math.sin(elapsed * 2 + f.phase) * 4, camera.x, camera.y);
+          f.x = f.baseX + Math.sin(elapsed * f.speed + f.phase) * f.radius;
+          f.y = f.baseY + Math.cos(elapsed * (f.speed * 0.9) + f.phase * 1.5) * f.radius;
+          const fScreen = toScreen(f.x, f.y, 4, camera.x, camera.y);
 
-          const blink = 0.35 + 0.65 * Math.max(0, Math.sin(elapsed * f.blinkSpeed + f.phase));
+          const blink = 0.4 + 0.6 * Math.max(0, Math.sin(elapsed * f.blinkSpeed + f.phase));
 
-          // Soft green-yellow glow
-          const glow = ctx.createRadialGradient(fScreen.x, fScreen.y, 1, fScreen.x, fScreen.y, 8);
-          glow.addColorStop(0, `rgba(163, 230, 53, ${blink})`);
-          glow.addColorStop(0.6, `rgba(234, 179, 8, ${blink * 0.45})`);
-          glow.addColorStop(1, 'rgba(234, 179, 8, 0)');
+          const glow = ctx.createRadialGradient(fScreen.x, fScreen.y, 1, fScreen.x, fScreen.y, 10);
+          glow.addColorStop(0, `rgba(250, 204, 21, ${blink})`);
+          glow.addColorStop(0.5, `rgba(163, 230, 53, ${blink * 0.5})`);
+          glow.addColorStop(1, 'rgba(163, 230, 53, 0)');
           ctx.fillStyle = glow;
           ctx.beginPath();
-          ctx.arc(fScreen.x, fScreen.y, 8, 0, Math.PI * 2);
+          ctx.arc(fScreen.x, fScreen.y, 10, 0, Math.PI * 2);
           ctx.fill();
 
-          // Firefly core
-          ctx.fillStyle = `rgba(254, 240, 138, ${blink})`;
+          ctx.fillStyle = '#ffffff';
           ctx.beginPath();
           ctx.arc(fScreen.x, fScreen.y, 1.8, 0, Math.PI * 2);
           ctx.fill();
@@ -1370,11 +1288,11 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
   }, [studentName, studentGender]);
 
   // -------------------------------------------------------------
-  // FEATURE 3: KAFE WARGA ITEM PURCHASES (Kopi, Roti, Eskrim)
+  // KAFE ITEM PURCHASES
   // -------------------------------------------------------------
   const handleBuyCoffee = () => {
     sounds.playRewardXp();
-    setCafeToast('☕ Menikmati kopi hangat nikmat! Barista @nnisa_0311 tersenyum ramah.');
+    setCafeToast('☕ Menikmati kopi hangat di Kafe Warga!');
     baristaSpeechRef.current = {
       text: 'Kopi hangat siap, selamat menikmati! ☕',
       expiresAt: Date.now() + 5000,
@@ -1388,7 +1306,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
 
   const handleBuyBread = () => {
     sounds.playRewardXp();
-    setCafeToast('🍞 Roti panggang gurih disantap di taman kota!');
+    setCafeToast('🍞 Roti lezat baru dipanggang!');
     baristaSpeechRef.current = {
       text: 'Roti hangat baru dipanggang! 🍞',
       expiresAt: Date.now() + 5000,
@@ -1402,9 +1320,9 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
 
   const handleBuyIceCream = () => {
     sounds.playRewardXp();
-    setCafeToast('🍦 Eskrim vanila strawberry manis menyegarkan harimu di Kota Refleksi!');
+    setCafeToast('🍦 Eskrim manis menyegarkan harimu!');
     baristaSpeechRef.current = {
-      text: 'Eskrim manis spesial untuk warga teladan! 🍦',
+      text: 'Eskrim manis spesial untukmu! 🍦',
       expiresAt: Date.now() + 5000,
     };
     playerSpeechRef.current = {
@@ -1418,9 +1336,9 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     <div
       ref={containerRef}
       className="relative w-full h-full select-none overflow-hidden touch-none"
-      data-testid="town-canvas-2d"
+      data-testid="town-canvas-reference-exact"
     >
-      {/* 2D High Performance Canvas */}
+      {/* Isometric Canvas */}
       <canvas ref={canvasRef} className="block w-full h-full" />
 
       {/* Floating Cafe Card ONLY when Touched/Clicked */}
@@ -1432,13 +1350,12 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           onTouchStart={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="bg-[#1a2530]/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-slate-700/80 shadow-[0_12px_36px_0_rgba(0,0,0,0.65)] flex flex-col items-center gap-2.5 min-w-[260px]">
-            {/* Header with Close Button */}
+          <div className="bg-[#121e2c]/95 backdrop-blur-md text-white px-3.5 py-3 rounded-2xl border border-slate-700/80 shadow-[0_12px_36px_0_rgba(0,0,0,0.65)] flex flex-col items-center gap-2.5 min-w-[250px] max-w-[90vw]">
             <div className="w-full flex items-center justify-between border-b border-slate-700/70 pb-1.5">
               <div className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5 whitespace-nowrap">
-                <span className="font-extrabold text-white">Cafe buka</span>
+                <span className="font-extrabold text-white">Toko Roti & Kafe</span>
                 <span className="text-slate-500">•</span>
-                <span className="text-emerald-300 font-semibold">barista @nnisa_0311</span>
+                <span className="text-emerald-300 font-semibold">@barista_kiki</span>
               </div>
               <button
                 onClick={() => setIsCafeMenuOpen(false)}
@@ -1449,12 +1366,10 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
               </button>
             </div>
 
-            {/* 3 Menu Items: Kopi, Roti, and Eskrim */}
             <div className="flex items-center gap-2">
               <button
                 onClick={handleBuyCoffee}
                 className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
-                title="Beli Kopi Hangat"
               >
                 <span className="text-base">☕</span>
                 <span className="text-[10px] mt-0.5">Kopi - 2</span>
@@ -1462,7 +1377,6 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
               <button
                 onClick={handleBuyBread}
                 className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
-                title="Beli Roti Panggang"
               >
                 <span className="text-base">🍞</span>
                 <span className="text-[10px] mt-0.5">Roti - 1</span>
@@ -1470,7 +1384,6 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
               <button
                 onClick={handleBuyIceCream}
                 className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
-                title="Beli Eskrim Manis Segar"
               >
                 <span className="text-base">🍦</span>
                 <span className="text-[10px] mt-0.5">Eskrim - 1</span>
@@ -1482,11 +1395,36 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
 
       {/* Floating Cafe Toast Notification */}
       {cafeToast && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-[#1e293b]/95 backdrop-blur-md text-emerald-300 font-bold text-xs sm:text-sm px-4 py-2 rounded-full border border-emerald-500/40 shadow-2xl animate-fade-in-up flex items-center gap-2">
+        <div className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-40 bg-[#121e2c]/95 backdrop-blur-md text-emerald-300 font-bold text-xs sm:text-sm px-4 py-2 rounded-full border border-emerald-500/40 shadow-2xl animate-fade-in-up flex items-center gap-2 max-w-[90vw] text-center">
           <span>✨</span>
           <span>{cafeToast}</span>
         </div>
       )}
+
+      {/* BOTTOM-RIGHT ZOOM & CAMERA CONTROLS (Exact Match to Screenshot) */}
+      <div className="absolute bottom-6 right-4 sm:right-6 z-20 flex flex-col items-center gap-2 pointer-events-auto">
+        <button
+          onClick={handleZoomIn}
+          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95"
+          title="Perbesar Peta (+)"
+        >
+          <Plus className="w-4 h-4 text-slate-200" />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95"
+          title="Perkecil Peta (-)"
+        >
+          <Minus className="w-4 h-4 text-slate-200" />
+        </button>
+        <button
+          onClick={handleCenterOnPlayer}
+          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-rose-400 border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95"
+          title="Fokus ke Posisi Saya"
+        >
+          <MapPin className="w-4 h-4 text-rose-400" />
+        </button>
+      </div>
     </div>
   );
 };
