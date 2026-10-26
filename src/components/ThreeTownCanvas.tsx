@@ -62,13 +62,70 @@ interface Cloud {
   speed: number;
 }
 
+export const TREES_LIST: [number, number][] = [
+  // Top corner (North)
+  [0, -5.4],
+  [-1.8, -5.2],
+  [1.8, -5.2],
+  // Left edge (West)
+  [-5.2, -1.8],
+  [-5.4, 0],
+  [-5.2, 1.8],
+  [-3.8, 3.8],
+  // Bottom corner (South)
+  [-1.8, 5.2],
+  [0, 5.4],
+  [1.8, 5.2],
+  // Right edge (East)
+  [5.2, -1.8],
+  [5.4, 0],
+  [5.2, 1.8],
+  [3.8, 3.8],
+  // Center park trees
+  [-1.4, -1.4],
+  [1.4, -1.4],
+  [-1.4, 1.4],
+  [1.4, 1.4],
+];
+
+export const STREET_LAMPS_LIST: [number, number][] = [
+  // Pathway intersections along outer square
+  [-3.0, -1.5],
+  [-3.0, 1.5],
+  [3.0, -1.5],
+  [3.0, 1.5],
+  [-1.5, -3.0],
+  [1.5, -3.0],
+  [-1.5, 3.0],
+  [1.5, 3.0],
+  // Central spokes along main crossroads
+  [-1.8, 0],
+  [1.8, 0],
+  [0, -1.9],
+  [0, 1.9],
+  // Outer square corners
+  [-3.0, -3.0],
+  [3.0, -3.0],
+  [-3.0, 3.0],
+  [3.0, 3.0],
+];
+
+export interface EntryConfirmation {
+  type: 'building' | 'cafe';
+  id: BuildingId | 'cafe';
+  name: string;
+  tagline: string;
+  icon: string;
+  color?: number;
+}
+
 interface Firefly {
-  baseX: number;
-  baseY: number;
-  x: number;
-  y: number;
+  treeIndex: number;
+  angle: number;
   radius: number;
   speed: number;
+  altitude: number;
+  altitudeWave: number;
   phase: number;
   blinkSpeed: number;
 }
@@ -100,6 +157,11 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     y: 0,
     visible: false,
   });
+
+  // Entry confirmation modal state
+  const [pendingConfirmation, setPendingConfirmation] = useState<EntryConfirmation | null>(null);
+  const pendingConfirmationRef = useRef<EntryConfirmation | null>(null);
+  pendingConfirmationRef.current = pendingConfirmation;
 
   // User Camera Zoom State (+ / -)
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -364,19 +426,18 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       alpha: 0.4 + (i % 4) * 0.18,
     }));
 
-    // Floating glowing fireflies in nighttime
-    const fireflies: Firefly[] = Array.from({ length: 24 }, () => {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 1.5 + Math.random() * 4.5;
+    // Floating tiny glowing fireflies in nighttime (tightly orbiting trees)
+    const fireflies: Firefly[] = Array.from({ length: 36 }, (_, i) => {
+      const treeIndex = i % TREES_LIST.length;
       return {
-        baseX: Math.cos(angle) * dist,
-        baseY: Math.sin(angle) * dist,
-        x: 0,
-        y: 0,
-        radius: 4 + Math.random() * 5,
-        speed: 0.8 + Math.random() * 1.2,
+        treeIndex,
+        angle: Math.random() * Math.PI * 2,
+        radius: 0.32 + Math.random() * 0.45,
+        speed: (0.75 + Math.random() * 0.85) * (Math.random() > 0.5 ? 1 : -1),
+        altitude: 18 + Math.random() * 16,
+        altitudeWave: 1.2 + Math.random() * 1.8,
         phase: Math.random() * Math.PI * 2,
-        blinkSpeed: 1.5 + Math.random() * 2.5,
+        blinkSpeed: 1.8 + Math.random() * 2.5,
       };
     });
 
@@ -400,12 +461,18 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       const cafeDist = Math.hypot(wx - cafeWx, wy - cafeWy);
       if (cafeDist < 1.8) {
         sounds.playClick();
-        setIsCafeMenuOpen(true);
         player.targetWx = cafeWx;
         player.targetWy = cafeWy + 1.2;
         player.isMoving = true;
         pendingBuildingId = null;
         lastTouchedIdRef.current = 'cafe';
+        setPendingConfirmation({
+          type: 'cafe',
+          id: 'cafe',
+          name: 'Toko Roti & Kafe Warga',
+          tagline: 'Kopi hangat, roti lezat & eskrim menyegarkan',
+          icon: '☕',
+        });
         return;
       }
 
@@ -483,31 +550,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     // TREE POSITIONS MATCHING SCREENSHOT EXACTLY
     // (Lush double-sphere trees along outer perimeter and plaza edges)
     // -----------------------------------------------------------
-    const trees: [number, number][] = [
-      // Top corner (North)
-      [0, -5.4],
-      [-1.8, -5.2],
-      [1.8, -5.2],
-      // Left edge (West)
-      [-5.2, -1.8],
-      [-5.4, 0],
-      [-5.2, 1.8],
-      [-3.8, 3.8],
-      // Bottom corner (South)
-      [-1.8, 5.2],
-      [0, 5.4],
-      [1.8, 5.2],
-      // Right edge (East)
-      [5.2, -1.8],
-      [5.4, 0],
-      [5.2, 1.8],
-      [3.8, 3.8],
-      // Center park trees
-      [-1.4, -1.4],
-      [1.4, -1.4],
-      [-1.4, 1.4],
-      [1.4, 1.4],
-    ];
+    const trees = TREES_LIST;
 
     // -----------------------------------------------------------
     // MAIN RENDER LOOP
@@ -560,7 +603,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           else if (dx >= 0 && dy < 0) player.facing = 'up-right';
           else player.facing = 'up-left';
 
-          // Proximity touch check: auto-open modal when avatar touches building doorstep
+          // Proximity touch check: show confirmation popup when avatar touches building doorstep
           let touchedBuilding: BuildingId | null = null;
           for (const b of BUILDINGS_INFO) {
             const [bx, , by] = b.position;
@@ -574,22 +617,38 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
 
           const cafeDist = Math.hypot(player.wx - cafeWx, player.wy - cafeWy);
           if (cafeDist < 1.3) {
-            if (lastTouchedIdRef.current !== 'cafe') {
+            if (lastTouchedIdRef.current !== 'cafe' && !pendingConfirmationRef.current) {
               lastTouchedIdRef.current = 'cafe';
               player.isMoving = false;
               player.walkFrame = 0;
               pendingBuildingId = null;
               sounds.playClick();
-              setIsCafeMenuOpen(true);
+              setPendingConfirmation({
+                type: 'cafe',
+                id: 'cafe',
+                name: 'Toko Roti & Kafe Warga',
+                tagline: 'Kopi hangat, roti lezat & eskrim menyegarkan',
+                icon: '☕',
+              });
             }
           } else if (touchedBuilding) {
-            if (lastTouchedIdRef.current !== touchedBuilding) {
+            if (lastTouchedIdRef.current !== touchedBuilding && !pendingConfirmationRef.current) {
               lastTouchedIdRef.current = touchedBuilding;
               player.isMoving = false;
               player.walkFrame = 0;
               pendingBuildingId = null;
               sounds.playClick();
-              onSelectBuildingRef.current(touchedBuilding);
+              const bInfo = BUILDINGS_INFO.find((b) => b.id === touchedBuilding);
+              if (bInfo) {
+                setPendingConfirmation({
+                  type: 'building',
+                  id: bInfo.id,
+                  name: bInfo.name,
+                  tagline: bInfo.tagline,
+                  icon: bInfo.icon,
+                  color: bInfo.color,
+                });
+              }
             }
           } else if (lastTouchedIdRef.current) {
             // Player has moved away, allow re-trigger on next contact
@@ -611,7 +670,18 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
             const chosen = pendingBuildingId;
             pendingBuildingId = null;
             lastTouchedIdRef.current = chosen;
-            onSelectBuildingRef.current(chosen);
+            const bInfo = BUILDINGS_INFO.find((b) => b.id === chosen);
+            if (bInfo && !pendingConfirmationRef.current) {
+              sounds.playClick();
+              setPendingConfirmation({
+                type: 'building',
+                id: bInfo.id,
+                name: bInfo.name,
+                tagline: bInfo.tagline,
+                icon: bInfo.icon,
+                color: bInfo.color,
+              });
+            }
           }
         }
       }
@@ -839,13 +909,38 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       ctx.fill();
 
       // ---------------------------------------------------------
-      // 4. DRAW 3D ISOMETRIC BUILDINGS, TREES, AVATARS (Depth-Sorted)
+      // 3.5 STREET LIGHTING (Warm Illuminated Pools along Roads at Night)
+      // ---------------------------------------------------------
+      if (isNight) {
+        const z = zoomLevelRef.current;
+        STREET_LAMPS_LIST.forEach(([lx, ly]) => {
+          const pt = toScreen(lx, ly, 0, camera.x, camera.y);
+          const poolRadiusX = 42 * z;
+          const poolRadiusY = 21 * z;
+
+          // Warm radiating pool on cobblestones
+          const lightGrad = ctx.createRadialGradient(pt.x, pt.y, 2 * z, pt.x, pt.y, poolRadiusX);
+          lightGrad.addColorStop(0, 'rgba(254, 240, 138, 0.42)');
+          lightGrad.addColorStop(0.28, 'rgba(250, 204, 21, 0.22)');
+          lightGrad.addColorStop(0.65, 'rgba(234, 179, 8, 0.07)');
+          lightGrad.addColorStop(1, 'rgba(234, 179, 8, 0)');
+
+          ctx.fillStyle = lightGrad;
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y, poolRadiusX, poolRadiusY, 0, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      // ---------------------------------------------------------
+      // 4. DRAW 3D ISOMETRIC BUILDINGS, TREES, AVATARS & LAMPS (Depth-Sorted)
       // ---------------------------------------------------------
       type DrawItem =
         | { type: 'building'; info: BuildingInfo; depth: number }
         | { type: 'cafe'; depth: number }
         | { type: 'avatar'; data: AvatarData; isPlayer: boolean; depth: number }
-        | { type: 'tree'; wx: number; wy: number; depth: number };
+        | { type: 'tree'; wx: number; wy: number; depth: number }
+        | { type: 'lamp'; wx: number; wy: number; depth: number };
 
       const drawItems: DrawItem[] = [];
 
@@ -864,6 +959,10 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
 
       trees.forEach(([tx, ty]) => {
         drawItems.push({ type: 'tree', wx: tx, wy: ty, depth: tx + ty });
+      });
+
+      STREET_LAMPS_LIST.forEach(([lx, ly]) => {
+        drawItems.push({ type: 'lamp', wx: lx, wy: ly, depth: lx + ly });
       });
 
       drawItems.sort((a, b) => a.depth - b.depth);
@@ -1749,32 +1848,125 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
             ctx.textBaseline = 'middle';
             ctx.fillText(speech, pt.x, bubbleY);
           }
+        } else if (item.type === 'lamp') {
+          // STREET LAMP POST (Cast Iron Classical Lamppost with Warm Glowing Lantern)
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          const lampHeight = 35 * z;
+
+          // Small circular cast-iron base plate
+          ctx.fillStyle = isNight ? '#1e293b' : '#475569';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y, 4 * z, 2.2 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Dark cast iron pole
+          ctx.strokeStyle = isNight ? '#0f172a' : '#334155';
+          ctx.lineWidth = 2.4 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x, pt.y);
+          ctx.lineTo(pt.x, pt.y - lampHeight);
+          ctx.stroke();
+
+          // Decorative iron collar ring
+          ctx.fillStyle = isNight ? '#334155' : '#64748b';
+          ctx.fillRect(pt.x - 2.2 * z, pt.y - lampHeight * 0.42, 4.4 * z, 2.2 * z);
+
+          // Horizontal iron bracket
+          ctx.lineWidth = 1.8 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 4 * z, pt.y - lampHeight);
+          ctx.lineTo(pt.x + 4 * z, pt.y - lampHeight);
+          ctx.stroke();
+
+          // Lantern housing
+          const lanternY = pt.y - lampHeight - 3 * z;
+          const lanternW = 7.5 * z;
+          const lanternH = 9.5 * z;
+
+          if (isNight) {
+            // Bright radiating lantern halo
+            const lanternGlow = ctx.createRadialGradient(pt.x, lanternY, 2 * z, pt.x, lanternY, 26 * z);
+            lanternGlow.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+            lanternGlow.addColorStop(0.25, 'rgba(254, 240, 138, 0.85)');
+            lanternGlow.addColorStop(0.55, 'rgba(250, 204, 21, 0.42)');
+            lanternGlow.addColorStop(1, 'rgba(234, 179, 8, 0)');
+
+            ctx.fillStyle = lanternGlow;
+            ctx.beginPath();
+            ctx.arc(pt.x, lanternY, 26 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Glowing warm yellow glass chamber
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - lanternW / 2, lanternY - lanternH / 2, lanternW, lanternH, 2 * z);
+            ctx.fill();
+
+            // White hot incandescent filament dot
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(pt.x, lanternY, 1.8 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            // Daytime frosted glass
+            ctx.fillStyle = 'rgba(241, 245, 249, 0.85)';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - lanternW / 2, lanternY - lanternH / 2, lanternW, lanternH, 2 * z);
+            ctx.fill();
+          }
+
+          // Iron frame outline
+          ctx.strokeStyle = isNight ? '#0a0f18' : '#1e293b';
+          ctx.lineWidth = 1 * z;
+          ctx.strokeRect(pt.x - lanternW / 2, lanternY - lanternH / 2, lanternW, lanternH);
+
+          // Pyramid roof cap
+          ctx.fillStyle = isNight ? '#0a0f18' : '#1e293b';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - lanternW / 2 - 1.5 * z, lanternY - lanternH / 2);
+          ctx.lineTo(pt.x, lanternY - lanternH / 2 - 4.5 * z);
+          ctx.lineTo(pt.x + lanternW / 2 + 1.5 * z, lanternY - lanternH / 2);
+          ctx.closePath();
+          ctx.fill();
+
+          // Finial tip
+          ctx.beginPath();
+          ctx.arc(pt.x, lanternY - lanternH / 2 - 5 * z, 1.2 * z, 0, Math.PI * 2);
+          ctx.fill();
         }
       });
 
       // ---------------------------------------------------------
-      // 5. NOCTURNAL GLOWING FIREFLIES (Malam)
+      // 5. NOCTURNAL GLOWING FIREFLIES (Kecil & Mengitari Pohon)
       // ---------------------------------------------------------
       if (isNight) {
+        const z = zoomLevelRef.current;
         fireflies.forEach((f) => {
-          f.x = f.baseX + Math.sin(elapsed * f.speed + f.phase) * f.radius;
-          f.y = f.baseY + Math.cos(elapsed * (f.speed * 0.9) + f.phase * 1.5) * f.radius;
-          const fScreen = toScreen(f.x, f.y, 4, camera.x, camera.y);
+          f.angle += f.speed * delta;
+          const tree = trees[f.treeIndex];
+          const fx = tree[0] + Math.cos(f.angle) * f.radius;
+          const fy = tree[1] + Math.sin(f.angle) * f.radius;
+          const fAlt = f.altitude + Math.sin(elapsed * f.altitudeWave + f.phase) * 3.5;
+          const fScreen = toScreen(fx, fy, fAlt, camera.x, camera.y);
 
-          const blink = 0.4 + 0.6 * Math.max(0, Math.sin(elapsed * f.blinkSpeed + f.phase));
+          const blink = 0.35 + 0.65 * Math.max(0, Math.sin(elapsed * f.blinkSpeed + f.phase));
+          const glowRadius = Math.max(3, 5 * z);
 
-          const glow = ctx.createRadialGradient(fScreen.x, fScreen.y, 1, fScreen.x, fScreen.y, 10);
-          glow.addColorStop(0, `rgba(250, 204, 21, ${blink})`);
-          glow.addColorStop(0.5, `rgba(163, 230, 53, ${blink * 0.5})`);
-          glow.addColorStop(1, 'rgba(163, 230, 53, 0)');
+          // Delicate warm bioluminescent halo
+          const glow = ctx.createRadialGradient(fScreen.x, fScreen.y, 0.5, fScreen.x, fScreen.y, glowRadius);
+          glow.addColorStop(0, `rgba(254, 240, 138, ${blink * 0.9})`);
+          glow.addColorStop(0.4, `rgba(190, 242, 100, ${blink * 0.5})`);
+          glow.addColorStop(1, 'rgba(190, 242, 100, 0)');
           ctx.fillStyle = glow;
           ctx.beginPath();
-          ctx.arc(fScreen.x, fScreen.y, 10, 0, Math.PI * 2);
+          ctx.arc(fScreen.x, fScreen.y, glowRadius, 0, Math.PI * 2);
           ctx.fill();
 
-          ctx.fillStyle = '#ffffff';
+          // Tiny delicate glowing particle dot (0.9px - 1.1px)
+          ctx.fillStyle = `rgba(255, 255, 255, ${blink})`;
           ctx.beginPath();
-          ctx.arc(fScreen.x, fScreen.y, 1.8, 0, Math.PI * 2);
+          ctx.arc(fScreen.x, fScreen.y, Math.max(0.7, 0.95 * z), 0, Math.PI * 2);
           ctx.fill();
         });
       }
@@ -1843,6 +2035,70 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
     >
       {/* Isometric Canvas */}
       <canvas ref={canvasRef} className="block w-full h-full" />
+
+      {/* POP-UP KONFIRMASI MASUK BANGUNAN / KAFE */}
+      {pendingConfirmation && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fade-in pointer-events-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setPendingConfirmation(null);
+            }
+          }}
+        >
+          <div className="bg-[#121e2c]/95 border border-slate-700/80 rounded-2xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] max-w-sm w-full flex flex-col items-center text-center gap-3 animate-scale-up">
+            {/* Building Icon Badge */}
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500/20 via-slate-800 to-emerald-500/20 border border-slate-600/70 flex items-center justify-center text-3xl shadow-inner">
+              {pendingConfirmation.icon}
+            </div>
+
+            <div>
+              <div className="text-[11px] font-bold tracking-wider uppercase text-amber-400">
+                Kamu Berada di Depan
+              </div>
+              <h3 className="text-lg font-black text-white mt-0.5">
+                {pendingConfirmation.name}
+              </h3>
+              <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                {pendingConfirmation.tagline}
+              </p>
+            </div>
+
+            <div className="text-xs text-slate-400">
+              Apakah kamu ingin masuk ke dalam sekarang?
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2.5 w-full mt-1.5">
+              <button
+                onClick={() => {
+                  sounds.playClick();
+                  setPendingConfirmation(null);
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition cursor-pointer active:scale-95"
+              >
+                🚶 Nanti Saja
+              </button>
+
+              <button
+                onClick={() => {
+                  sounds.playOpenModal();
+                  const target = pendingConfirmation;
+                  setPendingConfirmation(null);
+                  if (target.type === 'cafe') {
+                    setIsCafeMenuOpen(true);
+                  } else {
+                    onSelectBuildingRef.current(target.id as BuildingId);
+                  }
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-900/40 border border-emerald-400/40 transition cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <span>🚪 Masuk Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Cafe Card ONLY when Touched/Clicked */}
       {isCafeMenuOpen && cafeScreenPos.visible && (
