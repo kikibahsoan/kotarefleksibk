@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 
@@ -277,7 +278,9 @@ interface ServerPublicChatMessage {
   isReported?: boolean;
 }
 
-let serverChatMessages: ServerPublicChatMessage[] = [
+const CHATS_FILE_PATH = path.join(__dirname, 'server_chats.json');
+
+const INITIAL_DEFAULT_CHATS: ServerPublicChatMessage[] = [
   {
     id: 'pchat-init-1',
     senderId: 'std-dkv-101',
@@ -285,7 +288,7 @@ let serverChatMessages: ServerPublicChatMessage[] = [
     senderHandle: '@budi_dkv',
     className: 'X DKV 1 (Desain Komunikasi Visual)',
     roomNumber: 1,
-    content: 'Halo teman-teman DKV 1! Sudah baca materi arsitektur Von Neumann di perpustakaan?',
+    content: 'Halo teman-teman DKV! Sudah baca materi arsitektur Von Neumann di perpustakaan?',
     timestamp: '23.10',
     createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
     avatarColor: '#38bdf8',
@@ -318,10 +321,36 @@ let serverChatMessages: ServerPublicChatMessage[] = [
 
 const MAX_SERVER_CHAT_MESSAGES = 25;
 
-// Automatically purge messages older than 24 hours and keep at most 25 newest messages
+function loadServerChatsFromFile(): ServerPublicChatMessage[] {
+  try {
+    if (fs.existsSync(CHATS_FILE_PATH)) {
+      const raw = fs.readFileSync(CHATS_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[server.ts] Could not read server_chats.json, using defaults:', err);
+  }
+  return INITIAL_DEFAULT_CHATS;
+}
+
+let serverChatMessages: ServerPublicChatMessage[] = loadServerChatsFromFile();
+
+function saveServerChatsToFile() {
+  try {
+    fs.writeFileSync(CHATS_FILE_PATH, JSON.stringify(serverChatMessages, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[server.ts] Failed to persist server_chats.json:', err);
+  }
+}
+
+// Automatically purge messages older than 24 hours (24 * 60 * 60 * 1000 ms) and keep at most 25 newest messages
 function purgeExpiredServerChats() {
   const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
   const cutoffTime = Date.now() - TWENTY_FOUR_HOURS;
+  const prevCount = serverChatMessages.length;
   serverChatMessages = serverChatMessages
     .filter((msg) => {
       const time = new Date(msg.createdAt).getTime();
@@ -329,19 +358,46 @@ function purgeExpiredServerChats() {
     })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, MAX_SERVER_CHAT_MESSAGES);
+
+  if (serverChatMessages.length !== prevCount) {
+    saveServerChatsToFile();
+  }
 }
 
-// Get chats (filtered by 24-hour expiration and max 25 messages)
-app.get('/api/chat/messages', (_req, res) => {
+// Initial purge on startup
+purgeExpiredServerChats();
+saveServerChatsToFile();
+
+// Background timer: periodically purge chats older than 24 hours every 60 seconds
+setInterval(purgeExpiredServerChats, 60 * 1000);
+
+// Get chats (filtered by 24-hour expiration and max 25 messages, with optional ?since=ISO or ?roomNumber=N)
+app.get('/api/chat/messages', (req, res) => {
   purgeExpiredServerChats();
-  const room = _req.query.roomNumber ? Number(_req.query.roomNumber) : undefined;
-  const filtered = room
-    ? serverChatMessages.filter((m) => m.roomNumber === room)
-    : serverChatMessages;
-  res.json({ success: true, data: filtered.slice(0, MAX_SERVER_CHAT_MESSAGES), ttlHours: 24, maxLimit: MAX_SERVER_CHAT_MESSAGES });
+  const room = req.query.roomNumber ? Number(req.query.roomNumber) : undefined;
+  const since = req.query.since ? String(req.query.since) : undefined;
+
+  let result = serverChatMessages;
+  if (room) {
+    result = result.filter((m) => m.roomNumber === room);
+  }
+  if (since) {
+    const sinceTime = new Date(since).getTime();
+    if (!isNaN(sinceTime)) {
+      result = result.filter((m) => new Date(m.createdAt).getTime() > sinceTime);
+    }
+  }
+
+  res.json({
+    success: true,
+    data: result.slice(0, MAX_SERVER_CHAT_MESSAGES),
+    ttlHours: 24,
+    maxLimit: MAX_SERVER_CHAT_MESSAGES,
+    serverTime: new Date().toISOString(),
+  });
 });
 
-// Post chat message (shared with all students, keeping only latest 25 messages)
+// Post chat message (shared with all students, persisted to disk and auto-purged after 24h)
 app.post('/api/chat/messages', (req, res) => {
   purgeExpiredServerChats();
   const { senderId, senderName, senderHandle, className, roomNumber, content, avatarColor } = req.body;
@@ -369,11 +425,16 @@ app.post('/api/chat/messages', (req, res) => {
   };
 
   serverChatMessages.unshift(newChat);
-  // Strictly enforce max 25 messages
-  if (serverChatMessages.length > MAX_SERVER_CHAT_MESSAGES) {
-    serverChatMessages = serverChatMessages.slice(0, MAX_SERVER_CHAT_MESSAGES);
-  }
-  res.json({ success: true, data: newChat, ttlHours: 24, maxLimit: MAX_SERVER_CHAT_MESSAGES });
+  // Strictly enforce max 25 messages and 24-hour limit
+  purgeExpiredServerChats();
+  saveServerChatsToFile();
+
+  res.json({
+    success: true,
+    data: newChat,
+    ttlHours: 24,
+    maxLimit: MAX_SERVER_CHAT_MESSAGES,
+  });
 });
 
 // Report chat message
@@ -382,6 +443,7 @@ app.post('/api/chat/report', (req, res) => {
   serverChatMessages = serverChatMessages.map((m) =>
     m.id === messageId ? { ...m, isReported: true } : m
   );
+  saveServerChatsToFile();
   res.json({ success: true, message: 'Laporan berhasil dicatat.' });
 });
 

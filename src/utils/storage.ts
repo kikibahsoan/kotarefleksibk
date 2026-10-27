@@ -325,6 +325,11 @@ export const StorageService = {
     safeSet(STORAGE_KEYS.PUBLIC_CHAT, cleaned);
     try {
       window.dispatchEvent(new CustomEvent('kota_refleksi_public_chat_updated', { detail: cleaned }));
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('kota_refleksi_channel');
+        bc.postMessage({ type: 'chat_updated', data: cleaned });
+        bc.close();
+      }
     } catch (e) {
       // safe fallback
     }
@@ -335,7 +340,8 @@ export const StorageService = {
     const msgMap = new Map<string, PublicChatMessage>();
     localItems.forEach((m) => msgMap.set(m.id, m));
 
-    // 1. Fetch shared messages from server API
+    // 1. Fetch shared messages strictly from dedicated lightweight chat endpoint (/api/chat/messages)
+    // Does NOT trigger full spreadsheet or reflection/feedback reloads
     try {
       const response = await fetch('/api/chat/messages');
       if (response.ok) {
@@ -347,23 +353,15 @@ export const StorageService = {
         }
       }
     } catch (err) {
-      // Offline / client-only mode
-    }
-
-    // 2. Fetch shared messages from Google Spreadsheet (device-to-device sync)
-    try {
-      const gasResult = await this.fetchFromGAS();
-      if (gasResult && gasResult.success && Array.isArray(gasResult.chats)) {
-        gasResult.chats.forEach((m: PublicChatMessage) => {
-          if (m && m.id) msgMap.set(m.id, m);
-        });
-      }
-    } catch (err) {
-      // Safe fallback
+      // Offline / client-only fallback
     }
 
     const merged = this.purgeExpiredPublicChats(Array.from(msgMap.values()));
-    this.setPublicChatMessages(merged);
+    const localIds = localItems.map((m) => m.id).join(',');
+    const mergedIds = merged.map((m) => m.id).join(',');
+    if (localIds !== mergedIds) {
+      this.setPublicChatMessages(merged);
+    }
     return merged;
   },
 

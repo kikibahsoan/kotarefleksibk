@@ -11,6 +11,8 @@ interface ThreeTownCanvasProps {
   studentGender?: string;
   timeOfDay?: 'day' | 'night' | 'auto';
   latestMessage?: PublicChatMessage | null;
+  studentPoints?: number;
+  onDeductPoints?: (amount: number, reason: string) => boolean;
 }
 
 export interface BuildingInfo {
@@ -119,6 +121,58 @@ export interface EntryConfirmation {
   color?: number;
 }
 
+export interface SolidObstacle {
+  minWx: number;
+  maxWx: number;
+  minWy: number;
+  maxWy: number;
+}
+
+export const SOLID_BUILDING_OBSTACLES: SolidObstacle[] = [
+  // Balai Kota
+  { minWx: -1.35, maxWx: 1.35, minWy: -5.0, maxWy: -3.4 },
+  // Menara Mentor
+  { minWx: 3.3, maxWx: 5.0, minWy: -1.0, maxWy: 1.0 },
+  // Perpustakaan Kampus
+  { minWx: -5.0, maxWx: -3.3, minWy: -1.0, maxWy: 1.0 },
+  // Pasar Prestasi
+  { minWx: -3.6, maxWx: -2.0, minWy: 2.0, maxWy: 3.6 },
+  // Kantor Pos
+  { minWx: 2.0, maxWx: 3.6, minWy: -3.6, maxWy: -2.0 },
+  // Taman Refleksi (Gazebo & Pagoda)
+  { minWx: -3.6, maxWx: -2.0, minWy: -3.6, maxWy: -2.0 },
+  // Lab DKV & Bengkel
+  { minWx: 2.0, maxWx: 3.6, minWy: 2.0, maxWy: 3.6 },
+  // Toko Roti & Kafe
+  { minWx: -1.1, maxWx: 0.1, minWy: 1.9, maxWy: 2.9 },
+];
+
+export const isSolidCollision = (wx: number, wy: number, padding: number = 0.16): boolean => {
+  // Island edges
+  if (wx < -5.0 + padding || wx > 5.0 - padding || wy < -5.0 + padding || wy > 5.0 - padding) {
+    return true;
+  }
+
+  // Central Fountain pool
+  if (Math.hypot(wx, wy) < 0.92 + padding) {
+    return true;
+  }
+
+  // Solid buildings
+  for (const b of SOLID_BUILDING_OBSTACLES) {
+    if (
+      wx >= b.minWx - padding &&
+      wx <= b.maxWx + padding &&
+      wy >= b.minWy - padding &&
+      wy <= b.maxWy + padding
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 interface Firefly {
   treeIndex: number;
   angle: number;
@@ -137,7 +191,7 @@ interface Star {
   alpha: number;
 }
 
-export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
+export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTownCanvas({
   onSelectBuilding,
   activeBuilding,
   newMateriBuildingIds,
@@ -145,7 +199,9 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
   studentGender = 'L',
   timeOfDay = 'night',
   latestMessage,
-}) => {
+  studentPoints = 100,
+  onDeductPoints,
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -461,8 +517,8 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       const cafeDist = Math.hypot(wx - cafeWx, wy - cafeWy);
       if (cafeDist < 1.8) {
         sounds.playClick();
-        player.targetWx = cafeWx;
-        player.targetWy = cafeWy + 1.2;
+        player.targetWx = -0.5;
+        player.targetWy = 1.4; // Counter front outside obstacle
         player.isMoving = true;
         pendingBuildingId = null;
         lastTouchedIdRef.current = 'cafe';
@@ -480,10 +536,25 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
         const dist = Math.hypot(wx - bx, wy - by);
-        if (dist < 2.0 || (Math.abs(wx - bx) < 1.7 && Math.abs(wy - by) < 1.7)) {
+        if (dist < 2.1 || (Math.abs(wx - bx) < 1.7 && Math.abs(wy - by) < 1.7)) {
           sounds.playClick();
-          player.targetWx = bx * 0.75;
-          player.targetWy = by * 0.75;
+          // Walk to doorstep outside solid collision zone
+          if (b.id === 'balai_kota') {
+            player.targetWx = 0;
+            player.targetWy = -3.0;
+          } else if (b.id === 'menara_mentor') {
+            player.targetWx = 2.9;
+            player.targetWy = 0;
+          } else if (b.id === 'perpustakaan') {
+            player.targetWx = -2.9;
+            player.targetWy = 0;
+          } else if (b.id === 'monumen_warga') {
+            player.targetWx = 0;
+            player.targetWy = 1.25;
+          } else {
+            player.targetWx = bx * 0.68;
+            player.targetWy = by * 0.68;
+          }
           player.isMoving = true;
           pendingBuildingId = b.id;
           lastTouchedIdRef.current = null;
@@ -493,8 +564,18 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
 
       // 3. Click on ground to walk
       sounds.playClick();
-      player.targetWx = Math.max(-5.2, Math.min(5.2, wx));
-      player.targetWy = Math.max(-5.2, Math.min(5.2, wy));
+      let targetX = Math.max(-4.9, Math.min(4.9, wx));
+      let targetY = Math.max(-4.9, Math.min(4.9, wy));
+      if (isSolidCollision(targetX, targetY, 0.1)) {
+        // Nudge slightly towards player's current location to remain outside
+        const dirX = player.wx - targetX;
+        const dirY = player.wy - targetY;
+        const d = Math.hypot(dirX, dirY) || 1;
+        targetX += (dirX / d) * 0.6;
+        targetY += (dirY / d) * 0.6;
+      }
+      player.targetWx = targetX;
+      player.targetWy = targetY;
       player.isMoving = true;
       pendingBuildingId = null;
       lastTouchedIdRef.current = null;
@@ -586,7 +667,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       camera.x += (camera.targetX - camera.x) * (delta * 4.5);
       camera.y += (camera.targetY - camera.y) * (delta * 4.5);
 
-      // Update Player Movement (Natural relaxed cadence and touch trigger)
+      // Update Player Movement (Natural relaxed cadence, obstacle sliding & non-blocking touch trigger)
       if (player.isMoving) {
         const dx = player.targetWx - player.wx;
         const dy = player.targetWy - player.wy;
@@ -594,34 +675,57 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
 
         if (dist > 0.12) {
           const step = Math.min(dist, player.speed * delta);
-          player.wx += (dx / dist) * step;
-          player.wy += (dy / dist) * step;
-          player.walkFrame += delta * 7.5; // Natural step frequency matching speed 2.2
+          const stepX = (dx / dist) * step;
+          const stepY = (dy / dist) * step;
+
+          const nextWx = player.wx + stepX;
+          const nextWy = player.wy + stepY;
+
+          // Solid obstacle collision check with wall sliding
+          if (!isSolidCollision(nextWx, nextWy, 0.16)) {
+            player.wx = nextWx;
+            player.wy = nextWy;
+            player.walkFrame += delta * 7.5;
+          } else {
+            // Wall sliding: try X movement only
+            const canMoveX = !isSolidCollision(nextWx, player.wy, 0.16);
+            // Wall sliding: try Y movement only
+            const canMoveY = !isSolidCollision(player.wx, nextWy, 0.16);
+
+            if (canMoveX) {
+              player.wx = nextWx;
+              player.walkFrame += delta * 7.5;
+            } else if (canMoveY) {
+              player.wy = nextWy;
+              player.walkFrame += delta * 7.5;
+            } else {
+              // Blocked completely by building wall
+              player.isMoving = false;
+              player.walkFrame = 0;
+            }
+          }
 
           if (dx >= 0 && dy >= 0) player.facing = 'down-right';
           else if (dx < 0 && dy >= 0) player.facing = 'down-left';
           else if (dx >= 0 && dy < 0) player.facing = 'up-right';
           else player.facing = 'up-left';
 
-          // Proximity touch check: show confirmation popup when avatar touches building doorstep
-          let touchedBuilding: BuildingId | null = null;
+          // Proximity touch check: show confirmation popup at top WITHOUT interrupting player movement!
+          let touchedBuilding: BuildingInfo | null = null;
           for (const b of BUILDINGS_INFO) {
             const [bx, , by] = b.position;
             const bDist = Math.hypot(player.wx - bx, player.wy - by);
-            const threshold = b.id === 'monumen_warga' ? 1.15 : 1.4;
+            const threshold = b.id === 'monumen_warga' ? 1.4 : 1.7;
             if (bDist < threshold) {
-              touchedBuilding = b.id;
+              touchedBuilding = b;
               break;
             }
           }
 
           const cafeDist = Math.hypot(player.wx - cafeWx, player.wy - cafeWy);
-          if (cafeDist < 1.3) {
-            if (lastTouchedIdRef.current !== 'cafe' && !pendingConfirmationRef.current) {
+          if (cafeDist < 1.6) {
+            if (lastTouchedIdRef.current !== 'cafe') {
               lastTouchedIdRef.current = 'cafe';
-              player.isMoving = false;
-              player.walkFrame = 0;
-              pendingBuildingId = null;
               sounds.playClick();
               setPendingConfirmation({
                 type: 'cafe',
@@ -632,35 +736,34 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
               });
             }
           } else if (touchedBuilding) {
-            if (lastTouchedIdRef.current !== touchedBuilding && !pendingConfirmationRef.current) {
-              lastTouchedIdRef.current = touchedBuilding;
-              player.isMoving = false;
-              player.walkFrame = 0;
-              pendingBuildingId = null;
+            if (lastTouchedIdRef.current !== touchedBuilding.id) {
+              lastTouchedIdRef.current = touchedBuilding.id;
               sounds.playClick();
-              const bInfo = BUILDINGS_INFO.find((b) => b.id === touchedBuilding);
-              if (bInfo) {
-                setPendingConfirmation({
-                  type: 'building',
-                  id: bInfo.id,
-                  name: bInfo.name,
-                  tagline: bInfo.tagline,
-                  icon: bInfo.icon,
-                  color: bInfo.color,
-                });
-              }
+              setPendingConfirmation({
+                type: 'building',
+                id: touchedBuilding.id,
+                name: touchedBuilding.name,
+                tagline: touchedBuilding.tagline,
+                icon: touchedBuilding.icon,
+                color: touchedBuilding.color,
+              });
             }
           } else if (lastTouchedIdRef.current) {
-            // Player has moved away, allow re-trigger on next contact
+            // Player has moved away from building/cafe: auto-dismiss top popup
             const prevId = lastTouchedIdRef.current;
+            let away = false;
             if (prevId === 'cafe') {
-              if (cafeDist > 1.8) lastTouchedIdRef.current = null;
+              if (cafeDist > 2.0) away = true;
             } else {
               const prevB = BUILDINGS_INFO.find((b) => b.id === prevId);
               if (prevB) {
                 const d = Math.hypot(player.wx - prevB.position[0], player.wy - prevB.position[2]);
-                if (d > 1.8) lastTouchedIdRef.current = null;
+                if (d > 2.1) away = true;
               }
+            }
+            if (away) {
+              lastTouchedIdRef.current = null;
+              setPendingConfirmation(null);
             }
           }
         } else {
@@ -671,7 +774,7 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
             pendingBuildingId = null;
             lastTouchedIdRef.current = chosen;
             const bInfo = BUILDINGS_INFO.find((b) => b.id === chosen);
-            if (bInfo && !pendingConfirmationRef.current) {
+            if (bInfo) {
               sounds.playClick();
               setPendingConfirmation({
                 type: 'building',
@@ -1983,48 +2086,84 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
   }, [studentName, studentGender]);
 
   // -------------------------------------------------------------
-  // KAFE ITEM PURCHASES
+  // KAFE ITEM PURCHASES (Deduct XP Saldo)
   // -------------------------------------------------------------
   const handleBuyCoffee = () => {
-    sounds.playRewardXp();
-    setCafeToast('☕ Menikmati kopi hangat di Kafe Warga!');
-    baristaSpeechRef.current = {
-      text: 'Kopi hangat siap, selamat menikmati! ☕',
-      expiresAt: Date.now() + 5000,
-    };
-    playerSpeechRef.current = {
-      text: 'Mantap kopinya! ☕',
-      expiresAt: Date.now() + 5000,
-    };
-    setTimeout(() => setCafeToast(null), 3500);
+    const cost = 2;
+    if (studentPoints < cost) {
+      sounds.playClick();
+      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP, saldo kamu ${studentPoints} XP.`);
+      setTimeout(() => setCafeToast(null), 3500);
+      return;
+    }
+
+    const success = onDeductPoints ? onDeductPoints(cost, 'Kopi Hangat Kafe') : true;
+    if (success) {
+      sounds.playRewardXp();
+      const remaining = studentPoints - cost;
+      setCafeToast(`☕ Menikmati kopi hangat di Kafe Warga! (-2 XP) • Sisa Saldo: ${remaining} XP`);
+      baristaSpeechRef.current = {
+        text: `Kopi hangat siap, selamat menikmati! ☕ (-2 XP)`,
+        expiresAt: Date.now() + 5000,
+      };
+      playerSpeechRef.current = {
+        text: 'Mantap kopinya! ☕',
+        expiresAt: Date.now() + 5000,
+      };
+      setTimeout(() => setCafeToast(null), 3800);
+    }
   };
 
   const handleBuyBread = () => {
-    sounds.playRewardXp();
-    setCafeToast('🍞 Roti lezat baru dipanggang!');
-    baristaSpeechRef.current = {
-      text: 'Roti hangat baru dipanggang! 🍞',
-      expiresAt: Date.now() + 5000,
-    };
-    playerSpeechRef.current = {
-      text: 'Enak banget rotinya! 🍞',
-      expiresAt: Date.now() + 5000,
-    };
-    setTimeout(() => setCafeToast(null), 3500);
+    const cost = 1;
+    if (studentPoints < cost) {
+      sounds.playClick();
+      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP, saldo kamu ${studentPoints} XP.`);
+      setTimeout(() => setCafeToast(null), 3500);
+      return;
+    }
+
+    const success = onDeductPoints ? onDeductPoints(cost, 'Roti Panggang Kafe') : true;
+    if (success) {
+      sounds.playRewardXp();
+      const remaining = studentPoints - cost;
+      setCafeToast(`🍞 Roti lezat baru dipanggang! (-1 XP) • Sisa Saldo: ${remaining} XP`);
+      baristaSpeechRef.current = {
+        text: `Roti hangat baru dipanggang! 🍞 (-1 XP)`,
+        expiresAt: Date.now() + 5000,
+      };
+      playerSpeechRef.current = {
+        text: 'Enak banget rotinya! 🍞',
+        expiresAt: Date.now() + 5000,
+      };
+      setTimeout(() => setCafeToast(null), 3800);
+    }
   };
 
   const handleBuyIceCream = () => {
-    sounds.playRewardXp();
-    setCafeToast('🍦 Eskrim manis menyegarkan harimu!');
-    baristaSpeechRef.current = {
-      text: 'Eskrim manis spesial untukmu! 🍦',
-      expiresAt: Date.now() + 5000,
-    };
-    playerSpeechRef.current = {
-      text: 'Segar banget eskrimnya! 🍦',
-      expiresAt: Date.now() + 5000,
-    };
-    setTimeout(() => setCafeToast(null), 3500);
+    const cost = 1;
+    if (studentPoints < cost) {
+      sounds.playClick();
+      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP, saldo kamu ${studentPoints} XP.`);
+      setTimeout(() => setCafeToast(null), 3500);
+      return;
+    }
+
+    const success = onDeductPoints ? onDeductPoints(cost, 'Eskrim Kafe') : true;
+    if (success) {
+      sounds.playRewardXp();
+      const remaining = studentPoints - cost;
+      setCafeToast(`🍦 Eskrim manis menyegarkan harimu! (-1 XP) • Sisa Saldo: ${remaining} XP`);
+      baristaSpeechRef.current = {
+        text: `Eskrim manis spesial untukmu! 🍦 (-1 XP)`,
+        expiresAt: Date.now() + 5000,
+      };
+      playerSpeechRef.current = {
+        text: 'Segar banget eskrimnya! 🍦',
+        expiresAt: Date.now() + 5000,
+      };
+      setTimeout(() => setCafeToast(null), 3800);
+    }
   };
 
   return (
@@ -2036,50 +2175,33 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       {/* Isometric Canvas */}
       <canvas ref={canvasRef} className="block w-full h-full" />
 
-      {/* POP-UP KONFIRMASI MASUK BANGUNAN / KAFE */}
+      {/* POP-UP KONFIRMASI MASUK BANGUNAN / KAFE (PADA BAGIAN ATAS, TANPA MENGGANGGU PERGERAKAN AVATAR) */}
       {pendingConfirmation && (
-        <div
-          className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fade-in pointer-events-auto"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setPendingConfirmation(null);
-            }
-          }}
+        <aside
+          aria-label="Konfirmasi Masuk Bangunan"
+          className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-md pointer-events-auto animate-fade-in-down"
         >
-          <div className="bg-[#121e2c]/95 border border-slate-700/80 rounded-2xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] max-w-sm w-full flex flex-col items-center text-center gap-3 animate-scale-up">
-            {/* Building Icon Badge */}
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500/20 via-slate-800 to-emerald-500/20 border border-slate-600/70 flex items-center justify-center text-3xl shadow-inner">
-              {pendingConfirmation.icon}
-            </div>
-
-            <div>
-              <div className="text-[11px] font-bold tracking-wider uppercase text-amber-400">
-                Kamu Berada di Depan
+          <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-3 sm:p-3.5 shadow-[0_12px_36px_rgba(0,0,0,0.8)] flex items-center justify-between gap-3">
+            {/* Left: Building Icon & Name */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500/20 via-slate-800 to-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                {pendingConfirmation.icon}
               </div>
-              <h3 className="text-lg font-black text-white mt-0.5">
-                {pendingConfirmation.name}
-              </h3>
-              <p className="text-xs text-slate-300 mt-1 line-clamp-2">
-                {pendingConfirmation.tagline}
-              </p>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1">
+                  <span>📍 Dekat Bangunan</span>
+                </div>
+                <h4 className="text-xs sm:text-sm font-extrabold text-white truncate leading-tight">
+                  {pendingConfirmation.name}
+                </h4>
+                <p className="text-[10px] sm:text-[11px] text-slate-300 truncate">
+                  {pendingConfirmation.tagline}
+                </p>
+              </div>
             </div>
 
-            <div className="text-xs text-slate-400">
-              Apakah kamu ingin masuk ke dalam sekarang?
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2.5 w-full mt-1.5">
-              <button
-                onClick={() => {
-                  sounds.playClick();
-                  setPendingConfirmation(null);
-                }}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition cursor-pointer active:scale-95"
-              >
-                🚶 Nanti Saja
-              </button>
-
+            {/* Right: Enter and Dismiss Buttons */}
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => {
                   sounds.playOpenModal();
@@ -2091,13 +2213,23 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
                     onSelectBuildingRef.current(target.id as BuildingId);
                   }
                 }}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-900/40 border border-emerald-400/40 transition cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 border border-emerald-400/40 transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
               >
-                <span>🚪 Masuk Sekarang</span>
+                <span>🚪 Masuk</span>
+              </button>
+              <button
+                onClick={() => {
+                  sounds.playClick();
+                  setPendingConfirmation(null);
+                }}
+                className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition cursor-pointer"
+                title="Abaikan"
+              >
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
-        </div>
+        </aside>
       )}
 
       {/* Floating Cafe Card ONLY when Touched/Clicked */}
@@ -2109,12 +2241,12 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
           onTouchStart={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="bg-[#121e2c]/95 backdrop-blur-md text-white px-3.5 py-3 rounded-2xl border border-slate-700/80 shadow-[0_12px_36px_0_rgba(0,0,0,0.65)] flex flex-col items-center gap-2.5 min-w-[250px] max-w-[90vw]">
+          <div className="bg-[#121e2c]/95 backdrop-blur-md text-white px-3.5 py-3 rounded-2xl border border-slate-700/80 shadow-[0_12px_36px_0_rgba(0,0,0,0.65)] flex flex-col items-center gap-2.5 min-w-[260px] max-w-[90vw]">
             <div className="w-full flex items-center justify-between border-b border-slate-700/70 pb-1.5">
               <div className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5 whitespace-nowrap">
                 <span className="font-extrabold text-white">Toko Roti & Kafe</span>
                 <span className="text-slate-500">•</span>
-                <span className="text-emerald-300 font-semibold">@barista_kiki</span>
+                <span className="text-amber-400 font-mono text-[10px]">🪙 {studentPoints} XP</span>
               </div>
               <button
                 onClick={() => setIsCafeMenuOpen(false)}
@@ -2131,21 +2263,21 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
                 className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
               >
                 <span className="text-base">☕</span>
-                <span className="text-[10px] mt-0.5">Kopi - 2</span>
+                <span className="text-[10px] mt-0.5">Kopi (-2 XP)</span>
               </button>
               <button
                 onClick={handleBuyBread}
                 className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
               >
                 <span className="text-base">🍞</span>
-                <span className="text-[10px] mt-0.5">Roti - 1</span>
+                <span className="text-[10px] mt-0.5">Roti (-1 XP)</span>
               </button>
               <button
                 onClick={handleBuyIceCream}
                 className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
               >
                 <span className="text-base">🍦</span>
-                <span className="text-[10px] mt-0.5">Eskrim - 1</span>
+                <span className="text-[10px] mt-0.5">Eskrim (-1 XP)</span>
               </button>
             </div>
           </div>
@@ -2160,25 +2292,25 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
         </div>
       )}
 
-      {/* BOTTOM-RIGHT ZOOM & CAMERA CONTROLS (Positioned above mobile input bar) */}
-      <div className="absolute bottom-16 sm:bottom-6 right-3 sm:right-6 z-20 flex flex-col items-center gap-2 pointer-events-auto">
+      {/* BOTTOM-RIGHT ZOOM & CAMERA CONTROLS (Positioned cleanly above mobile chat input) */}
+      <div className="absolute bottom-20 sm:bottom-6 right-3 sm:right-6 z-30 flex flex-col items-center gap-2 pointer-events-auto">
         <button
           onClick={handleZoomIn}
-          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95"
+          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer"
           title="Perbesar Peta (+)"
         >
           <Plus className="w-4 h-4 text-slate-200" />
         </button>
         <button
           onClick={handleZoomOut}
-          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95"
+          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer"
           title="Perkecil Peta (-)"
         >
           <Minus className="w-4 h-4 text-slate-200" />
         </button>
         <button
           onClick={handleCenterOnPlayer}
-          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-rose-400 border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95"
+          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-rose-400 border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer"
           title="Fokus ke Posisi Saya"
         >
           <MapPin className="w-4 h-4 text-rose-400" />
@@ -2186,4 +2318,4 @@ export const ThreeTownCanvas: React.FC<ThreeTownCanvasProps> = ({
       </div>
     </div>
   );
-};
+});

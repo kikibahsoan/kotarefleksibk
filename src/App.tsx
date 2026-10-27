@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Student,
   Materi,
@@ -31,6 +31,7 @@ import { PasarPrestasiModal } from './components/modals/PasarPrestasiModal.tsx';
 import { RuangGuruModal } from './components/modals/RuangGuruModal.tsx';
 import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal.tsx';
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
+import { LofiAudioControl } from './components/LofiAudioControl.tsx';
 import { PublicChatMessage } from './types/index.ts';
 import {
   LogOut,
@@ -85,14 +86,21 @@ export default function App() {
   const [publicChats, setPublicChats] = useState<PublicChatMessage[]>(() =>
     StorageService.getPublicChatMessages()
   );
+  const publicChatsRef = useRef(publicChats);
+  publicChatsRef.current = publicChats;
+
   const [latestChat, setLatestChat] = useState<PublicChatMessage | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
 
-  // Sync public chat updates
+  // Sync public chat updates via event - only update if data changed
   useEffect(() => {
     const handleUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) {
-        setPublicChats(e.detail);
+        const curIds = publicChatsRef.current.map((c) => c.id).join(',');
+        const newIds = e.detail.map((c: any) => c.id).join(',');
+        if (curIds !== newIds) {
+          setPublicChats(e.detail);
+        }
       }
     };
     window.addEventListener('kota_refleksi_public_chat_updated', handleUpdate);
@@ -121,7 +129,106 @@ export default function App() {
     }
   };
 
-  const handleSendWorldChat = async (text: string) => {
+  // Auto-sync world chat strictly from dedicated server endpoint (/api/chat/messages)
+  // Only updates state if new chat messages actually arrived or expired
+  // Prevents heavy full-app reloads or disruptions to 3D canvas and other modules
+  useEffect(() => {
+    let isCancelled = false;
+
+    const pullRemoteChats = async () => {
+      try {
+        const currentList = publicChatsRef.current;
+        const prevIds = currentList.map((c: PublicChatMessage) => c.id).join(',');
+        const remoteList = await StorageService.fetchPublicChatMessages();
+        if (isCancelled) return;
+
+        const newIds = remoteList.map((c: PublicChatMessage) => c.id).join(',');
+        // If chat IDs are identical, exit early to prevent ANY re-rendering of App or canvas
+        if (prevIds === newIds) {
+          return;
+        }
+
+        const prevIdSet = new Set(currentList.map((c: PublicChatMessage) => c.id));
+        // Check if there are brand-new incoming messages from other students
+        const incomingFromOthers = remoteList.filter(
+          (msg: PublicChatMessage) => !prevIdSet.has(msg.id) && msg.senderId !== student?.id
+        );
+
+        if (incomingFromOthers.length > 0) {
+          // Display the newest incoming message in bubble & play gentle chime
+          setLatestChat(incomingFromOthers[0]);
+          playChimeSound();
+        }
+
+        setPublicChats(remoteList);
+      } catch (err) {
+        // Safe silent fallback
+      }
+    };
+
+    pullRemoteChats();
+    const interval = setInterval(pullRemoteChats, 3500);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [student?.id]);
+
+  // Add points to student saldo (from missions, reflection, quiz, chat)
+  const handleAddPoints = (amount: number, _reason?: string) => {
+    if (!student) return;
+    const newPoints = student.points + amount;
+    const myReflections = reflections.filter((r) => r.studentId === student.id);
+    const myMessages = messages.filter((m) => m.studentId === student.id);
+    const newBadges = evaluateBadges(student, myReflections, 1, myMessages.length);
+
+    const updatedStudent: Student = {
+      ...student,
+      points: newPoints,
+      badges: newBadges,
+    };
+
+    setStudent(updatedStudent);
+    StorageService.saveOrUpdateStudent(updatedStudent);
+
+    try {
+      confetti({
+        particleCount: 50,
+        spread: 70,
+        origin: { y: 0.65 },
+      });
+    } catch (e) {
+      // Safe fallback
+    }
+  };
+
+  const handleSelectBuilding = useCallback((buildingId: BuildingId) => {
+    setActiveBuilding(buildingId);
+  }, []);
+
+  // Deduct points from student saldo (buying coffee -2, bread -1, ice cream -1)
+  const handleDeductPoints = useCallback((amount: number, _reason?: string): boolean => {
+    let success = false;
+    setStudent((prevStudent) => {
+      if (!prevStudent) return null;
+      if (prevStudent.points < amount) {
+        success = false;
+        return prevStudent;
+      }
+      success = true;
+      const newPoints = Math.max(0, prevStudent.points - amount);
+      const updatedStudent: Student = {
+        ...prevStudent,
+        points: newPoints,
+      };
+      StorageService.saveOrUpdateStudent(updatedStudent);
+      return updatedStudent;
+    });
+    return success;
+  }, []);
+
+  const handleSendWorldChat = (text: string) => {
     if (!student) return;
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -147,11 +254,13 @@ export default function App() {
       avatarColor: '#38bdf8',
     };
 
-    const updated = [newMsg, ...publicChats.filter((m) => m.id !== newMsg.id)].slice(0, 25);
-    setPublicChats(updated);
+    // Update only chat state locally immediately
+    setPublicChats((prev) => [newMsg, ...prev.filter((m) => m.id !== newMsg.id)].slice(0, 25));
     setLatestChat(newMsg);
-    await StorageService.addPublicChatMessage(newMsg);
     playChimeSound();
+
+    // Persist and send to chat server asynchronously without blocking UI or triggering full data reloads
+    StorageService.addPublicChatMessage(newMsg).catch(() => {});
   };
 
   const handleReportMessage = (msgId: string) => {
@@ -421,10 +530,16 @@ export default function App() {
     StorageService.setSettings(newSettings);
   };
 
-  // Building ids with new materials
-  const newMateriBuildingIds: BuildingId[] = materis
-    .filter((m) => m.isNew)
-    .map((m) => m.location);
+  // Building ids with new materials (memoized to keep reference stable)
+  const newMateriBuildingIds: BuildingId[] = useMemo(
+    () => materis.filter((m) => m.isNew).map((m) => m.location),
+    [materis]
+  );
+
+  // Memoize check if student has shared a chat today for Balai Kota missions
+  const hasSharedChatToday = useMemo(() => {
+    return student ? publicChats.some((c) => c.senderId === student.id) : false;
+  }, [publicChats, student?.id]);
 
   // If no student is logged in, show Welcome Entrance
   if (!student) {
@@ -481,19 +596,21 @@ export default function App() {
 
   return (
     <div
-      className={`relative w-screen h-screen overflow-hidden ${
+      className={`relative w-full h-[100dvh] min-h-[100dvh] overflow-hidden ${
         timeOfDay === 'day' ? 'bg-[#38bdf8]' : 'bg-[#0c1527]'
       } select-none transition-colors duration-500`}
     >
       {/* 2D Isometric Town Canvas */}
       <ThreeTownCanvas
-        onSelectBuilding={(buildingId) => setActiveBuilding(buildingId)}
+        onSelectBuilding={handleSelectBuilding}
         activeBuilding={activeBuilding}
         newMateriBuildingIds={newMateriBuildingIds}
         studentName={student.name}
         studentGender={student.gender}
         timeOfDay={timeOfDay}
         latestMessage={latestChat}
+        studentPoints={student.points}
+        onDeductPoints={handleDeductPoints}
       />
 
       {/* TOP HEADER OVERLAY (Matching Reference Screenshots Exactly) */}
@@ -527,12 +644,12 @@ export default function App() {
               <div className="flex items-center gap-1 font-bold text-xs text-amber-400 font-mono shrink-0">
                 <span>🪙</span>
                 <span>{student.points}</span>
-                <span className="font-sans text-[11px] text-slate-400 font-normal">saldo</span>
+                <span className="font-sans text-[11px] text-slate-400 font-normal">saldo (XP)</span>
               </div>
             </div>
           </div>
 
-          {/* Right: Clock • Class • Chart/Nav • Bell • Audio • Day/Night */}
+          {/* Right: Clock • Class • Chart/Nav • Bell • Lo-Fi • Audio • Day/Night */}
           <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
             {/* Live Clock WIB Pill */}
             <div className="hidden md:flex items-center gap-1.5 bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-3 py-1.5 shadow-xl text-xs font-bold text-amber-400 font-mono">
@@ -570,6 +687,9 @@ export default function App() {
             >
               <Bell className="w-4 h-4 text-amber-400" />
             </button>
+
+            {/* Lo-Fi Background Music Controller */}
+            <LofiAudioControl />
 
             {/* Audio Toggle */}
             <button
@@ -615,10 +735,14 @@ export default function App() {
       {activeBuilding === 'balai_kota' && (
         <BalaiKotaModal
           onClose={() => setActiveBuilding(null)}
-          onNavigateBuilding={(id) => setActiveBuilding(id)}
+          onNavigateBuilding={handleSelectBuilding}
           objectives={objectives}
           materis={materis}
           studentName={student.name}
+          studentXp={student.points}
+          onAddPoints={handleAddPoints}
+          reflectionsCount={reflections.filter((r) => r.studentId === student.id).length}
+          hasSharedChatToday={hasSharedChatToday}
         />
       )}
 
