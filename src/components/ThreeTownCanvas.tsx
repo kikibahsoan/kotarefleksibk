@@ -821,9 +821,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // Proximity checks: East Fishing Dock [4.4, 1.8], West Literacy Corner [-4.3, 1.8], Fountain Benches, Trees
-      const fishDist = Math.hypot(player.wx - 4.4, player.wy - 1.8);
+      // Proximity checks: East Fishing Dock [4.8, 2.5], West Literacy Corner [-4.3, 1.8], Benches, Trees
+      const fishDist = Math.hypot(player.wx - 4.8, player.wy - 2.5);
       const litDist = Math.hypot(player.wx - (-4.3), player.wy - 1.8);
+      const litBenchDist = Math.hypot(player.wx - (-4.3), player.wy - 2.2);
       const eastBenchDist = Math.hypot(player.wx - 1.25, player.wy - 0.0);
       const westBenchDist = Math.hypot(player.wx - (-1.25), player.wy - 0.0);
 
@@ -848,6 +849,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       } else if (westBenchDist < 0.85) {
         if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'fountain_west') {
           setNearbyAction({ type: 'bench', benchId: 'fountain_west', benchName: 'Kursi Barat Air Mancur' });
+        }
+      } else if (litBenchDist < 0.85) {
+        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'literacy') {
+          setNearbyAction({ type: 'bench', benchId: 'literacy', benchName: 'Kursi Sudut Literasi' });
         }
       } else if (litDist < 1.05) {
         if (nearbyActionRef.current?.type !== 'literacy') {
@@ -1147,13 +1152,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         drawItems.push({ type: 'lamp', wx: lx, wy: ly, depth: lx + ly });
       });
 
-      // 1. Spot Memancing Relocated to East End (Ujung Timur) at [4.4, 1.8]
-      drawItems.push({ type: 'fishing_spot', wx: 4.4, wy: 1.8, depth: 4.4 + 1.8 });
+      // 1. Spot Memancing Relocated far to East End at [4.8, 2.5]
+      drawItems.push({ type: 'fishing_spot', wx: 4.8, wy: 2.5, depth: 4.8 + 2.5 });
 
-      // 2. Sudut Literasi Siswa at West End (Ujung Barat) at [-4.3, 1.8]
+      // 2. Sudut Literasi Siswa at West End at [-4.3, 1.8]
       drawItems.push({ type: 'literacy_corner', wx: -4.3, wy: 1.8, depth: -4.3 + 1.8 });
 
-      // 3. Kursi Taman Samping Air Mancur (East & West Benches)
+      // 3. Bench next to Sudut Literasi at [-4.3, 2.2]
+      drawItems.push({ type: 'bench', wx: -4.3, wy: 2.2, depth: -4.3 + 2.2, id: 'literacy' });
+
+      // 4. Kursi Taman Samping Air Mancur (East & West Benches)
       drawItems.push({ type: 'bench', wx: 1.25, wy: 0.0, depth: 1.25, id: 'fountain_east' });
       drawItems.push({ type: 'bench', wx: -1.25, wy: 0.0, depth: -1.25, id: 'fountain_west' });
 
@@ -1305,9 +1313,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.textAlign = 'center';
           ctx.fillText('📖 SUDUT LITERASI', pt.x + 4 * z, pt.y - 37 * z);
         } else if (item.type === 'fishing_spot') {
-          // DERMAGA MEMANCING WARGA - EAST END (Rustic Wooden Fishing Pier & Sign)
+          // DERMAGA MEMANCING WARGA & KOLAM KECIL - EAST END
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
+
+          // Small pond / kolam kecil right beside fishing dock
+          ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
+          ctx.beginPath();
+          ctx.ellipse(pt.x + 32 * z, pt.y + 14 * z, 22 * z, 11 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = isNight ? '#0369a1' : '#0284c7';
+          ctx.lineWidth = 1.5 * z;
+          ctx.stroke();
+
+          // Green lily pad on pond
+          ctx.fillStyle = '#16a34a';
+          ctx.beginPath();
+          ctx.ellipse(pt.x + 28 * z, pt.y + 12 * z, 4.5 * z, 2.5 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
 
           // Pier shadow
           ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
