@@ -154,6 +154,7 @@ export interface TownSettings {
   academicYear: string;
   teacherPin: string;
   gasWebAppUrl?: string;
+  spreadsheetUrl?: string;
 }
 
 export interface BuildingInfo {

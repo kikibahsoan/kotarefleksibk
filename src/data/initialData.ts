@@ -929,6 +929,8 @@ export const INITIAL_SETTINGS: TownSettings = {
   teacherPin: 'Kiki123!',
   gasWebAppUrl:
     'https://script.google.com/macros/s/AKfycbwzHhVYKBfznA_k4dZlB1eGFevpeLoJDiSUbLKXJACQPgsKFxi0HfbNNbjUZBWa7finfw/exec',
+  spreadsheetUrl:
+    'https://docs.google.com/spreadsheets/d/1-8R-1F2A7jL3XwD3r5V_sample/edit',
 };
 
 export const INITIAL_PUBLIC_CHAT: PublicChatMessage[] = [

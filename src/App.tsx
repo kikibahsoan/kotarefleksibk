@@ -64,6 +64,7 @@ export default function App() {
   const [activeBuilding, setActiveBuilding] = useState<BuildingId | null>(null);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [isTeacherPinModalOpen, setIsTeacherPinModalOpen] = useState(false);
+  const [teacherModalInitialTab, setTeacherModalInitialTab] = useState<'refleksi' | 'materi' | 'pesan' | 'pengaturan' | 'konsultasi'>('refleksi');
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
   const [preselectedMateriForReflection, setPreselectedMateriForReflection] = useState<string | undefined>(undefined);
   const [timeOfDay, setTimeOfDay] = useState<'day' | 'night' | 'auto'>('night');
@@ -556,6 +557,12 @@ export default function App() {
             onClose={() => setIsTeacherPinModalOpen(false)}
             expectedPin={settings.teacherPin}
             onSuccess={() => {
+              setTeacherModalInitialTab('refleksi');
+              setIsTeacherPinModalOpen(false);
+              setIsTeacherModalOpen(true);
+            }}
+            onOpenSettings={() => {
+              setTeacherModalInitialTab('pengaturan');
               setIsTeacherPinModalOpen(false);
               setIsTeacherModalOpen(true);
             }}
@@ -572,6 +579,7 @@ export default function App() {
             messages={messages}
             students={StorageService.getStudents()}
             settings={settings}
+            initialTab={teacherModalInitialTab}
             onAddMateri={handleAddMateri}
             onDeleteMateri={handleDeleteMateri}
             onAddObjective={handleAddObjective}
@@ -820,6 +828,7 @@ export default function App() {
           onClose={() => setIsQuickNavOpen(false)}
           onSelectBuilding={(id) => setActiveBuilding(id)}
           newMateriBuildingIds={newMateriBuildingIds}
+          onOpenTeacher={() => setIsTeacherPinModalOpen(true)}
         />
       )}
 
@@ -829,6 +838,12 @@ export default function App() {
           onClose={() => setIsTeacherPinModalOpen(false)}
           expectedPin={settings.teacherPin}
           onSuccess={() => {
+            setTeacherModalInitialTab('refleksi');
+            setIsTeacherPinModalOpen(false);
+            setIsTeacherModalOpen(true);
+          }}
+          onOpenSettings={() => {
+            setTeacherModalInitialTab('pengaturan');
             setIsTeacherPinModalOpen(false);
             setIsTeacherModalOpen(true);
           }}
@@ -846,6 +861,7 @@ export default function App() {
           messages={messages}
           students={StorageService.getStudents()}
           settings={settings}
+          initialTab={teacherModalInitialTab}
           onAddMateri={handleAddMateri}
           onDeleteMateri={handleDeleteMateri}
           onAddObjective={handleAddObjective}

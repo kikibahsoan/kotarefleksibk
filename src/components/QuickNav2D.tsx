@@ -7,17 +7,18 @@ interface QuickNav2DProps {
   onClose: () => void;
   onSelectBuilding: (buildingId: BuildingId) => void;
   newMateriBuildingIds: BuildingId[];
+  onOpenTeacher?: () => void;
 }
 
 const BUILDING_ICONS: Record<BuildingId, string> = {
   balai_kota: '🏛️',
   perpustakaan: '📚',
   taman_refleksi: '🌸',
-  menara_mentor: '🔭',
+  menara_mentor: '📡',
   bengkel_latihan: '🛠️',
   kantor_pos: '📮',
   pasar_prestasi: '🎪',
-  monumen_warga: '🌸',
+  monumen_warga: '⛲',
 };
 
 const BUILDING_DESCRIPTIONS: Record<BuildingId, string> = {
@@ -35,6 +36,7 @@ export const QuickNav2D: React.FC<QuickNav2DProps> = ({
   onClose,
   onSelectBuilding,
   newMateriBuildingIds,
+  onOpenTeacher,
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pt-8 pb-4 px-3 sm:p-6 bg-slate-950/80 backdrop-blur-sm animate-backdrop-fade">
@@ -95,6 +97,31 @@ export const QuickNav2D: React.FC<QuickNav2DProps> = ({
               </button>
             );
           })}
+
+          {onOpenTeacher && (
+            <button
+              onClick={() => {
+                onOpenTeacher();
+                onClose();
+              }}
+              className="w-full text-left p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-950/60 to-emerald-950/60 hover:from-amber-900/60 hover:to-emerald-900/60 border border-amber-500/40 hover:border-amber-400/70 transition flex items-center justify-between gap-3 group mt-2"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-amber-900/60 flex items-center justify-center text-2xl shrink-0 border border-amber-500/40 group-hover:scale-105 transition transform">
+                  👨‍🏫
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-amber-200 group-hover:text-amber-100 transition">
+                    Ruang Guru & Setting Cloud Spreadsheet
+                  </h4>
+                  <p className="text-xs text-amber-300/70 mt-0.5 leading-snug">
+                    Kelola materi, nilai murid, PIN guru, serta konfigurasi Google Sheets & Apps Script
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-amber-400 group-hover:text-white shrink-0 transition transform group-hover:translate-x-1" />
+            </button>
+          )}
         </div>
       </div>
     </div>

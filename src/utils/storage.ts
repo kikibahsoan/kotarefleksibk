@@ -54,6 +54,45 @@ function safeSet<T>(key: string, val: T): void {
   }
 }
 
+export function parseChatTimestamp(val: any): number {
+  if (!val) return Date.now();
+  if (typeof val === 'number') return val;
+  const str = String(val).trim();
+
+  // 1. Direct standard parse
+  let parsed = new Date(str).getTime();
+  if (!isNaN(parsed) && parsed > 0) return parsed;
+
+  // 2. Replace dots in time (e.g. "08.34" -> "08:34")
+  const withColons = str.replace(/(\d{1,2})\.(\d{2})(?:\.(\d{2}))?/, '$1:$2:$3');
+  parsed = new Date(withColons).getTime();
+  if (!isNaN(parsed) && parsed > 0) return parsed;
+
+  // 3. Indonesian month names conversion
+  const idMonths: Record<string, string> = {
+    jan: 'Jan', feb: 'Feb', mar: 'Mar', apr: 'Apr', mei: 'May', jun: 'Jun',
+    jul: 'Jul', agu: 'Aug', agt: 'Aug', sep: 'Sep', okt: 'Oct', nov: 'Nov', des: 'Dec'
+  };
+  let converted = withColons.toLowerCase();
+  for (const [idm, enm] of Object.entries(idMonths)) {
+    if (converted.includes(idm)) {
+      converted = converted.replace(idm, enm);
+      break;
+    }
+  }
+  parsed = new Date(converted).getTime();
+  if (!isNaN(parsed) && parsed > 0) return parsed;
+
+  // 4. Timestamp number match
+  const numMatch = str.match(/\d{10,13}/);
+  if (numMatch) {
+    const n = Number(numMatch[0]);
+    if (n > 1000000000) return n > 100000000000 ? n : n * 1000;
+  }
+
+  return Date.now();
+}
+
 export const StorageService = {
   getCurrentStudent(): Student | null {
     const student = safeGet<Student | null>(STORAGE_KEYS.CURRENT_USER, null);
@@ -296,10 +335,15 @@ export const StorageService = {
     const cutoff = Date.now() - TWENTY_FOUR_HOURS;
     return (items || [])
       .filter((m) => {
-        const time = new Date(m.createdAt).getTime();
-        return !isNaN(time) && time >= cutoff && !m.isReported;
+        if (!m || !m.id || !m.content) return false;
+        const time = parseChatTimestamp(m.createdAt || m.timestamp);
+        return time >= cutoff && !m.isReported;
       })
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a, b) => {
+        const timeA = parseChatTimestamp(a.createdAt || a.timestamp);
+        const timeB = parseChatTimestamp(b.createdAt || b.timestamp);
+        return timeB - timeA;
+      })
       .slice(0, MAX_CHATS);
   },
 
@@ -340,8 +384,7 @@ export const StorageService = {
     const msgMap = new Map<string, PublicChatMessage>();
     localItems.forEach((m) => msgMap.set(m.id, m));
 
-    // 1. Fetch shared messages strictly from dedicated lightweight chat endpoint (/api/chat/messages)
-    // Does NOT trigger full spreadsheet or reflection/feedback reloads
+    // 1. Fetch shared messages from server API (/api/chat/messages) if available
     try {
       const response = await fetch('/api/chat/messages');
       if (response.ok) {
@@ -354,6 +397,42 @@ export const StorageService = {
       }
     } catch (err) {
       // Offline / client-only fallback
+    }
+
+    // 2. Fetch shared messages from Google Spreadsheet / Google Apps Script Web App
+    // This connects all students across different devices & networks in real-time
+    const settings = this.getSettings();
+    if (settings.gasWebAppUrl && settings.gasWebAppUrl.startsWith('http')) {
+      try {
+        const url = new URL(settings.gasWebAppUrl);
+        url.searchParams.set('action', 'get_chats');
+        url.searchParams.set('_t', String(Date.now()));
+
+        const gasRes = await fetch(url.toString(), {
+          method: 'GET',
+          redirect: 'follow',
+          cache: 'no-store',
+        });
+        if (gasRes.ok) {
+          const resData = await gasRes.json();
+          const chatList = Array.isArray(resData.chats)
+            ? resData.chats
+            : Array.isArray(resData)
+            ? resData
+            : [];
+          chatList.forEach((m: PublicChatMessage) => {
+            if (m && m.id && m.content) {
+              msgMap.set(m.id, {
+                ...m,
+                roomNumber: m.roomNumber || 1,
+                avatarColor: m.avatarColor || '#38bdf8',
+              });
+            }
+          });
+        }
+      } catch (err) {
+        // Safe silent fallback if offline or network error
+      }
     }
 
     const merged = this.purgeExpiredPublicChats(Array.from(msgMap.values()));
@@ -377,7 +456,7 @@ export const StorageService = {
     const cleaned = this.purgeExpiredPublicChats(Array.from(map.values()));
     this.setPublicChatMessages(cleaned);
 
-    // Broadcast to server API so other students immediately receive it
+    // 1. Broadcast to server API
     try {
       fetch('/api/chat/messages', {
         method: 'POST',
@@ -388,7 +467,7 @@ export const StorageService = {
       // safe fallback
     }
 
-    // Sync to Google Apps Script if configured
+    // 2. Sync to Google Spreadsheet immediately so all students on all devices receive it
     this.syncWithGAS('send_public_chat', { message: msg });
   },
 
@@ -412,11 +491,15 @@ export const StorageService = {
   getSettings(): TownSettings {
     const saved = safeGet<TownSettings>(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
     let modified = false;
-    if (!saved.gasWebAppUrl || !saved.gasWebAppUrl.includes('AKfycbwzHhVYKBfznA_k4dZlB1eGFevpeLoJDiSUbLKXJACQPgsKFxi0HfbNNbjUZBWa7finfw')) {
+    if (!saved.gasWebAppUrl || saved.gasWebAppUrl.trim().length === 0) {
       saved.gasWebAppUrl = INITIAL_SETTINGS.gasWebAppUrl;
       modified = true;
     }
-    if (!saved.teacherPin || saved.teacherPin === '1234') {
+    if (!saved.spreadsheetUrl || saved.spreadsheetUrl.trim().length === 0) {
+      saved.spreadsheetUrl = INITIAL_SETTINGS.spreadsheetUrl;
+      modified = true;
+    }
+    if (!saved.teacherPin || saved.teacherPin.trim().length === 0) {
       saved.teacherPin = 'Kiki123!';
       modified = true;
     }
