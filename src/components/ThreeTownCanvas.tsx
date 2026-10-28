@@ -67,24 +67,35 @@ interface Cloud {
 }
 
 export const TREES_LIST: [number, number][] = [
-  // Top corner (North)
-  [0, -5.4],
-  [-1.8, -5.2],
-  [1.8, -5.2],
-  // Left edge (West)
+  // Outer perimeter for 15x15 island (North edge)
+  [0, -6.6],
+  [-2.2, -6.4],
+  [2.2, -6.4],
+  [-4.4, -6.0],
+  [4.4, -6.0],
+  // West edge
+  [-6.6, 0],
+  [-6.4, -2.2],
+  [-6.4, 2.2],
+  [-6.0, -4.4],
+  [-6.0, 4.4],
+  // South edge
+  [0, 6.6],
+  [-2.2, 6.4],
+  [2.2, 6.4],
+  [-4.4, 6.0],
+  [4.4, 6.0],
+  // East edge (leaving [4.6, -2.2] clear for Kolam)
+  [6.6, 0],
+  [6.4, 2.2],
+  [6.0, 4.4],
+  [6.0, -4.4],
+  // Mid-park groves
   [-5.2, -1.8],
-  [-5.4, 0],
-  [-5.2, 1.8],
-  [-3.8, 3.8],
-  // Bottom corner (South)
-  [-1.8, 5.2],
-  [0, 5.4],
-  [1.8, 5.2],
-  // Right edge (East)
-  [5.4, 0],
   [5.2, 1.8],
+  [-3.8, 3.8],
   [3.8, 3.8],
-  // Center park trees
+  // Central park trees
   [-1.4, -1.4],
   [1.4, -1.4],
   [-1.4, 1.4],
@@ -92,7 +103,7 @@ export const TREES_LIST: [number, number][] = [
 ];
 
 export const STREET_LAMPS_LIST: [number, number][] = [
-  // Pathway intersections along outer square
+  // Inner ring intersections
   [-3.0, -1.5],
   [-3.0, 1.5],
   [3.0, -1.5],
@@ -101,16 +112,27 @@ export const STREET_LAMPS_LIST: [number, number][] = [
   [1.5, -3.0],
   [-1.5, 3.0],
   [1.5, 3.0],
-  // Central spokes along main crossroads
+  // Central crossroad spokes
   [-1.8, 0],
   [1.8, 0],
   [0, -1.9],
   [0, 1.9],
-  // Outer square corners
+  // Outer promenade ring (for 15x15 grid)
+  [-5.0, -2.5],
+  [-5.0, 2.5],
+  [5.0, -2.5],
+  [5.0, 2.5],
+  [-2.5, -5.0],
+  [2.5, -5.0],
+  [-2.5, 5.0],
+  [2.5, 5.0],
+  // Corners
   [-3.0, -3.0],
   [3.0, -3.0],
   [-3.0, 3.0],
   [3.0, 3.0],
+  [-5.0, -5.0],
+  [5.0, 5.0],
 ];
 
 export interface EntryConfirmation {
@@ -149,8 +171,8 @@ export const SOLID_BUILDING_OBSTACLES: SolidObstacle[] = [
 ];
 
 export const isSolidCollision = (wx: number, wy: number, padding: number = 0.16): boolean => {
-  // Island edges
-  if (wx < -5.0 + padding || wx > 5.0 - padding || wy < -5.0 + padding || wy > 5.0 - padding) {
+  // 15x15 Island edges (from -7.0 to +7.0)
+  if (wx < -7.0 + padding || wx > 7.0 - padding || wy < -7.0 + padding || wy > 7.0 - padding) {
     return true;
   }
 
@@ -563,11 +585,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       // 1. Check Click on Cafe Stall (Toko Roti & Kafe)
       const cafeDist = Math.hypot(wx - cafeWx, wy - cafeWy);
-      if (cafeDist < 1.8) {
+      if (cafeDist < 2.0) {
         sounds.playClick();
         player.targetWx = -0.5;
-        player.targetWy = 1.4; // Counter front outside obstacle
+        player.targetWy = 1.4; // Counter front
         player.isMoving = true;
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
         pendingBuildingId = null;
         lastTouchedIdRef.current = 'cafe';
         setPendingConfirmation({
@@ -580,11 +603,79 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 2. Check Click on Buildings
+      // 2. Check Click on Kolam Pemancingan Timur [4.6, -2.2]
+      const fishSpotDist = Math.hypot(wx - 4.6, wy - (-2.2));
+      if (fishSpotDist < 2.2) {
+        sounds.playClick();
+        player.targetWx = 4.2;
+        player.targetWy = -2.0;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+        pendingBuildingId = null;
+        lastTouchedIdRef.current = null;
+        setNearbyAction({ type: 'fishing' });
+        return;
+      }
+
+      // 3. Check Click on Sudut Literasi [-4.3, 1.8]
+      const litSpotDist = Math.hypot(wx - (-4.3), wy - 1.8);
+      if (litSpotDist < 2.0) {
+        sounds.playClick();
+        player.targetWx = -3.7;
+        player.targetWy = 1.8;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+        pendingBuildingId = null;
+        lastTouchedIdRef.current = null;
+        sounds.playOpenModal();
+        setIsLiteracyModalOpen(true);
+        return;
+      }
+
+      // 4. Check Click on Benches
+      const eastBenchDist = Math.hypot(wx - 1.25, wy - 0.0);
+      const westBenchDist = Math.hypot(wx - (-1.25), wy - 0.0);
+      const litBenchDist = Math.hypot(wx - (-3.7), wy - 1.8);
+      if (eastBenchDist < 1.0) {
+        sounds.playClick();
+        player.targetWx = 1.25;
+        player.targetWy = 0.0;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: 1.25, wy: 0.0, time: performance.now() };
+        setIsSitting(true);
+        setSittingSeat('fountain_east');
+        setCafeToast('🪑 Duduk santai di kursi air mancur timur.');
+        setTimeout(() => setCafeToast(null), 2500);
+        return;
+      } else if (westBenchDist < 1.0) {
+        sounds.playClick();
+        player.targetWx = -1.25;
+        player.targetWy = 0.0;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: -1.25, wy: 0.0, time: performance.now() };
+        setIsSitting(true);
+        setSittingSeat('fountain_west');
+        setCafeToast('🪑 Duduk santai di kursi air mancur barat.');
+        setTimeout(() => setCafeToast(null), 2500);
+        return;
+      } else if (litBenchDist < 1.0) {
+        sounds.playClick();
+        player.targetWx = -3.7;
+        player.targetWy = 1.8;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: -3.7, wy: 1.8, time: performance.now() };
+        setIsSitting(true);
+        setSittingSeat('literacy');
+        setCafeToast('🪑 Duduk santai di bangku sudut literasi.');
+        setTimeout(() => setCafeToast(null), 2500);
+        return;
+      }
+
+      // 5. Check Click on Buildings
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
         const dist = Math.hypot(wx - bx, wy - by);
-        if (dist < 2.1 || (Math.abs(wx - bx) < 1.7 && Math.abs(wy - by) < 1.7)) {
+        if (dist < 2.2 || (Math.abs(wx - bx) < 1.8 && Math.abs(wy - by) < 1.8)) {
           sounds.playClick();
           // Walk to doorstep outside solid collision zone
           if (b.id === 'balai_kota') {
@@ -611,21 +702,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 3. Click on ground to walk
+      // 6. Click on ground anywhere across 15x15 platform
       sounds.playClick();
       if (isSittingRef.current) {
         setIsSitting(false);
         setSittingSeat(null);
       }
-      let targetX = Math.max(-4.9, Math.min(4.9, wx));
-      let targetY = Math.max(-4.9, Math.min(4.9, wy));
+      let targetX = Math.max(-6.8, Math.min(6.8, wx));
+      let targetY = Math.max(-6.8, Math.min(6.8, wy));
       if (isSolidCollision(targetX, targetY, 0.1)) {
-        // Nudge slightly towards player's current location to remain outside
+        // Nudge away from fountain center basin
         const dirX = player.wx - targetX;
         const dirY = player.wy - targetY;
         const d = Math.hypot(dirX, dirY) || 1;
-        targetX += (dirX / d) * 0.6;
-        targetY += (dirY / d) * 0.6;
+        targetX += (dirX / d) * 0.45;
+        targetY += (dirY / d) * 0.45;
       }
       clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now() };
       player.targetWx = targetX;
@@ -653,7 +744,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const onPointerMove = (e: MouseEvent) => {
       const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
 
-      if (Math.hypot(wx - cafeWx, wy - cafeWy) < 1.8) {
+      if (
+        Math.hypot(wx - cafeWx, wy - cafeWy) < 2.0 ||
+        Math.hypot(wx - 4.6, wy - (-2.2)) < 2.2 ||
+        Math.hypot(wx - (-4.3), wy - 1.8) < 2.0 ||
+        Math.hypot(wx - 1.25, wy - 0.0) < 1.0 ||
+        Math.hypot(wx - (-1.25), wy - 0.0) < 1.0 ||
+        Math.hypot(wx - (-3.7), wy - 1.8) < 1.0
+      ) {
         canvas.style.cursor = 'pointer';
         hoveredBuildingRef = null;
         setHoveredBuilding(null);
@@ -899,8 +997,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             npc.isMoving = true;
             const angle = Math.random() * Math.PI * 2;
             const dist = 1.0 + Math.random() * 2.5;
-            npc.targetWx = Math.max(-4.5, Math.min(4.5, npc.wx + Math.cos(angle) * dist));
-            npc.targetWy = Math.max(-4.5, Math.min(4.5, npc.wy + Math.sin(angle) * dist));
+            npc.targetWx = Math.max(-6.2, Math.min(6.2, npc.wx + Math.cos(angle) * dist));
+            npc.targetWy = Math.max(-6.2, Math.min(6.2, npc.wy + Math.sin(angle) * dist));
           }
         } else {
           const dx = npc.targetWx - npc.wx;
@@ -1004,25 +1102,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       // ---------------------------------------------------------
       // 2. ISOMETRIC CHECKERBOARD / TILE GRID PLATFORM
-      // (11x11 Grid, Green Lawn & Cream Paved Pathways)
+      // (15x15 Grid, Green Lawn & Cream Paved Pathways)
       // ---------------------------------------------------------
-      const GRID_RADIUS = 5; // -5 to +5 tiles
+      const GRID_RADIUS = 7; // -7 to +7 tiles (15x15 = 225 isometric tiles)
 
       const grassColor = isNight ? '#163323' : '#4a7c52';
       const grassBorder = isNight ? '#0f241a' : '#3d6944';
       const pathColor = isNight ? '#334155' : '#fcfaf2';
       const pathBorder = isNight ? '#475569' : '#e5dfd0';
 
-      // Helper to check if tile (gx, gy) is a paved walkway
+      // Helper to check if tile (gx, gy) is a paved walkway across 15x15 island
       const isPathway = (gx: number, gy: number) => {
-        // Outer loop road at |gx| == 3 or |gy| == 3
-        if (Math.abs(gx) === 3 && Math.abs(gy) <= 3) return true;
-        if (Math.abs(gy) === 3 && Math.abs(gx) <= 3) return true;
+        // Inner loop road at |gx| == 3 or |gy| == 3
+        if (Math.abs(gx) === 3 && Math.abs(gy) <= 5) return true;
+        if (Math.abs(gy) === 3 && Math.abs(gx) <= 5) return true;
+        // Outer promenade loop road at |gx| == 5 or |gy| == 5
+        if (Math.abs(gx) === 5 && Math.abs(gy) <= 5) return true;
+        if (Math.abs(gy) === 5 && Math.abs(gx) <= 5) return true;
         // Connecting central spokes to north/south/east/west
-        if (gx === 0 && Math.abs(gy) <= 4) return true;
-        if (gy === 0 && Math.abs(gx) <= 4) return true;
+        if (gx === 0 && Math.abs(gy) <= 6) return true;
+        if (gy === 0 && Math.abs(gx) <= 6) return true;
         // Central ring
         if (Math.abs(gx) <= 1 && Math.abs(gy) <= 1) return true;
+        // Walkway spur to East Pier & Kolam at [4.6, -2.2]
+        if (gx >= 3 && gx <= 5 && gy === -2) return true;
+        // Walkway spur to West Sudut Literasi at [-4.3, 1.8]
+        if (gx <= -3 && gx >= -5 && gy === 2) return true;
         return false;
       };
 
@@ -1268,40 +1373,57 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Shadow
           ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
           ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y + 4 * z, 32 * z, 16 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x, pt.y + 4 * z, 34 * z, 17 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
           // Wooden decking platform
           ctx.fillStyle = '#78350f';
           ctx.beginPath();
-          ctx.moveTo(pt.x - 26 * z, pt.y - 8 * z);
-          ctx.lineTo(pt.x + 16 * z, pt.y - 12 * z);
-          ctx.lineTo(pt.x + 26 * z, pt.y + 8 * z);
-          ctx.lineTo(pt.x - 16 * z, pt.y + 12 * z);
+          ctx.moveTo(pt.x - 28 * z, pt.y - 8 * z);
+          ctx.lineTo(pt.x + 18 * z, pt.y - 13 * z);
+          ctx.lineTo(pt.x + 28 * z, pt.y + 9 * z);
+          ctx.lineTo(pt.x - 18 * z, pt.y + 14 * z);
           ctx.closePath();
           ctx.fill();
           ctx.strokeStyle = '#451a03';
           ctx.lineWidth = 1 * z;
           ctx.stroke();
 
-          // Bookshelf on back wall
+          // Wooden floor plank lines
+          ctx.strokeStyle = '#572506';
+          ctx.lineWidth = 0.8 * z;
+          for (let pl = -18; pl <= 18; pl += 6) {
+            ctx.beginPath();
+            ctx.moveTo(pt.x + pl * z - 8 * z, pt.y + (pl * 0.4) * z - 8 * z);
+            ctx.lineTo(pt.x + pl * z + 8 * z, pt.y + (pl * 0.4) * z + 4 * z);
+            ctx.stroke();
+          }
+
+          // Bookshelf on back wall (3-tier oak wood)
           ctx.fillStyle = '#451a03';
-          ctx.fillRect(pt.x - 20 * z, pt.y - 28 * z, 14 * z, 22 * z);
+          ctx.fillRect(pt.x - 22 * z, pt.y - 30 * z, 16 * z, 24 * z);
           ctx.strokeStyle = '#78350f';
           ctx.lineWidth = 1 * z;
-          ctx.strokeRect(pt.x - 20 * z, pt.y - 28 * z, 14 * z, 22 * z);
+          ctx.strokeRect(pt.x - 22 * z, pt.y - 30 * z, 16 * z, 24 * z);
 
           // Colorful book spines on shelves
           const bookColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
           for (let shelf = 0; shelf < 3; shelf++) {
-            const shelfY = pt.y - (25 - shelf * 7) * z;
+            const shelfY = pt.y - (27 - shelf * 7.5) * z;
             ctx.fillStyle = '#78350f';
-            ctx.fillRect(pt.x - 19 * z, shelfY + 5 * z, 12 * z, 1.5 * z); // shelf plank
-            for (let bIdx = 0; bIdx < 4; bIdx++) {
+            ctx.fillRect(pt.x - 21 * z, shelfY + 5.5 * z, 14 * z, 1.6 * z); // shelf plank
+            for (let bIdx = 0; bIdx < 5; bIdx++) {
               ctx.fillStyle = bookColors[(shelf * 3 + bIdx) % bookColors.length];
-              ctx.fillRect(pt.x - (18 - bIdx * 2.8) * z, shelfY, 2.2 * z, 5 * z);
+              ctx.fillRect(pt.x - (20 - bIdx * 2.7) * z, shelfY, 2.3 * z, 5.5 * z);
             }
           }
+
+          // Small plaque above bookshelf "POJOK BACA DKV"
+          ctx.fillStyle = '#fef08a';
+          ctx.fillRect(pt.x - 20 * z, pt.y - 34 * z, 12 * z, 3.5 * z);
+          ctx.strokeStyle = '#b45309';
+          ctx.lineWidth = 0.6 * z;
+          ctx.strokeRect(pt.x - 20 * z, pt.y - 34 * z, 12 * z, 3.5 * z);
 
           // Reading Bench with cyan velvet cushion
           ctx.fillStyle = '#b45309';
@@ -1311,30 +1433,66 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           // Small coffee/reading table in front
           ctx.fillStyle = '#78350f';
-          ctx.fillRect(pt.x + 1 * z, pt.y + 1 * z, 10 * z, 5 * z);
+          ctx.fillRect(pt.x + 1 * z, pt.y + 1 * z, 11 * z, 5.5 * z);
           // Open comic/book on table
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(pt.x + 3 * z, pt.y - 0.5 * z, 6 * z, 3.5 * z);
+          ctx.fillRect(pt.x + 3 * z, pt.y - 0.5 * z, 6.5 * z, 3.8 * z);
           ctx.fillStyle = '#ef4444';
-          ctx.fillRect(pt.x + 3.5 * z, pt.y, 2.2 * z, 2.5 * z);
+          ctx.fillRect(pt.x + 3.5 * z, pt.y, 2.4 * z, 2.8 * z);
+
+          // Potted Monstera Plant beside bookshelf
+          ctx.fillStyle = '#b45309'; // Terracotta pot
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 26 * z, pt.y + 2 * z);
+          ctx.lineTo(pt.x - 21 * z, pt.y + 2 * z);
+          ctx.lineTo(pt.x - 22 * z, pt.y + 8 * z);
+          ctx.lineTo(pt.x - 25 * z, pt.y + 8 * z);
+          ctx.closePath();
+          ctx.fill();
+          // Lush split green leaves
+          ctx.fillStyle = '#15803d';
+          ctx.beginPath();
+          ctx.arc(pt.x - 23.5 * z, pt.y - 1 * z, 4 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x - 27 * z, pt.y - 2 * z, 3.2 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x - 21 * z, pt.y - 3 * z, 3.5 * z, 0, Math.PI * 2);
+          ctx.fill();
 
           // Pergola columns & roof trellis
           ctx.strokeStyle = '#572506';
-          ctx.lineWidth = 2 * z;
+          ctx.lineWidth = 2.2 * z;
           ctx.beginPath();
-          ctx.moveTo(pt.x - 24 * z, pt.y - 6 * z);
-          ctx.lineTo(pt.x - 24 * z, pt.y - 34 * z);
-          ctx.moveTo(pt.x + 22 * z, pt.y + 6 * z);
-          ctx.lineTo(pt.x + 22 * z, pt.y - 22 * z);
-          ctx.moveTo(pt.x + 14 * z, pt.y - 12 * z);
-          ctx.lineTo(pt.x + 14 * z, pt.y - 38 * z);
+          ctx.moveTo(pt.x - 26 * z, pt.y - 6 * z);
+          ctx.lineTo(pt.x - 26 * z, pt.y - 36 * z);
+          ctx.moveTo(pt.x + 24 * z, pt.y + 6 * z);
+          ctx.lineTo(pt.x + 24 * z, pt.y - 24 * z);
+          ctx.moveTo(pt.x + 16 * z, pt.y - 12 * z);
+          ctx.lineTo(pt.x + 16 * z, pt.y - 40 * z);
           ctx.stroke();
+
+          // Pergola top crossbeams
+          ctx.lineWidth = 1.4 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 28 * z, pt.y - 34 * z);
+          ctx.lineTo(pt.x + 18 * z, pt.y - 38 * z);
+          ctx.lineTo(pt.x + 26 * z, pt.y - 22 * z);
+          ctx.stroke();
+
+          // Cascading Wisteria Flower clusters (Violet & Pink)
+          const wisteriaColors = ['#a855f7', '#ec4899', '#c084fc', '#f472b6'];
+          for (let w = 0; w < 6; w++) {
+            const wx = pt.x - 22 * z + w * 7 * z;
+            const wy = pt.y - (33 - w * 2) * z;
+            ctx.fillStyle = wisteriaColors[w % wisteriaColors.length];
+            ctx.beginPath();
+            ctx.ellipse(wx, wy, 2.2 * z, 4 * z, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
 
           // Green ivy leaves on trellis
           ctx.fillStyle = '#16a34a';
-          for (let iv = 0; iv < 6; iv++) {
+          for (let iv = 0; iv < 8; iv++) {
             ctx.beginPath();
-            ctx.arc(pt.x - 24 * z + (iv % 2) * 2 * z, pt.y - (30 - iv * 4) * z, 2.2 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 26 * z + (iv % 2) * 2 * z, pt.y - (32 - iv * 3.8) * z, 2.2 * z, 0, Math.PI * 2);
             ctx.fill();
           }
 
@@ -1348,7 +1506,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.stroke();
           ctx.fillStyle = '#fef08a';
           ctx.beginPath();
-          ctx.arc(pt.x - 6 * z, litLanternY + 3 * z, 3 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x - 6 * z, litLanternY + 3 * z, 3.5 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Floating Pill Badge: 📖 Sudut Literasi
@@ -1377,33 +1535,38 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const z = zoomLevelRef.current;
 
           // 1. DEDICATED SCENIC POND (Kolam Ikan Alami)
-          const pondX = pt.x + 18 * z;
+          const pondX = pt.x + 20 * z;
           const pondY = pt.y + 14 * z;
-          const pondW = 44 * z;
-          const pondH = 22 * z;
+          const pondW = 50 * z;
+          const pondH = 25 * z;
 
           // Outer Cobblestone Rim
           ctx.fillStyle = isNight ? '#334155' : '#cbd5e1';
           ctx.beginPath();
-          ctx.ellipse(pondX, pondY, pondW + 6 * z, pondH + 3 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pondX, pondY, pondW + 6 * z, pondH + 3.5 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // Cobblestone border segments
+          // Cobblestone border segments with moss patches
           ctx.strokeStyle = isNight ? '#1e293b' : '#94a3b8';
           ctx.lineWidth = 1 * z;
-          for (let st = 0; st < 12; st++) {
-            const stAngle = (st / 12) * Math.PI * 2;
+          for (let st = 0; st < 16; st++) {
+            const stAngle = (st / 16) * Math.PI * 2;
             const sx = pondX + Math.cos(stAngle) * (pondW + 3 * z);
-            const sy = pondY + Math.sin(stAngle) * (pondH + 1.5 * z);
+            const sy = pondY + Math.sin(stAngle) * (pondH + 1.8 * z);
             ctx.beginPath();
-            ctx.arc(sx, sy, 2 * z, 0, Math.PI * 2);
+            ctx.arc(sx, sy, 2.4 * z, 0, Math.PI * 2);
             ctx.stroke();
+            if (st % 3 === 0) {
+              // Green moss accents
+              ctx.fillStyle = '#15803d';
+              ctx.fill();
+            }
           }
 
           // Shimmering Deep Cyan Water
           const pondGrad = ctx.createRadialGradient(pondX, pondY, 2 * z, pondX, pondY, pondW);
           pondGrad.addColorStop(0, isNight ? '#0369a1' : '#38bdf8');
-          pondGrad.addColorStop(0.75, isNight ? '#0284c7' : '#0284c7');
+          pondGrad.addColorStop(0.7, isNight ? '#0284c7' : '#0284c7');
           pondGrad.addColorStop(1, isNight ? '#075985' : '#0369a1');
           ctx.fillStyle = pondGrad;
           ctx.beginPath();
@@ -1413,44 +1576,63 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Water ripple waves
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
           ctx.lineWidth = 1 * z;
-          for (let wp = 0; wp < 2; wp++) {
-            const wRadius = ((elapsed * 6 + wp * 12) % (pondW * 0.8));
+          for (let wp = 0; wp < 3; wp++) {
+            const wRadius = ((elapsed * 6 + wp * 10) % (pondW * 0.85));
             ctx.beginPath();
             ctx.ellipse(pondX, pondY, wRadius, wRadius * 0.5, 0, 0, Math.PI * 2);
             ctx.stroke();
           }
 
-          // Swimming Koi Fish with animated tails
-          for (let k = 0; k < 2; k++) {
-            const kAngle = elapsed * 0.6 + k * Math.PI;
-            const kDist = 16 * z;
+          // 4 Swimming Koi Fish with animated tails (Kohaku, Showa, Yamabuki, Sanke)
+          const koiConfigs = [
+            { color: '#f97316', spot: '#ffffff', speed: 0.65, radius: 18 },
+            { color: '#ffffff', spot: '#0f172a', speed: 0.55, radius: 24 },
+            { color: '#f59e0b', spot: '#fef08a', speed: 0.75, radius: 14 },
+            { color: '#ef4444', spot: '#1e293b', speed: 0.6, radius: 20 },
+          ];
+
+          koiConfigs.forEach((koi, kIdx) => {
+            const kAngle = elapsed * koi.speed + kIdx * (Math.PI / 2);
+            const kDist = koi.radius * z;
             const kx = pondX + Math.cos(kAngle) * kDist;
             const ky = pondY + Math.sin(kAngle) * (kDist * 0.5);
-            const tailWag = Math.sin(elapsed * 6 + k) * 2 * z;
+            const tailWag = Math.sin(elapsed * 7 + kIdx) * 2.5 * z;
 
-            ctx.fillStyle = k === 0 ? '#f97316' : '#ffffff';
+            ctx.fillStyle = koi.color;
             ctx.beginPath();
-            ctx.ellipse(kx, ky, 3.5 * z, 1.8 * z, kAngle + Math.PI / 2, 0, Math.PI * 2);
+            ctx.ellipse(kx, ky, 3.8 * z, 1.9 * z, kAngle + Math.PI / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Calico spot marking
+            ctx.fillStyle = koi.spot;
+            ctx.beginPath();
+            ctx.arc(kx, ky, 1.2 * z, 0, Math.PI * 2);
             ctx.fill();
 
             // Fish tail fin
-            ctx.fillStyle = k === 0 ? '#ea580c' : '#fca5a5';
+            ctx.fillStyle = koi.color;
             ctx.beginPath();
             ctx.moveTo(kx - Math.cos(kAngle) * 3 * z, ky - Math.sin(kAngle) * 1.5 * z);
-            ctx.lineTo(kx - Math.cos(kAngle) * 6 * z + tailWag, ky - Math.sin(kAngle) * 3 * z + tailWag);
+            ctx.lineTo(kx - Math.cos(kAngle) * 6.5 * z + tailWag, ky - Math.sin(kAngle) * 3.5 * z + tailWag);
             ctx.stroke();
-          }
+          });
 
-          // Lily Pads & Lotus Flower
+          // Floating Lily Pads & Blooming Lotus Flowers
           ctx.fillStyle = '#16a34a';
           ctx.beginPath();
-          ctx.ellipse(pondX - 18 * z, pondY - 4 * z, 5.5 * z, 3 * z, 0, 0, Math.PI * 2);
-          ctx.ellipse(pondX + 16 * z, pondY + 6 * z, 4.5 * z, 2.5 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pondX - 20 * z, pondY - 4 * z, 6 * z, 3.2 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pondX + 18 * z, pondY + 7 * z, 5 * z, 2.8 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pondX - 4 * z, pondY + 12 * z, 4.5 * z, 2.4 * z, 0, 0, Math.PI * 2);
           ctx.fill();
-          // Lotus Flower
+          // Lotus Flowers
           ctx.fillStyle = '#f43f5e';
           ctx.beginPath();
-          ctx.arc(pondX - 18 * z, pondY - 5 * z, 2 * z, 0, Math.PI * 2);
+          ctx.arc(pondX - 20 * z, pondY - 5 * z, 2.5 * z, 0, Math.PI * 2);
+          ctx.arc(pondX + 18 * z, pondY + 6 * z, 2.2 * z, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.arc(pondX - 20 * z, pondY - 5 * z, 0.9 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // 2. RUSTIC WOODEN FISHING PIER OVER THE POND
@@ -1476,20 +1658,37 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           }
 
+          // Wooden Pier Railing Posts & Ropes
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 2 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 22 * z, pt.y - 10 * z);
+          ctx.lineTo(pt.x - 22 * z, pt.y - 20 * z);
+          ctx.moveTo(pt.x - 6 * z, pt.y - 3 * z);
+          ctx.lineTo(pt.x - 6 * z, pt.y - 13 * z);
+          ctx.moveTo(pt.x + 6 * z, pt.y + 4 * z);
+          ctx.lineTo(pt.x + 6 * z, pt.y - 6 * z);
+          ctx.stroke();
+          // Rope sag between posts
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 1 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 22 * z, pt.y - 18 * z);
+          ctx.quadraticCurveTo(pt.x - 14 * z, pt.y - 12 * z, pt.x - 6 * z, pt.y - 11 * z);
+          ctx.quadraticCurveTo(pt.x, pt.y - 6 * z, pt.x + 6 * z, pt.y - 4 * z);
+          ctx.stroke();
+
           // Wooden Stilts / Pilings
           ctx.fillStyle = '#451a03';
           ctx.fillRect(pt.x - 30 * z, pt.y - 2 * z, 3.5 * z, 12 * z);
           ctx.fillRect(pt.x - 4 * z, pt.y + 12 * z, 3.5 * z, 10 * z);
           ctx.fillRect(pt.x + 6 * z, pt.y + 3 * z, 3.5 * z, 10 * z);
 
-          // Mooring bollard with coiled golden rope
-          ctx.fillStyle = '#94a3b8';
-          ctx.fillRect(pt.x - 24 * z, pt.y - 8 * z, 3.5 * z, 6 * z);
-          ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 1 * z;
-          ctx.beginPath();
-          ctx.arc(pt.x - 22.2 * z, pt.y - 5 * z, 2.5 * z, 0, Math.PI * 2);
-          ctx.stroke();
+          // Tackle Box with Brass Clasp
+          ctx.fillStyle = '#0284c7';
+          ctx.fillRect(pt.x - 22 * z, pt.y - 6 * z, 6 * z, 4.5 * z);
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(pt.x - 20 * z, pt.y - 5 * z, 2 * z, 1.5 * z); // brass clasp
 
           // Bait / Fish Bucket with fresh water & caught fish tail
           ctx.fillStyle = '#cbd5e1';
@@ -1888,6 +2087,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.fillText('● ON AIR', pt.x + 17 * z, pt.y - 5.5 * z);
 
+            // Animated Audio Frequency Equalizer Display
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x + 6 * z, pt.y + 0.5 * z, 22 * z, 8 * z);
+            ctx.strokeStyle = '#0284c7';
+            ctx.lineWidth = 0.6 * z;
+            ctx.strokeRect(pt.x + 6 * z, pt.y + 0.5 * z, 22 * z, 8 * z);
+            const eqColors = ['#10b981', '#34d399', '#38bdf8', '#38bdf8', '#f59e0b'];
+            for (let eq = 0; eq < 5; eq++) {
+              const barH = (2 + Math.abs(Math.sin(elapsed * 6 + eq * 1.8)) * 4.5) * z;
+              ctx.fillStyle = eqColors[eq];
+              ctx.fillRect(pt.x + (8 + eq * 3.8) * z, pt.y + 7.5 * z - barH, 2.4 * z, barH);
+            }
+
             // Tall 4-tier Telecom Transmission Lattice Tower
             const towerX = pt.x + 38 * z;
             const towerY = pt.y + 12 * z;
@@ -1937,6 +2149,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.arc(towerX - 6 * z, towerY - 42 * z, 6 * z, -0.6, 1.8);
             ctx.stroke();
 
+            // Secondary high-frequency uplink microwave dish
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1.8 * z;
+            ctx.beginPath();
+            ctx.arc(towerX + 5 * z, towerY - 54 * z, 4.5 * z, 1.2, 3.6);
+            ctx.stroke();
+
             // Power Transformer box with warning diagonal hazard stripes
             ctx.fillStyle = '#1e293b';
             ctx.fillRect(towerX - 24 * z, towerY - 14 * z, 15 * z, 14 * z);
@@ -1977,6 +2196,34 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x - 34 * z, pt.y - 15 * z);
             ctx.closePath();
             ctx.fill();
+
+            // Rooftop Clock Tower & Bell Turret
+            ctx.fillStyle = '#1e40af';
+            ctx.fillRect(pt.x - 9 * z, pt.y - 50 * z, 18 * z, 15 * z);
+            ctx.fillStyle = '#1e3a8a';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 11 * z, pt.y - 50 * z);
+            ctx.lineTo(pt.x, pt.y - 62 * z);
+            ctx.lineTo(pt.x + 11 * z, pt.y - 50 * z);
+            ctx.closePath();
+            ctx.fill();
+            // Clock Face
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 42 * z, 5 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 1 * z;
+            ctx.stroke();
+            // Clock hands
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 0.9 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 42 * z);
+            ctx.lineTo(pt.x + 2.5 * z, pt.y - 42 * z);
+            ctx.moveTo(pt.x, pt.y - 42 * z);
+            ctx.lineTo(pt.x, pt.y - 45 * z);
+            ctx.stroke();
 
             // Blue square grid windows (4x2 on front, 4x2 on side) with book spine silhouettes
             ctx.fillStyle = '#38bdf8';
@@ -2049,6 +2296,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.beginPath();
               ctx.arc(ax + (awnW / 16), pt.y + 15 * z, awnW / 16, 0, Math.PI);
               ctx.fill();
+            }
+
+            // Blinking Festive Fairy String Lights along awning eaves
+            const lightColors = ['#f59e0b', '#ef4444', '#10b981', '#38bdf8', '#a855f7', '#ec4899', '#facc15', '#06b6d4'];
+            for (let li = 0; li < 9; li++) {
+              const lx = pt.x - 25 * z + li * (awnW / 8);
+              const ly = pt.y + 15 * z;
+              const isGlow = Math.sin(elapsed * 4 + li * 0.9) > -0.2;
+              ctx.fillStyle = lightColors[li % lightColors.length];
+              ctx.beginPath();
+              ctx.arc(lx, ly + 2 * z, 1.8 * z, 0, Math.PI * 2);
+              ctx.fill();
+              if (isGlow) {
+                ctx.fillStyle = 'rgba(254, 240, 138, 0.4)';
+                ctx.beginPath();
+                ctx.arc(lx, ly + 2 * z, 3.5 * z, 0, Math.PI * 2);
+                ctx.fill();
+              }
             }
 
             // Large glass bay showcase window
@@ -2179,6 +2444,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x, pt.y - 17 * z);
             ctx.stroke();
 
+            // Golden Postal Horn (Terompet Pos) Insignia on facade
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 1.4 * z;
+            ctx.beginPath();
+            ctx.arc(pt.x - 14 * z, pt.y - 6 * z, 4 * z, 0.5 * Math.PI, 2.2 * Math.PI);
+            ctx.stroke();
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 10 * z, pt.y - 6 * z);
+            ctx.lineTo(pt.x - 7 * z, pt.y - 8.5 * z);
+            ctx.lineTo(pt.x - 7 * z, pt.y - 3.5 * z);
+            ctx.closePath();
+            ctx.fill();
+
             // Red pillar postbox in front
             ctx.fillStyle = '#ef4444';
             ctx.beginPath();
@@ -2186,6 +2465,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(pt.x + 15 * z, pt.y + 19 * z, 5 * z, 1.5 * z); // mail slot
+
+            // Stack of parcel delivery boxes wrapped in brown kraft paper with ribbon ties
+            ctx.fillStyle = '#b45309'; // Box 1
+            ctx.fillRect(pt.x + 4 * z, pt.y + 20 * z, 8 * z, 6 * z);
+            ctx.strokeStyle = '#ef4444'; // Red ribbon
+            ctx.lineWidth = 0.8 * z;
+            ctx.strokeRect(pt.x + 7.5 * z, pt.y + 20 * z, 1 * z, 6 * z);
+
+            ctx.fillStyle = '#d97706'; // Box 2 (stacked)
+            ctx.fillRect(pt.x + 5.5 * z, pt.y + 15 * z, 5.5 * z, 5 * z);
+            ctx.strokeStyle = '#ffffff'; // White ribbon
+            ctx.lineWidth = 0.7 * z;
+            ctx.strokeRect(pt.x + 7.8 * z, pt.y + 15 * z, 0.9 * z, 5 * z);
 
             // Service counter windows
             ctx.fillStyle = '#38bdf8';
@@ -2233,6 +2525,38 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x + 20 * z, pt.y - 18 * z);
             ctx.closePath();
             ctx.fill();
+
+            // Japanese Stone Lantern (Tōrō) beside the pond
+            const slX = pt.x + 18 * z;
+            const slY = pt.y + 8 * z;
+            ctx.fillStyle = isNight ? '#334155' : '#94a3b8';
+            // Lantern base
+            ctx.fillRect(slX - 3.5 * z, slY - 2 * z, 7 * z, 2.5 * z);
+            // Pillar
+            ctx.fillRect(slX - 1.8 * z, slY - 9 * z, 3.6 * z, 7 * z);
+            // Fire chamber with warm light
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(slX - 2.8 * z, slY - 13.5 * z, 5.6 * z, 4.5 * z);
+            // Roof cap
+            ctx.fillStyle = isNight ? '#1e293b' : '#64748b';
+            ctx.beginPath();
+            ctx.moveTo(slX - 5 * z, slY - 13.5 * z);
+            ctx.lineTo(slX, slY - 17 * z);
+            ctx.lineTo(slX + 5 * z, slY - 13.5 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Gently drifting pink cherry blossom petals over the water
+            for (let pet = 0; pet < 5; pet++) {
+              const petAngle = elapsed * 0.8 + pet * 1.3;
+              const petR = (8 + (pet * 2.5)) * z;
+              const px = pt.x + Math.cos(petAngle) * petR;
+              const py = pt.y + Math.sin(petAngle) * (petR * 0.6) + Math.sin(elapsed * 2 + pet) * 2 * z;
+              ctx.fillStyle = '#fbcfe8';
+              ctx.beginPath();
+              ctx.ellipse(px, py, 2 * z, 1.1 * z, petAngle, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
 
           // Floating Building Label with icon & smooth rounded badge (elevated for Balai Kota & ON AIR)
@@ -2384,6 +2708,74 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.beginPath();
           ctx.ellipse(tableX, tableY - 6 * z, 8 * z, 4 * z, 0, 0, Math.PI * 2);
           ctx.fill();
+
+          // Woven bistro chair tucked beside the table
+          ctx.fillStyle = '#92400e';
+          ctx.fillRect(tableX + 9 * z, tableY - 4 * z, 5 * z, 4 * z); // seat
+          ctx.fillRect(tableX + 12 * z, tableY - 11 * z, 2 * z, 8 * z); // backrest
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 0.8 * z;
+          ctx.strokeRect(tableX + 9 * z, tableY - 4 * z, 5 * z, 4 * z);
+
+          // A-Frame Chalkboard Easel Menu beside Cafe
+          const easelX = pt.x + 26 * z;
+          const easelY = pt.y + 6 * z;
+          // Wooden A-frame legs
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 1.4 * z;
+          ctx.beginPath();
+          ctx.moveTo(easelX, easelY - 14 * z);
+          ctx.lineTo(easelX - 6 * z, easelY + 4 * z);
+          ctx.moveTo(easelX, easelY - 14 * z);
+          ctx.lineTo(easelX + 6 * z, easelY + 4 * z);
+          ctx.stroke();
+          // Slate Blackboard
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(easelX - 5 * z, easelY - 11 * z, 10 * z, 11 * z);
+          ctx.strokeStyle = '#92400e';
+          ctx.lineWidth = 0.8 * z;
+          ctx.strokeRect(easelX - 5 * z, easelY - 11 * z, 10 * z, 11 * z);
+          // Chalk menu text
+          ctx.fillStyle = '#fef08a';
+          ctx.font = `bold ${Math.round(3.8 * z)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('MENU', easelX, easelY - 7 * z);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `${Math.round(2.8 * z)}px sans-serif`;
+          ctx.fillText('☕ 2 XP', easelX, easelY - 3.5 * z);
+          ctx.fillText('🥐 1 XP', easelX, easelY - 0.5 * z);
+
+          // Coffee Bean Barrel with brass bands
+          const barrelX = pt.x - 22 * z;
+          const barrelY = pt.y + 8 * z;
+          ctx.fillStyle = '#78350f';
+          ctx.beginPath();
+          ctx.ellipse(barrelX, barrelY, 4.5 * z, 6 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 0.8 * z;
+          ctx.stroke();
+          // Barrel brass hoop lines
+          ctx.strokeStyle = '#d97706';
+          ctx.beginPath();
+          ctx.moveTo(barrelX - 4 * z, barrelY - 2 * z);
+          ctx.lineTo(barrelX + 4 * z, barrelY - 2 * z);
+          ctx.moveTo(barrelX - 4 * z, barrelY + 2 * z);
+          ctx.lineTo(barrelX + 4 * z, barrelY + 2 * z);
+          ctx.stroke();
+
+          // Sack of Flour ("TEPUNG") beside barrel
+          ctx.fillStyle = '#fef3c7';
+          ctx.beginPath();
+          ctx.roundRect(barrelX + 8 * z, barrelY - 1 * z, 6 * z, 5.5 * z, 2 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 0.6 * z;
+          ctx.stroke();
+          ctx.fillStyle = '#92400e';
+          ctx.font = `bold ${Math.round(2.2 * z)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('FLOUR', barrelX + 11 * z, barrelY + 2.5 * z);
         } else if (item.type === 'avatar') {
           // AVATARS (Smooth, Natural Leg Swing, Arm Swing, and Gentle Bobbing)
           const av = item.data;
