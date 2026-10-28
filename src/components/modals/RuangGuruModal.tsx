@@ -404,6 +404,7 @@ function saveMessageReply(ss, msgId, reply, repliedAt) {
 export interface RuangGuruModalProps {
   onClose: () => void;
   studentName?: string;
+  teacherName?: string;
   onAddXp?: (amount: number, reason: string) => void;
   materis?: Materi[];
   objectives?: LearningObjective[];
@@ -430,6 +431,7 @@ export interface RuangGuruModalProps {
 export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
   onClose,
   studentName = 'Siswa',
+  teacherName,
   onAddXp,
   materis = [],
   objectives = [],
@@ -604,13 +606,19 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
               🧑‍🏫
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
                   {isTeacherView ? 'Panel Manajemen Pendidik' : 'Konsultasi & Mentoring'}
                 </span>
                 <span className="text-xs text-amber-300 font-semibold flex items-center gap-1">
                   <Sparkles className="w-3 h-3" /> Ruang Guru Kota Refleksi
                 </span>
+                {teacherName && (
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-400/40 flex items-center gap-1 shadow-sm">
+                    <span>👨‍🏫</span>
+                    <span>{teacherName}</span>
+                  </span>
+                )}
               </div>
               <h2 className="text-xl font-black text-white font-['Outfit']">Ruang Guru & Panel Pengajar</h2>
             </div>

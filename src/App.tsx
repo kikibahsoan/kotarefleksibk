@@ -64,6 +64,7 @@ export default function App() {
   const [activeBuilding, setActiveBuilding] = useState<BuildingId | null>(null);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [isTeacherPinModalOpen, setIsTeacherPinModalOpen] = useState(false);
+  const [loggedTeacherName, setLoggedTeacherName] = useState<string | null>(null);
   const [teacherModalInitialTab, setTeacherModalInitialTab] = useState<'refleksi' | 'materi' | 'pesan' | 'pengaturan' | 'konsultasi'>('refleksi');
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
   const [preselectedMateriForReflection, setPreselectedMateriForReflection] = useState<string | undefined>(undefined);
@@ -621,44 +622,45 @@ export default function App() {
         onDeductPoints={handleDeductPoints}
       />
 
-      {/* TOP HEADER OVERLAY (Matching Reference Screenshots Exactly) */}
+      {/* TOP HEADER OVERLAY (Clean & Perfectly Responsive on Mobile) */}
       {!activeBuilding && !isQuickNavOpen && (
-        <header className="absolute top-3 sm:top-4 left-3 sm:left-5 right-3 sm:right-5 flex items-center justify-between pointer-events-none z-20 gap-2">
+        <header className="absolute top-2.5 sm:top-4 left-2.5 sm:left-5 right-2.5 sm:right-5 flex items-center justify-between pointer-events-none z-20 gap-1.5 sm:gap-2">
           {/* Left: < Back button and Profile Capsule */}
-          <div className="flex items-center gap-2 pointer-events-auto min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto min-w-0">
             {/* Back button */}
             <button
               onClick={handleLogout}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0"
+              className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Ganti Siswa / Keluar"
               aria-label="Kembali"
             >
-              <ChevronLeft className="w-4 h-4 text-slate-200" />
+              <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-200" />
             </button>
 
             {/* Profile Capsule */}
-            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-3 py-1 sm:py-1.5 flex items-center gap-2 shadow-xl min-w-0">
+            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 flex items-center gap-1.5 sm:gap-2 shadow-xl min-w-0">
               {/* Circular Avatar with gold border */}
-              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[11px] shadow-sm shrink-0">
+              <div className="w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[10px] sm:text-[11px] shadow-sm shrink-0">
                 {student.gender === 'P' ? '👧' : '👦'}
               </div>
 
               {/* Username Handle */}
-              <span className="font-extrabold text-xs sm:text-sm text-white max-w-[90px] sm:max-w-[150px] truncate">
+              <span className="font-extrabold text-[11px] sm:text-sm text-white max-w-[68px] sm:max-w-[150px] truncate leading-none">
                 {studentHandle}
               </span>
 
               {/* Gold Coin & Saldo */}
-              <div className="flex items-center gap-1 font-bold text-xs text-amber-400 font-mono shrink-0">
+              <div className="flex items-center gap-1 font-bold text-[11px] sm:text-xs text-amber-400 font-mono shrink-0">
                 <span>🪙</span>
                 <span>{student.points}</span>
-                <span className="font-sans text-[11px] text-slate-400 font-normal">saldo (XP)</span>
+                <span className="hidden sm:inline font-sans text-[11px] text-slate-400 font-normal">saldo (XP)</span>
+                <span className="sm:hidden text-[9px] text-amber-300 font-sans">XP</span>
               </div>
             </div>
           </div>
 
           {/* Right: Clock • Class • Chart/Nav • Bell • Lo-Fi • Audio • Day/Night */}
-          <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto shrink-0">
             {/* Live Clock WIB Pill */}
             <div className="hidden md:flex items-center gap-1.5 bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-3 py-1.5 shadow-xl text-xs font-bold text-amber-400 font-mono">
               <Clock className="w-3.5 h-3.5 text-amber-400" />
@@ -667,11 +669,11 @@ export default function App() {
 
             {/* Class Badge Pill */}
             <div
-              className="bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 flex items-center gap-1.5 shadow-xl text-xs font-bold text-emerald-400 shrink-0"
+              className="hidden min-[400px]:flex bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 items-center gap-1.5 shadow-xl text-[10px] sm:text-xs font-bold text-emerald-400 shrink-0"
               title={student.className}
             >
-              <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[11px] sm:text-xs">
+              <GraduationCap className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" />
+              <span className="truncate max-w-[65px] sm:max-w-none">
                 {student.className.includes('DKV 2') ? 'X DKV 2' : student.className.includes('DKV 3') ? 'X DKV 3' : 'XII RPL 1'}
               </span>
             </div>
@@ -679,49 +681,49 @@ export default function App() {
             {/* Chart / Quick Navigation */}
             <button
               onClick={() => setIsQuickNavOpen(true)}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0"
+              className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Daftar Gedung & Peta Kota"
               aria-label="Peta Gedung"
             >
-              <BarChart3 className="w-4 h-4 text-sky-400" />
+              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400" />
             </button>
 
             {/* Notification / Balai Kota Announcements */}
             <button
               onClick={() => setActiveBuilding('balai_kota')}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0"
+              className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Pengumuman & Misi Balai Kota"
               aria-label="Pengumuman"
             >
-              <Bell className="w-4 h-4 text-amber-400" />
+              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
             </button>
 
             {/* Lo-Fi Background Music Controller */}
             <LofiAudioControl />
 
-            {/* Audio Toggle */}
+            {/* Audio Toggle (Hidden on small mobile to avoid crowd) */}
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0"
+              className="hidden sm:flex w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title={audioEnabled ? 'Matikan Suara Chime' : 'Nyalakan Suara Chime'}
               aria-label="Toggle Suara"
             >
               {audioEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
             </button>
 
-            {/* Day / Night Toggle (Sun in Day, Crescent Moon in Night) */}
+            {/* Day / Night Toggle */}
             <button
               onClick={() => {
                 setTimeOfDay((prev) => (prev === 'day' ? 'night' : 'day'));
               }}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0"
+              className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0"
               title={timeOfDay === 'day' ? 'Waktu Pagi (Klik untuk ganti ke Malam)' : 'Waktu Malam (Klik untuk ganti ke Pagi)'}
               aria-label="Waktu Kota"
             >
               {timeOfDay === 'day' ? (
-                <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+                <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 animate-spin-slow" />
               ) : (
-                <Moon className="w-4 h-4 text-amber-200" />
+                <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200" />
               )}
             </button>
           </div>
@@ -837,7 +839,10 @@ export default function App() {
         <TeacherPinModal
           onClose={() => setIsTeacherPinModalOpen(false)}
           expectedPin={settings.teacherPin}
-          onSuccess={() => {
+          onSuccess={(teacherInfo) => {
+            if (teacherInfo?.name) {
+              setLoggedTeacherName(teacherInfo.name);
+            }
             setTeacherModalInitialTab('refleksi');
             setIsTeacherPinModalOpen(false);
             setIsTeacherModalOpen(true);
@@ -854,6 +859,7 @@ export default function App() {
       {isTeacherModalOpen && (
         <RuangGuruModal
           onClose={() => setIsTeacherModalOpen(false)}
+          teacherName={loggedTeacherName || undefined}
           materis={materis}
           objectives={objectives}
           reflections={reflections}

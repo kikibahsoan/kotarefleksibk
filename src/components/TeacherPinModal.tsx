@@ -7,20 +7,23 @@ import {
   AlertCircle,
   Settings,
   FileSpreadsheet,
-  Code2,
-  RefreshCw,
   CheckCircle2,
   Copy,
   Check,
   ExternalLink,
+  UserCheck,
+  ChevronDown,
+  Sparkles,
 } from 'lucide-react';
 import { StorageService } from '../utils/storage.ts';
 import { GOOGLE_APPS_SCRIPT_CODE } from './modals/RuangGuruModal.tsx';
 import { sounds } from '../utils/audio.ts';
+import { TEACHER_ACCOUNTS } from '../data/teacherAccounts.ts';
+import { TeacherAccount } from '../types/index.ts';
 
 interface TeacherPinModalProps {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (teacherInfo?: { name: string; username: string }) => void;
   onOpenSettings?: () => void;
   expectedPin: string;
 }
@@ -32,9 +35,13 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
   expectedPin,
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'settings'>('login');
-  const [pin, setPin] = useState('');
+  const [loginMode, setLoginMode] = useState<'account' | 'pin'>('account');
+  const [selectedUsername, setSelectedUsername] = useState<string>(TEACHER_ACCOUNTS[0].username);
+  const [password, setPassword] = useState('');
+  const [pinInput, setPinInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showAccountList, setShowAccountList] = useState(false);
 
   // Settings state directly in login modal
   const initialSettings = StorageService.getSettings();
@@ -45,15 +52,51 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const currentTeacher = TEACHER_ACCOUNTS.find((t) => t.username === selectedUsername) || TEACHER_ACCOUNTS[0];
+
+  const handleAccountLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanPin = pin.trim();
-    // Validates against configured pin or master teacher password 'Kiki123!'
-    if (cleanPin === expectedPin || cleanPin === 'Kiki123!') {
-      onSuccess();
+    const cleanPw = password.trim();
+
+    // Check against teacher's default password, or master passwords
+    if (
+      cleanPw === currentTeacher.defaultPassword ||
+      cleanPw === 'Kiki123!' ||
+      cleanPw === expectedPin
+    ) {
+      sounds.playRewardXp();
+      onSuccess({ name: currentTeacher.name, username: currentTeacher.username });
     } else {
-      setError(true);
+      sounds.playClick();
+      setError(`Password salah untuk akun ${currentTeacher.name}. Silakan periksa kembali password standar Anda.`);
     }
+  };
+
+  const handlePinLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = pinInput.trim();
+    if (clean === expectedPin || clean === 'Kiki123!') {
+      sounds.playRewardXp();
+      onSuccess({ name: 'Guru Pembimbing DKV', username: 'guru.dkv' });
+      return;
+    }
+
+    // Also check if entered password belongs to any of the 8 teachers
+    const matched = TEACHER_ACCOUNTS.find((t) => t.defaultPassword === clean || t.username === clean);
+    if (matched) {
+      sounds.playRewardXp();
+      onSuccess({ name: matched.name, username: matched.username });
+      return;
+    }
+
+    sounds.playClick();
+    setError('Kata sandi atau PIN guru tidak valid!');
+  };
+
+  const handleFillDefaultPassword = () => {
+    setPassword(currentTeacher.defaultPassword);
+    setError(null);
+    sounds.playClick();
   };
 
   const handleTestConnection = async () => {
@@ -120,7 +163,11 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-backdrop-fade">
-      <div className={`bg-slate-900 border border-slate-700 w-full ${activeTab === 'settings' ? 'max-w-lg' : 'max-w-sm'} rounded-3xl shadow-2xl p-5 sm:p-6 text-slate-100 relative animate-fade-in-up transition-all max-h-[92vh] overflow-y-auto`}>
+      <div
+        className={`bg-slate-900 border border-slate-700 w-full ${
+          activeTab === 'settings' ? 'max-w-lg' : 'max-w-md'
+        } rounded-3xl shadow-2xl p-5 sm:p-6 text-slate-100 relative animate-fade-in-up transition-all max-h-[92vh] overflow-y-auto`}
+      >
         <button
           onClick={onClose}
           aria-label="Tutup Login Guru"
@@ -160,64 +207,227 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
         {/* VIEW 1: LOGIN FORM */}
         {activeTab === 'login' && (
           <div>
-            <div className="text-center mb-5">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3 border border-amber-500/30">
-                <Lock className="w-6 h-6" />
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-2 border border-amber-500/30">
+                <UserCheck className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white">Akses Ruang Guru</h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Masukkan kata sandi guru untuk membuka panel pengelolaan.
+              <h3 className="text-base sm:text-lg font-bold text-white">
+                Login Akademik Guru DKV
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                SMKN 2 Gorontalo • Tahun Ajaran 2026/2027
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  autoFocus
-                  value={pin}
-                  onChange={(e) => {
-                    setPin(e.target.value);
-                    setError(false);
-                  }}
-                  placeholder="Ketik kata sandi..."
-                  className="w-full text-center text-lg font-bold py-3 px-10 bg-slate-800 border border-slate-700 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 text-xs text-red-400 bg-red-950/60 p-2.5 rounded-xl border border-red-800">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Kata sandi salah! Masukkan kata sandi guru yang benar.</span>
-                </div>
-              )}
-
+            {/* Mode Switch: Akun Guru vs Master PIN */}
+            <div className="flex bg-slate-800/90 p-1 rounded-xl border border-slate-700/70 mb-4 text-xs font-bold">
               <button
-                type="submit"
-                className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-sm shadow transition cursor-pointer active:scale-95"
+                type="button"
+                onClick={() => {
+                  setLoginMode('account');
+                  setError(null);
+                }}
+                className={`flex-1 py-1.5 rounded-lg transition cursor-pointer text-center ${
+                  loginMode === 'account'
+                    ? 'bg-amber-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
               >
-                Buka Ruang Guru
+                Pilih Akun Guru ({TEACHER_ACCOUNTS.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMode('pin');
+                  setError(null);
+                }}
+                className={`flex-1 py-1.5 rounded-lg transition cursor-pointer text-center ${
+                  loginMode === 'pin'
+                    ? 'bg-amber-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                PIN / Sandi Utama
+              </button>
+            </div>
+
+            {/* Sub-View: Account Login */}
+            {loginMode === 'account' ? (
+              <form onSubmit={handleAccountLogin} className="space-y-3.5">
+                {/* Select Teacher Dropdown */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center justify-between">
+                    <span>Nama Guru</span>
+                    <span className="text-[10px] text-amber-400 font-mono">
+                      @{currentTeacher.username}
+                    </span>
+                  </label>
+                  <select
+                    value={selectedUsername}
+                    onChange={(e) => {
+                      setSelectedUsername(e.target.value);
+                      setPassword('');
+                      setError(null);
+                    }}
+                    className="w-full text-xs font-semibold py-2.5 px-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    {TEACHER_ACCOUNTS.map((t) => (
+                      <option key={t.username} value={t.username}>
+                        {t.no}. {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Password Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-300">
+                      Password Standar Akun
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleFillDefaultPassword}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
+                    >
+                      ⚡ Isi Otomatis
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError(null);
+                      }}
+                      placeholder={`Ketik password (cth: ${currentTeacher.defaultPassword})`}
+                      className="w-full text-xs font-medium py-2.5 pl-3 pr-10 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Sembunyikan password' : 'Lihat password'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1"
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="flex items-start gap-2 text-xs text-red-400 bg-red-950/60 p-2.5 rounded-xl border border-red-800 leading-snug">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-xs shadow transition cursor-pointer active:scale-95"
+                >
+                  Masuk sebagai {currentTeacher.name.split(',')[0]}
+                </button>
+              </form>
+            ) : (
+              /* Sub-View: Master PIN / Password */
+              <form onSubmit={handlePinLogin} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Ketik Kata Sandi / Master PIN
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      autoFocus
+                      value={pinInput}
+                      onChange={(e) => {
+                        setPinInput(e.target.value);
+                        setError(null);
+                      }}
+                      placeholder="Masukkan kata sandi guru..."
+                      className="w-full text-center text-sm font-bold py-2.5 px-10 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1"
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 text-xs text-red-400 bg-red-950/60 p-2.5 rounded-xl border border-red-800">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-xs shadow transition cursor-pointer active:scale-95"
+                >
+                  Buka Ruang Guru
+                </button>
+              </form>
+            )}
+
+            {/* Expandable Teacher Account Directory Reference */}
+            <div className="mt-4 pt-3 border-t border-slate-800/80">
+              <button
+                type="button"
+                onClick={() => setShowAccountList(!showAccountList)}
+                className="w-full flex items-center justify-between text-[11px] font-bold text-slate-400 hover:text-amber-300 transition py-1"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  <span>Daftar 8 Akun Guru DKV (SMKN 2 Gorontalo)</span>
+                </span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform ${showAccountList ? 'rotate-180 text-amber-400' : ''}`}
+                />
               </button>
 
-              <div className="pt-3 border-t border-slate-800/80 text-center">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('settings')}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 transition cursor-pointer"
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                  <span>Konfigurasi Google Spreadsheet & Apps Script &gt;</span>
-                </button>
-              </div>
-            </form>
+              {showAccountList && (
+                <div className="mt-2 p-2.5 bg-slate-800/80 rounded-xl border border-slate-700/60 max-h-48 overflow-y-auto space-y-1.5 text-[11px]">
+                  {TEACHER_ACCOUNTS.map((t) => (
+                    <div
+                      key={t.username}
+                      onClick={() => {
+                        setSelectedUsername(t.username);
+                        setPassword(t.defaultPassword);
+                        setLoginMode('account');
+                        setError(null);
+                        sounds.playClick();
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-900/70 hover:bg-amber-950/60 border border-slate-800 hover:border-amber-500/40 transition cursor-pointer flex items-center justify-between"
+                      title="Klik untuk memilih akun ini"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <p className="font-bold text-white truncate">{t.name}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">@{t.username}</p>
+                      </div>
+                      <span className="text-[10px] font-mono text-amber-400 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
+                        {t.defaultPassword}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={() => setActiveTab('settings')}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition cursor-pointer"
+              >
+                <Settings className="w-3 h-3" />
+                <span>Konfigurasi Google Spreadsheet & Apps Script &gt;</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -269,54 +479,44 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
                   value={sheetUrlInput}
                   onChange={(e) => setSheetUrlInput(e.target.value)}
                   placeholder="https://docs.google.com/spreadsheets/d/.../edit"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  className="w-full text-xs font-medium py-2.5 px-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500 font-mono"
                 />
               </div>
 
               {/* URL Google Apps Script Web App */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                  <Code2 className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>URL Google Apps Script Web App (/exec)</span>
+                  <span className="text-emerald-400 font-mono text-xs">&lt;/&gt;</span>
+                  <span>URL Google Apps Script (Web App /exec)</span>
                 </label>
                 <input
                   type="url"
                   value={gasUrlInput}
                   onChange={(e) => setGasUrlInput(e.target.value)}
                   placeholder="https://script.google.com/macros/s/.../exec"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                  className="w-full text-xs font-medium py-2.5 px-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-500 font-mono"
                 />
               </div>
 
-              {/* Realtime Chat Sync Badge */}
-              <div className="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-xl flex items-start gap-2 text-[11px] text-emerald-200">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mt-1 shrink-0"></span>
-                <span>
-                  Obrolan murid otomatis tersimpan di sheet <b>Obrolan_Warga</b> dan sinkron antar-device setiap 3.5 detik (terhapus otomatis setelah 24 jam).
-                </span>
-              </div>
-
-              {/* Test Connection Button & Message */}
-              <div className="flex flex-col gap-2 pt-1">
-                <div className="flex items-center gap-2">
+              {/* Action Buttons: Test Connection & Copy Script */}
+              <div className="space-y-2 pt-1">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={handleTestConnection}
                     disabled={testStatus === 'testing'}
-                    className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-bold text-slate-200 hover:text-white flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-bold text-sky-300 hover:text-white flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${testStatus === 'testing' ? 'animate-spin' : ''}`} />
-                    <span>{testStatus === 'testing' ? 'Menguji...' : '⚡ Uji Koneksi'}</span>
+                    <span>{testStatus === 'testing' ? '⏳ Menguji...' : '⚡ Uji Koneksi'}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleCopyScript}
-                    className="py-2 px-3 rounded-xl bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                    title="Salin skrip Apps Script v2.5 untuk ditempel di Google Sheets"
+                    className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-bold text-amber-300 hover:text-white flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
-                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{isCopied ? 'Tersalin!' : 'Salin Skrip'}</span>
+                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{isCopied ? 'Tersalin!' : '📋 Salin Skrip'}</span>
                   </button>
                 </div>
 

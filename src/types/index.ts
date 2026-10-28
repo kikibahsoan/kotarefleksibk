@@ -173,3 +173,10 @@ export interface BuildingInfo {
   position?: [number, number, number];
   badge?: string;
 }
+
+export interface TeacherAccount {
+  no: number;
+  name: string;
+  username: string;
+  defaultPassword: string;
+}

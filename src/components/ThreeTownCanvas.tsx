@@ -48,6 +48,7 @@ interface AvatarData {
   shirtColor: string;
   pantsColor: string;
   hairColor: string;
+  gender?: 'L' | 'P';
   isMoving: boolean;
   pauseTimer: number;
   walkFrame: number;
@@ -219,6 +220,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const pendingConfirmationRef = useRef<EntryConfirmation | null>(null);
   pendingConfirmationRef.current = pendingConfirmation;
 
+  // Held item (kopi, roti, eskrim)
+  const [heldItem, setHeldItem] = useState<'kopi' | 'roti' | 'eskrim' | null>(null);
+  const heldItemRef = useRef<'kopi' | 'roti' | 'eskrim' | null>(null);
+  heldItemRef.current = heldItem;
+
+  // Watered trees state (index -> timestamp)
+  const [wateredTrees, setWateredTrees] = useState<Record<number, number>>({});
+  const wateredTreesRef = useRef<Record<number, number>>({});
+  wateredTreesRef.current = wateredTrees;
+
+  // Nearby interaction (tree watering or fishing spot)
+  const [nearbyAction, setNearbyAction] = useState<{
+    type: 'tree' | 'fishing';
+    treeIndex?: number;
+  } | null>(null);
+  const nearbyActionRef = useRef<{
+    type: 'tree' | 'fishing';
+    treeIndex?: number;
+  } | null>(null);
+  nearbyActionRef.current = nearbyAction;
+
+  // Fishing state & timer
+  const [isFishing, setIsFishing] = useState(false);
+  const isFishingRef = useRef(false);
+  isFishingRef.current = isFishing;
+  const fishingTimerRef = useRef<number | null>(null);
+
   // User Camera Zoom State (+ / -)
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const zoomLevelRef = useRef(zoomLevel);
@@ -338,10 +366,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       wy: 1.8,
       targetWx: 1.5,
       targetWy: 1.8,
-      speed: 2.2, // Natural, relaxed walking pace
-      shirtColor: '#3b82f6', // Blue shirt
-      pantsColor: '#1e293b', // Dark pants
-      hairColor: studentGender === 'P' ? '#78350f' : '#0f172a',
+      speed: 1.35, // Relaxed, gentle and natural walking speed
+      shirtColor: studentGender === 'P' ? '#ec4899' : '#2563eb',
+      pantsColor: studentGender === 'P' ? '#be185d' : '#1e293b',
+      hairColor: studentGender === 'P' ? '#6b3410' : '#0f172a',
+      gender: studentGender === 'P' ? 'P' : 'L',
       isMoving: false,
       pauseTimer: 0,
       walkFrame: 0,
@@ -358,10 +387,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       wy: -1.5,
       targetWx: 1.8,
       targetWy: -1.5,
-      speed: 2.0,
+      speed: 1.05,
       shirtColor: '#059669', // Teal green batik/blazer
       pantsColor: '#0f172a',
       hairColor: '#0f172a',
+      gender: 'P',
       isMoving: false,
       pauseTimer: 3,
       walkFrame: 0,
@@ -380,10 +410,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       wy: 1.2,
       targetWx: -1.8,
       targetWy: 1.2,
-      speed: 2.2,
+      speed: 1.1,
       shirtColor: '#10b981', // Emerald shirt
       pantsColor: '#1e293b',
-      hairColor: '#78350f',
+      hairColor: '#0f172a',
+      gender: 'L',
       isMoving: false,
       pauseTimer: 2,
       walkFrame: 0,
@@ -402,10 +433,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       wy: -1.6,
       targetWx: 0,
       targetWy: -1.6,
-      speed: 2.0,
+      speed: 1.05,
       shirtColor: '#06b6d4', // Cyan shirt
-      pantsColor: '#0f172a',
-      hairColor: '#7c2d12',
+      pantsColor: '#be185d',
+      hairColor: '#78350f',
+      gender: 'P',
       isMoving: false,
       pauseTimer: 4,
       walkFrame: 0,
@@ -424,10 +456,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       wy: 1.5,
       targetWx: 0,
       targetWy: 1.5,
-      speed: 2.4,
-      shirtColor: '#ec4899', // Pink shirt
-      pantsColor: '#1e293b',
-      hairColor: '#0f172a',
+      speed: 1.15,
+      shirtColor: '#f43f5e', // Rose shirt
+      pantsColor: '#475569',
+      hairColor: '#3d1c06',
+      gender: 'P',
       isMoving: false,
       pauseTimer: 2.5,
       walkFrame: 0,
@@ -668,7 +701,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       camera.y += (camera.targetY - camera.y) * (delta * 4.5);
 
       // Update Player Movement (Natural relaxed cadence, obstacle sliding & non-blocking touch trigger)
-      if (player.isMoving) {
+      if (isFishingRef.current) {
+        player.isMoving = false;
+        player.walkFrame = 0;
+        player.facing = 'down-right';
+      } else if (player.isMoving) {
         const dx = player.targetWx - player.wx;
         const dy = player.targetWy - player.wy;
         const dist = Math.hypot(dx, dy);
@@ -685,7 +722,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (!isSolidCollision(nextWx, nextWy, 0.16)) {
             player.wx = nextWx;
             player.wy = nextWy;
-            player.walkFrame += delta * 7.5;
+            player.walkFrame += delta * 5.2;
           } else {
             // Wall sliding: try X movement only
             const canMoveX = !isSolidCollision(nextWx, player.wy, 0.16);
@@ -694,10 +731,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
             if (canMoveX) {
               player.wx = nextWx;
-              player.walkFrame += delta * 7.5;
+              player.walkFrame += delta * 5.2;
             } else if (canMoveY) {
               player.wy = nextWy;
-              player.walkFrame += delta * 7.5;
+              player.walkFrame += delta * 5.2;
             } else {
               // Blocked completely by building wall
               player.isMoving = false;
@@ -766,26 +803,57 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               setPendingConfirmation(null);
             }
           }
+
+          // Check proximity to fishing spot & trees
+          const fishDist = Math.hypot(player.wx - (-1.4), player.wy - 0.4);
+          let nearTreeIdx = -1;
+          for (let tIdx = 0; tIdx < trees.length; tIdx++) {
+            const [tx, ty] = trees[tIdx];
+            const tDist = Math.hypot(player.wx - tx, player.wy - ty);
+            if (tDist < 0.85) {
+              nearTreeIdx = tIdx;
+              break;
+            }
+          }
+
+          if (fishDist < 0.95) {
+            if (nearbyActionRef.current?.type !== 'fishing') {
+              setNearbyAction({ type: 'fishing' });
+            }
+          } else if (nearTreeIdx !== -1) {
+            if (nearbyActionRef.current?.type !== 'tree' || nearbyActionRef.current?.treeIndex !== nearTreeIdx) {
+              setNearbyAction({ type: 'tree', treeIndex: nearTreeIdx });
+            }
+          } else if (nearbyActionRef.current) {
+            setNearbyAction(null);
+          }
         } else {
           player.isMoving = false;
           player.walkFrame = 0;
-          if (pendingBuildingId) {
-            const chosen = pendingBuildingId;
-            pendingBuildingId = null;
-            lastTouchedIdRef.current = chosen;
-            const bInfo = BUILDINGS_INFO.find((b) => b.id === chosen);
-            if (bInfo) {
-              sounds.playClick();
-              setPendingConfirmation({
-                type: 'building',
-                id: bInfo.id,
-                name: bInfo.name,
-                tagline: bInfo.tagline,
-                icon: bInfo.icon,
-                color: bInfo.color,
-              });
-            }
+        }
+      } else {
+        // Player standing still: check tree / fishing proximity so prompt remains accessible
+        const fishDist = Math.hypot(player.wx - (-1.4), player.wy - 0.4);
+        let nearTreeIdx = -1;
+        for (let tIdx = 0; tIdx < trees.length; tIdx++) {
+          const [tx, ty] = trees[tIdx];
+          const tDist = Math.hypot(player.wx - tx, player.wy - ty);
+          if (tDist < 0.85) {
+            nearTreeIdx = tIdx;
+            break;
           }
+        }
+
+        if (fishDist < 0.95) {
+          if (nearbyActionRef.current?.type !== 'fishing') {
+            setNearbyAction({ type: 'fishing' });
+          }
+        } else if (nearTreeIdx !== -1) {
+          if (nearbyActionRef.current?.type !== 'tree' || nearbyActionRef.current?.treeIndex !== nearTreeIdx) {
+            setNearbyAction({ type: 'tree', treeIndex: nearTreeIdx });
+          }
+        } else if (nearbyActionRef.current) {
+          setNearbyAction(null);
         }
       }
 
@@ -1042,8 +1110,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'building'; info: BuildingInfo; depth: number }
         | { type: 'cafe'; depth: number }
         | { type: 'avatar'; data: AvatarData; isPlayer: boolean; depth: number }
-        | { type: 'tree'; wx: number; wy: number; depth: number }
-        | { type: 'lamp'; wx: number; wy: number; depth: number };
+        | { type: 'tree'; wx: number; wy: number; depth: number; index: number }
+        | { type: 'lamp'; wx: number; wy: number; depth: number }
+        | { type: 'fishing_spot'; wx: number; wy: number; depth: number };
 
       const drawItems: DrawItem[] = [];
 
@@ -1060,22 +1129,111 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         drawItems.push({ type: 'avatar', data: npc, isPlayer: false, depth: npc.wx + npc.wy });
       });
 
-      trees.forEach(([tx, ty]) => {
-        drawItems.push({ type: 'tree', wx: tx, wy: ty, depth: tx + ty });
+      trees.forEach(([tx, ty], tIdx) => {
+        drawItems.push({ type: 'tree', wx: tx, wy: ty, depth: tx + ty, index: tIdx });
       });
 
       STREET_LAMPS_LIST.forEach(([lx, ly]) => {
         drawItems.push({ type: 'lamp', wx: lx, wy: ly, depth: lx + ly });
       });
 
+      // Fishing Spot Dock at [-1.4, 0.4]
+      drawItems.push({ type: 'fishing_spot', wx: -1.4, wy: 0.4, depth: -1.0 });
+
       drawItems.sort((a, b) => a.depth - b.depth);
 
       // Render Each Item
       drawItems.forEach((item) => {
-        if (item.type === 'tree') {
+        if (item.type === 'fishing_spot') {
+          // DERMAGA MEMANCING WARGA (Rustic Wooden Fishing Pier & Sign)
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+
+          // Pier shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x + 2, pt.y + 4, 24 * z, 12 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Wooden planks deck
+          ctx.fillStyle = '#78350f';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 20 * z, pt.y - 8 * z);
+          ctx.lineTo(pt.x + 14 * z, pt.y + 8 * z);
+          ctx.lineTo(pt.x + 4 * z, pt.y + 17 * z);
+          ctx.lineTo(pt.x - 30 * z, pt.y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 1 * z;
+          ctx.stroke();
+
+          // Plank separation lines
+          for (let p = -18; p <= 6; p += 6) {
+            ctx.strokeStyle = '#572506';
+            ctx.lineWidth = 0.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + p * z, pt.y + (p * 0.4) * z - 3 * z);
+            ctx.lineTo(pt.x + (p - 8) * z, pt.y + (p * 0.4) * z + 6 * z);
+            ctx.stroke();
+          }
+
+          // Wooden pilings / stilts
+          ctx.fillStyle = '#451a03';
+          ctx.fillRect(pt.x - 28 * z, pt.y, 3.5 * z, 10 * z);
+          ctx.fillRect(pt.x + 2 * z, pt.y + 14 * z, 3.5 * z, 10 * z);
+          ctx.fillRect(pt.x + 12 * z, pt.y + 6 * z, 3.5 * z, 10 * z);
+
+          // Mooring bollard with coiled rope
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(pt.x - 22 * z, pt.y - 6 * z, 3.5 * z, 6 * z);
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1 * z;
+          ctx.beginPath();
+          ctx.arc(pt.x - 20.2 * z, pt.y - 3 * z, 2.5 * z, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Bait / fish bucket with water
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(pt.x - 12 * z, pt.y - 12 * z, 7 * z, 9 * z);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(pt.x - 11.5 * z, pt.y - 11.5 * z, 6 * z, 3 * z);
+          // Little silver fish tail sticking out
+          ctx.fillStyle = '#94a3b8';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 9 * z, pt.y - 14 * z);
+          ctx.lineTo(pt.x - 7 * z, pt.y - 17 * z);
+          ctx.lineTo(pt.x - 6 * z, pt.y - 13.5 * z);
+          ctx.closePath();
+          ctx.fill();
+
+          // Wooden Fishing Signpost
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(pt.x + 6 * z, pt.y - 22 * z, 3.5 * z, 24 * z);
+          ctx.fillStyle = '#fef08a';
+          ctx.fillRect(pt.x - 4 * z, pt.y - 32 * z, 24 * z, 11 * z);
+          ctx.strokeStyle = '#b45309';
+          ctx.lineWidth = 1 * z;
+          ctx.strokeRect(pt.x - 4 * z, pt.y - 32 * z, 24 * z, 11 * z);
+          ctx.fillStyle = '#78350f';
+          ctx.font = `bold ${Math.round(6 * z)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('🎣 MANCING', pt.x + 8 * z, pt.y - 24.5 * z);
+
+          // Concentric ripples in the water around the dock
+          for (let r = 0; r < 2; r++) {
+            const rPhase = (elapsed * 0.8 + r * 0.5) % 1;
+            ctx.strokeStyle = `rgba(56, 189, 248, ${0.45 * (1 - rPhase)})`;
+            ctx.lineWidth = 1 * z;
+            ctx.beginPath();
+            ctx.ellipse(pt.x + 20 * z, pt.y + 12 * z, (8 + rPhase * 14) * z, (4 + rPhase * 7) * z, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        } else if (item.type === 'tree') {
           // Double-Sphere Tree (Noticeably Enlarged, Lush & Sculpted matching screenshot)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
+          const isWatered = Boolean(wateredTreesRef.current[item.index] && Date.now() - wateredTreesRef.current[item.index] < 10 * 60 * 1000);
 
           // Ground shadow (enlarged)
           ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
@@ -1091,34 +1249,62 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fillRect(pt.x + 0.5 * z, pt.y - 24 * z, 3 * z, 24 * z);
 
           // Lower large sphere (Teal/Emerald green with isometric shading)
-          ctx.fillStyle = isNight ? '#064e3b' : '#059669';
+          ctx.fillStyle = isWatered ? '#047857' : (isNight ? '#064e3b' : '#059669');
           ctx.beginPath();
           ctx.arc(pt.x, pt.y - 32 * z, 22 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Lower sphere highlight
-          ctx.fillStyle = isNight ? '#047857' : '#10b981';
+          ctx.fillStyle = isWatered ? '#10b981' : (isNight ? '#047857' : '#10b981');
           ctx.beginPath();
           ctx.arc(pt.x - 4 * z, pt.y - 36 * z, 16 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Upper overlapping bright mint/lime sphere
-          ctx.fillStyle = isNight ? '#047857' : '#10b981';
+          ctx.fillStyle = isWatered ? '#10b981' : (isNight ? '#047857' : '#10b981');
           ctx.beginPath();
           ctx.arc(pt.x + 1 * z, pt.y - 48 * z, 16 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Upper sphere soft top highlight
-          ctx.fillStyle = isNight ? '#059669' : '#34d399';
+          ctx.fillStyle = isWatered ? '#34d399' : (isNight ? '#059669' : '#34d399');
           ctx.beginPath();
           ctx.arc(pt.x - 2 * z, pt.y - 52 * z, 11 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Top foliage bud
-          ctx.fillStyle = isNight ? '#10b981' : '#6ee7b7';
+          ctx.fillStyle = isWatered ? '#6ee7b7' : (isNight ? '#10b981' : '#6ee7b7');
           ctx.beginPath();
           ctx.arc(pt.x, pt.y - 59 * z, 6 * z, 0, Math.PI * 2);
           ctx.fill();
+
+          // Watered tree flourishing blooms and sparkles
+          if (isWatered) {
+            // Blooming floral buds on crown
+            ctx.fillStyle = '#f472b6';
+            ctx.beginPath();
+            ctx.arc(pt.x - 12 * z, pt.y - 36 * z, 3 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 11 * z, pt.y - 42 * z, 3 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 3 * z, pt.y - 52 * z, 2.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(pt.x - 12 * z, pt.y - 36 * z, 1.2 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 11 * z, pt.y - 42 * z, 1.2 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 3 * z, pt.y - 52 * z, 1 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rising water sparkle particles
+            for (let s = 0; s < 3; s++) {
+              const sPhase = (elapsed * 2 + s * 1.5) % 3;
+              const sY = pt.y - (30 + sPhase * 18) * z;
+              const sX = pt.x + Math.sin(elapsed * 3 + s * 2) * 14 * z;
+              ctx.fillStyle = `rgba(254, 240, 138, ${1 - sPhase / 3})`;
+              ctx.beginPath();
+              ctx.arc(sX, sY, 1.5 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
         } else if (item.type === 'building') {
           const b = item.info;
           const [bx, , by] = b.position;
@@ -1830,25 +2016,81 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.ellipse(pt.x + 1, pt.y + 1, 8 * z, 4 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
+          const isFemale = item.isPlayer
+            ? studentGender === 'P'
+            : av.gender === 'P' || av.id === 'siti' || av.id === 'dia';
+
           // Natural leg swing & gentle bobbing matching slow walking speed
           const legSwing = av.isMoving ? Math.sin(av.walkFrame) * 3.5 * z : 0;
           const avY = pt.y - (av.isMoving ? Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0);
 
-          // Legs
-          ctx.fillStyle = av.pantsColor;
-          ctx.fillRect(pt.x - 3.5 * z, avY - 5 * z + legSwing, 3 * z, 6 * z);
-          ctx.fillRect(pt.x + 0.5 * z, avY - 5 * z - legSwing, 3 * z, 6 * z);
+          // Legs & Skirt/Pants
+          if (isFemale) {
+            // Legs in cute socks & tights
+            ctx.fillStyle = '#fed7aa';
+            ctx.fillRect(pt.x - 3.5 * z, avY - 4 * z + legSwing, 2.5 * z, 5 * z);
+            ctx.fillRect(pt.x + 1 * z, avY - 4 * z - legSwing, 2.5 * z, 5 * z);
+
+            // White ankle socks
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 3.5 * z, avY - 0.5 * z + legSwing, 2.5 * z, 2 * z);
+            ctx.fillRect(pt.x + 1 * z, avY - 0.5 * z - legSwing, 2.5 * z, 2 * z);
+
+            // Cute pastel/burgundy pleated skirt
+            ctx.fillStyle = av.pantsColor || '#be185d';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5.5 * z, avY - 7 * z);
+            ctx.lineTo(pt.x + 5.5 * z, avY - 7 * z);
+            ctx.lineTo(pt.x + 7.5 * z, avY - 2 * z);
+            ctx.lineTo(pt.x - 7.5 * z, avY - 2 * z);
+            ctx.closePath();
+            ctx.fill();
+            // Skirt pleat lines
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.lineWidth = 0.8 * z;
+            for (let pl = -4; pl <= 4; pl += 2.6) {
+              ctx.beginPath();
+              ctx.moveTo(pt.x + pl * z, avY - 7 * z);
+              ctx.lineTo(pt.x + pl * 1.3 * z, avY - 2 * z);
+              ctx.stroke();
+            }
+          } else {
+            // Male Pants
+            ctx.fillStyle = av.pantsColor;
+            ctx.fillRect(pt.x - 3.5 * z, avY - 5 * z + legSwing, 3 * z, 6 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY - 5 * z - legSwing, 3 * z, 6 * z);
+          }
 
           // Shoes
-          ctx.fillStyle = '#0f172a';
+          ctx.fillStyle = isFemale ? '#e11d48' : '#0f172a';
           ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing, 3.5 * z, 2.5 * z);
-          ctx.fillRect(pt.x, avY + 1 * z - legSwing, 3.5 * z, 2.5 * z);
+          ctx.fillRect(pt.x + 0.5 * z, avY + 1 * z - legSwing, 3.5 * z, 2.5 * z);
 
           // Shirt / Torso
           ctx.fillStyle = av.shirtColor;
           ctx.beginPath();
-          ctx.roundRect(pt.x - 5 * z, avY - 14 * z, 10 * z, 9.5 * z, 2.2 * z);
+          ctx.roundRect(pt.x - 5 * z, avY - 14 * z, 10 * z, 8.5 * z, 2.2 * z);
           ctx.fill();
+
+          if (isFemale) {
+            // Cute Peter Pan collar / ribbon tie on blouse
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(pt.x - 2 * z, avY - 13.5 * z, 1.8 * z, 0, Math.PI);
+            ctx.arc(pt.x + 2 * z, avY - 13.5 * z, 1.8 * z, 0, Math.PI);
+            ctx.fill();
+            ctx.fillStyle = '#f43f5e';
+            ctx.fillRect(pt.x - 1 * z, avY - 13 * z, 2 * z, 2.5 * z);
+          } else {
+            // Male open polo collar line
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 2 * z, avY - 14 * z);
+            ctx.lineTo(pt.x, avY - 11.5 * z);
+            ctx.lineTo(pt.x + 2 * z, avY - 14 * z);
+            ctx.stroke();
+          }
 
           // Natural arm swing opposing leg movement
           const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0;
@@ -1867,11 +2109,155 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(pt.x, avY - 18 * z, 5 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Hair
-          ctx.fillStyle = av.hairColor;
-          ctx.beginPath();
-          ctx.arc(pt.x, avY - 21 * z, 5.2 * z, Math.PI, 0);
-          ctx.fill();
+          // Blushing cheeks for female avatar
+          if (isFemale) {
+            ctx.fillStyle = 'rgba(244, 63, 94, 0.45)';
+            ctx.beginPath();
+            ctx.arc(pt.x - 3 * z, avY - 17.5 * z, 1.2 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 3 * z, avY - 17.5 * z, 1.2 * z, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Hair (Female vs Male)
+          if (isFemale) {
+            ctx.fillStyle = av.hairColor || '#6b3410';
+            // Round crown & bangs
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 21 * z, 5.8 * z, Math.PI, 0);
+            ctx.fill();
+            // Side locks flowing down
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 7 * z, avY - 20 * z, 2.4 * z, 10 * z, 1.2 * z);
+            ctx.roundRect(pt.x + 4.6 * z, avY - 20 * z, 2.4 * z, 10 * z, 1.2 * z);
+            ctx.fill();
+            // Coral / Pink hair ribbons on sides
+            ctx.fillStyle = '#f43f5e';
+            ctx.beginPath();
+            ctx.arc(pt.x - 6 * z, avY - 21 * z, 1.8 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 6 * z, avY - 21 * z, 1.8 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            // Male: clean neat crop with side part
+            ctx.fillStyle = av.hairColor || '#0f172a';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 21 * z, 5.2 * z, Math.PI, 0);
+            ctx.fill();
+            ctx.fillRect(pt.x - 4 * z, avY - 22 * z, 3 * z, 2.5 * z);
+          }
+
+          // HELD ITEM (Minimalist Coffee, Bread, or Ice Cream in hand)
+          if (item.isPlayer && heldItemRef.current) {
+            const hType = heldItemRef.current;
+            const hX = pt.x + 6 * z;
+            const hY = avY - 8 * z + armSwing;
+
+            if (hType === 'kopi') {
+              // Paper takeaway cup with sleeve and lid
+              ctx.fillStyle = '#f8fafc';
+              ctx.fillRect(hX - 1.5 * z, hY - 4 * z, 4 * z, 5.5 * z);
+              ctx.fillStyle = '#b45309';
+              ctx.fillRect(hX - 1.5 * z, hY - 2.5 * z, 4 * z, 2.5 * z);
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(hX - 2 * z, hY - 5 * z, 5 * z, 1.4 * z);
+              // Animated warm steam wisps
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+              ctx.lineWidth = 0.8 * z;
+              const sY = hY - (6 + (elapsed * 8) % 7) * z;
+              ctx.beginPath();
+              ctx.moveTo(hX + 0.5 * z, sY);
+              ctx.lineTo(hX + 0.5 * z + Math.sin(elapsed * 4) * 1.5 * z, sY - 2.5 * z);
+              ctx.stroke();
+            } else if (hType === 'roti') {
+              // Golden baked croissant
+              ctx.fillStyle = '#f59e0b';
+              ctx.beginPath();
+              ctx.ellipse(hX + 0.5 * z, hY - 2 * z, 3.8 * z, 2.4 * z, Math.PI / 4, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.strokeStyle = '#b45309';
+              ctx.lineWidth = 0.8 * z;
+              ctx.stroke();
+              // Butter glaze gleam
+              ctx.fillStyle = '#fef08a';
+              ctx.beginPath();
+              ctx.arc(hX - 0.5 * z, hY - 2.8 * z, 1.2 * z, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (hType === 'eskrim') {
+              // Crisp waffle cone
+              ctx.fillStyle = '#d97706';
+              ctx.beginPath();
+              ctx.moveTo(hX - 2 * z, hY - 1 * z);
+              ctx.lineTo(hX + 2 * z, hY - 1 * z);
+              ctx.lineTo(hX, hY + 3.5 * z);
+              ctx.closePath();
+              ctx.fill();
+              // Strawberry ice cream scoop
+              ctx.fillStyle = '#f472b6';
+              ctx.beginPath();
+              ctx.arc(hX, hY - 2.5 * z, 2.6 * z, 0, Math.PI * 2);
+              ctx.fill();
+              // Cherry on top
+              ctx.fillStyle = '#ef4444';
+              ctx.beginPath();
+              ctx.arc(hX, hY - 5.2 * z, 1 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
+          // FISHING ANIMATION (When fishing at pier)
+          if (item.isPlayer && isFishingRef.current) {
+            // Bamboo fishing rod held in hand
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 2 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 5 * z, avY - 6 * z);
+            ctx.lineTo(pt.x + 22 * z, avY - 22 * z);
+            ctx.stroke();
+
+            // Flexible rod tip bend
+            ctx.strokeStyle = '#92400e';
+            ctx.lineWidth = 1.2 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 22 * z, avY - 22 * z);
+            ctx.quadraticCurveTo(pt.x + 28 * z, avY - 24 * z, pt.x + 32 * z, avY - 16 * z);
+            ctx.stroke();
+
+            // Monofilament line dropping into water
+            const bobberX = pt.x + 36 * z;
+            const bobberY = avY + (4 + Math.sin(elapsed * 6) * 2.5) * z;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.lineWidth = 0.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 32 * z, avY - 16 * z);
+            ctx.lineTo(bobberX, bobberY);
+            ctx.stroke();
+
+            // Red-and-white bobber in water
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(bobberX, bobberY, 2.5 * z, Math.PI, 0);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(bobberX, bobberY, 2.5 * z, 0, Math.PI);
+            ctx.fill();
+
+            // Concentric ripples around bobber
+            const bPhase = (elapsed * 1.5) % 1;
+            ctx.strokeStyle = `rgba(56, 189, 248, ${0.6 * (1 - bPhase)})`;
+            ctx.lineWidth = 0.8 * z;
+            ctx.beginPath();
+            ctx.ellipse(bobberX, bobberY + 2 * z, (3 + bPhase * 8) * z, (1.5 + bPhase * 4) * z, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Occasional splash droplets
+            if (Math.sin(elapsed * 6) > 0.6) {
+              ctx.fillStyle = '#38bdf8';
+              ctx.beginPath();
+              ctx.arc(bobberX - 2 * z, bobberY - 3 * z, 0.8 * z, 0, Math.PI * 2);
+              ctx.arc(bobberX + 3 * z, bobberY - 4 * z, 1 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
 
           // Floating Username Tag Pill (Exact Match)
           const tagPosY = avY - 29 * z;
@@ -2100,6 +2486,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const success = onDeductPoints ? onDeductPoints(cost, 'Kopi Hangat Kafe') : true;
     if (success) {
       sounds.playRewardXp();
+      setHeldItem('kopi');
       const remaining = studentPoints - cost;
       setCafeToast(`☕ Menikmati kopi hangat di Kafe Warga! (-2 XP) • Sisa Saldo: ${remaining} XP`);
       baristaSpeechRef.current = {
@@ -2126,6 +2513,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const success = onDeductPoints ? onDeductPoints(cost, 'Roti Panggang Kafe') : true;
     if (success) {
       sounds.playRewardXp();
+      setHeldItem('roti');
       const remaining = studentPoints - cost;
       setCafeToast(`🍞 Roti lezat baru dipanggang! (-1 XP) • Sisa Saldo: ${remaining} XP`);
       baristaSpeechRef.current = {
@@ -2152,6 +2540,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const success = onDeductPoints ? onDeductPoints(cost, 'Eskrim Kafe') : true;
     if (success) {
       sounds.playRewardXp();
+      setHeldItem('eskrim');
       const remaining = studentPoints - cost;
       setCafeToast(`🍦 Eskrim manis menyegarkan harimu! (-1 XP) • Sisa Saldo: ${remaining} XP`);
       baristaSpeechRef.current = {
@@ -2166,6 +2555,78 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     }
   };
 
+  // -------------------------------------------------------------
+  // TREE WATERING ACTION (-1 XP Saldo)
+  // -------------------------------------------------------------
+  const handleWaterTree = (treeIdx: number) => {
+    const cost = 1;
+    if (studentPoints < cost) {
+      sounds.playClick();
+      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk menyiram pohon (saldo kamu ${studentPoints} XP).`);
+      setTimeout(() => setCafeToast(null), 3500);
+      return;
+    }
+
+    const success = onDeductPoints ? onDeductPoints(cost, 'Menyiram Pohon Hijau') : true;
+    if (success) {
+      sounds.playRewardXp();
+      const remaining = studentPoints - cost;
+      setWateredTrees((prev) => ({ ...prev, [treeIdx]: Date.now() }));
+      setCafeToast(`🌱 Berhasil menyiram pohon! Kota menjadi makin asri & rindang (-1 XP) • Sisa: ${remaining} XP`);
+      playerSpeechRef.current = {
+        text: 'Segar sekali pohonnya! 🌱✨',
+        expiresAt: Date.now() + 4500,
+      };
+      setTimeout(() => setCafeToast(null), 3500);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // FISHING ACTION (-3 XP Saldo with animation)
+  // -------------------------------------------------------------
+  const FISH_REWARDS = [
+    { name: 'Ikan Mas Refleksi', icon: '🐠' },
+    { name: 'Gurame DKV Kreatif', icon: '🐟' },
+    { name: 'Udang Windu Danau', icon: '🦐' },
+    { name: 'Ikan Nila Juara', icon: '🐡' },
+    { name: 'Botol Berisi Pesan Bijak', icon: '📜' },
+  ];
+
+  const handleStartFishing = () => {
+    if (isFishing) return;
+    const cost = 3;
+    if (studentPoints < cost) {
+      sounds.playClick();
+      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk memancing (saldo kamu ${studentPoints} XP).`);
+      setTimeout(() => setCafeToast(null), 3500);
+      return;
+    }
+
+    const success = onDeductPoints ? onDeductPoints(cost, 'Memancing Ikan Kota') : true;
+    if (success) {
+      sounds.playClick();
+      setIsFishing(true);
+      setCafeToast('🎣 Memasang umpan... Melempar joran ke perairan dermaga kota (-3 XP)');
+      playerSpeechRef.current = {
+        text: 'Mancing dulu ah, semoga dapat ikan besar! 🎣',
+        expiresAt: Date.now() + 3500,
+      };
+
+      if (fishingTimerRef.current) clearTimeout(fishingTimerRef.current);
+      fishingTimerRef.current = window.setTimeout(() => {
+        setIsFishing(false);
+        sounds.playRewardXp();
+        const randomCatch = FISH_REWARDS[Math.floor(Math.random() * FISH_REWARDS.length)];
+        setCafeToast(`🎉 Hore! Kamu berhasil menangkap ${randomCatch.icon} ${randomCatch.name}!`);
+        playerSpeechRef.current = {
+          text: `Dapat ${randomCatch.name}! Hore! 🎣✨`,
+          expiresAt: Date.now() + 5000,
+        };
+        setTimeout(() => setCafeToast(null), 4500);
+      }, 3500);
+    }
+  };
+
   return (
     <div
       ref={containerRef}
@@ -2175,7 +2636,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       {/* Isometric Canvas */}
       <canvas ref={canvasRef} className="block w-full h-full" />
 
-      {/* POP-UP KONFIRMASI MASUK BANGUNAN / KAFE (PADA BAGIAN ATAS, TANPA MENGGANGGU PERGERAKAN AVATAR) */}
+      {/* POP-UP KONFIRMASI MASUK BANGUNAN / KAFE */}
       {pendingConfirmation && (
         <aside
           aria-label="Konfirmasi Masuk Bangunan"
@@ -2230,6 +2691,93 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             </div>
           </div>
         </aside>
+      )}
+
+      {/* POP-UP AKSI MENYIRAM POHON / MEMANCING (Ketiadaan Konfirmasi Bangunan) */}
+      {!pendingConfirmation && nearbyAction && (
+        <aside
+          aria-label="Aksi Lingkungan Kota"
+          className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-sm pointer-events-auto animate-fade-in-down"
+        >
+          {nearbyAction.type === 'tree' ? (
+            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-emerald-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                  🌳
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-400">
+                    Pohon Rindang Kota
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                    Siram Pohon Hijau
+                  </h4>
+                  <p className="text-[10px] text-slate-300 truncate">
+                    Rawat tanaman asri & suburkan kota
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
+                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold border border-emerald-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <span>💧 Siram</span>
+                <span className="text-[10px] font-mono text-amber-300 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-500/30">
+                  -1 XP
+                </span>
+              </button>
+            </div>
+          ) : (
+            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-sky-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                  🎣
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold tracking-wider uppercase text-sky-400">
+                    Dermaga Air Kota
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                    Spot Memancing Warga
+                  </h4>
+                  <p className="text-[10px] text-slate-300 truncate">
+                    Santai memancing & dapatkan ikan unik
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleStartFishing}
+                disabled={isFishing}
+                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold border border-sky-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <span>{isFishing ? '⏳ Menunggu...' : '🎣 Mancing'}</span>
+                <span className="text-[10px] font-mono text-amber-300 bg-sky-950/80 px-1 py-0.5 rounded border border-sky-500/30">
+                  -3 XP
+                </span>
+              </button>
+            </div>
+          )}
+        </aside>
+      )}
+
+      {/* FLOATING HELD ITEM BADGE (Coffee, Bread, or Ice Cream) */}
+      {heldItem && (
+        <div className="absolute bottom-20 sm:bottom-6 left-3 sm:left-6 z-30 pointer-events-auto bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-full px-3 py-1.5 flex items-center gap-2 text-xs font-bold text-amber-200 shadow-xl animate-fade-in-up">
+          <span className="text-base">{heldItem === 'kopi' ? '☕' : heldItem === 'roti' ? '🥐' : '🍦'}</span>
+          <span className="text-[11px] sm:text-xs">
+            {heldItem === 'kopi' ? 'Memegang Kopi Hangat' : heldItem === 'roti' ? 'Memegang Roti Panggang' : 'Memegang Eskrim Segar'}
+          </span>
+          <button
+            onClick={() => {
+              sounds.playClick();
+              setHeldItem(null);
+            }}
+            className="w-4 h-4 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-[10px] cursor-pointer ml-1"
+            title="Habiskan / Simpan"
+          >
+            ✕
+          </button>
+        </div>
       )}
 
       {/* Floating Cafe Card ONLY when Touched/Clicked */}
