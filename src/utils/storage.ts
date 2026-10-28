@@ -328,23 +328,32 @@ export const StorageService = {
   },
 
   // Monumen Warga 24-Hour Purge & Max 25 Messages Helper:
-  // Removes messages older than 24 hours and strictly keeps only the latest 25 messages
+  // Removes messages older than 24 hours and strictly returns the latest 25 messages in chronological order (newest at bottom)
   purgeExpiredPublicChats(items: PublicChatMessage[]): PublicChatMessage[] {
     const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
     const MAX_CHATS = 25;
     const cutoff = Date.now() - TWENTY_FOUR_HOURS;
-    return (items || [])
-      .filter((m) => {
-        if (!m || !m.id || !m.content) return false;
-        const time = parseChatTimestamp(m.createdAt || m.timestamp);
-        return time >= cutoff && !m.isReported;
-      })
-      .sort((a, b) => {
-        const timeA = parseChatTimestamp(a.createdAt || a.timestamp);
-        const timeB = parseChatTimestamp(b.createdAt || b.timestamp);
-        return timeB - timeA;
-      })
-      .slice(0, MAX_CHATS);
+    const valid = (items || []).filter((m) => {
+      if (!m || !m.id || !m.content) return false;
+      const time = parseChatTimestamp(m.createdAt || m.timestamp);
+      return time >= cutoff && !m.isReported;
+    });
+
+    // 1. Sort newest first to pick the latest 25
+    valid.sort((a, b) => {
+      const timeA = parseChatTimestamp(a.createdAt || a.timestamp);
+      const timeB = parseChatTimestamp(b.createdAt || b.timestamp);
+      return timeB - timeA;
+    });
+
+    const latest = valid.slice(0, MAX_CHATS);
+
+    // 2. Sort chronologically ascending so newest message is at the very bottom
+    return latest.sort((a, b) => {
+      const timeA = parseChatTimestamp(a.createdAt || a.timestamp);
+      const timeB = parseChatTimestamp(b.createdAt || b.timestamp);
+      return timeA - timeB;
+    });
   },
 
   getPublicChatMessages(): PublicChatMessage[] {

@@ -247,17 +247,18 @@ export default function App() {
       id: `pchat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       senderId: student.id,
       senderName: student.name,
-      senderHandle: `@${cleanHandle || 'siswa'}`,
+      senderHandle: `@${cleanHandle || (student.isTeacher ? 'guru_dkv' : 'siswa')}`,
       className: student.className,
       roomNumber: (student.className.includes('DKV 3') ? 3 : 2) as 1 | 2 | 3,
       content: text,
       timestamp: `${hours}.${minutes}`,
       createdAt: now.toISOString(),
-      avatarColor: '#38bdf8',
+      avatarColor: student.isTeacher ? '#f59e0b' : '#38bdf8',
+      isTeacher: Boolean(student.isTeacher),
     };
 
-    // Update only chat state locally immediately
-    setPublicChats((prev) => [newMsg, ...prev.filter((m) => m.id !== newMsg.id)].slice(0, 25));
+    // Update only chat state locally immediately with newest at the BOTTOM
+    setPublicChats((prev) => [...prev.filter((m) => m.id !== newMsg.id), newMsg].slice(-25));
     setLatestChat(newMsg);
     playChimeSound();
 
@@ -557,10 +558,32 @@ export default function App() {
           <TeacherPinModal
             onClose={() => setIsTeacherPinModalOpen(false)}
             expectedPin={settings.teacherPin}
-            onSuccess={() => {
-              setTeacherModalInitialTab('refleksi');
+            onSuccess={(info) => {
+              const teacherGender = info?.gender || 'L';
+              const teacherUser: Student = {
+                id: `teacher-${info?.username || 'guru'}`,
+                name: info?.name || 'Guru Pembimbing DKV',
+                className: 'Guru Pembimbing DKV',
+                studentNumber: 'GURU-DKV',
+                password: '',
+                gender: teacherGender,
+                points: 999,
+                badges: ['guru_pembimbing', 'penjelajah_rajin'],
+                lastLogin: new Date().toISOString().slice(0, 10),
+                streakDays: 5,
+                isTeacher: true,
+              };
+              setStudent(teacherUser);
+              StorageService.setCurrentStudent(teacherUser);
+              if (info?.name) {
+                setLoggedTeacherName(info.name);
+              }
               setIsTeacherPinModalOpen(false);
-              setIsTeacherModalOpen(true);
+
+              if (info?.destination === 'panel') {
+                setTeacherModalInitialTab('refleksi');
+                setIsTeacherModalOpen(true);
+              }
             }}
             onOpenSettings={() => {
               setTeacherModalInitialTab('pengaturan');
@@ -616,6 +639,7 @@ export default function App() {
         newMateriBuildingIds={newMateriBuildingIds}
         studentName={student.name}
         studentGender={student.gender}
+        isTeacher={student.isTeacher}
         timeOfDay={timeOfDay}
         latestMessage={latestChat}
         studentPoints={student.points}
@@ -641,13 +665,20 @@ export default function App() {
             <div className="bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 flex items-center gap-1.5 sm:gap-2 shadow-xl min-w-0">
               {/* Circular Avatar with gold border */}
               <div className="w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[10px] sm:text-[11px] shadow-sm shrink-0">
-                {student.gender === 'P' ? '👧' : '👦'}
+                {student.isTeacher ? (student.gender === 'P' ? '👩‍🏫' : '👨‍🏫') : student.gender === 'P' ? '👧' : '👦'}
               </div>
 
               {/* Username Handle */}
               <span className="font-extrabold text-[11px] sm:text-sm text-white max-w-[68px] sm:max-w-[150px] truncate leading-none">
                 {studentHandle}
               </span>
+
+              {/* Teacher Badge if teacher */}
+              {student.isTeacher && (
+                <span className="hidden min-[480px]:inline-block px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-400/40 shrink-0">
+                  GURU
+                </span>
+              )}
 
               {/* Gold Coin & Saldo */}
               <div className="flex items-center gap-1 font-bold text-[11px] sm:text-xs text-amber-400 font-mono shrink-0">
@@ -657,6 +688,19 @@ export default function App() {
                 <span className="sm:hidden text-[9px] text-amber-300 font-sans">XP</span>
               </div>
             </div>
+
+            {/* Teacher Ruang Guru Quick Button */}
+            {student.isTeacher && (
+              <button
+                onClick={() => setIsTeacherModalOpen(true)}
+                className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-extrabold text-[10px] sm:text-xs shadow-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer border border-amber-300/40 shrink-0"
+                title="Buka Ruang Guru (Panel Pengajar)"
+              >
+                <span>📋</span>
+                <span className="hidden sm:inline">Ruang Guru</span>
+                <span className="sm:hidden">Guru</span>
+              </button>
+            )}
           </div>
 
           {/* Right: Clock • Class • Chart/Nav • Bell • Lo-Fi • Audio • Day/Night */}
@@ -840,12 +884,30 @@ export default function App() {
           onClose={() => setIsTeacherPinModalOpen(false)}
           expectedPin={settings.teacherPin}
           onSuccess={(teacherInfo) => {
+            const teacherGender = teacherInfo?.gender || 'L';
+            const teacherUser: Student = {
+              id: `teacher-${teacherInfo?.username || 'guru'}`,
+              name: teacherInfo?.name || 'Guru Pembimbing DKV',
+              className: 'Guru Pembimbing DKV',
+              studentNumber: 'GURU-DKV',
+              password: '',
+              gender: teacherGender,
+              points: 999,
+              badges: ['guru_pembimbing', 'penjelajah_rajin'],
+              lastLogin: new Date().toISOString().slice(0, 10),
+              streakDays: 5,
+              isTeacher: true,
+            };
+            setStudent(teacherUser);
+            StorageService.setCurrentStudent(teacherUser);
             if (teacherInfo?.name) {
               setLoggedTeacherName(teacherInfo.name);
             }
-            setTeacherModalInitialTab('refleksi');
             setIsTeacherPinModalOpen(false);
-            setIsTeacherModalOpen(true);
+            if (teacherInfo?.destination === 'panel') {
+              setTeacherModalInitialTab('refleksi');
+              setIsTeacherModalOpen(true);
+            }
           }}
           onOpenSettings={() => {
             setTeacherModalInitialTab('pengaturan');

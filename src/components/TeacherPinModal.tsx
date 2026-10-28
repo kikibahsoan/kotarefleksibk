@@ -21,9 +21,16 @@ import { sounds } from '../utils/audio.ts';
 import { TEACHER_ACCOUNTS } from '../data/teacherAccounts.ts';
 import { TeacherAccount } from '../types/index.ts';
 
+export interface TeacherLoginResult {
+  name: string;
+  username: string;
+  gender?: 'L' | 'P';
+  destination?: 'town' | 'panel';
+}
+
 interface TeacherPinModalProps {
   onClose: () => void;
-  onSuccess: (teacherInfo?: { name: string; username: string }) => void;
+  onSuccess: (teacherInfo: TeacherLoginResult) => void;
   onOpenSettings?: () => void;
   expectedPin: string;
 }
@@ -42,6 +49,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAccountList, setShowAccountList] = useState(false);
+  const [authenticatedTeacher, setAuthenticatedTeacher] = useState<TeacherLoginResult | null>(null);
 
   // Settings state directly in login modal
   const initialSettings = StorageService.getSettings();
@@ -65,7 +73,11 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
       cleanPw === expectedPin
     ) {
       sounds.playRewardXp();
-      onSuccess({ name: currentTeacher.name, username: currentTeacher.username });
+      setAuthenticatedTeacher({
+        name: currentTeacher.name,
+        username: currentTeacher.username,
+        gender: currentTeacher.gender,
+      });
     } else {
       sounds.playClick();
       setError(`Password salah untuk akun ${currentTeacher.name}. Silakan periksa kembali password standar Anda.`);
@@ -77,7 +89,11 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
     const clean = pinInput.trim();
     if (clean === expectedPin || clean === 'Kiki123!') {
       sounds.playRewardXp();
-      onSuccess({ name: 'Guru Pembimbing DKV', username: 'guru.dkv' });
+      setAuthenticatedTeacher({
+        name: 'Guru Pembimbing DKV',
+        username: 'guru.dkv',
+        gender: 'L',
+      });
       return;
     }
 
@@ -85,7 +101,11 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
     const matched = TEACHER_ACCOUNTS.find((t) => t.defaultPassword === clean || t.username === clean);
     if (matched) {
       sounds.playRewardXp();
-      onSuccess({ name: matched.name, username: matched.username });
+      setAuthenticatedTeacher({
+        name: matched.name,
+        username: matched.username,
+        gender: matched.gender,
+      });
       return;
     }
 
@@ -204,8 +224,58 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
           </button>
         </div>
 
-        {/* VIEW 1: LOGIN FORM */}
-        {activeTab === 'login' && (
+        {/* VIEW 1: LOGIN FORM / DESTINATION SELECTION */}
+        {activeTab === 'login' && authenticatedTeacher ? (
+          <div className="text-center py-3 space-y-4 animate-fade-in">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 text-emerald-400 flex items-center justify-center mx-auto border-2 border-emerald-500/40 shadow-xl shadow-emerald-500/10">
+              <CheckCircle2 className="w-9 h-9" />
+            </div>
+            <div>
+              <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-3 py-1 rounded-full">
+                Autentikasi Berhasil
+              </span>
+              <h3 className="text-lg font-black text-white mt-2">
+                Selamat Datang, Bapak/Ibu!
+              </h3>
+              <p className="text-sm font-extrabold text-amber-300 mt-0.5">
+                {authenticatedTeacher.name}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Guru Pembimbing DKV • SMKN 2 Gorontalo
+              </p>
+            </div>
+
+            <div className="pt-2 space-y-3 max-w-sm mx-auto">
+              <button
+                type="button"
+                onClick={() => onSuccess({ ...authenticatedTeacher, destination: 'town' })}
+                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-xl flex items-center gap-3 transition transform hover:scale-[1.02] active:scale-95 cursor-pointer border border-emerald-400/40 text-left"
+              >
+                <span className="text-2xl shrink-0">🏛️</span>
+                <div className="flex-1">
+                  <div className="font-extrabold">Masuk ke Kota (Sebagai Guru)</div>
+                  <div className="text-[10px] text-emerald-100/90 font-normal mt-0.5">
+                    Jelajahi kota Refleksia dengan avatar guru, sapa & berinteraksi di chat warga
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onSuccess({ ...authenticatedTeacher, destination: 'panel' })}
+                className="w-full py-3 px-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white font-bold text-xs shadow-md flex items-center gap-3 transition cursor-pointer border border-slate-700 hover:border-amber-500/50 text-left"
+              >
+                <span className="text-xl shrink-0">📋</span>
+                <div className="flex-1">
+                  <div className="font-bold text-amber-300">Buka Panel Ruang Guru</div>
+                  <div className="text-[10px] text-slate-400 font-normal">
+                    Lihat rekap refleksi, umpan balik BK, kelola materi & spreadsheet
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        ) : activeTab === 'login' && (
           <div>
             <div className="text-center mb-4">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-2 border border-amber-500/30">

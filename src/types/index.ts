@@ -20,6 +20,7 @@ export interface PublicChatMessage {
   createdAt: string; // ISO
   avatarColor?: string;
   isReported?: boolean;
+  isTeacher?: boolean;
 }
 
 export interface Student {
@@ -33,6 +34,7 @@ export interface Student {
   badges: string[];
   lastLogin: string;
   streakDays: number;
+  isTeacher?: boolean;
 }
 
 export interface Materi {
@@ -179,4 +181,5 @@ export interface TeacherAccount {
   name: string;
   username: string;
   defaultPassword: string;
+  gender: 'L' | 'P';
 }

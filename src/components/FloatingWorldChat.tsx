@@ -90,17 +90,29 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
             ) : (
               messages.map((m) => {
                 const isMe = m.senderHandle === studentHandle;
+                const isTeacher = Boolean(m.isTeacher || m.className?.includes('Guru') || m.senderHandle?.toLowerCase().includes('guru'));
                 return (
                   <div
                     key={m.id}
-                    className="flex items-baseline justify-between gap-2 py-0.5 group hover:bg-white/5 rounded px-1 transition-colors"
+                    className={`flex items-baseline justify-between gap-2 py-0.5 group rounded px-1 transition-colors ${
+                      isTeacher ? 'bg-amber-500/10 border-l-2 border-amber-400' : 'hover:bg-white/5'
+                    }`}
                   >
                     <div className="flex-1 min-w-0 pr-1">
+                      {isTeacher && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-extrabold rounded bg-amber-500/25 text-amber-300 border border-amber-400/50 mr-1.5 shadow-sm">
+                          👨‍🏫 GURU DKV
+                        </span>
+                      )}
                       <span
                         className={`font-bold mr-1.5 cursor-pointer text-[12px] ${
-                          isMe ? 'text-emerald-400' : 'text-teal-400'
+                          isTeacher
+                            ? 'text-amber-300 font-extrabold'
+                            : isMe
+                            ? 'text-emerald-400'
+                            : 'text-teal-400'
                         }`}
-                        title={m.senderName}
+                        title={`${m.senderName} (${m.className})`}
                       >
                         {m.senderHandle || '@warga'}
                       </span>

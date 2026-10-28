@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BuildingId, PublicChatMessage } from '../types/index.ts';
 import { sounds } from '../utils/audio.ts';
-import { X, Plus, Minus, MapPin } from 'lucide-react';
+import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2 } from 'lucide-react';
 
 interface ThreeTownCanvasProps {
   onSelectBuilding: (buildingId: BuildingId) => void;
@@ -9,6 +9,7 @@ interface ThreeTownCanvasProps {
   newMateriBuildingIds: BuildingId[];
   studentName?: string;
   studentGender?: string;
+  isTeacher?: boolean;
   timeOfDay?: 'day' | 'night' | 'auto';
   latestMessage?: PublicChatMessage | null;
   studentPoints?: number;
@@ -198,6 +199,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   newMateriBuildingIds,
   studentName = 'Siswa',
   studentGender = 'L',
+  isTeacher = false,
   timeOfDay = 'night',
   latestMessage,
   studentPoints = 100,
@@ -230,14 +232,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const wateredTreesRef = useRef<Record<number, number>>({});
   wateredTreesRef.current = wateredTrees;
 
-  // Nearby interaction (tree watering or fishing spot)
+  // Sitting state on fountain benches or literacy corner
+  const [isSitting, setIsSitting] = useState(false);
+  const isSittingRef = useRef(false);
+  isSittingRef.current = isSitting;
+  const [sittingSeat, setSittingSeat] = useState<'fountain_east' | 'fountain_west' | 'literacy' | null>(null);
+
+  // Literacy corner reading modal
+  const [isLiteracyModalOpen, setIsLiteracyModalOpen] = useState(false);
+  const [activeLiteracyDoc, setActiveLiteracyDoc] = useState<'komik' | 'majalah' | 'koran' | null>(null);
+
+  // Nearby interaction (tree watering, fishing spot, literacy corner, or bench)
   const [nearbyAction, setNearbyAction] = useState<{
-    type: 'tree' | 'fishing';
+    type: 'tree' | 'fishing' | 'literacy' | 'bench';
     treeIndex?: number;
+    benchId?: 'fountain_east' | 'fountain_west' | 'literacy';
+    benchName?: string;
   } | null>(null);
   const nearbyActionRef = useRef<{
-    type: 'tree' | 'fishing';
+    type: 'tree' | 'fishing' | 'literacy' | 'bench';
     treeIndex?: number;
+    benchId?: 'fountain_east' | 'fountain_west' | 'literacy';
+    benchName?: string;
   } | null>(null);
   nearbyActionRef.current = nearbyAction;
 
@@ -356,19 +372,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     // -----------------------------------------------------------
     const studentHandle = studentName.split(' ')[0].toLowerCase();
 
-    // 1. Player (Andi Pratama / Siswa)
+    // 1. Player (Siswa / Guru)
+    const isPlayerTeacher = Boolean(isTeacher);
     const player: AvatarData = {
-      id: 'siswa',
-      role: 'siswa',
-      handle: studentHandle || 'andi_pratama',
-      roleLabel: 'Kamu',
+      id: isPlayerTeacher ? 'guru_player' : 'siswa',
+      role: isPlayerTeacher ? 'guru' : 'siswa',
+      handle: studentHandle || (isPlayerTeacher ? 'guru_dkv' : 'andi_pratama'),
+      roleLabel: isPlayerTeacher ? 'Guru Pembimbing' : 'Kamu',
       wx: 1.5,
       wy: 1.8,
       targetWx: 1.5,
       targetWy: 1.8,
       speed: 1.35, // Relaxed, gentle and natural walking speed
-      shirtColor: studentGender === 'P' ? '#ec4899' : '#2563eb',
-      pantsColor: studentGender === 'P' ? '#be185d' : '#1e293b',
+      shirtColor: isPlayerTeacher
+        ? (studentGender === 'P' ? '#047857' : '#1e3a8a')
+        : (studentGender === 'P' ? '#ec4899' : '#2563eb'),
+      pantsColor: isPlayerTeacher
+        ? (studentGender === 'P' ? '#065f46' : '#1e293b')
+        : (studentGender === 'P' ? '#be185d' : '#1e293b'),
       hairColor: studentGender === 'P' ? '#6b3410' : '#0f172a',
       gender: studentGender === 'P' ? 'P' : 'L',
       isMoving: false,
@@ -701,7 +722,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       camera.y += (camera.targetY - camera.y) * (delta * 4.5);
 
       // Update Player Movement (Natural relaxed cadence, obstacle sliding & non-blocking touch trigger)
-      if (isFishingRef.current) {
+      if (isSittingRef.current) {
+        player.isMoving = false;
+        player.walkFrame = 0;
+      } else if (isFishingRef.current) {
         player.isMoving = false;
         player.walkFrame = 0;
         player.facing = 'down-right';
@@ -803,58 +827,54 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               setPendingConfirmation(null);
             }
           }
-
-          // Check proximity to fishing spot & trees
-          const fishDist = Math.hypot(player.wx - (-1.4), player.wy - 0.4);
-          let nearTreeIdx = -1;
-          for (let tIdx = 0; tIdx < trees.length; tIdx++) {
-            const [tx, ty] = trees[tIdx];
-            const tDist = Math.hypot(player.wx - tx, player.wy - ty);
-            if (tDist < 0.85) {
-              nearTreeIdx = tIdx;
-              break;
-            }
-          }
-
-          if (fishDist < 0.95) {
-            if (nearbyActionRef.current?.type !== 'fishing') {
-              setNearbyAction({ type: 'fishing' });
-            }
-          } else if (nearTreeIdx !== -1) {
-            if (nearbyActionRef.current?.type !== 'tree' || nearbyActionRef.current?.treeIndex !== nearTreeIdx) {
-              setNearbyAction({ type: 'tree', treeIndex: nearTreeIdx });
-            }
-          } else if (nearbyActionRef.current) {
-            setNearbyAction(null);
-          }
         } else {
           player.isMoving = false;
           player.walkFrame = 0;
         }
-      } else {
-        // Player standing still: check tree / fishing proximity so prompt remains accessible
-        const fishDist = Math.hypot(player.wx - (-1.4), player.wy - 0.4);
-        let nearTreeIdx = -1;
-        for (let tIdx = 0; tIdx < trees.length; tIdx++) {
-          const [tx, ty] = trees[tIdx];
-          const tDist = Math.hypot(player.wx - tx, player.wy - ty);
-          if (tDist < 0.85) {
-            nearTreeIdx = tIdx;
-            break;
-          }
-        }
+      }
 
-        if (fishDist < 0.95) {
-          if (nearbyActionRef.current?.type !== 'fishing') {
-            setNearbyAction({ type: 'fishing' });
-          }
-        } else if (nearTreeIdx !== -1) {
-          if (nearbyActionRef.current?.type !== 'tree' || nearbyActionRef.current?.treeIndex !== nearTreeIdx) {
-            setNearbyAction({ type: 'tree', treeIndex: nearTreeIdx });
-          }
-        } else if (nearbyActionRef.current) {
-          setNearbyAction(null);
+      // Proximity checks: East Fishing Dock [4.4, 1.8], West Literacy Corner [-4.3, 1.8], Fountain Benches, Trees
+      const fishDist = Math.hypot(player.wx - 4.4, player.wy - 1.8);
+      const litDist = Math.hypot(player.wx - (-4.3), player.wy - 1.8);
+      const eastBenchDist = Math.hypot(player.wx - 1.25, player.wy - 0.0);
+      const westBenchDist = Math.hypot(player.wx - (-1.25), player.wy - 0.0);
+
+      let nearTreeIdx = -1;
+      for (let tIdx = 0; tIdx < trees.length; tIdx++) {
+        const [tx, ty] = trees[tIdx];
+        const tDist = Math.hypot(player.wx - tx, player.wy - ty);
+        if (tDist < 0.85) {
+          nearTreeIdx = tIdx;
+          break;
         }
+      }
+
+      if (isSittingRef.current) {
+        if (nearbyActionRef.current?.type !== 'bench') {
+          setNearbyAction({ type: 'bench', benchName: 'Kursi Taman' });
+        }
+      } else if (eastBenchDist < 0.85) {
+        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'fountain_east') {
+          setNearbyAction({ type: 'bench', benchId: 'fountain_east', benchName: 'Kursi Timur Air Mancur' });
+        }
+      } else if (westBenchDist < 0.85) {
+        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'fountain_west') {
+          setNearbyAction({ type: 'bench', benchId: 'fountain_west', benchName: 'Kursi Barat Air Mancur' });
+        }
+      } else if (litDist < 1.05) {
+        if (nearbyActionRef.current?.type !== 'literacy') {
+          setNearbyAction({ type: 'literacy' });
+        }
+      } else if (fishDist < 1.0) {
+        if (nearbyActionRef.current?.type !== 'fishing') {
+          setNearbyAction({ type: 'fishing' });
+        }
+      } else if (nearTreeIdx !== -1) {
+        if (nearbyActionRef.current?.type !== 'tree' || nearbyActionRef.current?.treeIndex !== nearTreeIdx) {
+          setNearbyAction({ type: 'tree', treeIndex: nearTreeIdx });
+        }
+      } else if (nearbyActionRef.current) {
+        setNearbyAction(null);
       }
 
       // Update NPCs
@@ -1112,7 +1132,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'avatar'; data: AvatarData; isPlayer: boolean; depth: number }
         | { type: 'tree'; wx: number; wy: number; depth: number; index: number }
         | { type: 'lamp'; wx: number; wy: number; depth: number }
-        | { type: 'fishing_spot'; wx: number; wy: number; depth: number };
+        | { type: 'fishing_spot'; wx: number; wy: number; depth: number }
+        | { type: 'literacy_corner'; wx: number; wy: number; depth: number }
+        | { type: 'bench'; wx: number; wy: number; depth: number; id: 'fountain_east' | 'fountain_west' | 'literacy' };
 
       const drawItems: DrawItem[] = [];
 
@@ -1137,15 +1159,165 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         drawItems.push({ type: 'lamp', wx: lx, wy: ly, depth: lx + ly });
       });
 
-      // Fishing Spot Dock at [-1.4, 0.4]
-      drawItems.push({ type: 'fishing_spot', wx: -1.4, wy: 0.4, depth: -1.0 });
+      // 1. Spot Memancing Relocated to East End (Ujung Timur) at [4.4, 1.8]
+      drawItems.push({ type: 'fishing_spot', wx: 4.4, wy: 1.8, depth: 4.4 + 1.8 });
+
+      // 2. Sudut Literasi Siswa at West End (Ujung Barat) at [-4.3, 1.8]
+      drawItems.push({ type: 'literacy_corner', wx: -4.3, wy: 1.8, depth: -4.3 + 1.8 });
+
+      // 3. Kursi Taman Samping Air Mancur (East & West Benches)
+      drawItems.push({ type: 'bench', wx: 1.25, wy: 0.0, depth: 1.25, id: 'fountain_east' });
+      drawItems.push({ type: 'bench', wx: -1.25, wy: 0.0, depth: -1.25, id: 'fountain_west' });
 
       drawItems.sort((a, b) => a.depth - b.depth);
 
       // Render Each Item
       drawItems.forEach((item) => {
-        if (item.type === 'fishing_spot') {
-          // DERMAGA MEMANCING WARGA (Rustic Wooden Fishing Pier & Sign)
+        if (item.type === 'bench') {
+          // FOUNTAIN SIDE BENCH (Polished teak wood planks with dark cast-iron frame)
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+
+          // Ground shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 1 * z, 14 * z, 6 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Dark cast-iron frame/legs
+          ctx.fillStyle = isNight ? '#0f172a' : '#334155';
+          ctx.fillRect(pt.x - 11 * z, pt.y - 3 * z, 2.5 * z, 7 * z);
+          ctx.fillRect(pt.x + 8.5 * z, pt.y - 3 * z, 2.5 * z, 7 * z);
+          ctx.fillRect(pt.x - 11 * z, pt.y + 2 * z, 22 * z, 2 * z);
+
+          // Teak wooden seat slats
+          ctx.fillStyle = '#b45309';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 12 * z, pt.y - 4 * z);
+          ctx.lineTo(pt.x + 12 * z, pt.y - 4 * z);
+          ctx.lineTo(pt.x + 10 * z, pt.y + 1 * z);
+          ctx.lineTo(pt.x - 14 * z, pt.y + 1 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 0.8 * z;
+          ctx.stroke();
+
+          // Teak backrest slats
+          ctx.fillStyle = '#d97706';
+          ctx.fillRect(pt.x - 12 * z, pt.y - 11 * z, 24 * z, 3 * z);
+          ctx.fillRect(pt.x - 12 * z, pt.y - 7 * z, 24 * z, 2.5 * z);
+
+          // Armrest curves
+          ctx.strokeStyle = isNight ? '#0f172a' : '#334155';
+          ctx.lineWidth = 1.2 * z;
+          ctx.beginPath();
+          ctx.arc(pt.x - 11 * z, pt.y - 3 * z, 3 * z, Math.PI, 0);
+          ctx.arc(pt.x + 10 * z, pt.y - 3 * z, 3 * z, Math.PI, 0);
+          ctx.stroke();
+        } else if (item.type === 'literacy_corner') {
+          // SUDUT LITERASI WARGA (West End Reading Gazebo, Bookshelf & Reading Corner)
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+
+          // Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 4 * z, 32 * z, 16 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Wooden decking platform
+          ctx.fillStyle = '#78350f';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 26 * z, pt.y - 8 * z);
+          ctx.lineTo(pt.x + 16 * z, pt.y - 12 * z);
+          ctx.lineTo(pt.x + 26 * z, pt.y + 8 * z);
+          ctx.lineTo(pt.x - 16 * z, pt.y + 12 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 1 * z;
+          ctx.stroke();
+
+          // Bookshelf on back wall
+          ctx.fillStyle = '#451a03';
+          ctx.fillRect(pt.x - 20 * z, pt.y - 28 * z, 14 * z, 22 * z);
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 1 * z;
+          ctx.strokeRect(pt.x - 20 * z, pt.y - 28 * z, 14 * z, 22 * z);
+
+          // Colorful book spines on shelves
+          const bookColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+          for (let shelf = 0; shelf < 3; shelf++) {
+            const shelfY = pt.y - (25 - shelf * 7) * z;
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(pt.x - 19 * z, shelfY + 5 * z, 12 * z, 1.5 * z); // shelf plank
+            for (let bIdx = 0; bIdx < 4; bIdx++) {
+              ctx.fillStyle = bookColors[(shelf * 3 + bIdx) % bookColors.length];
+              ctx.fillRect(pt.x - (18 - bIdx * 2.8) * z, shelfY, 2.2 * z, 5 * z);
+            }
+          }
+
+          // Reading Bench with cyan velvet cushion
+          ctx.fillStyle = '#b45309';
+          ctx.fillRect(pt.x - 4 * z, pt.y - 8 * z, 16 * z, 6 * z);
+          ctx.fillStyle = '#0284c7'; // Cushion
+          ctx.fillRect(pt.x - 4 * z, pt.y - 9.5 * z, 16 * z, 2.5 * z);
+
+          // Small coffee/reading table in front
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(pt.x + 1 * z, pt.y + 1 * z, 10 * z, 5 * z);
+          // Open comic/book on table
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(pt.x + 3 * z, pt.y - 0.5 * z, 6 * z, 3.5 * z);
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(pt.x + 3.5 * z, pt.y, 2.2 * z, 2.5 * z);
+
+          // Pergola columns & roof trellis
+          ctx.strokeStyle = '#572506';
+          ctx.lineWidth = 2 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 24 * z, pt.y - 6 * z);
+          ctx.lineTo(pt.x - 24 * z, pt.y - 34 * z);
+          ctx.moveTo(pt.x + 22 * z, pt.y + 6 * z);
+          ctx.lineTo(pt.x + 22 * z, pt.y - 22 * z);
+          ctx.moveTo(pt.x + 14 * z, pt.y - 12 * z);
+          ctx.lineTo(pt.x + 14 * z, pt.y - 38 * z);
+          ctx.stroke();
+
+          // Green ivy leaves on trellis
+          ctx.fillStyle = '#16a34a';
+          for (let iv = 0; iv < 6; iv++) {
+            ctx.beginPath();
+            ctx.arc(pt.x - 24 * z + (iv % 2) * 2 * z, pt.y - (30 - iv * 4) * z, 2.2 * z, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Hanging brass lantern with warm glow
+          const litLanternY = pt.y - 32 * z;
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 6 * z, litLanternY - 4 * z);
+          ctx.lineTo(pt.x - 6 * z, litLanternY);
+          ctx.stroke();
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.arc(pt.x - 6 * z, litLanternY + 3 * z, 3 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Wooden Signpost "📖 SUDUT LITERASI"
+          ctx.fillStyle = '#fef08a';
+          ctx.fillRect(pt.x - 14 * z, pt.y - 44 * z, 36 * z, 10 * z);
+          ctx.strokeStyle = '#b45309';
+          ctx.lineWidth = 1 * z;
+          ctx.strokeRect(pt.x - 14 * z, pt.y - 44 * z, 36 * z, 10 * z);
+          ctx.fillStyle = '#78350f';
+          ctx.font = `bold ${Math.round(6 * z)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('📖 SUDUT LITERASI', pt.x + 4 * z, pt.y - 37 * z);
+        } else if (item.type === 'fishing_spot') {
+          // DERMAGA MEMANCING WARGA - EAST END (Rustic Wooden Fishing Pier & Sign)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
@@ -1211,14 +1383,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fillStyle = '#78350f';
           ctx.fillRect(pt.x + 6 * z, pt.y - 22 * z, 3.5 * z, 24 * z);
           ctx.fillStyle = '#fef08a';
-          ctx.fillRect(pt.x - 4 * z, pt.y - 32 * z, 24 * z, 11 * z);
+          ctx.fillRect(pt.x - 4 * z, pt.y - 32 * z, 26 * z, 11 * z);
           ctx.strokeStyle = '#b45309';
           ctx.lineWidth = 1 * z;
-          ctx.strokeRect(pt.x - 4 * z, pt.y - 32 * z, 24 * z, 11 * z);
+          ctx.strokeRect(pt.x - 4 * z, pt.y - 32 * z, 26 * z, 11 * z);
           ctx.fillStyle = '#78350f';
-          ctx.font = `bold ${Math.round(6 * z)}px sans-serif`;
+          ctx.font = `bold ${Math.round(5.5 * z)}px sans-serif`;
           ctx.textAlign = 'center';
-          ctx.fillText('🎣 MANCING', pt.x + 8 * z, pt.y - 24.5 * z);
+          ctx.fillText('🎣 DERMAGA TIMUR', pt.x + 9 * z, pt.y - 24.5 * z);
 
           // Concentric ripples in the water around the dock
           for (let r = 0; r < 2; r++) {
@@ -1278,21 +1450,52 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(pt.x, pt.y - 59 * z, 6 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Watered tree flourishing blooms and sparkles
+          // Watered tree: marked with bright red apples & rising water sparkles
           if (isWatered) {
-            // Blooming floral buds on crown
-            ctx.fillStyle = '#f472b6';
-            ctx.beginPath();
-            ctx.arc(pt.x - 12 * z, pt.y - 36 * z, 3 * z, 0, Math.PI * 2);
-            ctx.arc(pt.x + 11 * z, pt.y - 42 * z, 3 * z, 0, Math.PI * 2);
-            ctx.arc(pt.x - 3 * z, pt.y - 52 * z, 2.5 * z, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#fef08a';
-            ctx.beginPath();
-            ctx.arc(pt.x - 12 * z, pt.y - 36 * z, 1.2 * z, 0, Math.PI * 2);
-            ctx.arc(pt.x + 11 * z, pt.y - 42 * z, 1.2 * z, 0, Math.PI * 2);
-            ctx.arc(pt.x - 3 * z, pt.y - 52 * z, 1 * z, 0, Math.PI * 2);
-            ctx.fill();
+            // Bright Red Apples (Buah Apel Merah 🍎) hanging from foliage
+            const applePositions = [
+              [-11, -34],
+              [10, -36],
+              [-4, -48],
+              [8, -46],
+              [-12, -24],
+              [5, -26],
+            ];
+
+            applePositions.forEach(([ax, ay]) => {
+              const appleX = pt.x + ax * z;
+              const appleY = pt.y + ay * z;
+
+              // Little brown stem & green leaf
+              ctx.strokeStyle = '#451a03';
+              ctx.lineWidth = 0.9 * z;
+              ctx.beginPath();
+              ctx.moveTo(appleX, appleY - 2.8 * z);
+              ctx.lineTo(appleX + 0.5 * z, appleY - 4.5 * z);
+              ctx.stroke();
+
+              ctx.fillStyle = '#16a34a';
+              ctx.beginPath();
+              ctx.ellipse(appleX + 1.8 * z, appleY - 4 * z, 1.8 * z, 1.0 * z, Math.PI / 4, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Plump Red Apple body
+              ctx.fillStyle = '#dc2626';
+              ctx.beginPath();
+              ctx.arc(appleX, appleY, 3.4 * z, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = '#ef4444';
+              ctx.beginPath();
+              ctx.arc(appleX - 0.5 * z, appleY - 0.5 * z, 2.7 * z, 0, Math.PI * 2);
+              ctx.fill();
+
+              // White specular shine gleam
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.arc(appleX - 1 * z, appleY - 1.2 * z, 0.9 * z, 0, Math.PI * 2);
+              ctx.fill();
+            });
 
             // Rising water sparkle particles
             for (let s = 0; s < 3; s++) {
@@ -2019,98 +2222,171 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const isFemale = item.isPlayer
             ? studentGender === 'P'
             : av.gender === 'P' || av.id === 'siti' || av.id === 'dia';
+          const isTeacherAvatar = Boolean((item.isPlayer && isTeacher) || av.role === 'guru');
+          const isSittingNow = Boolean(item.isPlayer && isSittingRef.current);
 
-          // Natural leg swing & gentle bobbing matching slow walking speed
-          const legSwing = av.isMoving ? Math.sin(av.walkFrame) * 3.5 * z : 0;
-          const avY = pt.y - (av.isMoving ? Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0);
+          // Natural leg swing & gentle bobbing (disabled when sitting)
+          const legSwing = (av.isMoving && !isSittingNow) ? Math.sin(av.walkFrame) * 3.5 * z : 0;
+          const avY = pt.y + (isSittingNow ? 3.2 * z : (av.isMoving ? -Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0));
 
-          // Legs & Skirt/Pants
-          if (isFemale) {
-            // Legs in cute socks & tights
-            ctx.fillStyle = '#fed7aa';
-            ctx.fillRect(pt.x - 3.5 * z, avY - 4 * z + legSwing, 2.5 * z, 5 * z);
-            ctx.fillRect(pt.x + 1 * z, avY - 4 * z - legSwing, 2.5 * z, 5 * z);
+          // 1. LEGS & PANTS / SKIRT
+          if (isSittingNow) {
+            // SITTING ANIMATION: Legs folded forward over the bench surface
+            ctx.fillStyle = isTeacherAvatar
+              ? (isFemale ? '#065f46' : '#1e293b')
+              : (isFemale ? (av.pantsColor || '#be185d') : av.pantsColor);
 
-            // White ankle socks
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(pt.x - 3.5 * z, avY - 0.5 * z + legSwing, 2.5 * z, 2 * z);
-            ctx.fillRect(pt.x + 1 * z, avY - 0.5 * z - legSwing, 2.5 * z, 2 * z);
+            // Horizontal thighs resting on bench
+            ctx.fillRect(pt.x - 4 * z, avY - 5.5 * z, 3.8 * z, 3.5 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY - 5.5 * z, 3.8 * z, 3.5 * z);
 
-            // Cute pastel/burgundy pleated skirt
-            ctx.fillStyle = av.pantsColor || '#be185d';
-            ctx.beginPath();
-            ctx.moveTo(pt.x - 5.5 * z, avY - 7 * z);
-            ctx.lineTo(pt.x + 5.5 * z, avY - 7 * z);
-            ctx.lineTo(pt.x + 7.5 * z, avY - 2 * z);
-            ctx.lineTo(pt.x - 7.5 * z, avY - 2 * z);
-            ctx.closePath();
-            ctx.fill();
-            // Skirt pleat lines
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-            ctx.lineWidth = 0.8 * z;
-            for (let pl = -4; pl <= 4; pl += 2.6) {
+            // Vertical calves bent downward
+            ctx.fillRect(pt.x - 4 * z, avY - 2.5 * z, 3.2 * z, 4 * z);
+            ctx.fillRect(pt.x + 1 * z, avY - 2.5 * z, 3.2 * z, 4 * z);
+
+            // Shoes resting on floor
+            ctx.fillStyle = isFemale ? (isTeacherAvatar ? '#064e3b' : '#e11d48') : '#0f172a';
+            ctx.fillRect(pt.x - 4.5 * z, avY + 1.2 * z, 4 * z, 2.2 * z);
+            ctx.fillRect(pt.x + 0.8 * z, avY + 1.2 * z, 4 * z, 2.2 * z);
+          } else if (isFemale) {
+            if (isTeacherAvatar) {
+              // Female Teacher: Elegant tailored long slacks or maxi skirt
+              ctx.fillStyle = '#065f46';
+              ctx.fillRect(pt.x - 3.8 * z, avY - 5 * z + legSwing, 3.2 * z, 6 * z);
+              ctx.fillRect(pt.x + 0.6 * z, avY - 5 * z - legSwing, 3.2 * z, 6 * z);
+              ctx.fillStyle = '#064e3b';
+              ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing, 3.6 * z, 2.4 * z);
+              ctx.fillRect(pt.x + 0.6 * z, avY + 1 * z - legSwing, 3.6 * z, 2.4 * z);
+            } else {
+              // Female Student: Legs in socks & pleated skirt
+              ctx.fillStyle = '#fed7aa';
+              ctx.fillRect(pt.x - 3.5 * z, avY - 4 * z + legSwing, 2.5 * z, 5 * z);
+              ctx.fillRect(pt.x + 1 * z, avY - 4 * z - legSwing, 2.5 * z, 5 * z);
+
+              // White ankle socks
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(pt.x - 3.5 * z, avY - 0.5 * z + legSwing, 2.5 * z, 2 * z);
+              ctx.fillRect(pt.x + 1 * z, avY - 0.5 * z - legSwing, 2.5 * z, 2 * z);
+
+              // Pleated skirt
+              ctx.fillStyle = av.pantsColor || '#be185d';
               ctx.beginPath();
-              ctx.moveTo(pt.x + pl * z, avY - 7 * z);
-              ctx.lineTo(pt.x + pl * 1.3 * z, avY - 2 * z);
-              ctx.stroke();
+              ctx.moveTo(pt.x - 5.5 * z, avY - 7 * z);
+              ctx.lineTo(pt.x + 5.5 * z, avY - 7 * z);
+              ctx.lineTo(pt.x + 7.5 * z, avY - 2 * z);
+              ctx.lineTo(pt.x - 7.5 * z, avY - 2 * z);
+              ctx.closePath();
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+              ctx.lineWidth = 0.8 * z;
+              for (let pl = -4; pl <= 4; pl += 2.6) {
+                ctx.beginPath();
+                ctx.moveTo(pt.x + pl * z, avY - 7 * z);
+                ctx.lineTo(pt.x + pl * 1.3 * z, avY - 2 * z);
+                ctx.stroke();
+              }
+              // Shoes
+              ctx.fillStyle = '#e11d48';
+              ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing, 3.5 * z, 2.5 * z);
+              ctx.fillRect(pt.x + 0.5 * z, avY + 1 * z - legSwing, 3.5 * z, 2.5 * z);
             }
           } else {
             // Male Pants
-            ctx.fillStyle = av.pantsColor;
+            ctx.fillStyle = isTeacherAvatar ? '#1e293b' : av.pantsColor;
             ctx.fillRect(pt.x - 3.5 * z, avY - 5 * z + legSwing, 3 * z, 6 * z);
             ctx.fillRect(pt.x + 0.5 * z, avY - 5 * z - legSwing, 3 * z, 6 * z);
+            // Shoes
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing, 3.5 * z, 2.5 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY + 1 * z - legSwing, 3.5 * z, 2.5 * z);
           }
 
-          // Shoes
-          ctx.fillStyle = isFemale ? '#e11d48' : '#0f172a';
-          ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing, 3.5 * z, 2.5 * z);
-          ctx.fillRect(pt.x + 0.5 * z, avY + 1 * z - legSwing, 3.5 * z, 2.5 * z);
-
-          // Shirt / Torso
-          ctx.fillStyle = av.shirtColor;
-          ctx.beginPath();
-          ctx.roundRect(pt.x - 5 * z, avY - 14 * z, 10 * z, 8.5 * z, 2.2 * z);
-          ctx.fill();
-
-          if (isFemale) {
-            // Cute Peter Pan collar / ribbon tie on blouse
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(pt.x - 2 * z, avY - 13.5 * z, 1.8 * z, 0, Math.PI);
-            ctx.arc(pt.x + 2 * z, avY - 13.5 * z, 1.8 * z, 0, Math.PI);
-            ctx.fill();
-            ctx.fillStyle = '#f43f5e';
-            ctx.fillRect(pt.x - 1 * z, avY - 13 * z, 2 * z, 2.5 * z);
+          // 2. SHIRT / TORSO
+          if (isTeacherAvatar) {
+            if (isFemale) {
+              // Female Teacher: Formal emerald blazer with golden brooch
+              ctx.fillStyle = '#047857';
+              ctx.beginPath();
+              ctx.roundRect(pt.x - 5.5 * z, avY - 14 * z, 11 * z, 8.5 * z, 2.2 * z);
+              ctx.fill();
+              // Golden brooch
+              ctx.fillStyle = '#fef08a';
+              ctx.beginPath();
+              ctx.arc(pt.x - 2 * z, avY - 11.5 * z, 1.2 * z, 0, Math.PI * 2);
+              ctx.fill();
+            } else {
+              // Male Teacher: Formal navy blazer with golden amber tie
+              ctx.fillStyle = '#1e3a8a';
+              ctx.beginPath();
+              ctx.roundRect(pt.x - 5.5 * z, avY - 14 * z, 11 * z, 8.5 * z, 2.2 * z);
+              ctx.fill();
+              // White shirt v-neck & tie
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.moveTo(pt.x - 2 * z, avY - 14 * z);
+              ctx.lineTo(pt.x, avY - 11 * z);
+              ctx.lineTo(pt.x + 2 * z, avY - 14 * z);
+              ctx.fill();
+              ctx.fillStyle = '#f59e0b';
+              ctx.fillRect(pt.x - 0.8 * z, avY - 11.5 * z, 1.6 * z, 4.5 * z);
+            }
           } else {
-            // Male open polo collar line
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1 * z;
+            // Student Torso
+            ctx.fillStyle = av.shirtColor;
             ctx.beginPath();
-            ctx.moveTo(pt.x - 2 * z, avY - 14 * z);
-            ctx.lineTo(pt.x, avY - 11.5 * z);
-            ctx.lineTo(pt.x + 2 * z, avY - 14 * z);
-            ctx.stroke();
+            ctx.roundRect(pt.x - 5 * z, avY - 14 * z, 10 * z, 8.5 * z, 2.2 * z);
+            ctx.fill();
+
+            if (isFemale) {
+              // Cute Peter Pan collar
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.arc(pt.x - 2 * z, avY - 13.5 * z, 1.8 * z, 0, Math.PI);
+              ctx.arc(pt.x + 2 * z, avY - 13.5 * z, 1.8 * z, 0, Math.PI);
+              ctx.fill();
+              ctx.fillStyle = '#f43f5e';
+              ctx.fillRect(pt.x - 1 * z, avY - 13 * z, 2 * z, 2.5 * z);
+            } else {
+              // Male open polo collar line
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1 * z;
+              ctx.beginPath();
+              ctx.moveTo(pt.x - 2 * z, avY - 14 * z);
+              ctx.lineTo(pt.x, avY - 11.5 * z);
+              ctx.lineTo(pt.x + 2 * z, avY - 14 * z);
+              ctx.stroke();
+            }
           }
 
-          // Natural arm swing opposing leg movement
-          const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0;
-          ctx.fillStyle = av.shirtColor;
-          ctx.fillRect(pt.x - 7.2 * z, avY - 13 * z - armSwing, 2.2 * z, 7 * z);
-          ctx.fillRect(pt.x + 5 * z, avY - 13 * z + armSwing, 2.2 * z, 7 * z);
+          // 3. ARMS & HANDS
+          if (isSittingNow) {
+            // Resting arms on lap
+            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.fillRect(pt.x - 6.5 * z, avY - 13 * z, 2.2 * z, 6.5 * z);
+            ctx.fillRect(pt.x + 4.5 * z, avY - 13 * z, 2.2 * z, 6.5 * z);
+            // Hands on knees
+            ctx.fillStyle = '#fed7aa';
+            ctx.fillRect(pt.x - 5.5 * z, avY - 7 * z, 2.6 * z, 2.2 * z);
+            ctx.fillRect(pt.x + 3 * z, avY - 7 * z, 2.6 * z, 2.2 * z);
+          } else {
+            const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0;
+            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.fillRect(pt.x - 7.2 * z, avY - 13 * z - armSwing, 2.2 * z, 7 * z);
+            ctx.fillRect(pt.x + 5 * z, avY - 13 * z + armSwing, 2.2 * z, 7 * z);
+            // Hands
+            ctx.fillStyle = '#fed7aa';
+            ctx.fillRect(pt.x - 7.2 * z, avY - 6 * z - armSwing, 2.2 * z, 2.2 * z);
+            ctx.fillRect(pt.x + 5 * z, avY - 6 * z + armSwing, 2.2 * z, 2.2 * z);
+          }
 
-          // Hands
-          ctx.fillStyle = '#fed7aa';
-          ctx.fillRect(pt.x - 7.2 * z, avY - 6 * z - armSwing, 2.2 * z, 2.2 * z);
-          ctx.fillRect(pt.x + 5 * z, avY - 6 * z + armSwing, 2.2 * z, 2.2 * z);
-
-          // Head & Face
+          // 4. HEAD & FACE
           ctx.fillStyle = '#fed7aa';
           ctx.beginPath();
           ctx.arc(pt.x, avY - 18 * z, 5 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Blushing cheeks for female avatar
-          if (isFemale) {
+          if (isFemale && !isTeacherAvatar) {
+            // Blushing cheeks for female student
             ctx.fillStyle = 'rgba(244, 63, 94, 0.45)';
             ctx.beginPath();
             ctx.arc(pt.x - 3 * z, avY - 17.5 * z, 1.2 * z, 0, Math.PI * 2);
@@ -2118,26 +2394,66 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           }
 
-          // Hair (Female vs Male)
-          if (isFemale) {
+          // 5. HAIR & HIJAB (Distinguished Teacher vs Student)
+          if (isTeacherAvatar && isFemale) {
+            // Female Teacher: Elegant professional Hijab
+            ctx.fillStyle = '#059669'; // Emerald Hijab
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 19.5 * z, 6.2 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Hijab drape over shoulders
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 6.5 * z, avY - 17 * z);
+            ctx.lineTo(pt.x + 6.5 * z, avY - 17 * z);
+            ctx.lineTo(pt.x + 7.5 * z, avY - 10 * z);
+            ctx.lineTo(pt.x - 7.5 * z, avY - 10 * z);
+            ctx.closePath();
+            ctx.fill();
+            // Inner face opening
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 18 * z, 3.8 * z, 4.2 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Delicate blushing
+            ctx.fillStyle = 'rgba(244, 63, 94, 0.35)';
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.5 * z, avY - 17.5 * z, 1 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 2.5 * z, avY - 17.5 * z, 1 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (isTeacherAvatar) {
+            // Male Teacher: Smart side-parted hairstyle with glasses
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 21 * z, 5.4 * z, Math.PI, 0);
+            ctx.fill();
+            ctx.fillRect(pt.x - 4.5 * z, avY - 22 * z, 3.5 * z, 2.5 * z);
+            // Wireframe glasses
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 0.8 * z;
+            ctx.strokeRect(pt.x - 4 * z, avY - 19.5 * z, 3 * z, 2.2 * z);
+            ctx.strokeRect(pt.x + 1 * z, avY - 19.5 * z, 3 * z, 2.2 * z);
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 1 * z, avY - 18.5 * z);
+            ctx.lineTo(pt.x + 1 * z, avY - 18.5 * z);
+            ctx.stroke();
+          } else if (isFemale) {
+            // Female Student: Round crown & bangs with side locks & hair ribbons
             ctx.fillStyle = av.hairColor || '#6b3410';
-            // Round crown & bangs
             ctx.beginPath();
             ctx.arc(pt.x, avY - 21 * z, 5.8 * z, Math.PI, 0);
             ctx.fill();
-            // Side locks flowing down
             ctx.beginPath();
             ctx.roundRect(pt.x - 7 * z, avY - 20 * z, 2.4 * z, 10 * z, 1.2 * z);
             ctx.roundRect(pt.x + 4.6 * z, avY - 20 * z, 2.4 * z, 10 * z, 1.2 * z);
             ctx.fill();
-            // Coral / Pink hair ribbons on sides
+            // Hair ribbons
             ctx.fillStyle = '#f43f5e';
             ctx.beginPath();
             ctx.arc(pt.x - 6 * z, avY - 21 * z, 1.8 * z, 0, Math.PI * 2);
             ctx.arc(pt.x + 6 * z, avY - 21 * z, 1.8 * z, 0, Math.PI * 2);
             ctx.fill();
           } else {
-            // Male: clean neat crop with side part
+            // Male Student: Clean crop with side part
             ctx.fillStyle = av.hairColor || '#0f172a';
             ctx.beginPath();
             ctx.arc(pt.x, avY - 21 * z, 5.2 * z, Math.PI, 0);
@@ -2149,10 +2465,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (item.isPlayer && heldItemRef.current) {
             const hType = heldItemRef.current;
             const hX = pt.x + 6 * z;
-            const hY = avY - 8 * z + armSwing;
+            const hY = avY - 8 * z + (isSittingNow ? 0 : (av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0));
 
             if (hType === 'kopi') {
-              // Paper takeaway cup with sleeve and lid
               ctx.fillStyle = '#f8fafc';
               ctx.fillRect(hX - 1.5 * z, hY - 4 * z, 4 * z, 5.5 * z);
               ctx.fillStyle = '#b45309';
@@ -2168,7 +2483,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.lineTo(hX + 0.5 * z + Math.sin(elapsed * 4) * 1.5 * z, sY - 2.5 * z);
               ctx.stroke();
             } else if (hType === 'roti') {
-              // Golden baked croissant
               ctx.fillStyle = '#f59e0b';
               ctx.beginPath();
               ctx.ellipse(hX + 0.5 * z, hY - 2 * z, 3.8 * z, 2.4 * z, Math.PI / 4, 0, Math.PI * 2);
@@ -2176,13 +2490,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.strokeStyle = '#b45309';
               ctx.lineWidth = 0.8 * z;
               ctx.stroke();
-              // Butter glaze gleam
               ctx.fillStyle = '#fef08a';
               ctx.beginPath();
               ctx.arc(hX - 0.5 * z, hY - 2.8 * z, 1.2 * z, 0, Math.PI * 2);
               ctx.fill();
             } else if (hType === 'eskrim') {
-              // Crisp waffle cone
               ctx.fillStyle = '#d97706';
               ctx.beginPath();
               ctx.moveTo(hX - 2 * z, hY - 1 * z);
@@ -2190,12 +2502,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.lineTo(hX, hY + 3.5 * z);
               ctx.closePath();
               ctx.fill();
-              // Strawberry ice cream scoop
               ctx.fillStyle = '#f472b6';
               ctx.beginPath();
               ctx.arc(hX, hY - 2.5 * z, 2.6 * z, 0, Math.PI * 2);
               ctx.fill();
-              // Cherry on top
               ctx.fillStyle = '#ef4444';
               ctx.beginPath();
               ctx.arc(hX, hY - 5.2 * z, 1 * z, 0, Math.PI * 2);
@@ -2203,9 +2513,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
-          // FISHING ANIMATION (When fishing at pier)
+          // FISHING ANIMATION (When fishing at east pier)
           if (item.isPlayer && isFishingRef.current) {
-            // Bamboo fishing rod held in hand
             ctx.strokeStyle = '#78350f';
             ctx.lineWidth = 2 * z;
             ctx.beginPath();
@@ -2213,7 +2522,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x + 22 * z, avY - 22 * z);
             ctx.stroke();
 
-            // Flexible rod tip bend
             ctx.strokeStyle = '#92400e';
             ctx.lineWidth = 1.2 * z;
             ctx.beginPath();
@@ -2221,7 +2529,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.quadraticCurveTo(pt.x + 28 * z, avY - 24 * z, pt.x + 32 * z, avY - 16 * z);
             ctx.stroke();
 
-            // Monofilament line dropping into water
             const bobberX = pt.x + 36 * z;
             const bobberY = avY + (4 + Math.sin(elapsed * 6) * 2.5) * z;
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
@@ -2231,7 +2538,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(bobberX, bobberY);
             ctx.stroke();
 
-            // Red-and-white bobber in water
             ctx.fillStyle = '#ef4444';
             ctx.beginPath();
             ctx.arc(bobberX, bobberY, 2.5 * z, Math.PI, 0);
@@ -2241,7 +2547,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.arc(bobberX, bobberY, 2.5 * z, 0, Math.PI);
             ctx.fill();
 
-            // Concentric ripples around bobber
             const bPhase = (elapsed * 1.5) % 1;
             ctx.strokeStyle = `rgba(56, 189, 248, ${0.6 * (1 - bPhase)})`;
             ctx.lineWidth = 0.8 * z;
@@ -2249,7 +2554,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.ellipse(bobberX, bobberY + 2 * z, (3 + bPhase * 8) * z, (1.5 + bPhase * 4) * z, 0, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Occasional splash droplets
             if (Math.sin(elapsed * 6) > 0.6) {
               ctx.fillStyle = '#38bdf8';
               ctx.beginPath();
@@ -2259,11 +2563,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
-          // Floating Username Tag Pill (Exact Match)
+          // 6. USERNAME TAG PILL
           const tagPosY = avY - 29 * z;
           let labelText = `@${av.handle}`;
           if (item.isPlayer) {
-            labelText = `@${av.handle} (Kamu)`;
+            labelText = isTeacherAvatar ? `@${av.handle} (Guru)` : `@${av.handle} (Kamu)`;
           }
 
           ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
@@ -2277,11 +2581,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.roundRect(pt.x - tW / 2, tagPosY - tH / 2, tW, tH, 7 * z);
           ctx.fill();
 
-          if (item.isPlayer) {
-            ctx.strokeStyle = '#facc15'; // Gold highlight for player!
+          if (isTeacherAvatar) {
+            ctx.strokeStyle = '#f59e0b';
             ctx.lineWidth = 1.5;
             ctx.stroke();
-            ctx.fillStyle = '#fde047'; // Yellow text
+            ctx.fillStyle = '#fbbf24';
+          } else if (item.isPlayer) {
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = '#fde047';
           } else {
             ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
             ctx.lineWidth = 1;
@@ -2293,18 +2602,30 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.textBaseline = 'middle';
           ctx.fillText(labelText, pt.x, tagPosY);
 
-          // GURU Badge if Guru
-          if (av.role === 'guru') {
-            ctx.fillStyle = '#ea580c';
+          // 7. TEACHER IDENTITY BADGE: Positioned strictly ABOVE the username pill (never obscures the avatar!)
+          if (isTeacherAvatar) {
+            const badgeY = tagPosY - 13.5 * z;
+            const badgeLabel = isFemale ? '👩‍🏫 GURU DKV' : '👨‍🏫 GURU DKV';
+            ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
+            const bMetrics = ctx.measureText(badgeLabel);
+            const bW = bMetrics.width + 12 * z;
+            const bH = 13.5 * z;
+
+            ctx.fillStyle = 'rgba(217, 119, 6, 0.95)';
             ctx.beginPath();
-            ctx.roundRect(pt.x - 14 * z, tagPosY + 10 * z, 28 * z, 10 * z, 4 * z);
+            ctx.roundRect(pt.x - bW / 2, badgeY - bH / 2, bW, bH, 5 * z);
             ctx.fill();
+            ctx.strokeStyle = '#fde047';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+
             ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.round(6.5 * z)}px sans-serif`;
-            ctx.fillText('GURU', pt.x, tagPosY + 15 * z);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(badgeLabel, pt.x, badgeY);
           }
 
-          // Comic Speech Bubble
+          // 8. COMIC SPEECH BUBBLE (Floats above teacher badge or nametag)
           let speech: string | undefined = av.speechText;
           if (item.isPlayer && playerSpeechRef.current && Date.now() < playerSpeechRef.current.expiresAt) {
             speech = playerSpeechRef.current.text;
@@ -2318,7 +2639,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const sMetrics = ctx.measureText(speech);
             const sW = sMetrics.width + 14 * z;
             const sH = 20 * z;
-            const bubbleY = tagPosY - 18 * z;
+            const bubbleY = isTeacherAvatar ? tagPosY - 28 * z : tagPosY - 18 * z;
 
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
