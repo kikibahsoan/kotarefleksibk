@@ -3014,7 +3014,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         </aside>
       )}
 
-      {/* POP-UP AKSI MENYIRAM POHON / MEMANCING (Ketiadaan Konfirmasi Bangunan) */}
+      {/* POP-UP AKSI LITERASI, KURSI TAMAN, MENYIRAM POHON / MEMANCING */}
       {!pendingConfirmation && nearbyAction && (
         <aside
           aria-label="Aksi Lingkungan Kota"
@@ -3046,6 +3046,75 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 <span className="text-[10px] font-mono text-amber-300 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-500/30">
                   -1 XP
                 </span>
+              </button>
+            </div>
+          ) : nearbyAction.type === 'literacy' ? (
+            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-cyan-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                  📖
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold tracking-wider uppercase text-cyan-400">
+                    Sudut Literasi Warga
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                    Baca Buku & Majalah DKV
+                  </h4>
+                  <p className="text-[10px] text-slate-300 truncate">
+                    Komik, Majalah, atau Koran (-1 XP)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  sounds.playOpenModal();
+                  setIsLiteracyModalOpen(true);
+                }}
+                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold border border-cyan-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <span>📖 Baca</span>
+                <span className="text-[10px] font-mono text-amber-300 bg-cyan-950/80 px-1 py-0.5 rounded border border-cyan-500/30">
+                  -1 XP
+                </span>
+              </button>
+            </div>
+          ) : nearbyAction.type === 'bench' ? (
+            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                  🪑
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
+                    {nearbyAction.benchName || 'Kursi Taman'}
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                    {isSittingRef.current ? 'Bangun dari Kursi' : 'Duduk Santai di Kursi'}
+                  </h4>
+                  <p className="text-[10px] text-slate-300 truncate">
+                    Nikmati suasana tenang kota Refleksia
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  sounds.playClick();
+                  if (isSittingRef.current) {
+                    setIsSitting(false);
+                    setSittingSeat(null);
+                    setCafeToast('🚶 Berdiri kembali dari kursi taman.');
+                    setTimeout(() => setCafeToast(null), 2500);
+                  } else {
+                    setIsSitting(true);
+                    setSittingSeat(nearbyAction.benchId || 'fountain_east');
+                    setCafeToast('🪑 Duduk santai dengan animasi nyaman.');
+                    setTimeout(() => setCafeToast(null), 2500);
+                  }
+                }}
+                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <span>{isSittingRef.current ? '🚶 Berdiri' : '🪑 Duduk'}</span>
               </button>
             </div>
           ) : (
@@ -3161,8 +3230,180 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         </div>
       )}
 
-      {/* BOTTOM-RIGHT ZOOM & CAMERA CONTROLS (Positioned cleanly above mobile chat input) */}
-      <div className="absolute bottom-20 sm:bottom-6 right-3 sm:right-6 z-30 flex flex-col items-center gap-2 pointer-events-auto">
+      {/* LITERACY READING CORNER MODAL (-1 XP for Komik, Majalah, Koran) */}
+      {isLiteracyModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 animate-fade-in"
+          onClick={() => setIsLiteracyModalOpen(false)}
+        >
+          <div
+            className="bg-[#121e2c] border border-cyan-500/50 rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9)] text-white relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/40 text-xl font-black">
+                  📖
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">Sudut Literasi Warga</h3>
+                  <p className="text-[11px] text-slate-400">Pilih bahan bacaan kreatif DKV • Biaya: 1 XP</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsLiteracyModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const cost = 1;
+                  if (studentPoints < cost) {
+                    sounds.playClick();
+                    setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`);
+                    return;
+                  }
+                  const success = onDeductPoints ? onDeductPoints(cost, 'Baca Komik DKV') : true;
+                  if (success) {
+                    sounds.playRewardXp();
+                    setActiveLiteracyDoc('komik');
+                    setCafeToast('📚 Membaca Komik Desain Kreatif (-1 XP)');
+                    setTimeout(() => setCafeToast(null), 3000);
+                  }
+                }}
+                className={`p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                  activeLiteracyDoc === 'komik'
+                    ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-lg'
+                    : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
+                }`}
+              >
+                <span className="text-2xl">📚</span>
+                <span className="text-xs font-extrabold">Komik DKV</span>
+                <span className="text-[9px] text-amber-300 font-mono">-1 XP</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const cost = 1;
+                  if (studentPoints < cost) {
+                    sounds.playClick();
+                    setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`);
+                    return;
+                  }
+                  const success = onDeductPoints ? onDeductPoints(cost, 'Baca Majalah Desain') : true;
+                  if (success) {
+                    sounds.playRewardXp();
+                    setActiveLiteracyDoc('majalah');
+                    setCafeToast('📰 Membaca Majalah Seni Rupa (-1 XP)');
+                    setTimeout(() => setCafeToast(null), 3000);
+                  }
+                }}
+                className={`p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                  activeLiteracyDoc === 'majalah'
+                    ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-lg'
+                    : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
+                }`}
+              >
+                <span className="text-2xl">📰</span>
+                <span className="text-xs font-extrabold">Majalah Seni</span>
+                <span className="text-[9px] text-amber-300 font-mono">-1 XP</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const cost = 1;
+                  if (studentPoints < cost) {
+                    sounds.playClick();
+                    setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`);
+                    return;
+                  }
+                  const success = onDeductPoints ? onDeductPoints(cost, 'Baca Koran Kora') : true;
+                  if (success) {
+                    sounds.playRewardXp();
+                    setActiveLiteracyDoc('koran');
+                    setCafeToast('🗞️ Membaca Koran Warga Kora (-1 XP)');
+                    setTimeout(() => setCafeToast(null), 3000);
+                  }
+                }}
+                className={`p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                  activeLiteracyDoc === 'koran'
+                    ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-lg'
+                    : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
+                }`}
+              >
+                <span className="text-2xl">🗞️</span>
+                <span className="text-xs font-extrabold">Koran Kora</span>
+                <span className="text-[9px] text-amber-300 font-mono">-1 XP</span>
+              </button>
+            </div>
+
+            {/* Reading Display Area */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 text-xs sm:text-sm text-slate-200 leading-relaxed max-h-56 overflow-y-auto">
+              {!activeLiteracyDoc ? (
+                <div className="text-center py-8 text-slate-500 italic">
+                  Silakan pilih bahan bacaan Komik, Majalah, atau Koran di atas untuk mulai membaca.
+                </div>
+              ) : activeLiteracyDoc === 'komik' ? (
+                <div className="space-y-2">
+                  <div className="font-bold text-cyan-300 flex items-center gap-1.5">
+                    <span>📚</span> <span>Komik Edukasi DKV: Petualangan Warna & Cahaya</span>
+                  </div>
+                  <p className="text-slate-300 text-xs">
+                    Episode 1: Rahasia Kombinasi Warna CMYK & RGB dalam Desain Poster Interaktif. Andi dan Siti belajar bahwa harmoni warna menentukan pesan emosional sebuah karya visual yang profesional di SMKN 2 Gorontalo.
+                  </p>
+                  <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[11px] text-cyan-200 italic">
+                    "Desain yang baik adalah desain yang dapat dipahami tanpa perlu banyak penjelasan."
+                  </div>
+                </div>
+              ) : activeLiteracyDoc === 'majalah' ? (
+                <div className="space-y-2">
+                  <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                    <span>📰</span> <span>Majalah Seni & Desain: Tren Tipografi 2026</span>
+                  </div>
+                  <p className="text-slate-300 text-xs">
+                    Ulasan mendalam mengenai tren Serif Modern dan Sans Serif Geometris dalam branding produk digital masa kini. Siswa DKV SMKN 2 Gorontalo memamerkan karya poster pameran budaya Gorontalo.
+                  </p>
+                  <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-[11px] text-amber-200 italic">
+                    "Tipografi adalah suara visual dari sebuah pesan."
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="font-bold text-emerald-300 flex items-center gap-1.5">
+                    <span>🗞️</span> <span>Koran Kora Warga: Berita Harian Kota Refleksia</span>
+                  </div>
+                  <p className="text-slate-300 text-xs">
+                    Warga kota antusias menyiram pohon rindang dan berpartisipasi aktif dalam obrolan harian antarteman. Pameran karya Tefa DKV sukses menarik perhatian dewan mentor dan guru pembimbing.
+                  </p>
+                  <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-200 italic">
+                    "Gotong royong dan literasi adalah kunci kemajuan kota kita tercinta."
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsLiteracyModalOpen(false)}
+                className="py-2 px-5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-md transition cursor-pointer"
+              >
+                Tutup & Kembali Jelajah
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zoom & Center Controls */}
+      <div className="absolute right-4 bottom-20 z-30 flex flex-col gap-2">
         <button
           onClick={handleZoomIn}
           className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer"
