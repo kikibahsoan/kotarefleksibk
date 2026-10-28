@@ -576,7 +576,7 @@ export default function App() {
               const teacherUser: Student = {
                 id: `teacher-${info?.username || 'guru'}`,
                 name: info?.name || 'Guru Pembimbing DKV',
-                className: teacherSubject,
+                className: 'DKV',
                 studentNumber: 'GURU-DKV',
                 password: '',
                 gender: teacherGender,
@@ -720,23 +720,23 @@ export default function App() {
           {/* Right: Clock • Class • Chart/Nav • Bell • Lo-Fi • Audio • Day/Night */}
           <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto shrink-0">
             {/* Live WITA Clock Pill & Subject for teacher */}
-            <div className="hidden md:flex items-center gap-1.5 bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-3 py-1.5 shadow-xl text-xs font-bold text-amber-400 font-mono">
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <div className="flex items-center gap-1 sm:gap-1.5 bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 shadow-xl text-[10px] sm:text-xs font-bold text-amber-400 font-mono shrink-0">
+              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" />
               <span>{currentTimeWita}</span>
               {student.isTeacher && student.subject && (
-                <span className="ml-1 pl-1.5 border-l border-slate-600 text-emerald-300 truncate max-w-[210px] font-sans text-[11px]">
+                <span className="hidden lg:inline ml-1 pl-1.5 border-l border-slate-600 text-emerald-300 truncate max-w-[210px] font-sans text-[11px]">
                   {student.subject}
                 </span>
               )}
             </div>
 
-            {/* Class Badge Pill */}
+            {/* Class Badge Pill (DKV for teacher, Class for student) */}
             <div
-              className="hidden min-[400px]:flex bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 items-center gap-1.5 shadow-xl text-[10px] sm:text-xs font-bold text-emerald-400 shrink-0"
+              className="flex bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-xl text-[10px] sm:text-xs font-bold text-emerald-400 shrink-0"
               title={student.isTeacher ? 'DKV SMKN 2 Gorontalo' : student.className}
             >
-              <GraduationCap className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" />
-              <span className="truncate max-w-[65px] sm:max-w-none">
+              <GraduationCap className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate max-w-[55px] sm:max-w-none">
                 {student.isTeacher ? 'DKV' : (student.className.includes('DKV 2') ? 'X DKV 2' : student.className.includes('DKV 3') ? 'X DKV 3' : 'XII RPL 1')}
               </span>
             </div>

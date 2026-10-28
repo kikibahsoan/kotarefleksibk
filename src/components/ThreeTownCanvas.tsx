@@ -27,7 +27,7 @@ export interface BuildingInfo {
 
 export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'balai_kota', name: 'Balai Kota', tagline: 'Kubah Emas & Misi', position: [0, 0, -4.2], color: 0x3b82f6, icon: '🏛️' },
-  { id: 'menara_mentor', name: 'Dewan Kota & Tower', tagline: 'Studio ON AIR & AI', position: [4.2, 0, 0], color: 0x8b5cf6, icon: '📡' },
+  { id: 'menara_mentor', name: 'Studio ON AIR', tagline: 'Studio Podcast, ON AIR & AI', position: [4.2, 0, 0], color: 0x8b5cf6, icon: '🎙️' },
   { id: 'perpustakaan', name: 'Perpustakaan Kampus', tagline: 'Gedung Biru & Materi', position: [-4.2, 0, 0], color: 0x10b981, icon: '📚' },
   { id: 'pasar_prestasi', name: 'Toko Poin', tagline: 'Lencana & Hadiah', position: [-2.8, 0, 2.8], color: 0x06b6d4, icon: '🎪' },
   { id: 'kantor_pos', name: 'Kantor Pos Kilat', tagline: 'Kirim Pesan ke Guru', position: [2.8, 0, -2.8], color: 0xef4444, icon: '📮' },
@@ -81,7 +81,6 @@ export const TREES_LIST: [number, number][] = [
   [0, 5.4],
   [1.8, 5.2],
   // Right edge (East)
-  [5.2, -1.8],
   [5.4, 0],
   [5.2, 1.8],
   [3.8, 3.8],
@@ -260,6 +259,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const playerSpeechRef = useRef<{ text: string; expiresAt: number } | null>(null);
   const baristaSpeechRef = useRef<{ text: string; expiresAt: number } | null>(null);
 
+  // Animated destination click ripple
+  const clickRippleRef = useRef<{ wx: number; wy: number; time: number } | null>(null);
+
+  // Player avatar object reference for direct snapping/controls
+  const playerRef = useRef<AvatarData | null>(null);
+
   // References for render loop
   const onSelectBuildingRef = useRef(onSelectBuilding);
   onSelectBuildingRef.current = onSelectBuilding;
@@ -385,6 +390,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       walkFrame: 0,
       facing: 'down-left',
     };
+    playerRef.current = player;
 
     // 2. Guru (@ibu_rahmawati [GURU])
     const guru: AvatarData = {
@@ -598,6 +604,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWy = by * 0.68;
           }
           player.isMoving = true;
+          clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
           pendingBuildingId = b.id;
           lastTouchedIdRef.current = null;
           return;
@@ -606,6 +613,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       // 3. Click on ground to walk
       sounds.playClick();
+      if (isSittingRef.current) {
+        setIsSitting(false);
+        setSittingSeat(null);
+      }
       let targetX = Math.max(-4.9, Math.min(4.9, wx));
       let targetY = Math.max(-4.9, Math.min(4.9, wy));
       if (isSolidCollision(targetX, targetY, 0.1)) {
@@ -616,6 +627,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         targetX += (dirX / d) * 0.6;
         targetY += (dirY / d) * 0.6;
       }
+      clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now() };
       player.targetWx = targetX;
       player.targetWy = targetY;
       player.isMoving = true;
@@ -722,8 +734,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         const dy = player.targetWy - player.wy;
         const dist = Math.hypot(dx, dy);
 
-        if (dist > 0.12) {
-          const step = Math.min(dist, player.speed * delta);
+        if (dist > 0.08) {
+          // Soft, gentle deceleration easing as avatar approaches target
+          const easeSpeed = player.speed * Math.min(1.0, 0.45 + dist * 1.5);
+          const step = Math.min(dist, easeSpeed * delta);
           const stepX = (dx / dist) * step;
           const stepY = (dy / dist) * step;
 
@@ -734,7 +748,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (!isSolidCollision(nextWx, nextWy, 0.16)) {
             player.wx = nextWx;
             player.wy = nextWy;
-            player.walkFrame += delta * 5.2;
+            player.walkFrame += delta * (4.2 + (easeSpeed / player.speed) * 1.8);
           } else {
             // Wall sliding: try X movement only
             const canMoveX = !isSolidCollision(nextWx, player.wy, 0.16);
@@ -821,10 +835,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // Proximity checks: East Fishing Dock [4.8, 2.5], West Literacy Corner [-4.3, 1.8], Benches, Trees
-      const fishDist = Math.hypot(player.wx - 4.8, player.wy - 2.5);
+      // Proximity checks: East Fishing Dock & Kolam [4.6, -2.2], West Literacy Corner [-4.3, 1.8], Bench [-3.7, 1.8]
+      const fishDist = Math.hypot(player.wx - 4.6, player.wy - (-2.2));
       const litDist = Math.hypot(player.wx - (-4.3), player.wy - 1.8);
-      const litBenchDist = Math.hypot(player.wx - (-4.3), player.wy - 2.2);
+      const litBenchDist = Math.hypot(player.wx - (-3.7), player.wy - 1.8);
       const eastBenchDist = Math.hypot(player.wx - 1.25, player.wy - 0.0);
       const westBenchDist = Math.hypot(player.wx - (-1.25), player.wy - 0.0);
 
@@ -1052,6 +1066,41 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ctx.closePath();
       ctx.stroke();
 
+      // Soft Animated Click Destination Ripple on Ground
+      if (clickRippleRef.current) {
+        const age = (performance.now() - clickRippleRef.current.time) / 750;
+        if (age < 1.0) {
+          const rPt = toScreen(clickRippleRef.current.wx, clickRippleRef.current.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+
+          // Outer expanding ring
+          const rOuter = (6 + age * 24) * z;
+          ctx.strokeStyle = `rgba(56, 189, 248, ${0.85 * (1 - age)})`;
+          ctx.lineWidth = 2 * z;
+          ctx.beginPath();
+          ctx.ellipse(rPt.x, rPt.y, rOuter, rOuter * 0.5, 0, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Inner expanding pulse ring
+          if (age > 0.12) {
+            const rInner = (age - 0.12) * 18 * z;
+            ctx.strokeStyle = `rgba(254, 240, 138, ${0.75 * (1 - age)})`;
+            ctx.lineWidth = 1.5 * z;
+            ctx.beginPath();
+            ctx.ellipse(rPt.x, rPt.y, rInner, rInner * 0.5, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // Glowing center dot
+          ctx.fillStyle = `rgba(255, 255, 255, ${0.9 * (1 - age)})`;
+          ctx.beginPath();
+          ctx.ellipse(rPt.x, rPt.y, 3.2 * z, 1.6 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          clickRippleRef.current = null;
+        }
+      }
+
       // ---------------------------------------------------------
       // 3. CENTER PLAZA FOUNTAIN (Circular Stepped Pool)
       // ---------------------------------------------------------
@@ -1152,14 +1201,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         drawItems.push({ type: 'lamp', wx: lx, wy: ly, depth: lx + ly });
       });
 
-      // 1. Spot Memancing Relocated far to East End at [4.8, 2.5]
-      drawItems.push({ type: 'fishing_spot', wx: 4.8, wy: 2.5, depth: 4.8 + 2.5 });
+      // 1. Spot Memancing & Kolam Ikan Relocated far to East End at [4.6, -2.2]
+      drawItems.push({ type: 'fishing_spot', wx: 4.6, wy: -2.2, depth: 4.6 + -2.2 });
 
       // 2. Sudut Literasi Siswa at West End at [-4.3, 1.8]
       drawItems.push({ type: 'literacy_corner', wx: -4.3, wy: 1.8, depth: -4.3 + 1.8 });
 
-      // 3. Bench next to Sudut Literasi at [-4.3, 2.2]
-      drawItems.push({ type: 'bench', wx: -4.3, wy: 2.2, depth: -4.3 + 2.2, id: 'literacy' });
+      // 3. Bench next to Sudut Literasi at [-3.7, 1.8]
+      drawItems.push({ type: 'bench', wx: -3.7, wy: 1.8, depth: -3.7 + 1.8, id: 'literacy' });
 
       // 4. Kursi Taman Samping Air Mancur (East & West Benches)
       drawItems.push({ type: 'bench', wx: 1.25, wy: 0.0, depth: 1.25, id: 'fountain_east' });
@@ -1302,116 +1351,199 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(pt.x - 6 * z, litLanternY + 3 * z, 3 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Wooden Signpost "📖 SUDUT LITERASI"
-          ctx.fillStyle = '#fef08a';
-          ctx.fillRect(pt.x - 14 * z, pt.y - 44 * z, 36 * z, 10 * z);
-          ctx.strokeStyle = '#b45309';
-          ctx.lineWidth = 1 * z;
-          ctx.strokeRect(pt.x - 14 * z, pt.y - 44 * z, 36 * z, 10 * z);
-          ctx.fillStyle = '#78350f';
-          ctx.font = `bold ${Math.round(6 * z)}px sans-serif`;
+          // Floating Pill Badge: 📖 Sudut Literasi
+          const litTagY = pt.y - 52 * z;
+          const litLabel = '📖 Sudut Literasi';
+          ctx.font = `bold ${Math.round(9.5 * z)}px sans-serif`;
+          const litM = ctx.measureText(litLabel);
+          const litW = litM.width + 16 * z;
+          const litH = 20 * z;
+
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - litW / 2, litTagY - litH / 2, litW, litH, 10 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#06b6d4';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.fillStyle = '#38bdf8';
           ctx.textAlign = 'center';
-          ctx.fillText('📖 SUDUT LITERASI', pt.x + 4 * z, pt.y - 37 * z);
+          ctx.textBaseline = 'middle';
+          ctx.fillText(litLabel, pt.x, litTagY);
         } else if (item.type === 'fishing_spot') {
-          // DERMAGA MEMANCING WARGA & KOLAM KECIL - EAST END
+          // KOLAM PEMANCINGAN TIMUR & DERMAGA (Far from buildings, open scenic water)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
-          // Small pond / kolam kecil right beside fishing dock
-          ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
-          ctx.beginPath();
-          ctx.ellipse(pt.x + 32 * z, pt.y + 14 * z, 22 * z, 11 * z, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = isNight ? '#0369a1' : '#0284c7';
-          ctx.lineWidth = 1.5 * z;
-          ctx.stroke();
+          // 1. DEDICATED SCENIC POND (Kolam Ikan Alami)
+          const pondX = pt.x + 18 * z;
+          const pondY = pt.y + 14 * z;
+          const pondW = 44 * z;
+          const pondH = 22 * z;
 
-          // Green lily pad on pond
+          // Outer Cobblestone Rim
+          ctx.fillStyle = isNight ? '#334155' : '#cbd5e1';
+          ctx.beginPath();
+          ctx.ellipse(pondX, pondY, pondW + 6 * z, pondH + 3 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Cobblestone border segments
+          ctx.strokeStyle = isNight ? '#1e293b' : '#94a3b8';
+          ctx.lineWidth = 1 * z;
+          for (let st = 0; st < 12; st++) {
+            const stAngle = (st / 12) * Math.PI * 2;
+            const sx = pondX + Math.cos(stAngle) * (pondW + 3 * z);
+            const sy = pondY + Math.sin(stAngle) * (pondH + 1.5 * z);
+            ctx.beginPath();
+            ctx.arc(sx, sy, 2 * z, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // Shimmering Deep Cyan Water
+          const pondGrad = ctx.createRadialGradient(pondX, pondY, 2 * z, pondX, pondY, pondW);
+          pondGrad.addColorStop(0, isNight ? '#0369a1' : '#38bdf8');
+          pondGrad.addColorStop(0.75, isNight ? '#0284c7' : '#0284c7');
+          pondGrad.addColorStop(1, isNight ? '#075985' : '#0369a1');
+          ctx.fillStyle = pondGrad;
+          ctx.beginPath();
+          ctx.ellipse(pondX, pondY, pondW, pondH, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Water ripple waves
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.lineWidth = 1 * z;
+          for (let wp = 0; wp < 2; wp++) {
+            const wRadius = ((elapsed * 6 + wp * 12) % (pondW * 0.8));
+            ctx.beginPath();
+            ctx.ellipse(pondX, pondY, wRadius, wRadius * 0.5, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // Swimming Koi Fish with animated tails
+          for (let k = 0; k < 2; k++) {
+            const kAngle = elapsed * 0.6 + k * Math.PI;
+            const kDist = 16 * z;
+            const kx = pondX + Math.cos(kAngle) * kDist;
+            const ky = pondY + Math.sin(kAngle) * (kDist * 0.5);
+            const tailWag = Math.sin(elapsed * 6 + k) * 2 * z;
+
+            ctx.fillStyle = k === 0 ? '#f97316' : '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(kx, ky, 3.5 * z, 1.8 * z, kAngle + Math.PI / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Fish tail fin
+            ctx.fillStyle = k === 0 ? '#ea580c' : '#fca5a5';
+            ctx.beginPath();
+            ctx.moveTo(kx - Math.cos(kAngle) * 3 * z, ky - Math.sin(kAngle) * 1.5 * z);
+            ctx.lineTo(kx - Math.cos(kAngle) * 6 * z + tailWag, ky - Math.sin(kAngle) * 3 * z + tailWag);
+            ctx.stroke();
+          }
+
+          // Lily Pads & Lotus Flower
           ctx.fillStyle = '#16a34a';
           ctx.beginPath();
-          ctx.ellipse(pt.x + 28 * z, pt.y + 12 * z, 4.5 * z, 2.5 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pondX - 18 * z, pondY - 4 * z, 5.5 * z, 3 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pondX + 16 * z, pondY + 6 * z, 4.5 * z, 2.5 * z, 0, 0, Math.PI * 2);
           ctx.fill();
-
-          // Pier shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
+          // Lotus Flower
+          ctx.fillStyle = '#f43f5e';
           ctx.beginPath();
-          ctx.ellipse(pt.x + 2, pt.y + 4, 24 * z, 12 * z, 0, 0, Math.PI * 2);
+          ctx.arc(pondX - 18 * z, pondY - 5 * z, 2 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Wooden planks deck
+          // 2. RUSTIC WOODEN FISHING PIER OVER THE POND
           ctx.fillStyle = '#78350f';
           ctx.beginPath();
-          ctx.moveTo(pt.x - 20 * z, pt.y - 8 * z);
-          ctx.lineTo(pt.x + 14 * z, pt.y + 8 * z);
-          ctx.lineTo(pt.x + 4 * z, pt.y + 17 * z);
-          ctx.lineTo(pt.x - 30 * z, pt.y);
+          ctx.moveTo(pt.x - 24 * z, pt.y - 12 * z);
+          ctx.lineTo(pt.x + 8 * z, pt.y + 4 * z);
+          ctx.lineTo(pt.x - 2 * z, pt.y + 14 * z);
+          ctx.lineTo(pt.x - 34 * z, pt.y - 2 * z);
           ctx.closePath();
           ctx.fill();
           ctx.strokeStyle = '#451a03';
           ctx.lineWidth = 1 * z;
           ctx.stroke();
 
-          // Plank separation lines
-          for (let p = -18; p <= 6; p += 6) {
+          // Wooden pier planks
+          for (let p = -22; p <= 4; p += 5) {
             ctx.strokeStyle = '#572506';
             ctx.lineWidth = 0.8 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x + p * z, pt.y + (p * 0.4) * z - 3 * z);
-            ctx.lineTo(pt.x + (p - 8) * z, pt.y + (p * 0.4) * z + 6 * z);
+            ctx.moveTo(pt.x + p * z, pt.y + (p * 0.4) * z - 4 * z);
+            ctx.lineTo(pt.x + (p - 7) * z, pt.y + (p * 0.4) * z + 5 * z);
             ctx.stroke();
           }
 
-          // Wooden pilings / stilts
+          // Wooden Stilts / Pilings
           ctx.fillStyle = '#451a03';
-          ctx.fillRect(pt.x - 28 * z, pt.y, 3.5 * z, 10 * z);
-          ctx.fillRect(pt.x + 2 * z, pt.y + 14 * z, 3.5 * z, 10 * z);
-          ctx.fillRect(pt.x + 12 * z, pt.y + 6 * z, 3.5 * z, 10 * z);
+          ctx.fillRect(pt.x - 30 * z, pt.y - 2 * z, 3.5 * z, 12 * z);
+          ctx.fillRect(pt.x - 4 * z, pt.y + 12 * z, 3.5 * z, 10 * z);
+          ctx.fillRect(pt.x + 6 * z, pt.y + 3 * z, 3.5 * z, 10 * z);
 
-          // Mooring bollard with coiled rope
+          // Mooring bollard with coiled golden rope
           ctx.fillStyle = '#94a3b8';
-          ctx.fillRect(pt.x - 22 * z, pt.y - 6 * z, 3.5 * z, 6 * z);
+          ctx.fillRect(pt.x - 24 * z, pt.y - 8 * z, 3.5 * z, 6 * z);
           ctx.strokeStyle = '#fbbf24';
           ctx.lineWidth = 1 * z;
           ctx.beginPath();
-          ctx.arc(pt.x - 20.2 * z, pt.y - 3 * z, 2.5 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x - 22.2 * z, pt.y - 5 * z, 2.5 * z, 0, Math.PI * 2);
           ctx.stroke();
 
-          // Bait / fish bucket with water
+          // Bait / Fish Bucket with fresh water & caught fish tail
           ctx.fillStyle = '#cbd5e1';
-          ctx.fillRect(pt.x - 12 * z, pt.y - 12 * z, 7 * z, 9 * z);
+          ctx.fillRect(pt.x - 14 * z, pt.y - 14 * z, 7 * z, 9 * z);
           ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(pt.x - 11.5 * z, pt.y - 11.5 * z, 6 * z, 3 * z);
-          // Little silver fish tail sticking out
+          ctx.fillRect(pt.x - 13.5 * z, pt.y - 13.5 * z, 6 * z, 3 * z);
           ctx.fillStyle = '#94a3b8';
           ctx.beginPath();
-          ctx.moveTo(pt.x - 9 * z, pt.y - 14 * z);
-          ctx.lineTo(pt.x - 7 * z, pt.y - 17 * z);
-          ctx.lineTo(pt.x - 6 * z, pt.y - 13.5 * z);
+          ctx.moveTo(pt.x - 11 * z, pt.y - 16 * z);
+          ctx.lineTo(pt.x - 9 * z, pt.y - 19 * z);
+          ctx.lineTo(pt.x - 8 * z, pt.y - 15.5 * z);
           ctx.closePath();
           ctx.fill();
 
-          // Wooden Fishing Signpost
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(pt.x + 6 * z, pt.y - 22 * z, 3.5 * z, 24 * z);
-          ctx.fillStyle = '#fef08a';
-          ctx.fillRect(pt.x - 4 * z, pt.y - 32 * z, 26 * z, 11 * z);
-          ctx.strokeStyle = '#b45309';
-          ctx.lineWidth = 1 * z;
-          ctx.strokeRect(pt.x - 4 * z, pt.y - 32 * z, 26 * z, 11 * z);
-          ctx.fillStyle = '#78350f';
-          ctx.font = `bold ${Math.round(5.5 * z)}px sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.fillText('🎣 DERMAGA TIMUR', pt.x + 9 * z, pt.y - 24.5 * z);
+          // Fishing Rod angling out over the pond
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 1.6 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 6 * z, pt.y + 4 * z);
+          ctx.lineTo(pt.x + 14 * z, pt.y - 6 * z);
+          ctx.stroke();
+          // Transparent monofilament fishing line dropping into water
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+          ctx.lineWidth = 0.8 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x + 14 * z, pt.y - 6 * z);
+          ctx.lineTo(pt.x + 15 * z, pt.y + 12 * z);
+          ctx.stroke();
+          // Small red-white bobber float
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(pt.x + 15 * z, pt.y + 12 * z, 1.8 * z, 0, Math.PI * 2);
+          ctx.fill();
 
-          // Concentric ripples in the water around the dock
-          for (let r = 0; r < 2; r++) {
-            const rPhase = (elapsed * 0.8 + r * 0.5) % 1;
-            ctx.strokeStyle = `rgba(56, 189, 248, ${0.45 * (1 - rPhase)})`;
-            ctx.lineWidth = 1 * z;
-            ctx.beginPath();
-            ctx.ellipse(pt.x + 20 * z, pt.y + 12 * z, (8 + rPhase * 14) * z, (4 + rPhase * 7) * z, 0, 0, Math.PI * 2);
-            ctx.stroke();
-          }
+          // 3. FLOATING BADGE: 🎣 Kolam Pemancingan Timur
+          const dockTagY = pt.y - 48 * z;
+          const dockLabel = '🎣 Kolam Pemancingan Timur';
+          ctx.font = `bold ${Math.round(9.5 * z)}px sans-serif`;
+          const dM = ctx.measureText(dockLabel);
+          const dW = dM.width + 16 * z;
+          const dH = 20 * z;
+
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - dW / 2, dockTagY - dH / 2, dW, dH, 10 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#0284c7';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.fillStyle = '#38bdf8';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(dockLabel, pt.x, dockTagY);
         } else if (item.type === 'tree') {
           // Double-Sphere Tree (Noticeably Enlarged, Lush & Sculpted matching screenshot)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
@@ -2103,8 +2235,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           }
 
-          // Floating Building Label with icon & smooth rounded badge
-          const tagY = pt.y - 54 * z;
+          // Floating Building Label with icon & smooth rounded badge (elevated for Balai Kota & ON AIR)
+          const tagY = pt.y - (b.id === 'balai_kota' ? 88 : b.id === 'menara_mentor' ? 64 : 54) * z;
           const labelText = `${b.icon} ${b.name}`;
           ctx.font = `bold ${Math.round(10 * z)}px sans-serif`;
           const tMetrics = ctx.measureText(labelText);
@@ -2197,15 +2329,40 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           }
 
-          // Signboard "TOKO ROTI & KAFE"
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(pt.x - 18 * z, pt.y - 2 * z, 36 * z, 9 * z);
-          ctx.strokeStyle = '#b45309';
-          ctx.strokeRect(pt.x - 18 * z, pt.y - 2 * z, 36 * z, 9 * z);
-          ctx.fillStyle = '#b45309';
-          ctx.font = `bold ${Math.round(6 * z)}px sans-serif`;
+          // Floating Pill Badge above Toko Roti awning: 🥐 Toko Roti & Kafe
+          const trBadgeY = pt.y - 38 * z;
+          ctx.save();
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          const trLabel = '🥐 Toko Roti & Kafe';
+          ctx.font = `bold ${Math.round(9.5 * z)}px sans-serif`;
+          const trMetrics = ctx.measureText(trLabel);
+          const trW = trMetrics.width + 16 * z;
+          const trH = 19 * z;
+          ctx.beginPath();
+          ctx.roundRect(pt.x - trW / 2, trBadgeY - trH / 2, trW, trH, 9.5 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 1.2 * z;
+          ctx.stroke();
+          ctx.fillStyle = '#fef3c7';
           ctx.textAlign = 'center';
-          ctx.fillText('TOKO ROTI & KAFE', pt.x, pt.y + 5 * z);
+          ctx.textBaseline = 'middle';
+          ctx.fillText(trLabel, pt.x, trBadgeY);
+          ctx.restore();
+
+          // Signboard "TOKO ROTI & KAFE" on front counter
+          ctx.fillStyle = '#fef3c7';
+          ctx.strokeStyle = '#b45309';
+          ctx.lineWidth = 1 * z;
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 20 * z, pt.y - 2 * z, 40 * z, 8 * z, 2 * z);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#92400e';
+          ctx.font = `bold ${Math.round(5.5 * z)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('☕ TOKO ROTI & KAFE 🥐', pt.x, pt.y + 2.5 * z);
 
           // Outdoor cafe bistro table with parasol umbrella on left
           const tableX = pt.x - 36 * z;
@@ -2379,8 +2536,63 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           // 3. ARMS & HANDS
-          if (isSittingNow) {
-            // Resting arms on lap
+          const isReadingNow = Boolean(
+            item.isPlayer && (activeLiteracyDoc !== null || (isSittingNow && sittingSeat === 'literacy'))
+          );
+
+          if (isReadingNow) {
+            // ARMS HOLDING OPEN BOOK / COMIC
+            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            // Left arm reaching forward to hold book
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5.5 * z, avY - 12 * z);
+            ctx.lineTo(pt.x - 2 * z, avY - 7 * z);
+            ctx.lineTo(pt.x - 0.5 * z, avY - 9 * z);
+            ctx.lineTo(pt.x - 4 * z, avY - 13.5 * z);
+            ctx.fill();
+
+            // Right arm reaching forward to hold book
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 5.5 * z, avY - 12 * z);
+            ctx.lineTo(pt.x + 2 * z, avY - 7 * z);
+            ctx.lineTo(pt.x + 0.5 * z, avY - 9 * z);
+            ctx.lineTo(pt.x + 4 * z, avY - 13.5 * z);
+            ctx.fill();
+
+            // Hands holding the book pages
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x - 3.2 * z, avY - 7 * z, 1.4 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 3.2 * z, avY - 7 * z, 1.4 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Open book / comic / magazine cover
+            ctx.fillStyle = activeLiteracyDoc === 'komik' ? '#06b6d4' : activeLiteracyDoc === 'majalah' ? '#f59e0b' : '#10b981';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.5 * z, avY - 10.5 * z, 11 * z, 6.5 * z, 1.2 * z);
+            ctx.fill();
+
+            // Open white pages
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 4.8 * z, avY - 9.8 * z, 4.2 * z, 5.2 * z);
+            ctx.fillRect(pt.x + 0.6 * z, avY - 9.8 * z, 4.2 * z, 5.2 * z);
+
+            // Spine crease line
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 0.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x, avY - 9.8 * z);
+            ctx.lineTo(pt.x, avY - 4.6 * z);
+            ctx.stroke();
+
+            // Text lines on pages
+            ctx.fillStyle = '#64748b';
+            for (let pl = 0; pl < 3; pl++) {
+              ctx.fillRect(pt.x - 4.2 * z, avY - (8.8 - pl * 1.5) * z, 3 * z, 0.7 * z);
+              ctx.fillRect(pt.x + 1.2 * z, avY - (8.8 - pl * 1.5) * z, 3 * z, 0.7 * z);
+            }
+          } else if (isSittingNow) {
+            // Resting arms on lap / knees
             ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
             ctx.fillRect(pt.x - 6.5 * z, avY - 13 * z, 2.2 * z, 6.5 * z);
             ctx.fillRect(pt.x + 4.5 * z, avY - 13 * z, 2.2 * z, 6.5 * z);
@@ -2809,6 +3021,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       window.removeEventListener('resize', handleResize);
       canvas.removeEventListener('click', onPointerDown);
       canvas.removeEventListener('mousemove', onPointerMove);
+      playerRef.current = null;
     };
   }, [studentName, studentGender]);
 
@@ -3126,9 +3339,25 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     setCafeToast('🚶 Berdiri kembali dari kursi taman.');
                     setTimeout(() => setCafeToast(null), 2500);
                   } else {
+                    const seat = nearbyAction.benchId || 'fountain_east';
                     setIsSitting(true);
-                    setSittingSeat(nearbyAction.benchId || 'fountain_east');
-                    setCafeToast('🪑 Duduk santai dengan animasi nyaman.');
+                    setSittingSeat(seat);
+                    if (playerRef.current) {
+                      if (seat === 'fountain_east') {
+                        playerRef.current.wx = 1.25;
+                        playerRef.current.wy = 0.0;
+                      } else if (seat === 'fountain_west') {
+                        playerRef.current.wx = -1.25;
+                        playerRef.current.wy = 0.0;
+                      } else if (seat === 'literacy') {
+                        playerRef.current.wx = -3.7;
+                        playerRef.current.wy = 1.8;
+                      }
+                      playerRef.current.targetWx = playerRef.current.wx;
+                      playerRef.current.targetWy = playerRef.current.wy;
+                      playerRef.current.isMoving = false;
+                    }
+                    setCafeToast('🪑 Duduk santai di bangku taman.');
                     setTimeout(() => setCafeToast(null), 2500);
                   }
                 }}
@@ -3292,6 +3521,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   if (success) {
                     sounds.playRewardXp();
                     setActiveLiteracyDoc('komik');
+                    setIsSitting(true);
+                    setSittingSeat('literacy');
+                    if (playerRef.current) {
+                      playerRef.current.wx = -3.7;
+                      playerRef.current.wy = 1.8;
+                      playerRef.current.targetWx = -3.7;
+                      playerRef.current.targetWy = 1.8;
+                      playerRef.current.isMoving = false;
+                    }
                     setCafeToast('📚 Membaca Komik Desain Kreatif (-1 XP)');
                     setTimeout(() => setCafeToast(null), 3000);
                   }
@@ -3320,6 +3558,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   if (success) {
                     sounds.playRewardXp();
                     setActiveLiteracyDoc('majalah');
+                    setIsSitting(true);
+                    setSittingSeat('literacy');
+                    if (playerRef.current) {
+                      playerRef.current.wx = -3.7;
+                      playerRef.current.wy = 1.8;
+                      playerRef.current.targetWx = -3.7;
+                      playerRef.current.targetWy = 1.8;
+                      playerRef.current.isMoving = false;
+                    }
                     setCafeToast('📰 Membaca Majalah Seni Rupa (-1 XP)');
                     setTimeout(() => setCafeToast(null), 3000);
                   }
@@ -3348,6 +3595,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   if (success) {
                     sounds.playRewardXp();
                     setActiveLiteracyDoc('koran');
+                    setIsSitting(true);
+                    setSittingSeat('literacy');
+                    if (playerRef.current) {
+                      playerRef.current.wx = -3.7;
+                      playerRef.current.wy = 1.8;
+                      playerRef.current.targetWx = -3.7;
+                      playerRef.current.targetWy = 1.8;
+                      playerRef.current.isMoving = false;
+                    }
                     setCafeToast('🗞️ Membaca Koran Warga Kora (-1 XP)');
                     setTimeout(() => setCafeToast(null), 3000);
                   }
