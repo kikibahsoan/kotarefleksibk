@@ -35,6 +35,7 @@ export interface Student {
   lastLogin: string;
   streakDays: number;
   isTeacher?: boolean;
+  subject?: string;
 }
 
 export interface Materi {
@@ -182,4 +183,5 @@ export interface TeacherAccount {
   username: string;
   defaultPassword: string;
   gender: 'L' | 'P';
+  subjects: string[];
 }

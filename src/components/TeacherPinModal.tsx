@@ -25,6 +25,7 @@ export interface TeacherLoginResult {
   name: string;
   username: string;
   gender?: 'L' | 'P';
+  subject?: string;
   destination?: 'town' | 'panel';
 }
 
@@ -61,6 +62,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
   const [isSaved, setIsSaved] = useState(false);
 
   const currentTeacher = TEACHER_ACCOUNTS.find((t) => t.username === selectedUsername) || TEACHER_ACCOUNTS[0];
+  const [selectedSubject, setSelectedSubject] = useState<string>(currentTeacher.subjects[0] || '');
 
   const handleAccountLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +79,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
         name: currentTeacher.name,
         username: currentTeacher.username,
         gender: currentTeacher.gender,
+        subject: selectedSubject || currentTeacher.subjects[0],
       });
     } else {
       sounds.playClick();
@@ -105,6 +108,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
         name: matched.name,
         username: matched.username,
         gender: matched.gender,
+        subject: matched.subjects[0],
       });
       return;
     }
@@ -245,35 +249,57 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
               </p>
             </div>
 
-            <div className="pt-2 space-y-3 max-w-sm mx-auto">
-              <button
-                type="button"
-                onClick={() => onSuccess({ ...authenticatedTeacher, destination: 'town' })}
-                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-xl flex items-center gap-3 transition transform hover:scale-[1.02] active:scale-95 cursor-pointer border border-emerald-400/40 text-left"
-              >
-                <span className="text-2xl shrink-0">🏛️</span>
-                <div className="flex-1">
-                  <div className="font-extrabold">Masuk ke Kota (Sebagai Guru)</div>
-                  <div className="text-[10px] text-emerald-100/90 font-normal mt-0.5">
-                    Jelajahi kota Refleksia dengan avatar guru, sapa & berinteraksi di chat warga
+            {(() => {
+              const matchedT = TEACHER_ACCOUNTS.find((t) => t.username === authenticatedTeacher.username) || currentTeacher;
+              return (
+                <div className="space-y-3 max-w-sm mx-auto text-left">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Pilih Mata Pelajaran / Konsentrasi Keahlian
+                    </label>
+                    <select
+                      value={selectedSubject}
+                      onChange={(e) => setSelectedSubject(e.target.value)}
+                      className="w-full text-xs font-semibold py-2 px-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      {matchedT.subjects.map((subj) => (
+                        <option key={subj} value={subj}>
+                          {subj}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                </div>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => onSuccess({ ...authenticatedTeacher, destination: 'panel' })}
-                className="w-full py-3 px-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white font-bold text-xs shadow-md flex items-center gap-3 transition cursor-pointer border border-slate-700 hover:border-amber-500/50 text-left"
-              >
-                <span className="text-xl shrink-0">📋</span>
-                <div className="flex-1">
-                  <div className="font-bold text-amber-300">Buka Panel Ruang Guru</div>
-                  <div className="text-[10px] text-slate-400 font-normal">
-                    Lihat rekap refleksi, umpan balik BK, kelola materi & spreadsheet
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onSuccess({ ...authenticatedTeacher, subject: selectedSubject || matchedT.subjects[0], destination: 'town' })}
+                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-xl flex items-center gap-3 transition transform hover:scale-[1.02] active:scale-95 cursor-pointer border border-emerald-400/40 text-left"
+                  >
+                    <span className="text-2xl shrink-0">🏛️</span>
+                    <div className="flex-1">
+                      <div className="font-extrabold">Masuk ke Kota (Sebagai Guru)</div>
+                      <div className="text-[10px] text-emerald-100/90 font-normal mt-0.5">
+                        Jelajahi kota Refleksia dengan avatar guru & mata pelajaran terpilih
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onSuccess({ ...authenticatedTeacher, subject: selectedSubject || matchedT.subjects[0], destination: 'panel' })}
+                    className="w-full py-2.5 px-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white font-bold text-xs shadow-md flex items-center gap-3 transition cursor-pointer border border-slate-700 hover:border-amber-500/50 text-left"
+                  >
+                    <span className="text-xl shrink-0">📋</span>
+                    <div className="flex-1">
+                      <div className="font-bold text-amber-300">Buka Panel Ruang Guru</div>
+                      <div className="text-[10px] text-slate-400 font-normal">
+                        Rekap refleksi & manajemen materi DKV
+                      </div>
+                    </div>
+                  </button>
                 </div>
-              </button>
-            </div>
+              );
+            })()}
           </div>
         ) : activeTab === 'login' && (
           <div>

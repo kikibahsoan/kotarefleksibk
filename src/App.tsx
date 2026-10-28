@@ -70,16 +70,16 @@ export default function App() {
   const [preselectedMateriForReflection, setPreselectedMateriForReflection] = useState<string | undefined>(undefined);
   const [timeOfDay, setTimeOfDay] = useState<'day' | 'night' | 'auto'>('night');
 
-  // Live WIB Clock matching reference screenshot
+  // Live WIB Clock matching reference screenshot (Hours & Minutes only: e.g. "13:00 WIB")
   const [currentTimeWib, setCurrentTimeWib] = useState(() => {
     const now = new Date();
-    return now.toLocaleTimeString('id-ID', { hour12: false }) + ' WIB';
+    return now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' WIB';
   });
 
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
-      setCurrentTimeWib(now.toLocaleTimeString('id-ID', { hour12: false }) + ' WIB');
+      setCurrentTimeWib(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' WIB');
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -560,10 +560,11 @@ export default function App() {
             expectedPin={settings.teacherPin}
             onSuccess={(info) => {
               const teacherGender = info?.gender || 'L';
+              const teacherSubject = info?.subject || 'Kreatif, Inovatif, dan Kewirausahaan';
               const teacherUser: Student = {
                 id: `teacher-${info?.username || 'guru'}`,
                 name: info?.name || 'Guru Pembimbing DKV',
-                className: 'Guru Pembimbing DKV',
+                className: teacherSubject,
                 studentNumber: 'GURU-DKV',
                 password: '',
                 gender: teacherGender,
@@ -572,6 +573,7 @@ export default function App() {
                 lastLogin: new Date().toISOString().slice(0, 10),
                 streakDays: 5,
                 isTeacher: true,
+                subject: teacherSubject,
               };
               setStudent(teacherUser);
               StorageService.setCurrentStudent(teacherUser);
@@ -705,10 +707,15 @@ export default function App() {
 
           {/* Right: Clock • Class • Chart/Nav • Bell • Lo-Fi • Audio • Day/Night */}
           <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto shrink-0">
-            {/* Live Clock WIB Pill */}
+            {/* Live Clock WIB Pill & Subject for teacher */}
             <div className="hidden md:flex items-center gap-1.5 bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-3 py-1.5 shadow-xl text-xs font-bold text-amber-400 font-mono">
               <Clock className="w-3.5 h-3.5 text-amber-400" />
               <span>{currentTimeWib}</span>
+              {student.isTeacher && student.subject && (
+                <span className="ml-1 pl-1.5 border-l border-slate-600 text-emerald-300 truncate max-w-[210px] font-sans text-[11px]">
+                  {student.subject}
+                </span>
+              )}
             </div>
 
             {/* Class Badge Pill */}

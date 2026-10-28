@@ -160,18 +160,6 @@ export const isSolidCollision = (wx: number, wy: number, padding: number = 0.16)
     return true;
   }
 
-  // Solid buildings
-  for (const b of SOLID_BUILDING_OBSTACLES) {
-    if (
-      wx >= b.minWx - padding &&
-      wx <= b.maxWx + padding &&
-      wy >= b.minWy - padding &&
-      wy <= b.maxWy + padding
-    ) {
-      return true;
-    }
-  }
-
   return false;
 };
 
@@ -1515,6 +1503,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const z = zoomLevelRef.current;
           const isHovered = hoveredBuildingRef?.id === b.id;
 
+          const distToPlayer = Math.hypot(player.wx - bx, player.wy - by);
+          const isTransparent = distToPlayer < 2.2;
+
+          ctx.save();
+          if (isTransparent) {
+            ctx.globalAlpha = 0.5;
+          }
+
           // Realistic building shadow
           ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
           ctx.beginPath();
@@ -2104,6 +2100,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(labelText, pt.x, tagY);
+          ctx.restore();
         } else if (item.type === 'cafe') {
           // SOUTH: TOKO ROTI & KAFE WARGA (Enriched Bakery & Espresso Stall)
           const pt = toScreen(cafeWx, cafeWy, 0, camera.x, camera.y);
