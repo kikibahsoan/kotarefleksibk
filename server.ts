@@ -447,6 +447,117 @@ app.post('/api/chat/report', (req, res) => {
   res.json({ success: true, message: 'Laporan berhasil dicatat.' });
 });
 
+// =========================================================================
+// REAL-TIME PRESENCE & MULTI-DEVICE ONLINE AVATARS SYNC
+// =========================================================================
+interface ServerOnlinePlayer {
+  id: string;
+  handle: string;
+  name: string;
+  role: 'siswa' | 'guru' | 'warga';
+  roleLabel: string;
+  gender: 'L' | 'P';
+  shirtColor: string;
+  pantsColor: string;
+  hairColor: string;
+  wx: number;
+  wy: number;
+  targetWx: number;
+  targetWy: number;
+  speed: number;
+  isMoving: boolean;
+  walkFrame: number;
+  facing: 'down-left' | 'down-right' | 'up-left' | 'up-right';
+  isSitting?: boolean;
+  sittingSeat?: string;
+  isFishing?: boolean;
+  heldItem?: 'kopi' | 'roti' | 'eskrim' | null;
+  speechText?: string;
+  speechTimer?: number;
+  lastSeen: number;
+}
+
+const onlinePlayersMap = new Map<string, ServerOnlinePlayer>();
+
+function purgeInactivePlayers() {
+  const timeoutMs = 15000; // 15 seconds of inactivity
+  const now = Date.now();
+  for (const [id, player] of onlinePlayersMap.entries()) {
+    if (now - player.lastSeen > timeoutMs) {
+      onlinePlayersMap.delete(id);
+    }
+  }
+}
+
+// Inactive cleanup interval
+setInterval(purgeInactivePlayers, 5000);
+
+// Heartbeat & sync player position/state across all devices
+app.post('/api/presence/heartbeat', (req, res) => {
+  purgeInactivePlayers();
+  const data = req.body;
+  if (!data || !data.id) {
+    return res.status(400).json({ success: false, error: 'Data pemain tidak valid.' });
+  }
+
+  const player: ServerOnlinePlayer = {
+    id: String(data.id),
+    handle: String(data.handle || 'warga').replace(/^@/, ''),
+    name: String(data.name || data.handle || 'Warga'),
+    role: data.role === 'guru' ? 'guru' : 'siswa',
+    roleLabel: String(data.roleLabel || (data.role === 'guru' ? 'GURU DKV' : 'Warga')),
+    gender: data.gender === 'P' ? 'P' : 'L',
+    shirtColor: String(data.shirtColor || '#2563eb'),
+    pantsColor: String(data.pantsColor || '#1e293b'),
+    hairColor: String(data.hairColor || '#0f172a'),
+    wx: typeof data.wx === 'number' ? data.wx : 0,
+    wy: typeof data.wy === 'number' ? data.wy : 0,
+    targetWx: typeof data.targetWx === 'number' ? data.targetWx : (data.wx || 0),
+    targetWy: typeof data.targetWy === 'number' ? data.targetWy : (data.wy || 0),
+    speed: typeof data.speed === 'number' ? data.speed : 1.35,
+    isMoving: Boolean(data.isMoving),
+    walkFrame: typeof data.walkFrame === 'number' ? data.walkFrame : 0,
+    facing: data.facing || 'down-left',
+    isSitting: Boolean(data.isSitting),
+    sittingSeat: data.sittingSeat,
+    isFishing: Boolean(data.isFishing),
+    heldItem: data.heldItem || null,
+    speechText: data.speechText,
+    speechTimer: data.speechTimer,
+    lastSeen: Date.now(),
+  };
+
+  onlinePlayersMap.set(data.id, player);
+
+  // Return all other active online players from other devices/browsers
+  const others = Array.from(onlinePlayersMap.values()).filter((p) => p.id !== data.id);
+  res.json({
+    success: true,
+    onlinePlayers: others,
+    count: others.length + 1,
+    serverTime: Date.now(),
+  });
+});
+
+// Get list of online players
+app.get('/api/presence/online', (_req, res) => {
+  purgeInactivePlayers();
+  res.json({
+    success: true,
+    onlinePlayers: Array.from(onlinePlayersMap.values()),
+    count: onlinePlayersMap.size,
+  });
+});
+
+// Explicit player disconnect
+app.post('/api/presence/leave', (req, res) => {
+  const { id } = req.body;
+  if (id && onlinePlayersMap.has(id)) {
+    onlinePlayersMap.delete(id);
+  }
+  res.json({ success: true });
+});
+
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {

@@ -38,8 +38,9 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
 
 interface AvatarData {
   id: string;
-  role: 'siswa' | 'guru' | 'polisi' | 'petugas_kebersihan' | 'kurir' | 'barista';
+  role: 'siswa' | 'guru' | 'polisi' | 'petugas_kebersihan' | 'kurir' | 'barista' | 'penjaga_kota' | 'penjaga_lab' | 'penjaga_literasi' | 'penjaga_kolam' | 'pengawas' | 'kepala_balai';
   handle: string;
+  name?: string;
   roleLabel: string;
   wx: number;
   wy: number;
@@ -56,6 +57,17 @@ interface AvatarData {
   facing: 'down-left' | 'down-right' | 'up-left' | 'up-right';
   speechText?: string;
   speechTimer?: number;
+  anchorX?: number;
+  anchorY?: number;
+  wanderRadius?: number;
+  speeches?: string[];
+  isSitting?: boolean;
+  sittingSeat?: string;
+  isFishing?: boolean;
+  heldItem?: 'kopi' | 'roti' | 'eskrim' | null;
+  isOnlineRemote?: boolean;
+  spawnTime?: number;
+  lastPing?: number;
 }
 
 interface Cloud {
@@ -202,6 +214,23 @@ interface Star {
   alpha: number;
 }
 
+// The 4 outer corners/ends of the 15x15 map where online avatars from other devices spawn
+export const MAP_CORNERS: [number, number][] = [
+  [-5.5, -5.5], // Ujung Barat Laut (North-West)
+  [5.5, -5.5],  // Ujung Timur Laut (North-East)
+  [-5.5, 5.5],  // Ujung Barat Daya (South-West)
+  [5.5, 5.5],   // Ujung Tenggara (South-East)
+];
+
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
 export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTownCanvas({
   onSelectBuilding,
   activeBuilding,
@@ -246,6 +275,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const isSittingRef = useRef(false);
   isSittingRef.current = isSitting;
   const [sittingSeat, setSittingSeat] = useState<'fountain_east' | 'fountain_west' | 'literacy' | null>(null);
+  const sittingSeatRef = useRef<'fountain_east' | 'fountain_west' | 'literacy' | null>(null);
+  sittingSeatRef.current = sittingSeat;
 
   // Literacy corner reading modal
   const [isLiteracyModalOpen, setIsLiteracyModalOpen] = useState(false);
@@ -287,6 +318,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   // Player avatar object reference for direct snapping/controls
   const playerRef = useRef<AvatarData | null>(null);
 
+  // Remote online players from other devices
+  const remotePlayersRef = useRef<Map<string, AvatarData>>(new Map());
+  const [onlineCount, setOnlineCount] = useState<number>(1);
+
   // References for render loop
   const onSelectBuildingRef = useRef(onSelectBuilding);
   onSelectBuildingRef.current = onSelectBuilding;
@@ -320,6 +355,176 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     resetCameraRequestedRef.current = true;
     sounds.playClick();
   };
+
+  // -----------------------------------------------------------
+  // REAL-TIME MULTI-DEVICE PRESENCE SYNCHRONIZATION
+  // Other devices online spawn at the 4 corners of the map and disappear when offline
+  // -----------------------------------------------------------
+  useEffect(() => {
+    let isMounted = true;
+    const presenceChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window
+      ? new BroadcastChannel('kota_refleksi_presence')
+      : null;
+
+    const mySessionId = isTeacher
+      ? `guru_${studentName.replace(/\s+/g, '_').toLowerCase()}`
+      : `siswa_${studentName.replace(/\s+/g, '_').toLowerCase()}`;
+
+    const handleIncomingOthers = (others: any[]) => {
+      if (!isMounted) return;
+      const activeIds = new Set<string>();
+
+      others.forEach((rem: any) => {
+        if (!rem || !rem.id || rem.id === mySessionId) return;
+        activeIds.add(rem.id);
+
+        let existing = remotePlayersRef.current.get(rem.id);
+        if (!existing) {
+          // When a remote player comes online, spawn them at one of the 4 outer corners of the map!
+          const cornerIdx = Math.abs(hashString(rem.id)) % 4;
+          const [cornerWx, cornerWy] = MAP_CORNERS[cornerIdx];
+
+          existing = {
+            id: rem.id,
+            role: rem.role || 'siswa',
+            handle: rem.handle || 'warga',
+            name: rem.name || rem.handle,
+            roleLabel: rem.roleLabel || (rem.role === 'guru' ? 'GURU DKV' : 'Warga'),
+            wx: cornerWx,
+            wy: cornerWy,
+            targetWx: typeof rem.wx === 'number' ? rem.wx : cornerWx,
+            targetWy: typeof rem.wy === 'number' ? rem.wy : cornerWy,
+            speed: rem.speed || 1.35,
+            shirtColor: rem.shirtColor || (rem.gender === 'P' ? '#ec4899' : '#2563eb'),
+            pantsColor: rem.pantsColor || (rem.gender === 'P' ? '#be185d' : '#1e293b'),
+            hairColor: rem.hairColor || '#0f172a',
+            gender: rem.gender || 'L',
+            isMoving: Boolean(rem.isMoving),
+            pauseTimer: 0,
+            walkFrame: 0,
+            facing: rem.facing || 'down-left',
+            isSitting: Boolean(rem.isSitting),
+            sittingSeat: rem.sittingSeat,
+            isFishing: Boolean(rem.isFishing),
+            heldItem: rem.heldItem || null,
+            speechText: rem.speechText,
+            speechTimer: rem.speechTimer || (rem.speechText ? 5 : 0),
+            isOnlineRemote: true,
+            spawnTime: performance.now(),
+            lastPing: Date.now(),
+          };
+          remotePlayersRef.current.set(rem.id, existing);
+        } else {
+          // Update remote position and activity
+          existing.targetWx = typeof rem.wx === 'number' ? rem.wx : existing.targetWx;
+          existing.targetWy = typeof rem.wy === 'number' ? rem.wy : existing.targetWy;
+          existing.isSitting = Boolean(rem.isSitting);
+          existing.sittingSeat = rem.sittingSeat;
+          existing.isFishing = Boolean(rem.isFishing);
+          existing.heldItem = rem.heldItem || null;
+          existing.role = rem.role || existing.role;
+          existing.roleLabel = rem.roleLabel || existing.roleLabel;
+          existing.gender = rem.gender || existing.gender;
+          existing.shirtColor = rem.shirtColor || existing.shirtColor;
+          existing.pantsColor = rem.pantsColor || existing.pantsColor;
+          if (rem.speechText) {
+            existing.speechText = rem.speechText;
+            existing.speechTimer = rem.speechTimer || 5;
+          }
+          existing.lastPing = Date.now();
+        }
+      });
+
+      // When players go offline, remove them so they disappear from the map!
+      for (const [id] of remotePlayersRef.current.entries()) {
+        if (!activeIds.has(id)) {
+          remotePlayersRef.current.delete(id);
+        }
+      }
+
+      setOnlineCount(remotePlayersRef.current.size + 1);
+    };
+
+    const sendHeartbeat = async () => {
+      if (!isMounted || !playerRef.current) return;
+      const p = playerRef.current;
+      const payload = {
+        id: mySessionId,
+        handle: p.handle,
+        name: studentName,
+        role: isTeacher ? 'guru' : 'siswa',
+        roleLabel: isTeacher ? 'GURU DKV' : 'Warga',
+        gender: p.gender || (studentGender === 'P' ? 'P' : 'L'),
+        shirtColor: p.shirtColor,
+        pantsColor: p.pantsColor,
+        hairColor: p.hairColor,
+        wx: p.wx,
+        wy: p.wy,
+        targetWx: p.targetWx,
+        targetWy: p.targetWy,
+        speed: p.speed,
+        isMoving: p.isMoving,
+        walkFrame: p.walkFrame,
+        facing: p.facing,
+        isSitting: Boolean(isSittingRef.current),
+        sittingSeat: sittingSeatRef.current || undefined,
+        isFishing: Boolean(isFishingRef.current),
+        heldItem: heldItemRef.current || null,
+        speechText: playerSpeechRef.current && Date.now() < playerSpeechRef.current.expiresAt ? playerSpeechRef.current.text : undefined,
+        speechTimer: playerSpeechRef.current ? Math.max(0, (playerSpeechRef.current.expiresAt - Date.now()) / 1000) : 0,
+      };
+
+      // 1. BroadcastChannel for local instant reaction across browser windows
+      if (presenceChannel) {
+        try {
+          presenceChannel.postMessage({ type: 'presence_update', player: payload });
+        } catch (e) {}
+      }
+
+      // 2. Server API for real multi-device online presence
+      try {
+        const res = await fetch('/api/presence/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok && isMounted) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.onlinePlayers)) {
+            handleIncomingOthers(json.onlinePlayers);
+          }
+        }
+      } catch (err) {
+        // Offline / network fallback
+      }
+    };
+
+    if (presenceChannel) {
+      presenceChannel.onmessage = (event) => {
+        if (event.data?.type === 'presence_update' && event.data.player) {
+          handleIncomingOthers([event.data.player]);
+        }
+      };
+    }
+
+    const interval = setInterval(sendHeartbeat, 1600);
+    sendHeartbeat();
+
+    const onUnload = () => {
+      try {
+        navigator.sendBeacon('/api/presence/leave', JSON.stringify({ id: mySessionId }));
+      } catch (e) {}
+    };
+    window.addEventListener('beforeunload', onUnload);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      if (presenceChannel) presenceChannel.close();
+      window.removeEventListener('beforeunload', onUnload);
+      onUnload();
+    };
+  }, [isTeacher, studentName, studentGender]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -414,121 +619,242 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     };
     playerRef.current = player;
 
-    // 2. Guru (@ibu_rahmawati [GURU])
-    const guru: AvatarData = {
-      id: 'guru',
-      role: 'guru',
-      handle: 'ibu_rahmawati',
-      roleLabel: 'GURU',
-      wx: 1.8,
-      wy: -1.5,
-      targetWx: 1.8,
-      targetWy: -1.5,
-      speed: 1.05,
-      shirtColor: '#059669', // Teal green batik/blazer
-      pantsColor: '#0f172a',
-      hairColor: '#0f172a',
-      gender: 'P',
-      isMoving: false,
-      pauseTimer: 3,
-      walkFrame: 0,
-      facing: 'down-left',
-      speechText: 'Semangat belajar dan terus berefleksi!',
-      speechTimer: 5,
-    };
+    // -----------------------------------------------------------
+    // 7 OFFICIAL TOWN STAFF NPCS (ONLY THESE 7 ARE RANDOM NPCS IN KOTA REFLEKSIA)
+    // 1. Penjaga Kota (Surya)
+    // 2. Penjaga Lab (Malik)
+    // 3. Barista (Ma Uba)
+    // 4. Penjaga Sudut Literasi (Patra)
+    // 5. Penjaga Kolam (Tomi)
+    // 6. Pengawas (Naziefa)
+    // 7. Kepala Balai (Sony)
+    // -----------------------------------------------------------
 
-    // 3. Siswa Lain (@bima_satria)
-    const bima: AvatarData = {
-      id: 'bima',
-      role: 'polisi',
-      handle: 'bima_satria',
-      roleLabel: 'Warga',
-      wx: -1.8,
-      wy: 1.2,
-      targetWx: -1.8,
-      targetWy: 1.2,
-      speed: 1.1,
-      shirtColor: '#10b981', // Emerald shirt
-      pantsColor: '#1e293b',
+    // 1. Penjaga Kota (Surya) - Patrols main roads & central plaza
+    const surya: AvatarData = {
+      id: 'surya',
+      role: 'penjaga_kota',
+      handle: 'surya',
+      name: 'Surya',
+      roleLabel: 'Penjaga Kota',
+      wx: 0,
+      wy: 2.0,
+      targetWx: 0,
+      targetWy: 2.0,
+      anchorX: 0,
+      anchorY: 2.0,
+      wanderRadius: 2.6,
+      speed: 0.95,
+      shirtColor: '#0284c7', // Municipal azure uniform
+      pantsColor: '#0f172a',
       hairColor: '#0f172a',
       gender: 'L',
       isMoving: false,
       pauseTimer: 2,
       walkFrame: 0,
-      facing: 'down-right',
-      speechText: 'Peta Kota Refleksi sangat rapi!',
-      speechTimer: 6,
+      facing: 'down-left',
+      speechText: 'Kota Refleksia tertib dan aman!',
+      speechTimer: 5,
+      speeches: [
+        'Kota Refleksia tertib dan aman!',
+        'Selamat datang di Kota Refleksia DKV!',
+        'Jaga ketertiban dan fasilitas kota ya!',
+      ],
     };
 
-    // 4. Siswa Lain (@siti_nurhaliza)
-    const siti: AvatarData = {
-      id: 'siti',
-      role: 'petugas_kebersihan',
-      handle: 'siti_nurhaliza',
-      roleLabel: 'Warga',
-      wx: 0,
-      wy: -1.6,
-      targetWx: 0,
-      targetWy: -1.6,
-      speed: 1.05,
-      shirtColor: '#06b6d4', // Cyan shirt
-      pantsColor: '#be185d',
-      hairColor: '#78350f',
-      gender: 'P',
+    // 2. Penjaga Lab (Malik) - Near Bengkel Latihan & Lab DKV / Tefa (South-East)
+    const malik: AvatarData = {
+      id: 'malik',
+      role: 'penjaga_lab',
+      handle: 'malik',
+      name: 'Malik',
+      roleLabel: 'Penjaga Lab',
+      wx: 2.8,
+      wy: 2.2,
+      targetWx: 2.8,
+      targetWy: 2.2,
+      anchorX: 2.8,
+      anchorY: 2.2,
+      wanderRadius: 1.8,
+      speed: 0.85,
+      shirtColor: '#475569', // Tech lab coat
+      pantsColor: '#1e293b',
+      hairColor: '#1e293b',
+      gender: 'L',
       isMoving: false,
-      pauseTimer: 4,
+      pauseTimer: 3,
       walkFrame: 0,
       facing: 'down-left',
-      speechText: 'Air mancur di tengah sangat segar!',
-      speechTimer: 7,
+      speechText: 'Peralatan Lab DKV & Tefa siap digunakan!',
+      speechTimer: 5,
+      speeches: [
+        'Peralatan Lab DKV & Tefa siap digunakan!',
+        'Uji pemahaman kuis di Bengkel Latihan!',
+        'Desain hebat berakar pada logika komputasi.',
+      ],
     };
 
-    // 5. Siswa Lain (@dia_putri)
-    const dia: AvatarData = {
-      id: 'dia',
-      role: 'kurir',
-      handle: 'dia_putri',
-      roleLabel: 'Warga',
-      wx: 0,
-      wy: 1.5,
-      targetWx: 0,
-      targetWy: 1.5,
-      speed: 1.15,
-      shirtColor: '#f43f5e', // Rose shirt
-      pantsColor: '#475569',
-      hairColor: '#3d1c06',
-      gender: 'P',
-      isMoving: false,
-      pauseTimer: 2.5,
-      walkFrame: 0,
-      facing: 'up-right',
-      speechText: 'Mau pesan roti dan kopi di kafe!',
-      speechTimer: 4,
-    };
-
-    // 6. Barista Toko Roti & Kafe Warga
-    const barista: AvatarData = {
-      id: 'barista',
+    // 3. Barista Toko Roti & Kafe Warga (Ma Uba)
+    const maUba: AvatarData = {
+      id: 'ma_uba',
       role: 'barista',
-      handle: 'barista_kiki',
+      handle: 'ma_uba',
+      name: 'Ma Uba',
       roleLabel: 'Barista',
       wx: -0.8,
       wy: 2.5,
       targetWx: -0.8,
       targetWy: 2.5,
-      speed: 0,
-      shirtColor: '#ea580c',
-      pantsColor: '#1e293b',
-      hairColor: '#0f172a',
+      anchorX: -0.8,
+      anchorY: 2.5,
+      wanderRadius: 0,
+      speed: 0, // Stands at cafe counter
+      shirtColor: '#ea580c', // Warm barista apron
+      pantsColor: '#7c2d12',
+      hairColor: '#451a03',
+      gender: 'P',
       isMoving: false,
       pauseTimer: 99999,
       walkFrame: 0,
       facing: 'down-right',
       speechText: 'Kopi, roti, dan eskrim siap disajikan!',
       speechTimer: 6,
+      speeches: [
+        'Kopi hangat, roti lezat & eskrim siap!',
+        'Singgah santai di Toko Roti & Kafe Warga!',
+        'Nikmati secangkir kopi penambah inspirasi!',
+      ],
     };
 
-    const npcs: AvatarData[] = [guru, bima, siti, dia, barista];
+    // 4. Penjaga Sudut Literasi (Patra) - West Reading Corner Gazebo
+    const patra: AvatarData = {
+      id: 'patra',
+      role: 'penjaga_literasi',
+      handle: 'patra',
+      name: 'Patra',
+      roleLabel: 'Penjaga Sudut Literasi',
+      wx: -3.8,
+      wy: 1.5,
+      targetWx: -3.8,
+      targetWy: 1.5,
+      anchorX: -3.8,
+      anchorY: 1.5,
+      wanderRadius: 1.8,
+      speed: 0.85,
+      shirtColor: '#059669', // Emerald reading vest
+      pantsColor: '#1e293b',
+      hairColor: '#0f172a',
+      gender: 'L',
+      isMoving: false,
+      pauseTimer: 3.5,
+      walkFrame: 0,
+      facing: 'down-right',
+      speechText: 'Selamat membaca di Sudut Literasi DKV!',
+      speechTimer: 5,
+      speeches: [
+        'Selamat membaca di Sudut Literasi DKV!',
+        'Membaca komik & majalah memperkaya referensi!',
+        'Duduk santai di bangku sambil membaca buku.',
+      ],
+    };
+
+    // 5. Penjaga Kolam (Tomi) - East Fishing Pier & Pond
+    const tomi: AvatarData = {
+      id: 'tomi',
+      role: 'penjaga_kolam',
+      handle: 'tomi',
+      name: 'Tomi',
+      roleLabel: 'Penjaga Kolam',
+      wx: 4.0,
+      wy: -1.8,
+      targetWx: 4.0,
+      targetWy: -1.8,
+      anchorX: 4.0,
+      anchorY: -1.8,
+      wanderRadius: 1.6,
+      speed: 0.85,
+      shirtColor: '#0d9488', // Teal fisherman shirt
+      pantsColor: '#334155',
+      hairColor: '#0f172a',
+      gender: 'L',
+      isMoving: false,
+      pauseTimer: 2.5,
+      walkFrame: 0,
+      facing: 'down-left',
+      speechText: 'Kolam pancing tenang, ikan koi berenang lincah!',
+      speechTimer: 6,
+      speeches: [
+        'Kolam pancing tenang, ikan koi berenang lincah!',
+        'Spot dermaga timur sangat cocok untuk relaksasi.',
+        'Jaga kebersihan air kolam pancing ya!',
+      ],
+    };
+
+    // 6. Pengawas (Naziefa) - Campus & Perpustakaan Promenade
+    const naziefa: AvatarData = {
+      id: 'naziefa',
+      role: 'pengawas',
+      handle: 'naziefa',
+      name: 'Naziefa',
+      roleLabel: 'Pengawas',
+      wx: -2.2,
+      wy: -1.8,
+      targetWx: -2.2,
+      targetWy: -1.8,
+      anchorX: -2.2,
+      anchorY: -1.8,
+      wanderRadius: 2.2,
+      speed: 0.95,
+      shirtColor: '#7c3aed', // Royal purple supervisor attire
+      pantsColor: '#4c1d95',
+      hairColor: '#581c87',
+      gender: 'P',
+      isMoving: false,
+      pauseTimer: 3,
+      walkFrame: 0,
+      facing: 'down-right',
+      speechText: 'Tetap semangat belajar dan jaga disiplin!',
+      speechTimer: 5,
+      speeches: [
+        'Tetap semangat belajar dan jaga disiplin!',
+        'Jangan lupa tulis refleksi belajarmu hari ini.',
+        'Kota Refleksia tempat bertumbuh bersama.',
+      ],
+    };
+
+    // 7. Kepala Balai (Sony) - Balai Kota Courtyard
+    const sony: AvatarData = {
+      id: 'sony',
+      role: 'kepala_balai',
+      handle: 'sony',
+      name: 'Sony',
+      roleLabel: 'Kepala Balai',
+      wx: 0.0,
+      wy: -2.8,
+      targetWx: 0.0,
+      targetWy: -2.8,
+      anchorX: 0.0,
+      anchorY: -2.8,
+      wanderRadius: 1.8,
+      speed: 0.75,
+      shirtColor: '#b45309', // Formal batik gold/amber
+      pantsColor: '#0f172a',
+      hairColor: '#0f172a',
+      gender: 'L',
+      isMoving: false,
+      pauseTimer: 4,
+      walkFrame: 0,
+      facing: 'down-left',
+      speechText: 'Balai Kota siap mencatat refleksi belajarmu!',
+      speechTimer: 6,
+      speeches: [
+        'Balai Kota siap mencatat refleksi belajarmu!',
+        'Selamat datang di Balai Kota Refleksia!',
+        'Refleksi yang jujur adalah kunci kemajuan.',
+      ],
+    };
+
+    const npcs: AvatarData[] = [surya, malik, maUba, patra, tomi, naziefa, sony];
 
     // Cafe coordinates (Toko Roti & Kafe)
     const cafeWx = -0.5;
@@ -982,41 +1308,83 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setNearbyAction(null);
       }
 
-      // Update NPCs
+      // Update 7 Town NPCs
       npcs.forEach((npc) => {
-        if (npc.speed === 0) return;
-
         if (npc.speechTimer && npc.speechTimer > 0) {
           npc.speechTimer -= delta;
           if (npc.speechTimer <= 0) npc.speechText = undefined;
+        }
+
+        if (npc.speed === 0) {
+          // Stationary staff (Ma Uba - Barista)
+          npc.pauseTimer -= delta;
+          if (npc.pauseTimer <= 0 && npc.speeches && npc.speeches.length > 0) {
+            npc.speechText = npc.speeches[Math.floor(Math.random() * npc.speeches.length)];
+            npc.speechTimer = 5.5;
+            npc.pauseTimer = 18 + Math.random() * 12;
+          }
+          return;
         }
 
         if (!npc.isMoving) {
           npc.pauseTimer -= delta;
           if (npc.pauseTimer <= 0) {
             npc.isMoving = true;
+            const ax = npc.anchorX ?? npc.wx;
+            const ay = npc.anchorY ?? npc.wy;
+            const r = npc.wanderRadius ?? 2.0;
             const angle = Math.random() * Math.PI * 2;
-            const dist = 1.0 + Math.random() * 2.5;
-            npc.targetWx = Math.max(-6.2, Math.min(6.2, npc.wx + Math.cos(angle) * dist));
-            npc.targetWy = Math.max(-6.2, Math.min(6.2, npc.wy + Math.sin(angle) * dist));
+            const dist = 0.5 + Math.random() * r;
+            npc.targetWx = Math.max(-6.5, Math.min(6.5, ax + Math.cos(angle) * dist));
+            npc.targetWy = Math.max(-6.5, Math.min(6.5, ay + Math.sin(angle) * dist));
+
+            if (!npc.speechText && npc.speeches && npc.speeches.length > 0 && Math.random() < 0.4) {
+              npc.speechText = npc.speeches[Math.floor(Math.random() * npc.speeches.length)];
+              npc.speechTimer = 5;
+            }
           }
         } else {
           const dx = npc.targetWx - npc.wx;
           const dy = npc.targetWy - npc.wy;
           const dist = Math.hypot(dx, dy);
 
-          if (dist > 0.15) {
+          if (dist > 0.12) {
             const step = Math.min(dist, npc.speed * delta);
             npc.wx += (dx / dist) * step;
             npc.wy += (dy / dist) * step;
-            npc.walkFrame += delta * 10;
+            npc.walkFrame += delta * 9;
             if (dx >= 0) npc.facing = 'down-right';
             else npc.facing = 'down-left';
           } else {
             npc.isMoving = false;
             npc.walkFrame = 0;
-            npc.pauseTimer = 3 + Math.random() * 4;
+            npc.pauseTimer = 3.5 + Math.random() * 4.5;
           }
+        }
+      });
+
+      // Update Real-Time Online Remote Avatars from Other Devices
+      remotePlayersRef.current.forEach((rem) => {
+        if (rem.speechTimer && rem.speechTimer > 0) {
+          rem.speechTimer -= delta;
+          if (rem.speechTimer <= 0) rem.speechText = undefined;
+        }
+
+        const rdx = rem.targetWx - rem.wx;
+        const rdy = rem.targetWy - rem.wy;
+        const rdist = Math.hypot(rdx, rdy);
+
+        if (rdist > 0.08) {
+          const rstep = Math.min(rdist, (rem.speed || 1.35) * delta);
+          rem.wx += (rdx / rdist) * rstep;
+          rem.wy += (rdy / rdist) * rstep;
+          rem.isMoving = true;
+          rem.walkFrame += delta * 10;
+          if (rdx >= 0) rem.facing = 'down-right';
+          else rem.facing = 'down-left';
+        } else {
+          rem.isMoving = false;
+          rem.walkFrame = 0;
         }
       });
 
@@ -1296,6 +1664,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       npcs.forEach((npc) => {
         drawItems.push({ type: 'avatar', data: npc, isPlayer: false, depth: npc.wx + npc.wy });
+      });
+
+      // Real-time Online Avatars from other devices
+      remotePlayersRef.current.forEach((remotePlayer) => {
+        drawItems.push({ type: 'avatar', data: remotePlayer, isPlayer: false, depth: remotePlayer.wx + remotePlayer.wy });
       });
 
       trees.forEach(([tx, ty], tIdx) => {
@@ -2790,9 +3163,35 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           const isFemale = item.isPlayer
             ? studentGender === 'P'
-            : av.gender === 'P' || av.id === 'siti' || av.id === 'dia';
+            : av.gender === 'P';
           const isTeacherAvatar = Boolean((item.isPlayer && isTeacher) || av.role === 'guru');
-          const isSittingNow = Boolean(item.isPlayer && isSittingRef.current);
+          const isSittingNow = Boolean((item.isPlayer && isSittingRef.current) || av.isSitting);
+          const isFishingNow = Boolean((item.isPlayer && isFishingRef.current) || av.isFishing);
+          const currentHeldItem = item.isPlayer ? heldItemRef.current : av.heldItem;
+
+          // Spawning Portal Effect for Remote Online Avatars at Map Corners
+          if (av.isOnlineRemote && av.spawnTime && currentTime - av.spawnTime < 3500) {
+            const spawnFade = 1 - (currentTime - av.spawnTime) / 3500;
+            ctx.save();
+            ctx.strokeStyle = `rgba(56, 189, 248, ${0.85 * spawnFade})`;
+            ctx.lineWidth = 2 * z;
+            ctx.beginPath();
+            const ringR = (11 + Math.sin(elapsed * 9) * 3) * z;
+            ctx.ellipse(pt.x, pt.y + 1, ringR, ringR * 0.48, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Rising teleport sparkle particles
+            for (let sp = 0; sp < 4; sp++) {
+              const spOffset = (elapsed * 2.5 + sp * 0.25) % 1;
+              const spY = pt.y - spOffset * 26 * z;
+              const spX = pt.x + Math.sin(elapsed * 5 + sp * 2) * 10 * z;
+              ctx.fillStyle = `rgba(254, 240, 138, ${(1 - spOffset) * spawnFade})`;
+              ctx.beginPath();
+              ctx.arc(spX, spY, 1.8 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.restore();
+          }
 
           // Natural leg swing & gentle bobbing (disabled when sitting)
           const legSwing = (av.isMoving && !isSittingNow) ? Math.sin(av.walkFrame) * 3.5 * z : 0;
@@ -3086,8 +3485,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           // HELD ITEM (Minimalist Coffee, Bread, or Ice Cream in hand)
-          if (item.isPlayer && heldItemRef.current) {
-            const hType = heldItemRef.current;
+          if (currentHeldItem) {
+            const hType = currentHeldItem;
             const hX = pt.x + 6 * z;
             const hY = avY - 8 * z + (isSittingNow ? 0 : (av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0));
 
@@ -3138,7 +3537,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           // FISHING ANIMATION (When fishing at east pier)
-          if (item.isPlayer && isFishingRef.current) {
+          if (isFishingNow) {
             ctx.strokeStyle = '#78350f';
             ctx.lineWidth = 2 * z;
             ctx.beginPath();
@@ -3192,6 +3591,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           let labelText = `@${av.handle}`;
           if (item.isPlayer) {
             labelText = isTeacherAvatar ? `@${av.handle} (Guru)` : `@${av.handle} (Kamu)`;
+          } else if (av.isOnlineRemote) {
+            labelText = `@${av.handle} 🟢`;
+          } else if (av.role === 'penjaga_kota') {
+            labelText = `🛡️ @surya (Penjaga Kota)`;
+          } else if (av.role === 'penjaga_lab') {
+            labelText = `🔬 @malik (Penjaga Lab)`;
+          } else if (av.role === 'barista') {
+            labelText = `☕ @ma_uba (Barista)`;
+          } else if (av.role === 'penjaga_literasi') {
+            labelText = `📖 @patra (Sudut Literasi)`;
+          } else if (av.role === 'penjaga_kolam') {
+            labelText = `🎣 @tomi (Penjaga Kolam)`;
+          } else if (av.role === 'pengawas') {
+            labelText = `📋 @naziefa (Pengawas)`;
+          } else if (av.role === 'kepala_balai') {
+            labelText = `🏛️ @sony (Kepala Balai)`;
           }
 
           ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
@@ -3215,11 +3630,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 1.5;
             ctx.stroke();
             ctx.fillStyle = '#fde047';
-          } else {
-            ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
-            ctx.lineWidth = 1;
+          } else if (av.isOnlineRemote) {
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1.4;
             ctx.stroke();
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = '#34d399';
+          } else {
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+            ctx.fillStyle = '#e2e8f0';
           }
 
           ctx.textAlign = 'center';
@@ -4069,6 +4489,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           </div>
         </div>
       )}
+
+      {/* ONLINE CITIZENS BADGE (Real-Time Device Presence) */}
+      <div className="absolute top-20 sm:top-24 left-4 z-20 pointer-events-none">
+        <div className="bg-[#121e2c]/90 backdrop-blur-md border border-emerald-500/40 rounded-full px-3 py-1 text-white text-[11px] font-bold shadow-lg flex items-center gap-2 animate-fade-in-up">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="text-emerald-300 font-mono">{onlineCount}</span>
+          <span className="text-slate-300">Warga Online</span>
+        </div>
+      </div>
 
       {/* Zoom & Center Controls */}
       <div className="absolute right-4 bottom-20 z-30 flex flex-col gap-2">
