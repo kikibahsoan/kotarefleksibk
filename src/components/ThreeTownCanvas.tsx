@@ -270,16 +270,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const wateredTreesRef = useRef<Record<number, number>>({});
   wateredTreesRef.current = wateredTrees;
 
-  // Active water spray particles { treeIndex, startTime }
-  const waterSpraysRef = useRef<Array<{ treeIndex: number; startTime: number }>>([]);
-
-  // Sitting state on 4 fountain benches or literacy corner
-  type BenchId = 'fountain_east' | 'fountain_west' | 'fountain_north' | 'fountain_south' | 'literacy';
+  // Sitting state on fountain benches or literacy corner
   const [isSitting, setIsSitting] = useState(false);
   const isSittingRef = useRef(false);
   isSittingRef.current = isSitting;
-  const [sittingSeat, setSittingSeat] = useState<BenchId | null>(null);
-  const sittingSeatRef = useRef<BenchId | null>(null);
+  const [sittingSeat, setSittingSeat] = useState<'fountain_east' | 'fountain_west' | 'literacy' | null>(null);
+  const sittingSeatRef = useRef<'fountain_east' | 'fountain_west' | 'literacy' | null>(null);
   sittingSeatRef.current = sittingSeat;
 
   // Literacy corner reading modal
@@ -290,13 +286,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [nearbyAction, setNearbyAction] = useState<{
     type: 'tree' | 'fishing' | 'literacy' | 'bench';
     treeIndex?: number;
-    benchId?: BenchId;
+    benchId?: 'fountain_east' | 'fountain_west' | 'literacy';
     benchName?: string;
   } | null>(null);
   const nearbyActionRef = useRef<{
     type: 'tree' | 'fishing' | 'literacy' | 'bench';
     treeIndex?: number;
-    benchId?: BenchId;
+    benchId?: 'fountain_east' | 'fountain_west' | 'literacy';
     benchName?: string;
   } | null>(null);
   nearbyActionRef.current = nearbyAction;
@@ -446,7 +442,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           existing.isSitting = Boolean(rem.isSitting);
           existing.sittingSeat = rem.sittingSeat;
-          if (rem.facing) existing.facing = rem.facing;
           existing.isFishing = Boolean(rem.isFishing);
           existing.heldItem = rem.heldItem || null;
           existing.role = rem.role || existing.role;
@@ -990,50 +985,42 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 4. Check Click on Benches (4 Fountain Benches surrounding Central Fountain + 1 Literacy Bench)
-      const eastBenchDist = Math.hypot(wx - 1.45, wy - 0.0);
-      const westBenchDist = Math.hypot(wx - (-1.45), wy - 0.0);
-      const northBenchDist = Math.hypot(wx - 0.0, wy - (-1.45));
-      const southBenchDist = Math.hypot(wx - 0.0, wy - 1.45);
+      // 4. Check Click on Benches
+      const eastBenchDist = Math.hypot(wx - 1.25, wy - 0.0);
+      const westBenchDist = Math.hypot(wx - (-1.25), wy - 0.0);
       const litBenchDist = Math.hypot(wx - (-3.7), wy - 1.8);
-
-      const sitAtBench = (
-        seatId: BenchId,
-        targetX: number,
-        targetY: number,
-        facingDir: 'down-left' | 'down-right' | 'up-left' | 'up-right',
-        name: string
-      ) => {
+      if (eastBenchDist < 1.0) {
         sounds.playClick();
-        player.targetWx = targetX;
-        player.targetWy = targetY;
-        player.wx = targetX;
-        player.wy = targetY;
-        player.isMoving = false;
-        player.walkFrame = 0;
-        player.facing = facingDir;
+        player.targetWx = 1.25;
+        player.targetWy = 0.0;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: 1.25, wy: 0.0, time: performance.now() };
         setIsSitting(true);
-        setSittingSeat(seatId);
-        clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now() };
-        setCafeToast(`🪑 Duduk santai di ${name}.`);
+        setSittingSeat('fountain_east');
+        setCafeToast('🪑 Duduk santai di kursi air mancur timur.');
         setTimeout(() => setCafeToast(null), 2500);
-        sendHeartbeatRef.current?.();
-      };
-
-      if (eastBenchDist < 1.05) {
-        sitAtBench('fountain_east', 1.45, 0.0, 'down-left', 'bangku timur air mancur');
         return;
-      } else if (westBenchDist < 1.05) {
-        sitAtBench('fountain_west', -1.45, 0.0, 'down-right', 'bangku barat air mancur');
+      } else if (westBenchDist < 1.0) {
+        sounds.playClick();
+        player.targetWx = -1.25;
+        player.targetWy = 0.0;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: -1.25, wy: 0.0, time: performance.now() };
+        setIsSitting(true);
+        setSittingSeat('fountain_west');
+        setCafeToast('🪑 Duduk santai di kursi air mancur barat.');
+        setTimeout(() => setCafeToast(null), 2500);
         return;
-      } else if (northBenchDist < 1.05) {
-        sitAtBench('fountain_north', 0.0, -1.45, 'down-left', 'bangku utara air mancur');
-        return;
-      } else if (southBenchDist < 1.05) {
-        sitAtBench('fountain_south', 0.0, 1.45, 'up-right', 'bangku selatan air mancur');
-        return;
-      } else if (litBenchDist < 1.05) {
-        sitAtBench('literacy', -3.7, 1.8, 'down-right', 'bangku sudut literasi');
+      } else if (litBenchDist < 1.0) {
+        sounds.playClick();
+        player.targetWx = -3.7;
+        player.targetWy = 1.8;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: -3.7, wy: 1.8, time: performance.now() };
+        setIsSitting(true);
+        setSittingSeat('literacy');
+        setCafeToast('🪑 Duduk santai di bangku sudut literasi.');
+        setTimeout(() => setCafeToast(null), 2500);
         return;
       }
 
@@ -1116,11 +1103,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         Math.hypot(wx - cafeWx, wy - cafeWy) < 2.0 ||
         Math.hypot(wx - 4.6, wy - (-2.2)) < 2.2 ||
         Math.hypot(wx - (-4.3), wy - 1.8) < 2.0 ||
-        Math.hypot(wx - 1.45, wy - 0.0) < 1.05 ||
-        Math.hypot(wx - (-1.45), wy - 0.0) < 1.05 ||
-        Math.hypot(wx - 0.0, wy - (-1.45)) < 1.05 ||
-        Math.hypot(wx - 0.0, wy - 1.45) < 1.05 ||
-        Math.hypot(wx - (-3.7), wy - 1.8) < 1.05
+        Math.hypot(wx - 1.25, wy - 0.0) < 1.0 ||
+        Math.hypot(wx - (-1.25), wy - 0.0) < 1.0 ||
+        Math.hypot(wx - (-3.7), wy - 1.8) < 1.0
       ) {
         canvas.style.cursor = 'pointer';
         hoveredBuildingRef = null;
@@ -1303,14 +1288,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // Proximity checks: East Fishing Dock & Kolam [4.6, -2.2], West Literacy Corner [-4.3, 1.8], 4 Fountain Benches + Literacy Bench
+      // Proximity checks: East Fishing Dock & Kolam [4.6, -2.2], West Literacy Corner [-4.3, 1.8], Bench [-3.7, 1.8]
       const fishDist = Math.hypot(player.wx - 4.6, player.wy - (-2.2));
       const litDist = Math.hypot(player.wx - (-4.3), player.wy - 1.8);
       const litBenchDist = Math.hypot(player.wx - (-3.7), player.wy - 1.8);
-      const eastBenchDist = Math.hypot(player.wx - 1.45, player.wy - 0.0);
-      const westBenchDist = Math.hypot(player.wx - (-1.45), player.wy - 0.0);
-      const northBenchDist = Math.hypot(player.wx - 0.0, player.wy - (-1.45));
-      const southBenchDist = Math.hypot(player.wx - 0.0, player.wy - 1.45);
+      const eastBenchDist = Math.hypot(player.wx - 1.25, player.wy - 0.0);
+      const westBenchDist = Math.hypot(player.wx - (-1.25), player.wy - 0.0);
 
       let nearTreeIdx = -1;
       for (let tIdx = 0; tIdx < trees.length; tIdx++) {
@@ -1324,34 +1307,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       if (isSittingRef.current) {
         if (nearbyActionRef.current?.type !== 'bench') {
-          const currentSeat = sittingSeatRef.current;
-          let seatName = 'Kursi Taman';
-          if (currentSeat === 'fountain_east') seatName = 'Bangku Timur Air Mancur';
-          else if (currentSeat === 'fountain_west') seatName = 'Bangku Barat Air Mancur';
-          else if (currentSeat === 'fountain_north') seatName = 'Bangku Utara Air Mancur';
-          else if (currentSeat === 'fountain_south') seatName = 'Bangku Selatan Air Mancur';
-          else if (currentSeat === 'literacy') seatName = 'Bangku Sudut Literasi';
-          setNearbyAction({ type: 'bench', benchId: currentSeat || undefined, benchName: seatName });
+          setNearbyAction({ type: 'bench', benchName: 'Kursi Taman' });
         }
-      } else if (eastBenchDist < 0.95) {
+      } else if (eastBenchDist < 0.85) {
         if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'fountain_east') {
-          setNearbyAction({ type: 'bench', benchId: 'fountain_east', benchName: 'Bangku Timur Air Mancur' });
+          setNearbyAction({ type: 'bench', benchId: 'fountain_east', benchName: 'Kursi Timur Air Mancur' });
         }
-      } else if (westBenchDist < 0.95) {
+      } else if (westBenchDist < 0.85) {
         if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'fountain_west') {
-          setNearbyAction({ type: 'bench', benchId: 'fountain_west', benchName: 'Bangku Barat Air Mancur' });
+          setNearbyAction({ type: 'bench', benchId: 'fountain_west', benchName: 'Kursi Barat Air Mancur' });
         }
-      } else if (northBenchDist < 0.95) {
-        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'fountain_north') {
-          setNearbyAction({ type: 'bench', benchId: 'fountain_north', benchName: 'Bangku Utara Air Mancur' });
-        }
-      } else if (southBenchDist < 0.95) {
-        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'fountain_south') {
-          setNearbyAction({ type: 'bench', benchId: 'fountain_south', benchName: 'Bangku Selatan Air Mancur' });
-        }
-      } else if (litBenchDist < 0.95) {
+      } else if (litBenchDist < 0.85) {
         if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'literacy') {
-          setNearbyAction({ type: 'bench', benchId: 'literacy', benchName: 'Bangku Sudut Literasi' });
+          setNearbyAction({ type: 'bench', benchId: 'literacy', benchName: 'Kursi Sudut Literasi' });
         }
       } else if (litDist < 1.05) {
         if (nearbyActionRef.current?.type !== 'literacy') {
@@ -1710,7 +1678,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'lamp'; wx: number; wy: number; depth: number }
         | { type: 'fishing_spot'; wx: number; wy: number; depth: number }
         | { type: 'literacy_corner'; wx: number; wy: number; depth: number }
-        | { type: 'bench'; wx: number; wy: number; depth: number; id: BenchId };
+        | { type: 'bench'; wx: number; wy: number; depth: number; id: 'fountain_east' | 'fountain_west' | 'literacy' };
 
       const drawItems: DrawItem[] = [];
 
@@ -1749,11 +1717,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // 3. Bench next to Sudut Literasi at [-3.7, 1.8]
       drawItems.push({ type: 'bench', wx: -3.7, wy: 1.8, depth: -3.7 + 1.8, id: 'literacy' });
 
-      // 4. Exactly 4 Benches surrounding the Central Fountain (East, West, North, South)
-      drawItems.push({ type: 'bench', wx: 1.45, wy: 0.0, depth: 1.45, id: 'fountain_east' });
-      drawItems.push({ type: 'bench', wx: -1.45, wy: 0.0, depth: -1.45, id: 'fountain_west' });
-      drawItems.push({ type: 'bench', wx: 0.0, wy: -1.45, depth: -1.45, id: 'fountain_north' });
-      drawItems.push({ type: 'bench', wx: 0.0, wy: 1.45, depth: 1.45, id: 'fountain_south' });
+      // 4. Kursi Taman Samping Air Mancur (East & West Benches)
+      drawItems.push({ type: 'bench', wx: 1.25, wy: 0.0, depth: 1.25, id: 'fountain_east' });
+      drawItems.push({ type: 'bench', wx: -1.25, wy: 0.0, depth: -1.25, id: 'fountain_west' });
 
       drawItems.sort((a, b) => a.depth - b.depth);
 
@@ -1790,17 +1756,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.stroke();
 
           // Teak backrest slats
-          if (item.id === 'fountain_south') {
-            // South bench faces North towards fountain (backrest at lower edge)
-            ctx.fillStyle = '#d97706';
-            ctx.fillRect(pt.x - 12 * z, pt.y + 2.5 * z, 24 * z, 2.8 * z);
-            ctx.fillRect(pt.x - 12 * z, pt.y + 5.5 * z, 24 * z, 2.2 * z);
-          } else {
-            // North, East, West, and Literacy benches face South / Inward towards fountain
-            ctx.fillStyle = '#d97706';
-            ctx.fillRect(pt.x - 12 * z, pt.y - 11 * z, 24 * z, 3 * z);
-            ctx.fillRect(pt.x - 12 * z, pt.y - 7 * z, 24 * z, 2.5 * z);
-          }
+          ctx.fillStyle = '#d97706';
+          ctx.fillRect(pt.x - 12 * z, pt.y - 11 * z, 24 * z, 3 * z);
+          ctx.fillRect(pt.x - 12 * z, pt.y - 7 * z, 24 * z, 2.5 * z);
 
           // Armrest curves
           ctx.strokeStyle = isNight ? '#0f172a' : '#334155';
@@ -2191,9 +2149,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Double-Sphere Tree (Noticeably Enlarged, Lush & Sculpted matching screenshot)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
-          const wateredTime = wateredTreesRef.current[item.index];
-          const elapsedSinceWatered = wateredTime ? (currentTime - wateredTime) / 1000 : 999;
-          const isWatered = elapsedSinceWatered < 8.0;
+          const isWatered = Boolean(wateredTreesRef.current[item.index] && Date.now() - wateredTreesRef.current[item.index] < 10 * 60 * 1000);
 
           // Ground shadow (enlarged)
           ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
@@ -2238,53 +2194,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(pt.x, pt.y - 59 * z, 6 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // 1. Water Spray Arc & Splashing Particles (when watered, during first 1.8 seconds)
-          if (elapsedSinceWatered < 1.8) {
-            const sprayT = elapsedSinceWatered / 1.8;
-            ctx.save();
-            for (let d = 0; d < 12; d++) {
-              const dProg = ((elapsedSinceWatered * 2.5 + d * 0.1) % 1.0);
-              const dropAngle = -Math.PI * 0.72 + (d * 0.14) - 0.45;
-              const dropDist = (14 + dProg * 32) * z;
-              const dropX = pt.x + Math.cos(dropAngle) * dropDist + Math.sin(d * 2.1) * 3 * z;
-              const dropY = pt.y - 18 * z - Math.sin(dProg * Math.PI) * 16 * z + (dProg * 12 * z);
-              const dAlpha = Math.sin(dProg * Math.PI) * (1 - sprayT * 0.3);
-
-              ctx.fillStyle = `rgba(56, 189, 248, ${dAlpha})`;
-              ctx.beginPath();
-              ctx.arc(dropX, dropY, (1.8 + Math.sin(d) * 0.6) * z, 0, Math.PI * 2);
-              ctx.fill();
-
-              ctx.fillStyle = `rgba(255, 255, 255, ${dAlpha * 0.9})`;
-              ctx.beginPath();
-              ctx.arc(dropX - 0.5 * z, dropY - 0.5 * z, 0.8 * z, 0, Math.PI * 2);
-              ctx.fill();
-            }
-
-            // Expanding base water splash ripples
-            const splashR = ((elapsedSinceWatered * 2) % 1) * 16 * z;
-            ctx.strokeStyle = `rgba(56, 189, 248, ${0.7 * (1 - sprayT)})`;
-            ctx.lineWidth = 1.2 * z;
-            ctx.beginPath();
-            ctx.ellipse(pt.x, pt.y + 2 * z, splashR, splashR * 0.45, 0, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
-          }
-
-          // 2. Red Apples with 8-Second Lifecycle & Smooth Fade-Out
+          // Watered tree: marked with bright red apples & rising water sparkles
           if (isWatered) {
-            let appleAlpha = 1.0;
-            if (elapsedSinceWatered < 0.6) {
-              // Fade / grow into view smoothly in 0.6s
-              appleAlpha = elapsedSinceWatered / 0.6;
-            } else if (elapsedSinceWatered > 6.0) {
-              // Fade out smoothly between second 6 and 8
-              appleAlpha = Math.max(0, (8.0 - elapsedSinceWatered) / 2.0);
-            }
-
-            ctx.save();
-            ctx.globalAlpha = appleAlpha;
-
+            // Bright Red Apples (Buah Apel Merah 🍎) hanging from foliage
             const applePositions = [
               [-11, -34],
               [10, -36],
@@ -2294,10 +2206,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               [5, -26],
             ];
 
-            applePositions.forEach(([ax, ay], aIdx) => {
-              const appleBob = Math.sin(elapsed * 4 + aIdx) * 0.7 * z;
+            applePositions.forEach(([ax, ay]) => {
               const appleX = pt.x + ax * z;
-              const appleY = pt.y + ay * z + appleBob;
+              const appleY = pt.y + ay * z;
 
               // Little brown stem & green leaf
               ctx.strokeStyle = '#451a03';
@@ -2330,14 +2241,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.fill();
             });
 
-            ctx.restore();
-
             // Rising water sparkle particles
             for (let s = 0; s < 3; s++) {
               const sPhase = (elapsed * 2 + s * 1.5) % 3;
               const sY = pt.y - (30 + sPhase * 18) * z;
               const sX = pt.x + Math.sin(elapsed * 3 + s * 2) * 14 * z;
-              ctx.fillStyle = `rgba(56, 189, 248, ${(1 - sPhase / 3) * appleAlpha})`;
+              ctx.fillStyle = `rgba(254, 240, 138, ${1 - sPhase / 3})`;
               ctx.beginPath();
               ctx.arc(sX, sY, 1.5 * z, 0, Math.PI * 2);
               ctx.fill();
@@ -3315,27 +3224,27 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           // Natural leg swing & gentle bobbing (disabled when sitting)
           const legSwing = (av.isMoving && !isSittingNow) ? Math.sin(av.walkFrame) * 3.5 * z : 0;
-          const avY = pt.y + (isSittingNow ? -1.8 * z : (av.isMoving ? -Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0));
+          const avY = pt.y + (isSittingNow ? 3.2 * z : (av.isMoving ? -Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0));
 
           // 1. LEGS & PANTS / SKIRT
           if (isSittingNow) {
-            // SITTING ANIMATION: Legs folded forward resting comfortably over the bench surface
+            // SITTING ANIMATION: Legs folded forward over the bench surface
             ctx.fillStyle = isTeacherAvatar
               ? (isFemale ? '#065f46' : '#1e293b')
               : (isFemale ? (av.pantsColor || '#be185d') : av.pantsColor);
 
-            // Horizontal thighs resting flat on bench plank
-            ctx.fillRect(pt.x - 4 * z, avY - 4 * z, 3.8 * z, 3.2 * z);
-            ctx.fillRect(pt.x + 0.5 * z, avY - 4 * z, 3.8 * z, 3.2 * z);
+            // Horizontal thighs resting on bench
+            ctx.fillRect(pt.x - 4 * z, avY - 5.5 * z, 3.8 * z, 3.5 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY - 5.5 * z, 3.8 * z, 3.5 * z);
 
-            // Vertical calves hanging downward from bench
-            ctx.fillRect(pt.x - 4 * z, avY - 1 * z, 3.2 * z, 4.2 * z);
-            ctx.fillRect(pt.x + 1 * z, avY - 1 * z, 3.2 * z, 4.2 * z);
+            // Vertical calves bent downward
+            ctx.fillRect(pt.x - 4 * z, avY - 2.5 * z, 3.2 * z, 4 * z);
+            ctx.fillRect(pt.x + 1 * z, avY - 2.5 * z, 3.2 * z, 4 * z);
 
-            // Shoes resting right on the ground
+            // Shoes resting on floor
             ctx.fillStyle = isFemale ? (isTeacherAvatar ? '#064e3b' : '#e11d48') : '#0f172a';
-            ctx.fillRect(pt.x - 4.5 * z, avY + 3.2 * z, 4 * z, 2.2 * z);
-            ctx.fillRect(pt.x + 0.8 * z, avY + 3.2 * z, 4 * z, 2.2 * z);
+            ctx.fillRect(pt.x - 4.5 * z, avY + 1.2 * z, 4 * z, 2.2 * z);
+            ctx.fillRect(pt.x + 0.8 * z, avY + 1.2 * z, 4 * z, 2.2 * z);
           } else if (isFemale) {
             if (isTeacherAvatar) {
               // Female Teacher: Elegant tailored long slacks or maxi skirt
@@ -4057,12 +3966,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     if (success) {
       sounds.playRewardXp();
       const remaining = studentPoints - cost;
-      const now = Date.now();
-      setWateredTrees((prev) => ({ ...prev, [treeIdx]: now }));
-      waterSpraysRef.current.push({ treeIndex: treeIdx, startTime: now });
-      setCafeToast(`💧 Pohon berhasil disiram! Buah apel merah ranum tumbuh segar 🍎 (-1 XP) • Sisa: ${remaining} XP`);
+      setWateredTrees((prev) => ({ ...prev, [treeIdx]: Date.now() }));
+      setCafeToast(`🌱 Berhasil menyiram pohon! Kota menjadi makin asri & rindang (-1 XP) • Sisa: ${remaining} XP`);
       playerSpeechRef.current = {
-        text: 'Segar sekali! Pohon berbuah apel 🍎✨',
+        text: 'Segar sekali pohonnya! 🌱✨',
         expiresAt: Date.now() + 4500,
       };
       setTimeout(() => setCafeToast(null), 3500);
@@ -4272,41 +4179,26 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     setSittingSeat(null);
                     setCafeToast('🚶 Berdiri kembali dari kursi taman.');
                     setTimeout(() => setCafeToast(null), 2500);
-                    sendHeartbeatRef.current?.();
                   } else {
                     const seat = nearbyAction.benchId || 'fountain_east';
                     setIsSitting(true);
                     setSittingSeat(seat);
                     if (playerRef.current) {
                       if (seat === 'fountain_east') {
-                        playerRef.current.wx = 1.45;
+                        playerRef.current.wx = 1.25;
                         playerRef.current.wy = 0.0;
-                        playerRef.current.facing = 'down-left';
                       } else if (seat === 'fountain_west') {
-                        playerRef.current.wx = -1.45;
+                        playerRef.current.wx = -1.25;
                         playerRef.current.wy = 0.0;
-                        playerRef.current.facing = 'down-right';
-                      } else if (seat === 'fountain_north') {
-                        playerRef.current.wx = 0.0;
-                        playerRef.current.wy = -1.45;
-                        playerRef.current.facing = 'down-left';
-                      } else if (seat === 'fountain_south') {
-                        playerRef.current.wx = 0.0;
-                        playerRef.current.wy = 1.45;
-                        playerRef.current.facing = 'up-right';
                       } else if (seat === 'literacy') {
                         playerRef.current.wx = -3.7;
                         playerRef.current.wy = 1.8;
-                        playerRef.current.facing = 'down-right';
                       }
                       playerRef.current.targetWx = playerRef.current.wx;
                       playerRef.current.targetWy = playerRef.current.wy;
                       playerRef.current.isMoving = false;
-                      playerRef.current.walkFrame = 0;
-                      sendHeartbeatRef.current?.();
                     }
-                    const name = nearbyAction.benchName || 'bangku taman';
-                    setCafeToast(`🪑 Duduk santai di ${name}.`);
+                    setCafeToast('🪑 Duduk santai di bangku taman.');
                     setTimeout(() => setCafeToast(null), 2500);
                   }
                 }}
