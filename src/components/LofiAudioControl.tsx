@@ -47,7 +47,7 @@ export const LofiAudioControl: React.FC = () => {
           e.preventDefault();
           setShowVolumeSlider((prev) => !prev);
         }}
-        className={`group relative h-8 sm:h-9 px-2.5 sm:px-3 rounded-full backdrop-blur-md border shadow-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0 ${
+        className={`group relative h-7.5 sm:h-9 w-7.5 sm:w-auto px-0 sm:px-3 rounded-full backdrop-blur-md border shadow-lg flex items-center justify-center sm:justify-start gap-1.5 transition active:scale-95 cursor-pointer shrink-0 ${
           isPlaying
             ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
             : 'bg-[#121e2c]/95 border-slate-700/60 text-slate-300 hover:text-white hover:bg-[#1a293b]'
@@ -82,7 +82,7 @@ export const LofiAudioControl: React.FC = () => {
             e.stopPropagation();
             setShowVolumeSlider((prev) => !prev);
           }}
-          className="text-[10px] opacity-70 hover:opacity-100 hover:text-white px-0.5 py-0.5"
+          className="hidden sm:inline-block text-[10px] opacity-70 hover:opacity-100 hover:text-white px-0.5 py-0.5"
           title="Atur Volume Musik"
         >
           ▾

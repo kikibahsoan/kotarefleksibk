@@ -321,6 +321,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   // Remote online players from other devices
   const remotePlayersRef = useRef<Map<string, AvatarData>>(new Map());
   const [onlineCount, setOnlineCount] = useState<number>(1);
+  const sendHeartbeatRef = useRef<(() => void) | null>(null);
 
   // References for render loop
   const onSelectBuildingRef = useRef(onSelectBuilding);
@@ -366,9 +367,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ? new BroadcastChannel('kota_refleksi_presence')
       : null;
 
-    const mySessionId = isTeacher
-      ? `guru_${studentName.replace(/\s+/g, '_').toLowerCase()}`
-      : `siswa_${studentName.replace(/\s+/g, '_').toLowerCase()}`;
+    // Unique persistent client device ID per browser tab/device so different devices never clash
+    let clientDeviceId = '';
+    try {
+      clientDeviceId = sessionStorage.getItem('kota_device_uuid') || '';
+      if (!clientDeviceId) {
+        clientDeviceId = 'dev_' + Math.random().toString(36).substring(2, 8) + '_' + Date.now().toString(36).slice(-4);
+        sessionStorage.setItem('kota_device_uuid', clientDeviceId);
+      }
+    } catch (e) {
+      clientDeviceId = 'dev_' + Math.random().toString(36).substring(2, 8);
+    }
+
+    const mySessionId = `${isTeacher ? 'guru' : 'siswa'}_${studentName.replace(/\s+/g, '_').toLowerCase()}_${clientDeviceId}`;
 
     const handleIncomingOthers = (others: any[]) => {
       if (!isMounted) return;
@@ -392,8 +403,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             roleLabel: rem.roleLabel || (rem.role === 'guru' ? 'GURU DKV' : 'Warga'),
             wx: cornerWx,
             wy: cornerWy,
-            targetWx: typeof rem.wx === 'number' ? rem.wx : cornerWx,
-            targetWy: typeof rem.wy === 'number' ? rem.wy : cornerWy,
+            targetWx: typeof rem.targetWx === 'number' ? rem.targetWx : (typeof rem.wx === 'number' ? rem.wx : cornerWx),
+            targetWy: typeof rem.targetWy === 'number' ? rem.targetWy : (typeof rem.wy === 'number' ? rem.wy : cornerWy),
             speed: rem.speed || 1.35,
             shirtColor: rem.shirtColor || (rem.gender === 'P' ? '#ec4899' : '#2563eb'),
             pantsColor: rem.pantsColor || (rem.gender === 'P' ? '#be185d' : '#1e293b'),
@@ -415,9 +426,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           };
           remotePlayersRef.current.set(rem.id, existing);
         } else {
-          // Update remote position and activity
-          existing.targetWx = typeof rem.wx === 'number' ? rem.wx : existing.targetWx;
-          existing.targetWy = typeof rem.wy === 'number' ? rem.wy : existing.targetWy;
+          // Update remote position and smooth target movement
+          const newTargetWx = typeof rem.targetWx === 'number' ? rem.targetWx : (typeof rem.wx === 'number' ? rem.wx : existing.targetWx);
+          const newTargetWy = typeof rem.targetWy === 'number' ? rem.targetWy : (typeof rem.wy === 'number' ? rem.wy : existing.targetWy);
+          existing.targetWx = newTargetWx;
+          existing.targetWy = newTargetWy;
+          existing.speed = rem.speed || existing.speed;
+
+          // If remote player is far from target (> 4.5 tiles), snap wx/wy so they catch up properly
+          const distFromCurrent = Math.hypot(existing.wx - (typeof rem.wx === 'number' ? rem.wx : newTargetWx), existing.wy - (typeof rem.wy === 'number' ? rem.wy : newTargetWy));
+          if (distFromCurrent > 4.5) {
+            existing.wx = typeof rem.wx === 'number' ? rem.wx : newTargetWx;
+            existing.wy = typeof rem.wy === 'number' ? rem.wy : newTargetWy;
+          }
+
           existing.isSitting = Boolean(rem.isSitting);
           existing.sittingSeat = rem.sittingSeat;
           existing.isFishing = Boolean(rem.isFishing);
@@ -499,6 +521,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       }
     };
 
+    // Store instant trigger in ref so movements can be immediately synced
+    sendHeartbeatRef.current = sendHeartbeat;
+
     if (presenceChannel) {
       presenceChannel.onmessage = (event) => {
         if (event.data?.type === 'presence_update' && event.data.player) {
@@ -507,10 +532,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       };
     }
 
-    const interval = setInterval(sendHeartbeat, 1600);
+    const interval = setInterval(sendHeartbeat, 1000);
     sendHeartbeat();
 
     const onUnload = () => {
+      sendHeartbeatRef.current = null;
       try {
         navigator.sendBeacon('/api/presence/leave', JSON.stringify({ id: mySessionId }));
       } catch (e) {}
@@ -519,6 +545,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     return () => {
       isMounted = false;
+      sendHeartbeatRef.current = null;
       clearInterval(interval);
       if (presenceChannel) presenceChannel.close();
       window.removeEventListener('beforeunload', onUnload);
@@ -1065,6 +1092,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         clientY = e.touches[0].clientY;
       }
       handlePointerAction(clientX, clientY);
+      // Immediately notify other devices of new position and movement
+      sendHeartbeatRef.current?.();
     };
 
     const onPointerMove = (e: MouseEvent) => {
@@ -4491,9 +4520,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       )}
 
       {/* ONLINE CITIZENS BADGE (Real-Time Device Presence) */}
-      <div className="absolute top-20 sm:top-24 left-4 z-20 pointer-events-none">
-        <div className="bg-[#121e2c]/90 backdrop-blur-md border border-emerald-500/40 rounded-full px-3 py-1 text-white text-[11px] font-bold shadow-lg flex items-center gap-2 animate-fade-in-up">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <div className="absolute top-13 sm:top-15 left-2.5 sm:left-4 z-20 pointer-events-none">
+        <div className="bg-[#121e2c]/90 backdrop-blur-md border border-emerald-500/40 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5 sm:gap-2 animate-fade-in-up">
+          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span className="text-emerald-300 font-mono">{onlineCount}</span>
           <span className="text-slate-300">Warga Online</span>
         </div>

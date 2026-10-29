@@ -661,14 +661,15 @@ export default function App() {
       />
 
       {/* TOP HEADER OVERLAY (Clean & Perfectly Responsive on Mobile) */}
+      {/* TOP HEADER OVERLAY (Clean & Perfectly Responsive on Mobile, Never Overlaps) */}
       {!activeBuilding && !isQuickNavOpen && (
-        <header className="absolute top-2.5 sm:top-4 left-2.5 sm:left-5 right-2.5 sm:right-5 flex items-center justify-between pointer-events-none z-20 gap-1.5 sm:gap-2">
-          {/* Left: < Back button and Profile Capsule */}
-          <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto min-w-0">
+        <header className="absolute top-2 sm:top-3.5 left-2 sm:left-4 right-2 sm:right-4 flex items-center justify-between pointer-events-none z-20 gap-1 sm:gap-2 max-w-full">
+          {/* Left: < Back button, Profile Capsule, and Teacher Ruang Guru button */}
+          <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto min-w-0 shrink">
             {/* Back button */}
             <button
               onClick={handleLogout}
-              className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Ganti Siswa / Keluar"
               aria-label="Kembali"
             >
@@ -676,67 +677,66 @@ export default function App() {
             </button>
 
             {/* Profile Capsule */}
-            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 flex items-center gap-1.5 sm:gap-2 shadow-xl min-w-0">
+            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 flex items-center gap-1 sm:gap-1.5 shadow-xl min-w-0 shrink">
               {/* Circular Avatar with gold border */}
-              <div className="w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[10px] sm:text-[11px] shadow-sm shrink-0">
+              <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[10px] sm:text-[11px] shadow-sm shrink-0">
                 {student.isTeacher ? (student.gender === 'P' ? '👩‍🏫' : '👨‍🏫') : student.gender === 'P' ? '👧' : '👦'}
               </div>
 
-              {/* Username Handle */}
-              <span className="font-extrabold text-[11px] sm:text-sm text-white max-w-[68px] sm:max-w-[150px] truncate leading-none">
+              {/* Username Handle (Responsively Truncated so it never overlaps) */}
+              <span className="font-extrabold text-[11px] sm:text-xs text-white max-w-[46px] min-[360px]:max-w-[62px] min-[420px]:max-w-[95px] sm:max-w-[130px] md:max-w-[160px] truncate leading-none">
                 {studentHandle}
               </span>
 
               {/* Teacher Badge if teacher */}
               {student.isTeacher && (
-                <span className="hidden min-[480px]:inline-block px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-400/40 shrink-0">
+                <span className="hidden min-[480px]:inline-block px-1.5 py-0.5 rounded text-[8.5px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-400/40 shrink-0">
                   GURU
                 </span>
               )}
 
               {/* Gold Coin & Saldo */}
-              <div className="flex items-center gap-1 font-bold text-[11px] sm:text-xs text-amber-400 font-mono shrink-0">
+              <div className="flex items-center gap-0.5 font-bold text-[10.5px] sm:text-xs text-amber-400 font-mono shrink-0">
                 <span>🪙</span>
                 <span>{student.points}</span>
-                <span className="hidden sm:inline font-sans text-[11px] text-slate-400 font-normal">saldo (XP)</span>
-                <span className="sm:hidden text-[9px] text-amber-300 font-sans">XP</span>
+                <span className="hidden md:inline font-sans text-[10px] text-slate-400 font-normal ml-0.5">XP</span>
               </div>
             </div>
 
-            {/* Teacher Ruang Guru Quick Button */}
+            {/* Teacher Ruang Guru Quick Button (Compact 28px circle on mobile, expanded pill on sm+) */}
             {student.isTeacher && (
               <button
                 onClick={() => setIsTeacherModalOpen(true)}
-                className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-extrabold text-[10px] sm:text-xs shadow-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer border border-amber-300/40 shrink-0"
+                className="w-7.5 h-7.5 sm:w-auto sm:px-2.5 sm:py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-extrabold text-[10.5px] sm:text-xs shadow-xl flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer border border-amber-300/40 shrink-0"
                 title="Buka Ruang Guru (Panel Pengajar)"
+                aria-label="Ruang Guru"
               >
                 <span>📋</span>
                 <span className="hidden sm:inline">Ruang Guru</span>
-                <span className="sm:hidden">Guru</span>
               </button>
             )}
           </div>
 
           {/* Right: Clock • Class • Chart/Nav • Bell • Lo-Fi • Audio • Day/Night */}
-          <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto shrink-0 ml-auto">
             {/* Live WITA Clock Pill & Subject for teacher */}
-            <div className="flex items-center gap-1 sm:gap-1.5 bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 shadow-xl text-[10px] sm:text-xs font-bold text-amber-400 font-mono shrink-0">
-              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" />
+            <div className="flex items-center gap-1 bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 shadow-xl text-[10px] sm:text-xs font-bold text-amber-400 font-mono shrink-0">
+              <Clock className="w-3 h-3 text-amber-400 shrink-0" />
               <span>{currentTimeWita}</span>
               {student.isTeacher && student.subject && (
-                <span className="hidden lg:inline ml-1 pl-1.5 border-l border-slate-600 text-emerald-300 truncate max-w-[210px] font-sans text-[11px]">
+                <span className="hidden xl:inline ml-1 pl-1.5 border-l border-slate-600 text-emerald-300 truncate max-w-[130px] font-sans text-[10px]">
                   {student.subject}
                 </span>
               )}
             </div>
 
-            {/* Class Badge Pill (DKV for teacher, Class for student) */}
+            {/* Class Badge Pill (Hidden on narrowest screens < 370px to preserve space) */}
             <div
-              className="flex bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-2 sm:px-3 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-xl text-[10px] sm:text-xs font-bold text-emerald-400 shrink-0"
+              className="hidden min-[370px]:flex bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 shadow-xl text-[10px] sm:text-xs font-bold text-emerald-400 shrink-0"
               title={student.isTeacher ? 'DKV SMKN 2 Gorontalo' : student.className}
             >
-              <GraduationCap className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
-              <span className="truncate max-w-[55px] sm:max-w-none">
+              <GraduationCap className="w-3 h-3 text-emerald-400 shrink-0" />
+              <span className="truncate max-w-[48px] sm:max-w-none">
                 {student.isTeacher ? 'DKV' : (student.className.includes('DKV 2') ? 'X DKV 2' : student.className.includes('DKV 3') ? 'X DKV 3' : 'XII RPL 1')}
               </span>
             </div>
@@ -744,17 +744,17 @@ export default function App() {
             {/* Chart / Quick Navigation */}
             <button
               onClick={() => setIsQuickNavOpen(true)}
-              className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Daftar Gedung & Peta Kota"
               aria-label="Peta Gedung"
             >
               <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400" />
             </button>
 
-            {/* Notification / Balai Kota Announcements */}
+            {/* Balai Kota Announcements (Bell) */}
             <button
               onClick={() => setActiveBuilding('balai_kota')}
-              className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="hidden min-[480px]:flex w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Pengumuman & Misi Balai Kota"
               aria-label="Pengumuman"
             >
@@ -764,14 +764,14 @@ export default function App() {
             {/* Lo-Fi Background Music Controller */}
             <LofiAudioControl />
 
-            {/* Audio Toggle (Hidden on small mobile to avoid crowd) */}
+            {/* Audio Toggle (Desktop only) */}
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
-              className="hidden sm:flex w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="hidden md:flex w-8 h-8 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title={audioEnabled ? 'Matikan Suara Chime' : 'Nyalakan Suara Chime'}
               aria-label="Toggle Suara"
             >
-              {audioEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+              {audioEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
             </button>
 
             {/* Day / Night Toggle */}
@@ -779,7 +779,7 @@ export default function App() {
               onClick={() => {
                 setTimeOfDay((prev) => (prev === 'day' ? 'night' : 'day'));
               }}
-              className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0"
+              className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0"
               title={timeOfDay === 'day' ? 'Waktu Pagi (Klik untuk ganti ke Malam)' : 'Waktu Malam (Klik untuk ganti ke Pagi)'}
               aria-label="Waktu Kota"
             >
