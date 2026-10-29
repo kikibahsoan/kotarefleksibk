@@ -480,7 +480,7 @@ interface ServerOnlinePlayer {
 const onlinePlayersMap = new Map<string, ServerOnlinePlayer>();
 
 function purgeInactivePlayers() {
-  const timeoutMs = 15000; // 15 seconds of inactivity
+  const timeoutMs = 12000; // 12 seconds of inactivity
   const now = Date.now();
   for (const [id, player] of onlinePlayersMap.entries()) {
     if (now - player.lastSeen > timeoutMs) {
@@ -489,8 +489,8 @@ function purgeInactivePlayers() {
   }
 }
 
-// Inactive cleanup interval
-setInterval(purgeInactivePlayers, 5000);
+// Inactive cleanup interval (check every 3 seconds)
+setInterval(purgeInactivePlayers, 3000);
 
 // Heartbeat & sync player position/state across all devices
 app.post('/api/presence/heartbeat', (req, res) => {
