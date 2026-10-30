@@ -170,7 +170,7 @@ export default function App() {
 
         if (incomingFromOthers.length > 0) {
           // Display the newest incoming message in bubble & play gentle chime
-          setLatestChat(incomingFromOthers[0]);
+          setLatestChat(incomingFromOthers[incomingFromOthers.length - 1]);
           playChimeSound();
         }
 
@@ -659,6 +659,7 @@ export default function App() {
         onSelectBuilding={handleSelectBuilding}
         activeBuilding={activeBuilding}
         newMateriBuildingIds={newMateriBuildingIds}
+        studentId={student.id}
         studentName={student.name}
         studentGender={student.gender}
         isTeacher={student.isTeacher}
