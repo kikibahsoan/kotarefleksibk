@@ -37,7 +37,7 @@ export const MonumenWargaChatModal: React.FC<PapanInformasiModalProps> = ({
       date: 'Hari ini',
       urgent: true,
       content:
-        'Siswa X DKV 2 dan X DKV 3 diharapkan menyelesaikan modul pembelajaran di Perpustakaan dan mengisi refleksi mandiri di Taman Refleksi sebelum akhir pekan ini. Evaluasi AI Mentor akan langsung diproses setelah pengisian.',
+        'Siswa X DKV 2 dan X DKV 3 diharapkan menyelesaikan modul pembelajaran di Perpustakaan Kampus dan mengisi refleksi mandiri di Pusat Refleksi (+3 Poin) sebelum akhir pekan ini. Evaluasi AI Mentor akan langsung diproses setelah pengisian.',
     },
     {
       id: 'ann-2',
@@ -46,7 +46,7 @@ export const MonumenWargaChatModal: React.FC<PapanInformasiModalProps> = ({
       date: '2 hari lalu',
       urgent: false,
       content:
-        'Uji pemahamanmu tentang antrean FIFO dan Shortest Job First di Bengkel Latihan. Dapatkan tambahan +30 XP dan lencana khusus jika mencapai skor sempurna!',
+        'Uji pemahamanmu tentang antrean FIFO dan Shortest Job First di Lab DKV & Tefa. Dapatkan tambahan +1 XP per soal benar dan lencana khusus jika mencapai skor sempurna!',
     },
     {
       id: 'ann-3',
@@ -149,7 +149,7 @@ export const MonumenWargaChatModal: React.FC<PapanInformasiModalProps> = ({
                   </p>
                 </div>
                 <div className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-xl text-xs font-bold border border-emerald-500/30">
-                  +30 XP per Refleksi
+                  +3 Poin per Refleksi
                 </div>
               </div>
 
@@ -215,7 +215,7 @@ export const MonumenWargaChatModal: React.FC<PapanInformasiModalProps> = ({
                     <span className="font-bold text-white">09:15 - 10:45</span>
                   </li>
                   <li className="flex items-center justify-between py-1">
-                    <span>Pengisian Refleksi di Taman Refleksi</span>
+                    <span>Pengisian Refleksi di Pusat Refleksi</span>
                     <span className="font-bold text-emerald-400">11:00 - Selesai</span>
                   </li>
                 </ul>

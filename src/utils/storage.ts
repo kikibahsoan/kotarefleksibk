@@ -104,16 +104,37 @@ export const StorageService = {
       }
       return null;
     }
+    if (student) {
+      const migratedKey = `kota_xp_v2_${student.id}`;
+      if (!localStorage.getItem(migratedKey)) {
+        const initialPoints = student.isTeacher ? 10 : 5;
+        const updated = { ...student, points: initialPoints };
+        try {
+          localStorage.setItem(migratedKey, '1');
+        } catch (e) {}
+        safeSet(STORAGE_KEYS.CURRENT_USER, updated);
+        return updated;
+      }
+    }
     return student;
   },
 
   setCurrentStudent(student: Student | null): void {
     safeSet(STORAGE_KEYS.CURRENT_USER, student);
+    if (student) {
+      try {
+        localStorage.setItem(`kota_xp_v2_${student.id}`, '1');
+      } catch (e) {}
+    }
   },
 
   getMateri(): Materi[] {
     const items = safeGet<Materi[]>(STORAGE_KEYS.MATERI, INITIAL_MATERI);
-    if (!items || items.length === 0 || !items.some((m) => m.id.startsWith('materi-bk-'))) {
+    if (
+      !items ||
+      items.length < 5 ||
+      !items.some((m) => m.id === 'materi-bk-01' && m.content.includes('BAB 1 —'))
+    ) {
       safeSet(STORAGE_KEYS.MATERI, INITIAL_MATERI);
       return INITIAL_MATERI;
     }
@@ -159,7 +180,11 @@ export const StorageService = {
 
   getQuizQuestions(): QuizQuestion[] {
     const items = safeGet<QuizQuestion[]>(STORAGE_KEYS.QUIZ, INITIAL_QUIZ);
-    if (!items || items.length === 0 || !items.some((q) => q.id.startsWith('q-bk-'))) {
+    if (
+      !items ||
+      items.length < 25 ||
+      !items.some((q) => q.id === 'q-bk-1a')
+    ) {
       safeSet(STORAGE_KEYS.QUIZ, INITIAL_QUIZ);
       return INITIAL_QUIZ;
     }
@@ -177,8 +202,17 @@ export const StorageService = {
 
   getStudents(): Student[] {
     const items = safeGet<Student[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
-    if (!items || items.length < 50 || items.some((s) => s.className.includes('DKV 1'))) {
+    const listMigrated = localStorage.getItem('kota_students_xp_v2');
+    if (
+      !items ||
+      items.length < 50 ||
+      items.some((s) => s.className.includes('DKV 1')) ||
+      !listMigrated
+    ) {
       safeSet(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
+      try {
+        localStorage.setItem('kota_students_xp_v2', '1');
+      } catch (e) {}
       return INITIAL_STUDENTS;
     }
     return items;

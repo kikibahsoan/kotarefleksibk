@@ -1,113 +1,154 @@
-import React, { useState, useEffect } from 'react';
-import { X, CheckCircle2, Award, Target, Sparkles, Gift, ArrowRight } from 'lucide-react';
+import React from 'react';
+import { X, CheckCircle2, Award, Target, Sparkles, ArrowRight, Shuffle } from 'lucide-react';
 import { sounds } from '../../utils/audio';
+import { BuildingId } from '../../types/index.ts';
+
+export interface TownMissionDef {
+  id: string;
+  title: string;
+  desc: string;
+  xp: number;
+  targetId: BuildingId;
+  icon: string;
+}
+
+export const TOWN_MISSION_POOL: TownMissionDef[] = [
+  {
+    id: 'm_refleksi',
+    title: 'Kirim Refleksi di Pusat Refleksi',
+    desc: 'Tulis dan kirim refleksi pembelajaran di Pusat Refleksi (+3 XP)',
+    xp: 3,
+    targetId: 'taman_refleksi',
+    icon: '🌍',
+  },
+  {
+    id: 'm_bengkel',
+    title: 'Tuntaskan 5 Soal Berjenjang di Bengkel Latihan',
+    desc: 'Jawab soal kuis berjenjang (5 detik/soal) di Bengkel Latihan',
+    xp: 3,
+    targetId: 'bengkel_latihan',
+    icon: '🛠️',
+  },
+  {
+    id: 'm_perpustakaan',
+    title: 'Pelajari Modul di Perpustakaan',
+    desc: 'Buka dan baca materi ajar Berpikir Komputasional di Perpustakaan Kampus',
+    xp: 3,
+    targetId: 'perpustakaan',
+    icon: '📚',
+  },
+  {
+    id: 'm_chat',
+    title: 'Sapa Warga di Obrolan Kota',
+    desc: 'Kirim pesan sapaan atau insight belajar ke obrolan langsung warga kota',
+    xp: 3,
+    targetId: 'monumen_warga',
+    icon: '💬',
+  },
+  {
+    id: 'm_pos',
+    title: 'Kirim Pesan Konsultasi di Kantor Pos',
+    desc: 'Kirim surat pertanyaan atau progres belajar ke Guru via Kantor Pos Kilat',
+    xp: 3,
+    targetId: 'kantor_pos',
+    icon: '📮',
+  },
+  {
+    id: 'm_mentor',
+    title: 'Simak Evaluasi di Studio ON AIR',
+    desc: 'Kunjungi Studio ON AIR (Menara Mentor) untuk menyimak umpan balik AI Mentor',
+    xp: 3,
+    targetId: 'menara_mentor',
+    icon: '🎙️',
+  },
+  {
+    id: 'm_papan',
+    title: 'Baca Pengumuman di Papan Informasi',
+    desc: 'Buka Papan Informasi Refleksia untuk mempelajari buletin & tips metakognisi',
+    xp: 3,
+    targetId: 'monumen_warga',
+    icon: '📋',
+  },
+  {
+    id: 'm_pasar',
+    title: 'Cek Progres Lencana di Toko Poin',
+    desc: 'Kunjungi Pasar Prestasi (Toko Poin) untuk mengecek koleksi lencana warga',
+    xp: 3,
+    targetId: 'pasar_prestasi',
+    icon: '🎪',
+  },
+];
+
+export function getOrInitUserRandomMissions(userId: string, forceNew = false): TownMissionDef[] {
+  const storageKey = `kota_random_missions_v2_${userId}`;
+  if (!forceNew) {
+    try {
+      const savedIds = localStorage.getItem(storageKey);
+      if (savedIds) {
+        const parsed: string[] = JSON.parse(savedIds);
+        const mapped = parsed
+          .map((id) => TOWN_MISSION_POOL.find((m) => m.id === id))
+          .filter((m): m is TownMissionDef => Boolean(m));
+        if (mapped.length === 5) {
+          return mapped;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Shuffle pool using Fisher-Yates and select 5 random missions
+  const poolCopy = [...TOWN_MISSION_POOL];
+  for (let i = poolCopy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [poolCopy[i], poolCopy[j]] = [poolCopy[j], poolCopy[i]];
+  }
+  const selected = poolCopy.slice(0, 5);
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(selected.map((m) => m.id)));
+  } catch (e) {}
+  return selected;
+}
+
+export function getCompletedMissionIds(userId: string): string[] {
+  const storageKey = `kota_completed_missions_v2_${userId}`;
+  try {
+    const raw = localStorage.getItem(storageKey);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveCompletedMissionIds(userId: string, ids: string[]): void {
+  const storageKey = `kota_completed_missions_v2_${userId}`;
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(ids));
+  } catch (e) {}
+}
 
 interface BalaiKotaModalProps {
   studentName?: string;
   studentXp?: number;
   onClose: () => void;
-  onOpenBuilding?: (id: any) => void;
-  onNavigateBuilding?: (id: any) => void;
+  onOpenBuilding?: (id: BuildingId) => void;
+  onNavigateBuilding?: (id: BuildingId) => void;
   objectives?: any[];
   materis?: any[];
-  onAddPoints?: (amount: number, reason: string) => void;
-  reflectionsCount?: number;
-  hasSharedChatToday?: boolean;
+  assignedMissions: TownMissionDef[];
+  completedMissionIds: string[];
 }
 
 export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
   studentName = 'Siswa',
-  studentXp = 100,
+  studentXp = 5,
   onClose,
   onOpenBuilding,
   onNavigateBuilding,
-  onAddPoints,
-  reflectionsCount = 0,
-  hasSharedChatToday = false,
+  assignedMissions,
+  completedMissionIds,
 }) => {
   const openTarget = onNavigateBuilding || onOpenBuilding || (() => {});
-  const todayDateStr = new Date().toISOString().slice(0, 10);
-  const storageKey = `kota_missions_claimed_${studentName}_${todayDateStr}`;
-
-  // Keep track of claimed missions for today (auto-resets every 24h as date changes)
-  const [claimedMissions, setClaimedMissions] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(claimedMissions));
-    } catch (e) {}
-  }, [claimedMissions, storageKey]);
-
-  const dailyMissions = [
-    {
-      id: 'm-1',
-      title: 'Tulis Jurnal Refleksi 4F',
-      desc: 'Isi Facts, Feelings, Findings, Future di Perpustakaan atau Taman Refleksi',
-      xp: 30,
-      targetId: 'taman_refleksi',
-      icon: '📚',
-      isReadyToClaim: reflectionsCount > 0,
-    },
-    {
-      id: 'm-2',
-      title: 'Mancing Ide & Meditasi Refleksi',
-      desc: 'Tangkap inspirasi mindful di Kolam Pancing samping Balai Kota',
-      xp: 25,
-      targetId: 'kolam_pancing',
-      icon: '🎣',
-      isReadyToClaim: true, // Can be completed directly
-    },
-    {
-      id: 'm-3',
-      title: 'Sapa Warga di Kafe Refleksi',
-      desc: 'Kirim pesan atau insight belajarmu ke obrolan warga kota',
-      xp: 15,
-      targetId: 'kafe_refleksi',
-      icon: '☕',
-      isReadyToClaim: hasSharedChatToday,
-    },
-    {
-      id: 'm-4',
-      title: 'Cek Papan Info & Bonus Harian',
-      desc: 'Pelajari tips metakognisi hari ini dan ambil bonus absensi warga',
-      xp: 10,
-      targetId: 'papan_informasi',
-      icon: '📋',
-      isReadyToClaim: true, // Daily login/attendance bonus
-    },
-    {
-      id: 'm-5',
-      title: 'Asah Logika di Bengkel Latihan',
-      desc: 'Selesaikan tantangan kuis cepat Berpikir Komputasional',
-      xp: 20,
-      targetId: 'bengkel_latihan',
-      icon: '🛠️',
-      isReadyToClaim: false,
-    },
-  ];
-
-  const handleClaimMission = (missionId: string, xpAmount: number, title: string) => {
-    if (claimedMissions.includes(missionId)) return;
-
-    sounds.playRewardXp();
-    setClaimedMissions((prev) => [...prev, missionId]);
-
-    if (onAddPoints) {
-      onAddPoints(xpAmount, title);
-    }
-
-    setToastMessage(`🎉 Misi "${title}" tuntas! +${xpAmount} XP berhasil ditambahkan ke saldo!`);
-    setTimeout(() => setToastMessage(null), 4000);
-  };
+  const completedCount = assignedMissions.filter((m) => completedMissionIds.includes(m.id)).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
@@ -123,7 +164,7 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
                   Pusat Kota Refleksia
                 </span>
-                <span className="text-xs text-slate-400">Gedung Utama</span>
+                <span className="text-xs text-slate-400">Daftar Misi Warga</span>
               </div>
               <h2 className="text-xl font-black text-white font-['Outfit']">Balai Kota Refleksia</h2>
             </div>
@@ -137,53 +178,52 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
           </button>
         </div>
 
-        {/* Success Toast Banner */}
-        {toastMessage && (
-          <div className="mt-4 p-3 rounded-2xl bg-emerald-950/80 border border-emerald-400/50 text-emerald-200 text-xs sm:text-sm font-bold flex items-center gap-2 shadow-lg animate-in fade-in slide-in-from-top-2">
-            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 animate-spin-slow" />
-            <span className="flex-1">{toastMessage}</span>
-          </div>
-        )}
-
         {/* Civic Status Card with Saldo (XP) */}
         <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-blue-900/40 via-indigo-900/40 to-slate-900/40 border border-blue-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="text-xs text-blue-200 font-semibold flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Status Warga Teladan
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Status Warga Refleksia
             </div>
             <h4 className="text-lg font-bold text-white mt-0.5">{studentName}</h4>
-            <p className="text-xs text-slate-300">
-              Tuntaskan misi harian untuk menambah saldo XP kamu. Saldo XP bisa dipakai belanja kopi, roti, dan eskrim!
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Setiap misi bernilai <strong className="text-amber-300">+3 XP</strong>. Tidak ada klaim instan — tuntaskan langsung aktivitas misinya di kota dan XP otomatis masuk ke saldomu!
             </p>
           </div>
           <div className="flex items-center gap-3 bg-black/40 px-4 py-2.5 rounded-2xl border border-amber-400/40 shrink-0 shadow-inner">
             <Award className="w-8 h-8 text-amber-400" />
             <div>
-              <div className="text-[11px] text-slate-300 font-medium">Saldo Dompet Warga</div>
+              <div className="text-[11px] text-slate-300 font-medium">Saldo Koin (XP)</div>
               <div className="text-lg font-black text-amber-300 font-mono">🪙 {studentXp} XP</div>
             </div>
           </div>
         </div>
 
-        {/* Daily Missions */}
+        {/* Randomized Missions List (No Manual Claim Button) */}
         <div className="mt-6">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Target className="w-4 h-4 text-cyan-400" /> Misi Harian Berhadiah XP
+              <Target className="w-4 h-4 text-cyan-400" /> Daftar Misi Kota (Acak / Random)
             </h3>
-            <span className="text-[11px] text-cyan-300 font-medium">Auto-reset setiap 24 Jam</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold flex items-center gap-1">
+                <Shuffle className="w-3 h-3" /> Misi Random • +3 XP / Misi
+              </span>
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+                {completedCount}/{assignedMissions.length} Tuntas
+              </span>
+            </div>
           </div>
 
           <div className="space-y-2.5">
-            {dailyMissions.map((mission) => {
-              const isClaimed = claimedMissions.includes(mission.id);
+            {assignedMissions.map((mission, idx) => {
+              const isCompleted = completedMissionIds.includes(mission.id);
 
               return (
                 <div
                   key={mission.id}
                   className={`p-3 sm:p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    isClaimed
-                      ? 'bg-emerald-950/20 border-emerald-500/30 opacity-85'
+                    isCompleted
+                      ? 'bg-emerald-950/30 border-emerald-500/40'
                       : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                 >
@@ -192,15 +232,18 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
                       {mission.icon}
                     </div>
                     <div className="min-w-0">
-                      <h5 className="text-sm font-bold text-white flex items-center gap-2">
-                        <span>{mission.title}</span>
-                        {isClaimed && (
-                          <span className="text-[10px] font-semibold text-emerald-400 flex items-center gap-0.5 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/30">
-                            <CheckCircle2 className="w-3 h-3" /> Selesai (+XP Masuk)
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                          Misi #{idx + 1}
+                        </span>
+                        <h5 className="text-sm font-bold text-white">{mission.title}</h5>
+                        {isCompleted && (
+                          <span className="text-[10px] font-semibold text-emerald-300 flex items-center gap-1 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/30">
+                            <CheckCircle2 className="w-3 h-3" /> Tuntas (+3 XP Masuk Otomatis)
                           </span>
                         )}
-                      </h5>
-                      <p className="text-xs text-slate-300 leading-relaxed mt-0.5">{mission.desc}</p>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed mt-1">{mission.desc}</p>
                     </div>
                   </div>
 
@@ -209,18 +252,11 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
                       +{mission.xp} XP
                     </span>
 
-                    {isClaimed ? (
-                      <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700 cursor-default">
-                        Sudah Diklaim
+                    {isCompleted ? (
+                      <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-600/40 flex items-center gap-1 cursor-default">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Misi Tuntas</span>
                       </span>
-                    ) : mission.isReadyToClaim ? (
-                      <button
-                        onClick={() => handleClaimMission(mission.id, mission.xp, mission.title)}
-                        className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 shadow-md shadow-amber-500/30 border border-yellow-300 transition active:scale-95 cursor-pointer flex items-center gap-1 animate-pulse"
-                      >
-                        <Gift className="w-3.5 h-3.5" />
-                        <span>Klaim +{mission.xp} XP</span>
-                      </button>
                     ) : (
                       <button
                         onClick={() => {
@@ -228,10 +264,10 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
                           onClose();
                           openTarget(mission.targetId);
                         }}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition active:scale-95 shadow-sm flex items-center gap-1 cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition active:scale-95 shadow-sm flex items-center gap-1.5 cursor-pointer"
                       >
-                        <span>Kerjakan</span>
-                        <ArrowRight className="w-3 h-3" />
+                        <span>Kerjakan Misi</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
@@ -244,3 +280,4 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
     </div>
   );
 };
+

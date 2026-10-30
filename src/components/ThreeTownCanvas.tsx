@@ -35,10 +35,20 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'perpustakaan', name: 'Perpustakaan Kampus', tagline: 'Gedung Biru & Materi', position: [-4.2, 0, 0], color: 0x10b981, icon: '📚' },
   { id: 'pasar_prestasi', name: 'Toko Poin', tagline: 'Lencana & Hadiah', position: [-2.8, 0, 2.8], color: 0x06b6d4, icon: '🎪' },
   { id: 'kantor_pos', name: 'Kantor Pos Kilat', tagline: 'Kirim Pesan ke Guru', position: [2.8, 0, -2.8], color: 0xef4444, icon: '📮' },
-  { id: 'taman_refleksi', name: 'Taman Refleksi', tagline: 'Tulis Jurnal Refleksi', position: [-2.8, 0, -2.8], color: 0xec4899, icon: '🌸' },
+  { id: 'taman_refleksi', name: 'Pusat Refleksi', tagline: 'Tulis Jurnal Refleksi (+3 Poin)', position: [-2.8, 0, -2.8], color: 0xd97706, icon: '🌍' },
   { id: 'bengkel_latihan', name: 'Lab DKV & Tefa', tagline: 'Tower Kontrol & Kuis', position: [2.8, 0, 2.8], color: 0xf59e0b, icon: '🛠️' },
   { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
 ];
+
+export type EmoteType = 'love' | 'wave' | 'laugh' | 'dance';
+
+export interface ActiveEmote {
+  type: EmoteType;
+  icon: string;
+  label: string;
+  startTime: number;
+  expiresAt: number;
+}
 
 interface AvatarData {
   id: string;
@@ -64,11 +74,15 @@ interface AvatarData {
   anchorX?: number;
   anchorY?: number;
   wanderRadius?: number;
+  patrolWaypoints?: [number, number][];
+  waypointIndex?: number;
   speeches?: string[];
   isSitting?: boolean;
   sittingSeat?: string;
   isFishing?: boolean;
+  fishingStartTime?: number;
   heldItem?: 'kopi' | 'roti' | 'eskrim' | null;
+  activeEmote?: ActiveEmote | null;
   isOnlineRemote?: boolean;
   spawnTime?: number;
   lastPing?: number;
@@ -107,16 +121,16 @@ export const TREES_LIST: [number, number][] = [
   [6.4, 2.2],
   [6.0, 4.4],
   [6.0, -4.4],
-  // Mid-park groves
+  // Mid-park groves (tree moved from [3.8, 3.8] to [-0.5, 2.4] to clear view for Toko Roti & Kafe behind Lab DKV)
   [-5.2, -1.8],
   [5.2, 1.8],
   [-3.8, 3.4],
-  [3.8, 3.8],
-  // Central park trees
-  [-1.4, -1.4],
-  [1.4, -1.4],
-  [-1.4, 1.4],
-  [1.4, 1.4],
+  [-0.5, 2.4],
+  // Central park trees (spaced around the 8 fountain benches)
+  [-1.72, -1.72],
+  [1.72, -1.72],
+  [-1.72, 1.72],
+  [1.72, 1.72],
 ];
 
 export const STREET_LAMPS_LIST: [number, number][] = [
@@ -149,7 +163,7 @@ export const STREET_LAMPS_LIST: [number, number][] = [
   [-3.0, 3.0],
   [3.0, 3.0],
   [-5.0, -5.0],
-  [5.0, 5.0],
+  [5.45, 4.55],
 ];
 
 export interface EntryConfirmation {
@@ -179,12 +193,12 @@ export const SOLID_BUILDING_OBSTACLES: SolidObstacle[] = [
   { minWx: -3.6, maxWx: -2.0, minWy: 2.0, maxWy: 3.6 },
   // Kantor Pos
   { minWx: 2.0, maxWx: 3.6, minWy: -3.6, maxWy: -2.0 },
-  // Taman Refleksi (Gazebo & Pagoda)
+  // Taman Refleksi (Pusat Refleksi)
   { minWx: -3.6, maxWx: -2.0, minWy: -3.6, maxWy: -2.0 },
   // Lab DKV & Bengkel
   { minWx: 2.0, maxWx: 3.6, minWy: 2.0, maxWy: 3.6 },
-  // Toko Roti & Kafe
-  { minWx: -1.1, maxWx: 0.1, minWy: 1.9, maxWy: 2.9 },
+  // Toko Roti & Kafe (Di ujung kota belakang Lab DKV)
+  { minWx: 4.05, maxWx: 5.25, minWy: 4.05, maxWy: 5.05 },
 ];
 
 export const isSolidCollision = (wx: number, wy: number, padding: number = 0.16): boolean => {
@@ -249,6 +263,24 @@ export type BenchId =
   | 'fountain_4'
   | 'fountain_4_a'
   | 'fountain_4_b'
+  | 'fountain_5'
+  | 'fountain_5_a'
+  | 'fountain_5_b'
+  | 'fountain_6'
+  | 'fountain_6_a'
+  | 'fountain_6_b'
+  | 'fountain_7'
+  | 'fountain_7_a'
+  | 'fountain_7_b'
+  | 'fountain_8'
+  | 'fountain_8_a'
+  | 'fountain_8_b'
+  | 'literacy_1'
+  | 'literacy_1_a'
+  | 'literacy_1_b'
+  | 'literacy_2'
+  | 'literacy_2_a'
+  | 'literacy_2_b'
   | 'campfire_1'
   | 'campfire_1_a'
   | 'campfire_1_b'
@@ -274,7 +306,19 @@ export interface TwoPersonSeatSlot {
 }
 
 export interface TwoPersonBenchGroup {
-  groupId: 'fountain_1' | 'fountain_2' | 'fountain_3' | 'fountain_4' | 'campfire_1' | 'campfire_2';
+  groupId:
+    | 'fountain_1'
+    | 'fountain_2'
+    | 'fountain_3'
+    | 'fountain_4'
+    | 'fountain_5'
+    | 'fountain_6'
+    | 'fountain_7'
+    | 'fountain_8'
+    | 'literacy_1'
+    | 'literacy_2'
+    | 'campfire_1'
+    | 'campfire_2';
   name: string;
   kind: 'fountain_minimalist' | 'campfire';
   wx: number;
@@ -283,54 +327,130 @@ export interface TwoPersonBenchGroup {
   seats: [TwoPersonSeatSlot, TwoPersonSeatSlot];
 }
 
-// 4 Tempat Duduk Minimalis di Sekitar Air Mancur (Masing-Masing Muat 2 Orang = Total 8 Kursi)
+// 8 Tempat Duduk Minimalis di Sekitar Air Mancur (Masing-Masing Muat 2 Orang = Total 16 Kursi)
 export const FOUNTAIN_MINIMALIST_BENCHES: TwoPersonBenchGroup[] = [
   {
     groupId: 'fountain_1',
-    name: 'Bangku Minimalis 1 (Barat Air Mancur)',
+    name: 'Bangku Air Mancur 1 (Barat Laut)',
     kind: 'fountain_minimalist',
-    wx: -1.25,
-    wy: 0.65,
+    wx: -1.05,
+    wy: -1.05,
     facing: 'down-right',
     seats: [
-      { id: 'fountain_1_a', label: 'Bangku Minimalis 1 • Kursi Kiri (1/2)', wx: -1.32, wy: 0.72, screenOffsetX: -6.2 },
-      { id: 'fountain_1_b', label: 'Bangku Minimalis 1 • Kursi Kanan (2/2)', wx: -1.18, wy: 0.58, screenOffsetX: 6.2 },
+      { id: 'fountain_1_a', label: 'Bangku Air Mancur 1 • Kursi Kiri (1/2)', wx: -1.12, wy: -0.98, screenOffsetX: -6.2 },
+      { id: 'fountain_1_b', label: 'Bangku Air Mancur 1 • Kursi Kanan (2/2)', wx: -0.98, wy: -1.12, screenOffsetX: 6.2 },
     ],
   },
   {
     groupId: 'fountain_2',
-    name: 'Bangku Minimalis 2 (Depan Kiri Air Mancur)',
+    name: 'Bangku Air Mancur 2 (Utara)',
     kind: 'fountain_minimalist',
-    wx: -0.55,
-    wy: 1.35,
-    facing: 'up-right',
+    wx: 0.0,
+    wy: -1.42,
+    facing: 'down-right',
     seats: [
-      { id: 'fountain_2_a', label: 'Bangku Minimalis 2 • Kursi Kiri (1/2)', wx: -0.62, wy: 1.28, screenOffsetX: -6.2 },
-      { id: 'fountain_2_b', label: 'Bangku Minimalis 2 • Kursi Kanan (2/2)', wx: -0.48, wy: 1.42, screenOffsetX: 6.2 },
+      { id: 'fountain_2_a', label: 'Bangku Air Mancur 2 • Kursi Kiri (1/2)', wx: -0.07, wy: -1.35, screenOffsetX: -6.2 },
+      { id: 'fountain_2_b', label: 'Bangku Air Mancur 2 • Kursi Kanan (2/2)', wx: 0.07, wy: -1.49, screenOffsetX: 6.2 },
     ],
   },
   {
     groupId: 'fountain_3',
-    name: 'Bangku Minimalis 3 (Depan Kanan Air Mancur)',
+    name: 'Bangku Air Mancur 3 (Timur Laut)',
     kind: 'fountain_minimalist',
-    wx: 0.55,
-    wy: 1.35,
-    facing: 'up-left',
+    wx: 1.05,
+    wy: -1.05,
+    facing: 'down-left',
     seats: [
-      { id: 'fountain_3_a', label: 'Bangku Minimalis 3 • Kursi Kiri (1/2)', wx: 0.48, wy: 1.42, screenOffsetX: -6.2 },
-      { id: 'fountain_3_b', label: 'Bangku Minimalis 3 • Kursi Kanan (2/2)', wx: 0.62, wy: 1.28, screenOffsetX: 6.2 },
+      { id: 'fountain_3_a', label: 'Bangku Air Mancur 3 • Kursi Kiri (1/2)', wx: 0.98, wy: -1.12, screenOffsetX: -6.2 },
+      { id: 'fountain_3_b', label: 'Bangku Air Mancur 3 • Kursi Kanan (2/2)', wx: 1.12, wy: -0.98, screenOffsetX: 6.2 },
     ],
   },
   {
     groupId: 'fountain_4',
-    name: 'Bangku Minimalis 4 (Timur Air Mancur)',
+    name: 'Bangku Air Mancur 4 (Timur)',
     kind: 'fountain_minimalist',
-    wx: 1.25,
-    wy: 0.65,
+    wx: 1.42,
+    wy: 0.0,
     facing: 'down-left',
     seats: [
-      { id: 'fountain_4_a', label: 'Bangku Minimalis 4 • Kursi Kiri (1/2)', wx: 1.18, wy: 0.58, screenOffsetX: -6.2 },
-      { id: 'fountain_4_b', label: 'Bangku Minimalis 4 • Kursi Kanan (2/2)', wx: 1.32, wy: 0.72, screenOffsetX: 6.2 },
+      { id: 'fountain_4_a', label: 'Bangku Air Mancur 4 • Kursi Kiri (1/2)', wx: 1.35, wy: -0.07, screenOffsetX: -6.2 },
+      { id: 'fountain_4_b', label: 'Bangku Air Mancur 4 • Kursi Kanan (2/2)', wx: 1.49, wy: 0.07, screenOffsetX: 6.2 },
+    ],
+  },
+  {
+    groupId: 'fountain_5',
+    name: 'Bangku Air Mancur 5 (Tenggara)',
+    kind: 'fountain_minimalist',
+    wx: 1.05,
+    wy: 1.05,
+    facing: 'up-left',
+    seats: [
+      { id: 'fountain_5_a', label: 'Bangku Air Mancur 5 • Kursi Kiri (1/2)', wx: 0.98, wy: 1.12, screenOffsetX: -6.2 },
+      { id: 'fountain_5_b', label: 'Bangku Air Mancur 5 • Kursi Kanan (2/2)', wx: 1.12, wy: 0.98, screenOffsetX: 6.2 },
+    ],
+  },
+  {
+    groupId: 'fountain_6',
+    name: 'Bangku Air Mancur 6 (Selatan)',
+    kind: 'fountain_minimalist',
+    wx: 0.0,
+    wy: 1.42,
+    facing: 'up-left',
+    seats: [
+      { id: 'fountain_6_a', label: 'Bangku Air Mancur 6 • Kursi Kiri (1/2)', wx: -0.07, wy: 1.49, screenOffsetX: -6.2 },
+      { id: 'fountain_6_b', label: 'Bangku Air Mancur 6 • Kursi Kanan (2/2)', wx: 0.07, wy: 1.35, screenOffsetX: 6.2 },
+    ],
+  },
+  {
+    groupId: 'fountain_7',
+    name: 'Bangku Air Mancur 7 (Barat Daya)',
+    kind: 'fountain_minimalist',
+    wx: -1.05,
+    wy: 1.05,
+    facing: 'up-right',
+    seats: [
+      { id: 'fountain_7_a', label: 'Bangku Air Mancur 7 • Kursi Kiri (1/2)', wx: -1.12, wy: 0.98, screenOffsetX: -6.2 },
+      { id: 'fountain_7_b', label: 'Bangku Air Mancur 7 • Kursi Kanan (2/2)', wx: -0.98, wy: 1.12, screenOffsetX: 6.2 },
+    ],
+  },
+  {
+    groupId: 'fountain_8',
+    name: 'Bangku Air Mancur 8 (Barat)',
+    kind: 'fountain_minimalist',
+    wx: -1.42,
+    wy: 0.0,
+    facing: 'down-right',
+    seats: [
+      { id: 'fountain_8_a', label: 'Bangku Air Mancur 8 • Kursi Kiri (1/2)', wx: -1.49, wy: 0.07, screenOffsetX: -6.2 },
+      { id: 'fountain_8_b', label: 'Bangku Air Mancur 8 • Kursi Kanan (2/2)', wx: -1.35, wy: -0.07, screenOffsetX: 6.2 },
+    ],
+  },
+];
+
+// 2 Kursi Literasi Minimalis (Model Sama Seperti Kursi Samping Air Mancur, Masing-Masing Muat 2 Orang)
+export const LITERACY_BENCHES: TwoPersonBenchGroup[] = [
+  {
+    groupId: 'literacy_1',
+    name: 'Kursi Literasi 1 (Samping Sudut Literasi)',
+    kind: 'fountain_minimalist',
+    wx: -3.65,
+    wy: 1.45,
+    facing: 'down-right',
+    seats: [
+      { id: 'literacy_1_a', label: 'Kursi Literasi 1 • Kiri (1/2)', wx: -3.72, wy: 1.52, screenOffsetX: -6.2 },
+      { id: 'literacy_1_b', label: 'Kursi Literasi 1 • Kanan (2/2)', wx: -3.58, wy: 1.38, screenOffsetX: 6.2 },
+    ],
+  },
+  {
+    groupId: 'literacy_2',
+    name: 'Kursi Literasi 2 (Depan Sudut Literasi)',
+    kind: 'fountain_minimalist',
+    wx: -3.65,
+    wy: 2.15,
+    facing: 'down-right',
+    seats: [
+      { id: 'literacy_2_a', label: 'Kursi Literasi 2 • Kiri (1/2)', wx: -3.72, wy: 2.22, screenOffsetX: -6.2 },
+      { id: 'literacy_2_b', label: 'Kursi Literasi 2 • Kanan (2/2)', wx: -3.58, wy: 2.08, screenOffsetX: 6.2 },
     ],
   },
 ];
@@ -367,6 +487,7 @@ export const CAMPFIRE_BENCHES: TwoPersonBenchGroup[] = [
 
 export const ALL_TWO_PERSON_BENCHES: TwoPersonBenchGroup[] = [
   ...FOUNTAIN_MINIMALIST_BENCHES,
+  ...LITERACY_BENCHES,
   ...CAMPFIRE_BENCHES,
 ];
 
@@ -508,6 +629,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [hoveredBuilding, setHoveredBuilding] = useState<BuildingInfo | null>(null);
   const [isCafeMenuOpen, setIsCafeMenuOpen] = useState(false);
   const [cafeToast, setCafeToast] = useState<string | null>(null);
+  const cafeToastTimerRef = useRef<number | null>(null);
   const [cafeScreenPos, setCafeScreenPos] = useState<{ x: number; y: number; visible: boolean }>({
     x: 0,
     y: 0,
@@ -519,10 +641,143 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const pendingConfirmationRef = useRef<EntryConfirmation | null>(null);
   pendingConfirmationRef.current = pendingConfirmation;
 
-  // Held item (kopi, roti, eskrim)
+  // Held item (kopi: 90s, roti: 60s, eskrim: 30s)
   const [heldItem, setHeldItem] = useState<'kopi' | 'roti' | 'eskrim' | null>(null);
   const heldItemRef = useRef<'kopi' | 'roti' | 'eskrim' | null>(null);
   heldItemRef.current = heldItem;
+  const [heldItemRemainingSec, setHeldItemRemainingSec] = useState<number>(0);
+  const heldItemExpiresAtRef = useRef<number | null>(null);
+  const heldItemTimerRef = useRef<number | null>(null);
+  const heldItemIntervalRef = useRef<number | null>(null);
+
+  // Centralized non-overlapping toast helper
+  const showToast = (msg: string | null, durationMs = 3200) => {
+    if (cafeToastTimerRef.current) {
+      window.clearTimeout(cafeToastTimerRef.current);
+      cafeToastTimerRef.current = null;
+    }
+    setCafeToast(msg);
+    if (msg && durationMs > 0) {
+      cafeToastTimerRef.current = window.setTimeout(() => {
+        setCafeToast(null);
+        cafeToastTimerRef.current = null;
+      }, durationMs);
+    }
+  };
+
+  // Equip or clear held item with automatic expiration (kopi: 90s, roti: 60s, eskrim: 30s)
+  const equipHeldItem = (item: 'kopi' | 'roti' | 'eskrim' | null) => {
+    if (heldItemTimerRef.current) {
+      window.clearTimeout(heldItemTimerRef.current);
+      heldItemTimerRef.current = null;
+    }
+    if (heldItemIntervalRef.current) {
+      window.clearInterval(heldItemIntervalRef.current);
+      heldItemIntervalRef.current = null;
+    }
+
+    if (!item) {
+      heldItemRef.current = null;
+      heldItemExpiresAtRef.current = null;
+      setHeldItem(null);
+      setHeldItemRemainingSec(0);
+      sendHeartbeatRef.current?.();
+      return;
+    }
+
+    const durationSec = item === 'kopi' ? 90 : item === 'roti' ? 60 : 30;
+    const expiresAt = Date.now() + durationSec * 1000;
+    heldItemRef.current = item;
+    heldItemExpiresAtRef.current = expiresAt;
+    setHeldItem(item);
+    setHeldItemRemainingSec(durationSec);
+    sendHeartbeatRef.current?.();
+
+    heldItemIntervalRef.current = window.setInterval(() => {
+      if (!heldItemExpiresAtRef.current) return;
+      const secsLeft = Math.max(0, Math.ceil((heldItemExpiresAtRef.current - Date.now()) / 1000));
+      setHeldItemRemainingSec(secsLeft);
+      if (secsLeft <= 0) {
+        if (heldItemIntervalRef.current) {
+          window.clearInterval(heldItemIntervalRef.current);
+          heldItemIntervalRef.current = null;
+        }
+        heldItemRef.current = null;
+        heldItemExpiresAtRef.current = null;
+        setHeldItem(null);
+        sendHeartbeatRef.current?.();
+      }
+    }, 500);
+
+    heldItemTimerRef.current = window.setTimeout(() => {
+      if (heldItemIntervalRef.current) {
+        window.clearInterval(heldItemIntervalRef.current);
+        heldItemIntervalRef.current = null;
+      }
+      heldItemTimerRef.current = null;
+      heldItemRef.current = null;
+      heldItemExpiresAtRef.current = null;
+      setHeldItem(null);
+      setHeldItemRemainingSec(0);
+      sendHeartbeatRef.current?.();
+    }, durationSec * 1000);
+  };
+
+  // Radial Emote Menu & Active Emote State
+  const [isEmoteMenuOpen, setIsEmoteMenuOpen] = useState(false);
+  const isEmoteMenuOpenRef = useRef(false);
+  isEmoteMenuOpenRef.current = isEmoteMenuOpen;
+  const [playerScreenPos, setPlayerScreenPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [playerEmote, setPlayerEmote] = useState<ActiveEmote | null>(null);
+  const playerEmoteRef = useRef<ActiveEmote | null>(null);
+  playerEmoteRef.current = playerEmote;
+
+  const triggerEmote = (type: EmoteType) => {
+    const config: Record<EmoteType, { icon: string; label: string; duration: number }> = {
+      love: { icon: '❤️', label: 'Suka', duration: 7000 },
+      wave: { icon: '👋', label: 'Lambai', duration: 7000 },
+      laugh: { icon: '😂', label: 'Tertawa', duration: 7000 },
+      dance: { icon: '🎵', label: 'Joget', duration: 8500 },
+    };
+    const c = config[type];
+    const emoteObj: ActiveEmote = {
+      type,
+      icon: c.icon,
+      label: c.label,
+      startTime: Date.now(),
+      expiresAt: Date.now() + c.duration,
+    };
+
+    setPlayerEmote(emoteObj);
+    if (playerRef.current) {
+      playerRef.current.activeEmote = emoteObj;
+    }
+    setIsEmoteMenuOpen(false);
+
+    if (type === 'dance') {
+      sounds.playDanceMusic();
+      showToast(`🎵 Asyik berjoget mengikuti irama musik!`, 2800);
+    } else {
+      sounds.playEmote();
+      if (type === 'love') {
+        showToast(`❤️ Suka & apresiasi hangat untuk warga Refleksia!`, 2500);
+      } else if (type === 'wave') {
+        showToast(`👋 Melambaikan tangan menyapa semua teman!`, 2500);
+      } else if (type === 'laugh') {
+        showToast(`😂 Tertawa gembira bersama warga kota!`, 2500);
+      }
+    }
+
+    sendHeartbeatRef.current?.();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (heldItemTimerRef.current) window.clearTimeout(heldItemTimerRef.current);
+      if (heldItemIntervalRef.current) window.clearInterval(heldItemIntervalRef.current);
+      if (cafeToastTimerRef.current) window.clearTimeout(cafeToastTimerRef.current);
+    };
+  }, []);
 
   // Tree 3-step watering & 15-second apple fruiting cycle state (treeIndex -> TreeWaterCycle)
   const [treeCycles, setTreeCycles] = useState<Record<number, TreeWaterCycle>>({});
@@ -580,6 +835,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const isFishingRef = useRef(false);
   isFishingRef.current = isFishing;
   const fishingTimerRef = useRef<number | null>(null);
+  const fishingStartTimeRef = useRef<number>(0);
 
   // User Camera Zoom State (+ / -)
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -653,6 +909,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const p = playerRef.current;
     if (!p) return;
 
+    setPendingConfirmation(null);
+    setIsCafeMenuOpen(false);
+
     const dist = Math.hypot(p.wx - targetX, p.wy - targetY);
     clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now() };
 
@@ -710,8 +969,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     if (!chosenSlot) {
       sounds.playClick();
-      setCafeToast(`🪑 ${group.name} sudah penuh (2/2 orang). Silakan pilih bangku di sebelahnya!`);
-      setTimeout(() => setCafeToast(null), 2800);
+      showToast(`🪑 ${group.name} sudah penuh (2/2 orang). Silakan pilih bangku di sebelahnya!`, 2800);
       return false;
     }
 
@@ -719,16 +977,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const targetSlot = chosenSlot;
     walkToSeatAndSit(targetSlot.id, targetSlot.wx, targetSlot.wy, group.facing, () => {
       if (group.kind === 'campfire') {
-        setCafeToast(`🔥 Duduk di ${group.name} untuk menghangatkan tubuh di dekat Api Unggun!`);
+        showToast(`🔥 Duduk di ${group.name} untuk menghangatkan tubuh di dekat Api Unggun!`, 3000);
       } else {
         const otherOccupied = isSeatOccupiedByRemote(
           targetSlot.id === firstSlot.id ? secondSlot.id : firstSlot.id
         );
-        setCafeToast(
-          `🪑 Duduk santai di ${group.name} (${otherOccupied ? '2/2 terisi bersama warga' : '1/2 kapasitas'}).`
+        showToast(
+          `🪑 Duduk santai di ${group.name} (${otherOccupied ? '2/2 terisi bersama warga' : '1/2 kapasitas'}).`,
+          3000
         );
       }
-      setTimeout(() => setCafeToast(null), 3000);
     });
     return true;
   };
@@ -753,8 +1011,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         targetSwing = partner;
       } else {
         sounds.playClick();
-        setCafeToast('🎠 Kedua kursi di tempat ayunan ini sedang dinaiki warga lain!');
-        setTimeout(() => setCafeToast(null), 2800);
+        showToast('🎠 Kedua kursi di tempat ayunan ini sedang dinaiki warga lain!', 2800);
         return false;
       }
     }
@@ -762,10 +1019,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const cost = 1;
     if (studentPointsRef.current < cost) {
       sounds.playClick();
-      setCafeToast(
-        `⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk naik ayunan (saldo kamu ${studentPointsRef.current} XP).`
+      showToast(
+        `⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk naik ayunan (saldo kamu ${studentPointsRef.current} XP).`,
+        3200
       );
-      setTimeout(() => setCafeToast(null), 3200);
       return false;
     }
 
@@ -774,8 +1031,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       if (studentPointsRef.current < cost) {
         setIsSitting(false);
         setSittingSeat(null);
-        setCafeToast(`⚠️ Saldo XP tidak cukup untuk naik ayunan!`);
-        setTimeout(() => setCafeToast(null), 2800);
+        showToast(`⚠️ Saldo XP tidak cukup untuk naik ayunan!`, 2800);
         return;
       }
       const ok = onDeductPointsRef.current
@@ -788,8 +1044,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       }
       sounds.playRewardXp();
       const remaining = Math.max(0, studentPointsRef.current - cost);
-      setCafeToast(`🎠 Naik & berayun di ${targetSwing.name} (-1 XP) • Sisa Saldo: ${remaining} XP`);
-      setTimeout(() => setCafeToast(null), 3200);
+      showToast(`🎠 Naik & berayun di ${targetSwing.name} (-1 XP) • Sisa Saldo: ${remaining} XP`, 3200);
     });
     return true;
   };
@@ -939,7 +1194,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             isSitting: Boolean(rem.isSitting),
             sittingSeat: rem.sittingSeat,
             isFishing: Boolean(rem.isFishing),
+            fishingStartTime: Boolean(rem.isFishing) ? performance.now() : undefined,
             heldItem: rem.heldItem || null,
+            activeEmote: rem.activeEmote && Date.now() < rem.activeEmote.expiresAt ? rem.activeEmote : null,
             speechText: rem.speechText,
             speechTimer: rem.speechTimer || (rem.speechText ? 5 : 0),
             isOnlineRemote: true,
@@ -988,8 +1245,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           existing.isSitting = Boolean(rem.isSitting);
           existing.sittingSeat = rem.sittingSeat;
           if (rem.facing) existing.facing = rem.facing;
-          existing.isFishing = Boolean(rem.isFishing);
+          const wasFishing = Boolean(existing.isFishing);
+          const nowFishing = Boolean(rem.isFishing);
+          if (!wasFishing && nowFishing) {
+            existing.fishingStartTime = performance.now();
+          } else if (!nowFishing) {
+            existing.fishingStartTime = undefined;
+          }
+          existing.isFishing = nowFishing;
           existing.heldItem = rem.heldItem || null;
+          existing.activeEmote = rem.activeEmote && Date.now() < rem.activeEmote.expiresAt ? rem.activeEmote : null;
           if (rem.speechText) {
             existing.speechText = rem.speechText;
             existing.speechTimer = typeof rem.speechTimer === 'number' && rem.speechTimer > 0 ? rem.speechTimer : 5;
@@ -1036,6 +1301,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         sittingSeat: sittingSeatRef.current || undefined,
         isFishing: Boolean(isFishingRef.current),
         heldItem: heldItemRef.current || null,
+        activeEmote: playerEmoteRef.current && Date.now() < playerEmoteRef.current.expiresAt ? playerEmoteRef.current : null,
         speechText: playerSpeechRef.current && Date.now() < playerSpeechRef.current.expiresAt ? playerSpeechRef.current.text : undefined,
         speechTimer: playerSpeechRef.current ? Math.max(0, (playerSpeechRef.current.expiresAt - Date.now()) / 1000) : 0,
       };
@@ -1313,114 +1579,131 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     sendHeartbeatRef.current?.();
 
     // -----------------------------------------------------------
-    // 7 OFFICIAL TOWN STAFF NPCS (ONLY THESE 7 ARE RANDOM NPCS IN KOTA REFLEKSIA)
-    // 1. Penjaga Kota (Surya)
-    // 2. Penjaga Lab (Malik)
-    // 3. Barista (Ma Uba)
-    // 4. Penjaga Sudut Literasi (Patra)
-    // 5. Penjaga Kolam (Tomi)
-    // 6. Pengawas (Naziefa)
-    // 7. Kepala Balai (Sony)
+    // 6 OFFICIAL TOWN STAFF NPCS IN KOTA REFLEKSIA
+    // 1. Satpam Kota (Surya) - Mengitari seluruh kota menjaga keamanan
+    // 2. Kutu Buku Berkacamata (Malik) - Di sekitar Lab DKV & Tefa
+    // 3. Ibu Kantin (Ma Uba) - Berdiri ramah tepat di depan Toko Roti & Kafe
+    // 4. Ibu Muslim Penjaga Literasi (Patra) - Selalu di Sudut Literasi mengajak warga membaca
+    // 5. Penjaga Kolam (Tomi) - Dermaga Kolam Pancing Timur
+    // 6. Wali Kota (Sony) - Mengitari kota & menyapa warga
+    // (NPC Naziefa telah dihilangkan sesuai permintaan)
     // -----------------------------------------------------------
 
-    // 1. Penjaga Kota (Surya) - Patrols main roads & central plaza
+    // 1. Satpam Kota (Surya) - Mengitari seluruh jalan kota
     const surya: AvatarData = {
       id: 'surya',
       role: 'penjaga_kota',
       handle: 'surya',
       name: 'Surya',
-      roleLabel: 'Penjaga Kota',
-      wx: 0,
-      wy: 2.0,
-      targetWx: 0,
-      targetWy: 2.0,
-      anchorX: 0,
-      anchorY: 2.0,
-      wanderRadius: 2.6,
-      speed: 0.95,
-      shirtColor: '#0284c7', // Municipal azure uniform
-      pantsColor: '#0f172a',
+      roleLabel: 'Satpam Kota',
+      wx: 0.0,
+      wy: 4.8,
+      targetWx: 3.2,
+      targetWy: 3.6,
+      patrolWaypoints: [
+        [0.0, 4.8],
+        [3.2, 3.6],
+        [3.5, 0.0],
+        [3.2, -3.2],
+        [0.0, -3.2],
+        [-3.2, -3.2],
+        [-3.5, 0.0],
+        [-3.2, 3.6],
+        [0.0, 1.8],
+      ],
+      waypointIndex: 1,
+      speed: 1.05,
+      shirtColor: '#d6c7b2', // Seragam PDH Satpam krem/coklat muda
+      pantsColor: '#451a03', // Celana PDH Satpam coklat tua gelap
       hairColor: '#0f172a',
       gender: 'L',
-      isMoving: false,
-      pauseTimer: 2,
+      isMoving: true,
+      pauseTimer: 1.2,
       walkFrame: 0,
-      facing: 'down-left',
+      facing: 'down-right',
     };
 
-    // 2. Penjaga Lab (Malik) - Near Bengkel Latihan & Lab DKV / Tefa (South-East)
+    // 2. Kutu Buku Berkacamata (Malik) - Near Bengkel Latihan & Lab DKV / Tefa (South-East)
     const malik: AvatarData = {
       id: 'malik',
       role: 'penjaga_lab',
       handle: 'malik',
       name: 'Malik',
-      roleLabel: 'Penjaga Lab',
+      roleLabel: 'Kutu Buku Lab',
       wx: 2.8,
       wy: 2.2,
       targetWx: 2.8,
       targetWy: 2.2,
       anchorX: 2.8,
       anchorY: 2.2,
-      wanderRadius: 1.8,
-      speed: 0.85,
-      shirtColor: '#475569', // Tech lab coat
-      pantsColor: '#1e293b',
-      hairColor: '#1e293b',
+      wanderRadius: 1.4,
+      speed: 0.78,
+      shirtColor: '#1e3a8a', // Sweater vest kutu buku di atas kemeja putih & dasi kupu-kupu
+      pantsColor: '#334155',
+      hairColor: '#0f172a',
       gender: 'L',
       isMoving: false,
-      pauseTimer: 3,
+      pauseTimer: 2.5,
       walkFrame: 0,
       facing: 'down-left',
     };
 
-    // 3. Barista Toko Roti & Kafe Warga (Ma Uba)
+    // 3. Ibu Kantin Toko Roti & Kafe (Ma Uba) - Posisi tepat di DEPAN Toko menyambut warga
     const maUba: AvatarData = {
       id: 'ma_uba',
       role: 'barista',
       handle: 'ma_uba',
       name: 'Ma Uba',
-      roleLabel: 'Barista',
-      wx: -0.8,
-      wy: 2.5,
-      targetWx: -0.8,
-      targetWy: 2.5,
-      anchorX: -0.8,
-      anchorY: 2.5,
+      roleLabel: 'Ibu Kantin',
+      wx: 4.88,
+      wy: 4.82,
+      targetWx: 4.88,
+      targetWy: 4.82,
+      anchorX: 4.88,
+      anchorY: 4.82,
       wanderRadius: 0,
-      speed: 0, // Stands at cafe counter
-      shirtColor: '#ea580c', // Warm barista apron
+      speed: 0, // Berdiri ramah tepat di depan Toko
+      shirtColor: '#ea580c', // Blus hangat dengan celemek putih Ibu Kantin
       pantsColor: '#7c2d12',
       hairColor: '#451a03',
       gender: 'P',
       isMoving: false,
       pauseTimer: 99999,
       walkFrame: 0,
-      facing: 'down-right',
+      facing: 'down-left',
     };
 
-    // 4. Penjaga Sudut Literasi (Patra) - West Reading Corner Gazebo
+    // 4. Ibu Muslim Sudut Literasi (Patra) - Selalu berada di Sudut Literasi mengajak orang membaca
     const patra: AvatarData = {
       id: 'patra',
       role: 'penjaga_literasi',
       handle: 'patra',
       name: 'Patra',
-      roleLabel: 'Penjaga Sudut Literasi',
-      wx: -3.8,
-      wy: 1.5,
-      targetWx: -3.8,
-      targetWy: 1.5,
-      anchorX: -3.8,
-      anchorY: 1.5,
-      wanderRadius: 1.8,
-      speed: 0.85,
-      shirtColor: '#059669', // Emerald reading vest
-      pantsColor: '#1e293b',
-      hairColor: '#0f172a',
-      gender: 'L',
+      roleLabel: 'Ibu Literasi',
+      wx: -3.95,
+      wy: 1.78,
+      targetWx: -3.95,
+      targetWy: 1.78,
+      anchorX: -3.95,
+      anchorY: 1.78,
+      wanderRadius: 0.22, // Selalu berada di Sudut Literasi
+      speed: 0.42,
+      shirtColor: '#0d9488', // Gamis & Hijab Syar'i Ibu Muslimah warna hijau zamrud/toska lembut
+      pantsColor: '#115e59',
+      hairColor: '#064e3b',
+      gender: 'P',
       isMoving: false,
-      pauseTimer: 3.5,
+      pauseTimer: 2.5,
       walkFrame: 0,
       facing: 'down-right',
+      speeches: [
+        'Assalamualaikum, yuk mampir baca buku! 📖',
+        'Mari duduk di Sudut Literasi & baca komik! 📚',
+        'Membaca membuka jendela dunia, ayo baca! ✨',
+        'Ada komik DKV, majalah & koran seru di sini! 📰',
+      ],
+      speechText: 'Assalamualaikum, yuk mampir baca buku! 📖',
+      speechTimer: 5.5,
     };
 
     // 5. Penjaga Kolam (Tomi) - East Fishing Pier & Pond
@@ -1436,9 +1719,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       targetWy: -1.8,
       anchorX: 4.0,
       anchorY: -1.8,
-      wanderRadius: 1.6,
+      wanderRadius: 1.5,
       speed: 0.85,
-      shirtColor: '#0d9488', // Teal fisherman shirt
+      shirtColor: '#0d9488',
       pantsColor: '#334155',
       hairColor: '#0f172a',
       gender: 'L',
@@ -1448,61 +1731,55 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       facing: 'down-left',
     };
 
-    // 6. Pengawas (Naziefa) - Campus & Perpustakaan Promenade
-    const naziefa: AvatarData = {
-      id: 'naziefa',
-      role: 'pengawas',
-      handle: 'naziefa',
-      name: 'Naziefa',
-      roleLabel: 'Pengawas',
-      wx: -2.2,
-      wy: -1.8,
-      targetWx: -2.2,
-      targetWy: -1.8,
-      anchorX: -2.2,
-      anchorY: -1.8,
-      wanderRadius: 2.2,
-      speed: 0.95,
-      shirtColor: '#7c3aed', // Royal purple supervisor attire
-      pantsColor: '#4c1d95',
-      hairColor: '#581c87',
-      gender: 'P',
-      isMoving: false,
-      pauseTimer: 3,
-      walkFrame: 0,
-      facing: 'down-right',
-    };
-
-    // 7. Kepala Balai (Sony) - Balai Kota Courtyard
+    // 6. Wali Kota (Sony) - Mengitari seluruh kota dan menyapa warga
     const sony: AvatarData = {
       id: 'sony',
       role: 'kepala_balai',
       handle: 'sony',
       name: 'Sony',
-      roleLabel: 'Kepala Balai',
+      roleLabel: 'Wali Kota',
       wx: 0.0,
-      wy: -2.8,
-      targetWx: 0.0,
-      targetWy: -2.8,
-      anchorX: 0.0,
-      anchorY: -2.8,
-      wanderRadius: 1.8,
-      speed: 0.75,
-      shirtColor: '#b45309', // Formal batik gold/amber
-      pantsColor: '#0f172a',
+      wy: -2.5,
+      targetWx: 2.0,
+      targetWy: -2.0,
+      patrolWaypoints: [
+        [0.0, -2.5],
+        [2.0, -2.0],
+        [2.5, 0.0],
+        [2.0, 2.0],
+        [0.0, 2.5],
+        [-2.0, 2.0],
+        [-2.5, 0.0],
+        [-2.0, -2.0],
+        [0.0, 1.4],
+        [0.0, 4.2],
+        [0.0, 1.4],
+      ],
+      waypointIndex: 1,
+      speed: 0.92,
+      shirtColor: '#f8fafc', // Jas Dinas Putih Wali Kota (PDUB) dengan lencana emas & dasi merah
+      pantsColor: '#f1f5f9',
       hairColor: '#0f172a',
       gender: 'L',
-      isMoving: false,
-      pauseTimer: 4,
+      isMoving: true,
+      pauseTimer: 1.5,
       walkFrame: 0,
-      facing: 'down-left',
+      facing: 'down-right',
+      speeches: [
+        'Halo warga! Selamat beraktivitas di Refleksia City! 👋',
+        'Semangat belajar & berkarya hari ini ya! 🌟',
+        'Mari jaga kota kita tetap asri dan kreatif! 🏛️',
+        'Salam hangat dari Wali Kota untuk seluruh warga! 🤝',
+      ],
+      speechText: 'Halo warga! Selamat beraktivitas di Refleksia City! 👋',
+      speechTimer: 5.0,
     };
 
-    const npcs: AvatarData[] = [surya, malik, maUba, patra, tomi, naziefa, sony];
+    const npcs: AvatarData[] = [surya, malik, maUba, patra, tomi, sony];
 
-    // Cafe coordinates (Toko Roti & Kafe)
-    const cafeWx = -0.5;
-    const cafeWy = 2.4;
+    // Cafe coordinates (Toko Roti & Kafe - Di ujung kota belakang Lab DKV)
+    const cafeWx = 4.65;
+    const cafeWy = 4.55;
 
     // -----------------------------------------------------------
     // SKY & WEATHER ELEMENTS MATCHING SCREENSHOT
@@ -1551,19 +1828,42 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     };
 
     const handlePointerAction = (clientX: number, clientY: number) => {
-      const { wx, wy } = getPointerWorldPos(clientX, clientY);
+      const { sx, sy, wx, wy } = getPointerWorldPos(clientX, clientY);
 
-      // 1. Check Click on Cafe Stall (Toko Roti & Kafe)
+      // 0. Check Click on Player Avatar -> Open/toggle radial emote picker!
+      const z = zoomLevelRef.current;
+      const pPt = toScreen(player.wx, player.wy, 0, camera.x, camera.y);
+      const distToPlayerScreen = Math.hypot(sx - pPt.x, sy - (pPt.y - 12 * z));
+      const distToPlayerWorld = Math.hypot(wx - player.wx, wy - player.wy);
+
+      if (distToPlayerScreen < 28 * z || distToPlayerWorld < 0.65) {
+        sounds.playClick();
+        setIsEmoteMenuOpen((prev) => {
+          const next = !prev;
+          if (next) {
+            setPlayerScreenPos({ x: Math.round(pPt.x), y: Math.round(pPt.y - 12 * z) });
+          }
+          return next;
+        });
+        return;
+      }
+
+      // If radial emote menu was open and user clicked elsewhere, dismiss it
+      if (isEmoteMenuOpenRef.current) {
+        setIsEmoteMenuOpen(false);
+      }
+
+      // 1. Check Click on Cafe Stall (Toko Roti & Kafe di ujung kota belakang Lab DKV)
       const cafeDist = Math.hypot(wx - cafeWx, wy - cafeWy);
-      if (cafeDist < 2.0) {
+      if (cafeDist < 1.95) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
           setSittingSeat(null);
         }
         pendingSeatRef.current = null;
-        player.targetWx = -0.5;
-        player.targetWy = 1.4; // Counter front
+        player.targetWx = 4.15;
+        player.targetWy = 4.15; // Counter front
         player.isMoving = true;
         clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
         pendingBuildingId = null;
@@ -1593,31 +1893,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
+        setPendingConfirmation(null);
+        setIsCafeMenuOpen(false);
         setNearbyAction({ type: 'fishing' });
         return;
       }
 
-      // 3. Check Click on Benches (4 Minimalist Fountain Benches [2-seater], 2 Campfire Benches [2-seater], 1 Literacy Bench) & 2 Swing Structures (-1 XP)
-      const sitAtSingleBench = (
-        seatId: BenchId,
-        targetX: number,
-        targetY: number,
-        facingDir: 'down-left' | 'down-right' | 'up-left' | 'up-right',
-        name: string
-      ) => {
-        sounds.playClick();
-        pendingBuildingId = null;
-        lastTouchedIdRef.current = null;
-        walkToSeatAndSit(seatId, targetX, targetY, facingDir, () => {
-          setCafeToast(`🪑 Duduk santai di ${name}.`);
-          setTimeout(() => setCafeToast(null), 2500);
-        });
-      };
-
-      // 3a. Check Click on 4 Minimalist 2-Seater Fountain Benches + 2 Campfire Benches
+      // 3. Check Click on Benches (8 Minimalist Fountain Benches [2-seater], 2 Literacy Benches [2-seater], 2 Campfire Benches [2-seater]) & 2 Swing Structures (-1 XP)
       for (const group of ALL_TWO_PERSON_BENCHES) {
         const groupDist = Math.hypot(wx - group.wx, wy - group.wy);
-        if (groupDist < 1.05) {
+        if (groupDist < 0.95) {
           const distA = Math.hypot(wx - group.seats[0].wx, wy - group.seats[0].wy);
           const distB = Math.hypot(wx - group.seats[1].wx, wy - group.seats[1].wy);
           const preferredIdx: 0 | 1 = distB < distA ? 1 : 0;
@@ -1653,19 +1938,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 3d. Check Click on Bangku Sudut Literasi [-3.7, 1.8] or Sudut Literasi [-4.3, 1.8]
-      const litBenchDist = Math.hypot(wx - (-3.7), wy - 1.8);
-      if (litBenchDist < 1.05) {
-        sitAtSingleBench('literacy', -3.7, 1.8, 'down-right', 'Bangku Sudut Literasi');
-        return;
-      }
-
+      // 3d. Check Click on Sudut Literasi [-4.3, 1.8]
       const litSpotDist = Math.hypot(wx - (-4.3), wy - 1.8);
       if (litSpotDist < 2.0) {
         sounds.playClick();
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
-        walkToSeatAndSit('literacy', -3.7, 1.8, 'down-right', () => {
+        const targetLitBench = LITERACY_BENCHES[0];
+        walkToSeatAndSit(targetLitBench.seats[0].id, targetLitBench.seats[0].wx, targetLitBench.seats[0].wy, targetLitBench.facing, () => {
           sounds.playOpenModal();
           setIsLiteracyModalOpen(true);
         });
@@ -1753,7 +2033,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const onPointerMove = (e: MouseEvent) => {
       const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
 
+      const isOverPlayer = Math.hypot(wx - player.wx, wy - player.wy) < 0.65;
+
       const isOverInteractiveSpot =
+        isOverPlayer ||
         Math.hypot(wx - cafeWx, wy - cafeWy) < 2.0 ||
         Math.hypot(wx - 4.6, wy - (-2.2)) < 2.2 ||
         Math.hypot(wx - (-4.3), wy - 1.8) < 2.0 ||
@@ -1825,6 +2108,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       camera.targetY = (player.wx + player.wy) * currentTileH;
       camera.x += (camera.targetX - camera.x) * (delta * 4.5);
       camera.y += (camera.targetY - camera.y) * (delta * 4.5);
+
+      // Update player screen coordinates for radial emote menu if open
+      if (isEmoteMenuOpenRef.current && playerRef.current) {
+        const pPt = toScreen(player.wx, player.wy, 0, camera.x, camera.y);
+        const z = zoomLevelRef.current;
+        setPlayerScreenPos({ x: Math.round(pPt.x), y: Math.round(pPt.y - 12 * z) });
+      }
+
+      // Check for local emote expiration
+      if (playerEmoteRef.current && Date.now() >= playerEmoteRef.current.expiresAt) {
+        playerEmoteRef.current = null;
+        setPlayerEmote(null);
+        if (playerRef.current) {
+          playerRef.current.activeEmote = null;
+        }
+      }
 
       // Update Player Movement (Natural relaxed cadence, obstacle sliding & seat arrival transition)
       if (isSittingRef.current) {
@@ -2077,8 +2376,29 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setNearbyAction(null);
       }
 
-      // Update 7 Town NPCs (No random idle chat bubbles so chat boxes only appear for real live chat)
+      // Update 6 Town NPCs (Patrol routes for Sony & Surya, Sudut Literasi invitations for Patra, Mayor greetings for Sony)
       npcs.forEach((npc) => {
+        // Handle speech timer for Sony (Wali Kota menyapa warga) & Patra (Ibu Muslim mengajak warga baca di Sudut Literasi)
+        if (npc.speeches && npc.speeches.length > 0) {
+          if (npc.speechTimer && npc.speechTimer > 0) {
+            npc.speechTimer -= delta;
+            if (npc.speechTimer <= 0) {
+              npc.speechText = undefined;
+              // Pause before next greeting
+              npc.speechTimer = -(3.5 + Math.random() * 3.5);
+            }
+          } else {
+            const distToPlayer = Math.hypot(player.wx - npc.wx, player.wy - npc.wy);
+            // Trigger faster if player is nearby
+            npc.speechTimer = (npc.speechTimer || -2) + delta * (distToPlayer < 2.6 ? 2.5 : 1.0);
+            if (npc.speechTimer >= 0) {
+              const nextIdx = Math.floor(Math.random() * npc.speeches.length);
+              npc.speechText = npc.speeches[nextIdx];
+              npc.speechTimer = 4.8 + Math.random() * 1.5;
+            }
+          }
+        }
+
         if (npc.speed === 0) {
           return;
         }
@@ -2087,30 +2407,38 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           npc.pauseTimer -= delta;
           if (npc.pauseTimer <= 0) {
             npc.isMoving = true;
-            const ax = npc.anchorX ?? npc.wx;
-            const ay = npc.anchorY ?? npc.wy;
-            const r = npc.wanderRadius ?? 2.0;
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 0.5 + Math.random() * r;
-            npc.targetWx = Math.max(-6.5, Math.min(6.5, ax + Math.cos(angle) * dist));
-            npc.targetWy = Math.max(-6.5, Math.min(6.5, ay + Math.sin(angle) * dist));
+            if (npc.patrolWaypoints && npc.patrolWaypoints.length > 0) {
+              const nextWpIdx = ((npc.waypointIndex ?? 0) + 1) % npc.patrolWaypoints.length;
+              npc.waypointIndex = nextWpIdx;
+              npc.targetWx = npc.patrolWaypoints[nextWpIdx][0];
+              npc.targetWy = npc.patrolWaypoints[nextWpIdx][1];
+            } else {
+              const ax = npc.anchorX ?? npc.wx;
+              const ay = npc.anchorY ?? npc.wy;
+              const r = npc.wanderRadius ?? 2.0;
+              const angle = Math.random() * Math.PI * 2;
+              const dist = 0.25 + Math.random() * r;
+              npc.targetWx = Math.max(-6.5, Math.min(6.5, ax + Math.cos(angle) * dist));
+              npc.targetWy = Math.max(-6.5, Math.min(6.5, ay + Math.sin(angle) * dist));
+            }
           }
         } else {
           const dx = npc.targetWx - npc.wx;
           const dy = npc.targetWy - npc.wy;
           const dist = Math.hypot(dx, dy);
 
-          if (dist > 0.12) {
+          if (dist > 0.1) {
             const step = Math.min(dist, npc.speed * delta);
             npc.wx += (dx / dist) * step;
             npc.wy += (dy / dist) * step;
-            npc.walkFrame += delta * 9;
+            npc.walkFrame += delta * 8.5;
             if (dx >= 0) npc.facing = 'down-right';
             else npc.facing = 'down-left';
           } else {
             npc.isMoving = false;
             npc.walkFrame = 0;
-            npc.pauseTimer = 3.5 + Math.random() * 4.5;
+            // Sony & Surya pause briefly at each patrol point before continuing around the city
+            npc.pauseTimer = npc.patrolWaypoints ? 1.2 + Math.random() * 1.6 : 3.2 + Math.random() * 3.5;
           }
         }
       });
@@ -2392,6 +2720,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if ((gx === 2 || gx === 3) && gy === -4) return true;
         // Cozy corner stone patio for Api Unggun & Bangku Hangat at [-5..-4, 4..5]
         if ((gx === -5 || gx === -4) && (gy === 4 || gy === 5)) return true;
+        // Paved corner patio for relocated Toko Roti & Kafe behind Lab DKV at [4..5, 4..5]
+        if ((gx === 4 || gx === 5) && (gy === 4 || gy === 5)) return true;
         return false;
       };
 
@@ -2612,10 +2942,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // 2. Sudut Literasi Siswa at West End at [-4.3, 1.8]
       drawItems.push({ type: 'literacy_corner', wx: -4.3, wy: 1.8, depth: -4.3 + 1.8 });
 
-      // 3. Bench next to Sudut Literasi at [-3.7, 1.8]
-      drawItems.push({ type: 'bench', wx: -3.7, wy: 1.8, depth: -3.7 + 1.8, id: 'literacy' });
-
-      // 4. 4 Minimalist 2-Seater Benches around Central Fountain + 2 Campfire Benches
+      // 3. 8 Minimalist 2-Seater Benches around Central Fountain + 2 Literacy Benches + 2 Campfire Benches
       ALL_TWO_PERSON_BENCHES.forEach((group) => {
         drawItems.push({
           type: 'bench',
@@ -3394,28 +3721,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillRect(shelfX + 1.4 * z, rowY + 4.8 * z, shelfW - 2.8 * z, 1.1 * z);
           }
 
-          // 3. Minimalist Teak Reading Bench (Matches avatar sitting position [-3.7, 1.8])
-          const benchX = pt.x + 2 * z;
-          const benchY = pt.y - 6 * z;
-          // Matte black steel bench legs
-          ctx.fillStyle = '#0f172a';
-          ctx.fillRect(benchX - 6.5 * z, benchY + 1.5 * z, 1.8 * z, 3.8 * z);
-          ctx.fillRect(benchX + 6.5 * z, benchY + 1.5 * z, 1.8 * z, 3.8 * z);
-          // Warm teak bench frame
-          ctx.fillStyle = '#b45309';
-          ctx.beginPath();
-          ctx.roundRect(benchX - 8 * z, benchY - 1 * z, 17.5 * z, 3.2 * z, 1 * z);
-          ctx.fill();
-          // Minimalist cream/linen seat cushion
-          ctx.fillStyle = isNight ? '#cbd5e1' : '#f8fafc';
-          ctx.beginPath();
-          ctx.roundRect(benchX - 7.2 * z, benchY - 2.4 * z, 16 * z, 2.0 * z, 1 * z);
-          ctx.fill();
-          // Slatted low teak backrest
-          ctx.fillStyle = '#92400e';
-          ctx.beginPath();
-          ctx.roundRect(benchX - 7.5 * z, benchY - 6.2 * z, 16.5 * z, 2.6 * z, 0.8 * z);
-          ctx.fill();
+          // Note: The 2 minimalist reading benches at Sudut Literasi are rendered via LITERACY_BENCHES (fountain_minimalist style)
 
           // 4. Minimalist Round Nordic Coffee Table & Open Book in Front
           const rTableX = pt.x + 7 * z;
@@ -4344,30 +4650,41 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(pt.x - 34 * z, pt.y - 20 * z, 9 * z, 4 * z);
           } else if (b.id === 'menara_mentor') {
-            // EAST: DEWAN KOTA & STUDIO BROADCAST MENARA MENTOR (Refined Isometric Studio & Telecom Tower)
-            // 1. Stone Plinth Base
-            ctx.fillStyle = '#94a3b8';
+            // EAST: STUDIO ON AIR & MENARA MENTOR (Detailed Broadcast Media Center, Control Room & Telecom Tower)
+            // 1. Two-Tiered Dark Slate & Granite Acoustic Foundation Plinth
+            ctx.fillStyle = '#475569';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 32 * z, pt.y + 18 * z);
-            ctx.lineTo(pt.x, pt.y + 36 * z);
-            ctx.lineTo(pt.x + 32 * z, pt.y + 18 * z);
-            ctx.lineTo(pt.x + 32 * z, pt.y + 22 * z);
-            ctx.lineTo(pt.x, pt.y + 40 * z);
-            ctx.lineTo(pt.x - 32 * z, pt.y + 22 * z);
+            ctx.moveTo(pt.x - 34 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x, pt.y + 37 * z);
+            ctx.lineTo(pt.x + 34 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x + 34 * z, pt.y + 23 * z);
+            ctx.lineTo(pt.x, pt.y + 42 * z);
+            ctx.lineTo(pt.x - 34 * z, pt.y + 23 * z);
             ctx.closePath();
             ctx.fill();
 
-            // 2. Isometric Roof Deck
-            ctx.fillStyle = '#cbd5e1';
+            ctx.fillStyle = '#64748b';
             ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y - 34 * z);
-            ctx.lineTo(pt.x + 30 * z, pt.y - 18 * z);
-            ctx.lineTo(pt.x, pt.y - 2 * z);
-            ctx.lineTo(pt.x - 30 * z, pt.y - 18 * z);
+            ctx.moveTo(pt.x - 32 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x, pt.y + 34 * z);
+            ctx.lineTo(pt.x + 32 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x + 32 * z, pt.y + 19 * z);
+            ctx.lineTo(pt.x, pt.y + 37 * z);
+            ctx.lineTo(pt.x - 32 * z, pt.y + 19 * z);
             ctx.closePath();
             ctx.fill();
 
-            // 3. Left Shaded Wall
+            // 2. Isometric Roof Deck with Dark Studio Slate Finish
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 35 * z);
+            ctx.lineTo(pt.x + 31 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 1 * z);
+            ctx.lineTo(pt.x - 31 * z, pt.y - 18 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // 3. Left Shaded Wall with Acoustic Ribbed Cladding
             ctx.fillStyle = '#e2e8f0';
             ctx.beginPath();
             ctx.moveTo(pt.x - 30 * z, pt.y - 18 * z);
@@ -4376,11 +4693,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x - 30 * z, pt.y + 18 * z);
             ctx.closePath();
             ctx.fill();
-            ctx.strokeStyle = '#cbd5e1';
+            ctx.strokeStyle = '#94a3b8';
             ctx.lineWidth = 0.8 * z;
             ctx.stroke();
 
-            // 4. Right Sunlit Wall
+            // Vertical acoustic slat lines on left wall
+            ctx.strokeStyle = 'rgba(100, 116, 139, 0.35)';
+            ctx.lineWidth = 0.7 * z;
+            for (let sl = 1; sl <= 5; sl++) {
+              const frac = sl / 6;
+              const sx = pt.x - 30 * z * (1 - frac);
+              const syTop = pt.y - 18 * z + 16 * z * frac;
+              ctx.beginPath();
+              ctx.moveTo(sx, syTop + 2 * z);
+              ctx.lineTo(sx, syTop + 32 * z);
+              ctx.stroke();
+            }
+
+            // 4. Right Sunlit Wall with Studio Paneling
             ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
             ctx.moveTo(pt.x, pt.y - 2 * z);
@@ -4393,80 +4723,183 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 0.8 * z;
             ctx.stroke();
 
-            // Emerald Architectural Roof Trim Band
+            // Emerald & Cyan Broadcast Fascia Ribbon along Roof Edge
             ctx.strokeStyle = '#059669';
-            ctx.lineWidth = 2.2 * z;
+            ctx.lineWidth = 2.8 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x - 30 * z, pt.y - 18 * z);
-            ctx.lineTo(pt.x, pt.y - 2 * z);
-            ctx.lineTo(pt.x + 30 * z, pt.y - 18 * z);
+            ctx.moveTo(pt.x - 31 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 1 * z);
+            ctx.lineTo(pt.x + 31 * z, pt.y - 18 * z);
             ctx.stroke();
 
-            // Two Neat Acoustic Vaulted Studio Roofs on Roof Deck
-            [-9, 9].forEach((vx) => {
-              ctx.fillStyle = '#059669';
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 31 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x, pt.y + 1 * z);
+            ctx.lineTo(pt.x + 31 * z, pt.y - 16 * z);
+            ctx.stroke();
+
+            // Two Soundproof Acoustic Vaulted Studio Domes on Roof Deck
+            [-9.5, 8.5].forEach((vx) => {
+              ctx.fillStyle = '#047857';
               ctx.beginPath();
-              ctx.arc(pt.x + vx * z, pt.y - 18 * z, 9.5 * z, Math.PI, 0);
+              ctx.arc(pt.x + vx * z, pt.y - 18 * z, 9 * z, Math.PI, 0);
               ctx.fill();
-              ctx.strokeStyle = '#10b981';
-              ctx.lineWidth = 1.2 * z;
+              ctx.strokeStyle = '#34d399';
+              ctx.lineWidth = 1.1 * z;
+              ctx.stroke();
+              ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+              ctx.lineWidth = 0.7 * z;
+              ctx.beginPath();
+              ctx.arc(pt.x + vx * z, pt.y - 18 * z, 6.2 * z, Math.PI * 1.15, -Math.PI * 0.15);
               ctx.stroke();
             });
 
-            // Studio Entrance Portal on Left Facade
-            ctx.fillStyle = '#0284c7';
+            // Rooftop Parabolic Satellite Uplink Dish (Left Roof Corner)
+            const dishX = pt.x - 19 * z;
+            const dishY = pt.y - 23 * z;
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 1.6 * z;
             ctx.beginPath();
-            ctx.arc(pt.x - 14 * z, pt.y + 14 * z, 5 * z, Math.PI, 0);
-            ctx.rect(pt.x - 19 * z, pt.y + 14 * z, 10 * z, 12 * z);
+            ctx.moveTo(dishX, dishY + 5 * z);
+            ctx.lineTo(dishX, dishY);
+            ctx.stroke();
+            ctx.fillStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.ellipse(dishX, dishY - 1 * z, 6.5 * z, 3.8 * z, -0.35, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = '#ffffff';
+            ctx.strokeStyle = '#0284c7';
             ctx.lineWidth = 0.9 * z;
             ctx.stroke();
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 0.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(dishX, dishY - 1 * z);
+            ctx.lineTo(dishX + 3.5 * z, dishY - 4.5 * z);
+            ctx.stroke();
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(dishX + 3.5 * z, dishY - 4.5 * z, 1.1 * z, 0, Math.PI * 2);
+            ctx.fill();
 
-            // Illuminated Red "● ON AIR" Sign & Equalizer Display on Right Facade
-            const neonPulse = 0.85 + Math.sin(elapsed * 5) * 0.15;
+            // Left Facade: Control Room Panoramic Window (Showing Mixing Console & Studio Monitors)
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 27 * z, pt.y - 8 * z);
+            ctx.lineTo(pt.x - 11 * z, pt.y + 0.5 * z);
+            ctx.lineTo(pt.x - 11 * z, pt.y + 9.5 * z);
+            ctx.lineTo(pt.x - 27 * z, pt.y + 1 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1 * z;
+            ctx.stroke();
+
+            // Glowing mixing desk sliders & dual waveform monitors inside window
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(pt.x - 24.5 * z, pt.y - 4 * z, 5 * z, 3.2 * z);
+            ctx.fillStyle = '#10b981';
+            ctx.fillRect(pt.x - 18 * z, pt.y - 0.5 * z, 5 * z, 3.2 * z);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x - 25 * z, pt.y + 0.5 * z, 11 * z, 1.5 * z);
+
+            // Studio Acoustic Entrance Portal with Condenser Mic Emblem (Left Lower Facade)
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(pt.x - 14 * z, pt.y + 15 * z, 5.2 * z, Math.PI, 0);
+            ctx.rect(pt.x - 19.2 * z, pt.y + 15 * z, 10.4 * z, 12.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.1 * z;
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(125, 211, 252, 0.6)';
+            ctx.lineWidth = 0.7 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 14 * z, pt.y + 10 * z);
+            ctx.lineTo(pt.x - 14 * z, pt.y + 27.5 * z);
+            ctx.stroke();
+
+            // Golden Condenser Microphone & Headphone Emblem above Studio Door
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 15.4 * z, pt.y + 7.5 * z, 2.8 * z, 4.5 * z, 1.4 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#fef08a';
+            ctx.lineWidth = 0.9 * z;
+            ctx.beginPath();
+            ctx.arc(pt.x - 14 * z, pt.y + 10.2 * z, 2.6 * z, 0, Math.PI);
+            ctx.stroke();
+
+            // Illuminated Red "● ON AIR" Lightbox Sign on Right Facade
+            const neonPulse = 0.82 + Math.sin(elapsed * 5) * 0.18;
+            ctx.fillStyle = '#7f1d1d';
+            ctx.beginPath();
+            ctx.roundRect(pt.x + 4 * z, pt.y - 8 * z, 22 * z, 8.5 * z, 2.5 * z);
+            ctx.fill();
             ctx.fillStyle = '#dc2626';
             ctx.beginPath();
-            ctx.roundRect(pt.x + 5 * z, pt.y - 6 * z, 20 * z, 8 * z, 2.5 * z);
+            ctx.roundRect(pt.x + 4.8 * z, pt.y - 7.2 * z, 20.4 * z, 7 * z, 2 * z);
             ctx.fill();
             ctx.strokeStyle = `rgba(254, 202, 202, ${neonPulse})`;
-            ctx.lineWidth = 1 * z;
+            ctx.lineWidth = 1.2 * z;
             ctx.stroke();
             ctx.fillStyle = '#ffffff';
             ctx.font = `bold ${Math.round(5.2 * z)}px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText('● ON AIR', pt.x + 15 * z, pt.y - 0.5 * z);
+            ctx.fillText('● ON AIR', pt.x + 15 * z, pt.y - 2.1 * z);
 
-            // Animated Audio Frequency Equalizer Display (6 channels)
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(pt.x + 5 * z, pt.y + 4.5 * z, 20 * z, 7.5 * z);
-            ctx.strokeStyle = '#0284c7';
-            ctx.lineWidth = 0.6 * z;
-            ctx.strokeRect(pt.x + 5 * z, pt.y + 4.5 * z, 20 * z, 7.5 * z);
-            const eqColors = ['#10b981', '#34d399', '#38bdf8', '#38bdf8', '#f59e0b', '#ef4444'];
-            for (let eq = 0; eq < 6; eq++) {
-              const barH = (1.8 + Math.abs(Math.sin(elapsed * 6 + eq * 1.5)) * 4.5) * z;
-              ctx.fillStyle = eqColors[eq];
-              ctx.fillRect(pt.x + (6.2 + eq * 3.0) * z, pt.y + 11.2 * z - barH, 2.0 * z, barH);
-            }
-
-            // Tall 5-tier Telecom Transmission Lattice Tower
-            const towerX = pt.x + 36 * z;
-            const towerY = pt.y + 12 * z;
-            ctx.strokeStyle = '#64748b';
-            ctx.lineWidth = 2.2 * z;
+            // Animated 8-Channel Audio Spectrum Equalizer Matrix on Right Facade
+            ctx.fillStyle = '#090d16';
             ctx.beginPath();
-            ctx.moveTo(towerX - 10 * z, towerY);
-            ctx.lineTo(towerX, towerY - 65 * z);
-            ctx.lineTo(towerX + 10 * z, towerY);
+            ctx.roundRect(pt.x + 4.5 * z, pt.y + 2.2 * z, 21 * z, 10.5 * z, 1.8 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#0284c7';
+            ctx.lineWidth = 0.8 * z;
             ctx.stroke();
 
-            ctx.lineWidth = 1.1 * z;
+            const eqColors = ['#10b981', '#10b981', '#34d399', '#38bdf8', '#38bdf8', '#facc15', '#f59e0b', '#ef4444'];
+            for (let eq = 0; eq < 8; eq++) {
+              const barH = (2.0 + Math.abs(Math.sin(elapsed * 6.5 + eq * 1.15)) * 6.8) * z;
+              ctx.fillStyle = eqColors[eq];
+              ctx.fillRect(pt.x + (5.8 + eq * 2.4) * z, pt.y + 11.6 * z - barH, 1.7 * z, barH);
+            }
+
+            // Acoustic Gold Foam Panel Showcase on Lower Right Wall
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(pt.x + 5.5 * z, pt.y + 14.5 * z, 19 * z, 8 * z);
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 0.7 * z;
+            ctx.strokeRect(pt.x + 5.5 * z, pt.y + 14.5 * z, 19 * z, 8 * z);
+            for (let wp = 0; wp < 5; wp++) {
+              ctx.fillStyle = wp % 2 === 0 ? '#f59e0b' : '#0284c7';
+              ctx.beginPath();
+              ctx.moveTo(pt.x + (6.5 + wp * 3.5) * z, pt.y + 21.5 * z);
+              ctx.lineTo(pt.x + (8.25 + wp * 3.5) * z, pt.y + 15.8 * z);
+              ctx.lineTo(pt.x + (10 + wp * 3.5) * z, pt.y + 21.5 * z);
+              ctx.closePath();
+              ctx.fill();
+            }
+
+            // Tall Red-and-White Broadcast Transmission Lattice Tower with Microwave Drums
+            const towerX = pt.x + 36 * z;
+            const towerY = pt.y + 12 * z;
             for (let tb = 1; tb <= 5; tb++) {
-              const ty1 = towerY - (tb - 1) * 12.5 * z;
-              const ty2 = towerY - tb * 12.5 * z;
-              const w1 = (1 - (tb - 1) / 6) * 10 * z;
-              const w2 = (1 - tb / 6) * 10 * z;
+              const ty1 = towerY - (tb - 1) * 13 * z;
+              const ty2 = towerY - tb * 13 * z;
+              const w1 = (1 - (tb - 1) / 6.2) * 10.5 * z;
+              const w2 = (1 - tb / 6.2) * 10.5 * z;
+              ctx.strokeStyle = tb % 2 === 1 ? '#dc2626' : '#f8fafc';
+              ctx.lineWidth = 2.1 * z;
+              ctx.beginPath();
+              ctx.moveTo(towerX - w1, ty1);
+              ctx.lineTo(towerX - w2, ty2);
+              ctx.moveTo(towerX + w1, ty1);
+              ctx.lineTo(towerX + w2, ty2);
+              ctx.stroke();
+
+              ctx.lineWidth = 1.05 * z;
               ctx.beginPath();
               ctx.moveTo(towerX - w2, ty2);
               ctx.lineTo(towerX + w2, ty2);
@@ -4477,17 +4910,37 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.stroke();
             }
 
-            // Blinking Red Aviation Beacon
+            // Microwave drum transceivers mounted on tower
+            ctx.fillStyle = '#f8fafc';
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 0.9 * z;
+            ctx.beginPath();
+            ctx.arc(towerX - 5.5 * z, towerY - 34 * z, 2.8 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(towerX + 4.5 * z, towerY - 47 * z, 2.3 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Blinking Red Aviation Beacon & Radiating Radio Wave Rings
             const beaconIsOn = Math.floor(beaconBlink) % 2 === 0;
+            const wavePhase = (elapsed * 1.4) % 1;
+            ctx.strokeStyle = `rgba(56, 189, 248, ${(1 - wavePhase) * 0.65})`;
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.arc(towerX, towerY - 68 * z, (4 + wavePhase * 14) * z, 0, Math.PI * 2);
+            ctx.stroke();
+
             if (beaconIsOn) {
-              ctx.fillStyle = 'rgba(239, 68, 68, 0.42)';
+              ctx.fillStyle = 'rgba(239, 68, 68, 0.45)';
               ctx.beginPath();
-              ctx.arc(towerX, towerY - 67 * z, 7.5 * z, 0, Math.PI * 2);
+              ctx.arc(towerX, towerY - 68 * z, 8 * z, 0, Math.PI * 2);
               ctx.fill();
             }
             ctx.fillStyle = beaconIsOn ? '#ef4444' : '#7f1d1d';
             ctx.beginPath();
-            ctx.arc(towerX, towerY - 67 * z, 3.2 * z, 0, Math.PI * 2);
+            ctx.arc(towerX, towerY - 68 * z, 3.3 * z, 0, Math.PI * 2);
             ctx.fill();
           } else if (b.id === 'perpustakaan') {
             // WEST: PERPUSTAKAAN KOTA (Modern-Classical Civic Library & Knowledge Hall — NO Steeple, NO Cross)
@@ -4682,31 +5135,55 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#e0f2fe';
             ctx.fillRect(pt.x + 8.2 * z, pt.y + 24.5 * z, 2.6 * z, 1.1 * z);
           } else if (b.id === 'pasar_prestasi') {
-            // SOUTH-WEST: TOKO POIN (PASAR PRESTASI - Refined Isometric Boutique & Trophy Gallery)
-            // 1. Stone Plinth Base
-            ctx.fillStyle = '#94a3b8';
+            // SOUTH-WEST: TOKO POIN (PASAR PRESTASI - Detailed Grand Boutique Emporium, Trophy Gallery & Reward Kiosk)
+            // 1. Two-Tiered Cream Marble & Gold Trim Foundation Plinth
+            ctx.fillStyle = '#78716c';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 30 * z, pt.y + 18 * z);
-            ctx.lineTo(pt.x, pt.y + 33 * z);
-            ctx.lineTo(pt.x + 30 * z, pt.y + 18 * z);
-            ctx.lineTo(pt.x + 30 * z, pt.y + 22 * z);
-            ctx.lineTo(pt.x, pt.y + 37 * z);
-            ctx.lineTo(pt.x - 30 * z, pt.y + 22 * z);
+            ctx.moveTo(pt.x - 32 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x, pt.y + 35 * z);
+            ctx.lineTo(pt.x + 32 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x + 32 * z, pt.y + 23 * z);
+            ctx.lineTo(pt.x, pt.y + 40 * z);
+            ctx.lineTo(pt.x - 32 * z, pt.y + 23 * z);
             ctx.closePath();
             ctx.fill();
 
-            // 2. Isometric Roof Deck
+            ctx.fillStyle = '#d6d3d1';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 30 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x, pt.y + 32 * z);
+            ctx.lineTo(pt.x + 30 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x + 30 * z, pt.y + 19 * z);
+            ctx.lineTo(pt.x, pt.y + 35 * z);
+            ctx.lineTo(pt.x - 30 * z, pt.y + 19 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // 2. Isometric Terracotta & Gold Roof Deck with Skylight Lantern
             ctx.fillStyle = '#fef3c7';
             ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y - 32 * z);
-            ctx.lineTo(pt.x + 28 * z, pt.y - 18 * z);
-            ctx.lineTo(pt.x, pt.y - 4 * z);
-            ctx.lineTo(pt.x - 28 * z, pt.y - 18 * z);
+            ctx.moveTo(pt.x, pt.y - 33 * z);
+            ctx.lineTo(pt.x + 29 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 3 * z);
+            ctx.lineTo(pt.x - 29 * z, pt.y - 18 * z);
             ctx.closePath();
             ctx.fill();
 
-            // 3. Left Shaded Wall
-            ctx.fillStyle = '#e2e8f0';
+            // Inner Skylight Glass Atrium on Roof
+            ctx.fillStyle = isNight ? '#fde047' : '#38bdf8';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 26 * z);
+            ctx.lineTo(pt.x + 14 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 10 * z);
+            ctx.lineTo(pt.x - 14 * z, pt.y - 18 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 1.1 * z;
+            ctx.stroke();
+
+            // 3. Left Shaded Boutique Wall
+            ctx.fillStyle = '#f1f5f9';
             ctx.beginPath();
             ctx.moveTo(pt.x - 28 * z, pt.y - 18 * z);
             ctx.lineTo(pt.x, pt.y - 4 * z);
@@ -4718,8 +5195,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 0.8 * z;
             ctx.stroke();
 
-            // 4. Right Sunlit Wall
-            ctx.fillStyle = '#f8fafc';
+            // 4. Right Sunlit Boutique Wall with Warm Cream Finish
+            ctx.fillStyle = '#fffbeb';
             ctx.beginPath();
             ctx.moveTo(pt.x, pt.y - 4 * z);
             ctx.lineTo(pt.x + 28 * z, pt.y - 18 * z);
@@ -4727,63 +5204,137 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x, pt.y + 30 * z);
             ctx.closePath();
             ctx.fill();
-            ctx.strokeStyle = '#cbd5e1';
+            ctx.strokeStyle = '#fde68a';
             ctx.lineWidth = 0.8 * z;
             ctx.stroke();
 
-            // Golden Crown Parapet Molding along Roof Edge
-            ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 2.2 * z;
+            // Decorative Gold Corner Columns / Pilasters
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x - 28 * z, pt.y - 18 * z, 2.2 * z, 34 * z);
+            ctx.fillRect(pt.x - 1.1 * z, pt.y - 4 * z, 2.2 * z, 34 * z);
+            ctx.fillRect(pt.x + 25.8 * z, pt.y - 18 * z, 2.2 * z, 34 * z);
+
+            // Golden Crown Parapet Molding & Warm String Lights along Roof Edge
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 2.6 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x - 28 * z, pt.y - 18 * z);
-            ctx.lineTo(pt.x, pt.y - 4 * z);
-            ctx.lineTo(pt.x + 28 * z, pt.y - 18 * z);
+            ctx.moveTo(pt.x - 29 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 3 * z);
+            ctx.lineTo(pt.x + 29 * z, pt.y - 18 * z);
             ctx.stroke();
 
-            // Festive Red & White Scalloped Awning
-            const awnW = 48 * z;
-            for (let a = 0; a < 8; a++) {
-              ctx.fillStyle = a % 2 === 0 ? '#ef4444' : '#ffffff';
-              const ax = pt.x - 24 * z + a * (awnW / 8);
-              ctx.fillRect(ax, pt.y + 4 * z, awnW / 8, 8 * z);
+            for (let bl = -24; bl <= 24; bl += 6) {
+              const by = pt.y - 3 * z - (Math.abs(bl) / 28) * 14 * z + 1.8 * z;
+              ctx.fillStyle = isNight ? '#fef08a' : '#fbbf24';
               ctx.beginPath();
-              ctx.arc(ax + (awnW / 16), pt.y + 12 * z, awnW / 16, 0, Math.PI);
+              ctx.arc(pt.x + bl * z, by, 1.1 * z, 0, Math.PI * 2);
               ctx.fill();
             }
 
-            // Large glass bay showcase window with Golden Trophy Cup
-            ctx.fillStyle = isNight ? '#fef9c3' : '#bae6fd';
-            ctx.fillRect(pt.x - 19 * z, pt.y + 14 * z, 15 * z, 11 * z);
-            ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 1 * z;
-            ctx.strokeRect(pt.x - 19 * z, pt.y + 14 * z, 15 * z, 11 * z);
+            // Festive Red, Gold & White Striped Boutique Awning Across Both Facades
+            const awnW = 50 * z;
+            for (let a = 0; a < 10; a++) {
+              ctx.fillStyle = a % 2 === 0 ? '#dc2626' : '#fffbeb';
+              const ax = pt.x - 25 * z + a * (awnW / 10);
+              ctx.fillRect(ax, pt.y + 2.5 * z, awnW / 10, 7.5 * z);
+              ctx.beginPath();
+              ctx.arc(ax + awnW / 20, pt.y + 10 * z, awnW / 20, 0, Math.PI);
+              ctx.fill();
+              ctx.fillStyle = '#f59e0b';
+              ctx.beginPath();
+              ctx.arc(ax + awnW / 20, pt.y + 11.2 * z, 0.7 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
 
-            // Velvet Display Pedestal & Golden Trophy Cup inside window
+            // Left Facade: Grand Trophy & Gift Box Display Window
+            ctx.fillStyle = isNight ? '#fef9c3' : '#e0f2fe';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 24.5 * z, pt.y + 12.5 * z, 20.5 * z, 12.5 * z, 1.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+
+            // Velvet Display Pedestal + Golden Cup Trophy + Silver Medal + Wrapped Gift Box
             ctx.fillStyle = '#991b1b';
-            ctx.fillRect(pt.x - 14 * z, pt.y + 22 * z, 5 * z, 3 * z);
+            ctx.fillRect(pt.x - 22.5 * z, pt.y + 21.5 * z, 16.5 * z, 3 * z);
             ctx.fillStyle = '#f59e0b';
             ctx.beginPath();
-            ctx.arc(pt.x - 11.5 * z, pt.y + 18.5 * z, 2.8 * z, 0, Math.PI);
-            ctx.rect(pt.x - 12.3 * z, pt.y + 20.5 * z, 1.6 * z, 2 * z);
+            ctx.arc(pt.x - 14.5 * z, pt.y + 17.2 * z, 2.8 * z, 0, Math.PI);
+            ctx.rect(pt.x - 15.3 * z, pt.y + 19.2 * z, 1.6 * z, 2.3 * z);
             ctx.fill();
-
-            // Entrance door with red carpet welcome mat
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(pt.x + 2 * z, pt.y + 14 * z, 11 * z, 13 * z);
-            ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 0.8 * z;
-            ctx.strokeRect(pt.x + 2 * z, pt.y + 14 * z, 11 * z, 13 * z);
-            ctx.fillStyle = '#dc2626';
-            ctx.fillRect(pt.x + 2.5 * z, pt.y + 27 * z, 10 * z, 2.5 * z);
-
-            // Rooftop Golden Star Trophy Medallion Crest
+            ctx.fillStyle = '#2563eb';
+            ctx.fillRect(pt.x - 21.5 * z, pt.y + 18 * z, 4 * z, 3.5 * z);
             ctx.fillStyle = '#facc15';
+            ctx.fillRect(pt.x - 19.9 * z, pt.y + 18 * z, 0.9 * z, 3.5 * z);
+            ctx.fillRect(pt.x - 21.5 * z, pt.y + 19.3 * z, 4 * z, 0.8 * z);
+            ctx.fillStyle = '#10b981';
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 12 * z, 5.5 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 8.5 * z, pt.y + 18.5 * z, 2.1 * z, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = '#b45309';
+            ctx.strokeStyle = '#fef08a';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+
+            // Right Facade: Ornate Boutique Entrance Door with Red VIP Carpet
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(pt.x + 2.5 * z, pt.y + 12.5 * z, 11 * z, 14.5 * z, 1.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 1.1 * z;
             ctx.stroke();
+            ctx.fillStyle = isNight ? 'rgba(254, 240, 138, 0.35)' : 'rgba(56, 189, 248, 0.35)';
+            ctx.fillRect(pt.x + 3.8 * z, pt.y + 14 * z, 3.8 * z, 11 * z);
+            ctx.fillRect(pt.x + 8.4 * z, pt.y + 14 * z, 3.8 * z, 11 * z);
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(pt.x + 7.2 * z, pt.y + 19 * z, 1.6 * z, 2.2 * z);
+
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(pt.x + 2.5 * z, pt.y + 27 * z, 11 * z, 3.5 * z);
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 0.7 * z;
+            ctx.strokeRect(pt.x + 2.5 * z, pt.y + 27 * z, 11 * z, 3.5 * z);
+
+            // Digital "POIN EXPRESS" Reward Exchange Kiosk Cabinet on Right Side
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.roundRect(pt.x + 15.5 * z, pt.y + 12.5 * z, 9.5 * z, 12.5 * z, 1.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(pt.x + 17 * z, pt.y + 14.2 * z, 6.5 * z, 4.5 * z);
+            ctx.fillStyle = '#facc15';
+            ctx.font = `bold ${Math.max(3, Math.round(3.2 * z))}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('★ XP', pt.x + 20.2 * z, pt.y + 17.5 * z);
+            ctx.fillStyle = '#10b981';
+            ctx.fillRect(pt.x + 17.5 * z, pt.y + 20.2 * z, 5.5 * z, 2 * z);
+
+            // Rooftop Rotating 3D Golden Star Coin & Trophy Medallion Crest
+            const coinPulse = Math.max(0.25, Math.abs(Math.cos(elapsed * 2.2)));
+            ctx.fillStyle = '#b45309';
+            ctx.fillRect(pt.x - 5 * z, pt.y - 10 * z, 10 * z, 3 * z);
+            ctx.fillStyle = 'rgba(250, 204, 21, 0.25)';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 17 * z, 9 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y - 17 * z, 7 * z * coinPulse, 7 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+            if (coinPulse > 0.45) {
+              ctx.fillStyle = '#92400e';
+              ctx.font = `bold ${Math.round(6.5 * z)}px sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('★', pt.x, pt.y - 17 * z);
+            }
           } else if (b.id === 'bengkel_latihan') {
             // SOUTH-EAST: LAB DKV & TEFA (Modern Creative Design Studio, Sawtooth Skylight & Glass Control Tower)
             // 1. Concrete Studio Base Plinth
@@ -4875,194 +5426,529 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
             ctx.stroke();
           } else if (b.id === 'kantor_pos') {
-            // NORTH-EAST: KANTOR POS KILAT (Refined Isometric Express Post Office & Courier Hub)
-            // 1. Left Shaded Wall
+            // NORTH-EAST: KANTOR POS KILAT (Detailed Express Post Office, Clock Gable, Sorting Bay & Courier Hub)
+            // 1. Stepped Stone Foundation Plinth
+            ctx.fillStyle = '#64748b';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 29 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x, pt.y + 32 * z);
+            ctx.lineTo(pt.x + 29 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x + 29 * z, pt.y + 20 * z);
+            ctx.lineTo(pt.x, pt.y + 36 * z);
+            ctx.lineTo(pt.x - 29 * z, pt.y + 20 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // 2. Left Shaded Wall with Classic Postal Quoins
             ctx.fillStyle = '#e2e8f0';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 26 * z, pt.y - 16 * z);
-            ctx.lineTo(pt.x, pt.y - 3 * z);
-            ctx.lineTo(pt.x, pt.y + 30 * z);
-            ctx.lineTo(pt.x - 26 * z, pt.y + 16 * z);
+            ctx.moveTo(pt.x - 27 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x, pt.y - 2 * z);
+            ctx.lineTo(pt.x, pt.y + 31 * z);
+            ctx.lineTo(pt.x - 27 * z, pt.y + 16 * z);
             ctx.closePath();
             ctx.fill();
-            ctx.strokeStyle = '#cbd5e1';
+            ctx.strokeStyle = '#94a3b8';
             ctx.lineWidth = 0.8 * z;
             ctx.stroke();
 
-            // 2. Right Sunlit Wall
+            // 3. Right Sunlit Wall
             ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y - 3 * z);
-            ctx.lineTo(pt.x + 26 * z, pt.y - 16 * z);
-            ctx.lineTo(pt.x + 26 * z, pt.y + 16 * z);
-            ctx.lineTo(pt.x, pt.y + 30 * z);
+            ctx.moveTo(pt.x, pt.y - 2 * z);
+            ctx.lineTo(pt.x + 27 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x + 27 * z, pt.y + 16 * z);
+            ctx.lineTo(pt.x, pt.y + 31 * z);
             ctx.closePath();
             ctx.fill();
             ctx.strokeStyle = '#cbd5e1';
             ctx.lineWidth = 0.8 * z;
             ctx.stroke();
 
-            // 3. Pitched Crimson Postal Roof with Neat Eaves
+            // Brick Corner Quoins along Left, Center, and Right Edges
+            for (let q = 0; q < 5; q++) {
+              ctx.fillStyle = q % 2 === 0 ? '#dc2626' : '#f59e0b';
+              ctx.fillRect(pt.x - 27 * z, pt.y + (-12 + q * 5.2) * z, 2.2 * z, 2.4 * z);
+              ctx.fillRect(pt.x - 1.1 * z, pt.y + (2 + q * 5.2) * z, 2.2 * z, 2.4 * z);
+              ctx.fillRect(pt.x + 24.8 * z, pt.y + (-12 + q * 5.2) * z, 2.2 * z, 2.4 * z);
+            }
+
+            // 4. Pitched Crimson Postal Roof with Shingle Texture & Overhanging Gold Eaves
             ctx.fillStyle = '#b91c1c';
             ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y - 32 * z);
-            ctx.lineTo(pt.x + 28 * z, pt.y - 16 * z);
-            ctx.lineTo(pt.x, pt.y - 2 * z);
-            ctx.lineTo(pt.x - 28 * z, pt.y - 16 * z);
+            ctx.moveTo(pt.x, pt.y - 34 * z);
+            ctx.lineTo(pt.x + 30 * z, pt.y - 16 * z);
+            ctx.lineTo(pt.x, pt.y - 1 * z);
+            ctx.lineTo(pt.x - 30 * z, pt.y - 16 * z);
             ctx.closePath();
             ctx.fill();
             ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 1.1 * z;
+            ctx.lineWidth = 1.4 * z;
             ctx.stroke();
 
-            // Classic Airmail Red-Blue Stripe along Both Isometric Walls
-            ctx.strokeStyle = '#ef4444';
-            ctx.lineWidth = 1.6 * z;
+            // Subtle roof tile ridges
+            ctx.strokeStyle = 'rgba(127, 29, 29, 0.45)';
+            ctx.lineWidth = 0.7 * z;
+            for (let rt = 1; rt <= 3; rt++) {
+              const rOff = rt * 4.2 * z;
+              ctx.beginPath();
+              ctx.moveTo(pt.x - (28 - rt * 5) * z, pt.y - 16 * z - rOff * 0.35);
+              ctx.lineTo(pt.x, pt.y - 2 * z - rOff);
+              ctx.lineTo(pt.x + (28 - rt * 5) * z, pt.y - 16 * z - rOff * 0.35);
+              ctx.stroke();
+            }
+
+            // Rooftop Dispatch Radio Antenna & Weather Vane
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1.2 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x - 26 * z, pt.y - 2 * z);
-            ctx.lineTo(pt.x, pt.y + 11 * z);
-            ctx.lineTo(pt.x + 26 * z, pt.y - 2 * z);
+            ctx.moveTo(pt.x, pt.y - 34 * z);
+            ctx.lineTo(pt.x, pt.y - 44 * z);
+            ctx.moveTo(pt.x - 4 * z, pt.y - 40 * z);
+            ctx.lineTo(pt.x + 4 * z, pt.y - 40 * z);
+            ctx.stroke();
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 44.5 * z, 1.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Classic International Airmail Red-White-Blue Stripe Band
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 27 * z, pt.y - 3.5 * z);
+            ctx.lineTo(pt.x, pt.y + 10 * z);
+            ctx.lineTo(pt.x + 27 * z, pt.y - 3.5 * z);
             ctx.stroke();
 
             ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 1.8 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x - 26 * z, pt.y + 0.5 * z);
-            ctx.lineTo(pt.x, pt.y + 13.5 * z);
-            ctx.lineTo(pt.x + 26 * z, pt.y + 0.5 * z);
+            ctx.moveTo(pt.x - 27 * z, pt.y - 1 * z);
+            ctx.lineTo(pt.x, pt.y + 12.5 * z);
+            ctx.lineTo(pt.x + 27 * z, pt.y - 1 * z);
             ctx.stroke();
 
-            // Town Post Clock on Roof Gable
+            // Ornate Town Post Clock Gable & Winged Envelope Signboard ("POS KILAT")
+            ctx.fillStyle = '#991b1b';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 15.5 * z, 6.8 * z, 0, Math.PI * 2);
+            ctx.fill();
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 14 * z, 5.2 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x, pt.y - 15.5 * z, 5.4 * z, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 1.2 * z;
+            ctx.lineWidth = 1.3 * z;
             ctx.stroke();
             ctx.strokeStyle = '#0f172a';
             ctx.lineWidth = 0.9 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y - 14 * z);
-            ctx.lineTo(pt.x + 2.6 * z, pt.y - 14 * z);
-            ctx.moveTo(pt.x, pt.y - 14 * z);
-            ctx.lineTo(pt.x, pt.y - 17 * z);
+            ctx.moveTo(pt.x, pt.y - 15.5 * z);
+            ctx.lineTo(pt.x + 2.8 * z, pt.y - 15.5 * z);
+            ctx.moveTo(pt.x, pt.y - 15.5 * z);
+            ctx.lineTo(pt.x, pt.y - 18.8 * z);
             ctx.stroke();
 
-            // Service counter window & entrance door
-            ctx.fillStyle = isNight ? '#fef08a' : '#38bdf8';
-            ctx.fillRect(pt.x - 19 * z, pt.y + 6 * z, 11 * z, 8 * z);
-            ctx.strokeStyle = '#ffffff';
+            // Winged Envelope "POS KILAT" Sign Banner below Clock
+            ctx.fillStyle = '#ea580c';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 11.5 * z, pt.y - 8 * z, 23 * z, 5.2 * z, 1.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#fef08a';
             ctx.lineWidth = 0.8 * z;
-            ctx.strokeRect(pt.x - 19 * z, pt.y + 6 * z, 11 * z, 8 * z);
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.max(3.5, Math.round(3.6 * z))}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('✉ POS KILAT', pt.x, pt.y - 4.3 * z);
 
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(pt.x - 4 * z, pt.y + 15 * z, 9 * z, 13 * z);
-
-            // Red Pillar Postbox & Neat Parcel Boxes
-            ctx.fillStyle = '#ef4444';
+            // Left Facade: Express Service Counter Window with Wooden Ledge
+            ctx.fillStyle = isNight ? '#fef08a' : '#38bdf8';
             ctx.beginPath();
-            ctx.roundRect(pt.x + 14 * z, pt.y + 14 * z, 6.5 * z, 11.5 * z, 2.5 * z);
+            ctx.roundRect(pt.x - 23 * z, pt.y + 5 * z, 14 * z, 9.5 * z, 1.2 * z);
             ctx.fill();
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(pt.x + 15 * z, pt.y + 16.5 * z, 4.5 * z, 1.3 * z);
-          } else if (b.id === 'taman_refleksi') {
-            // NORTH-WEST: TAMAN REFLEKSI (Refined Octagonal Rose Marble Sanctuary Pavilion & Lotus Koi Pond)
-            // 1. Stepped White & Rose Marble Octagonal Platform
-            ctx.fillStyle = '#f9a8d4';
-            ctx.beginPath();
-            ctx.ellipse(pt.x, pt.y + 2 * z, 24 * z, 13.5 * z, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#fdf2f8';
-            ctx.beginPath();
-            ctx.ellipse(pt.x, pt.y, 22 * z, 12 * z, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#f472b6';
+            ctx.strokeStyle = '#1e293b';
             ctx.lineWidth = 1 * z;
             ctx.stroke();
-
-            // 2. Tranquil Lotus Reflection Pool
-            ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
             ctx.beginPath();
-            ctx.ellipse(pt.x, pt.y, 16 * z, 8.8 * z, 0, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.moveTo(pt.x - 16 * z, pt.y + 5 * z);
+            ctx.lineTo(pt.x - 16 * z, pt.y + 14.5 * z);
+            ctx.stroke();
+            ctx.fillStyle = '#b45309';
+            ctx.fillRect(pt.x - 24 * z, pt.y + 14 * z, 16 * z, 1.8 * z);
 
-            // Animated orange koi fish swimming in reflection pool
-            for (let k = 0; k < 2; k++) {
-              const koiAngle = elapsed * 1.5 + k * Math.PI;
-              const koiDist = 8.5 * z;
-              const kx = pt.x + Math.cos(koiAngle) * koiDist;
-              const ky = pt.y + Math.sin(koiAngle) * (koiDist * 0.5);
-              ctx.fillStyle = '#f97316';
-              ctx.beginPath();
-              ctx.ellipse(kx, ky, 2.6 * z, 1.1 * z, koiAngle, 0, Math.PI * 2);
-              ctx.fill();
-            }
-
-            // Blooming pink lotus blossom in center with lily pads
-            ctx.fillStyle = '#15803d';
+            // Center Entrance Door with Golden Mail Slot
+            ctx.fillStyle = '#0f172a';
             ctx.beginPath();
-            ctx.ellipse(pt.x - 3.5 * z, pt.y + 1.5 * z, 3.5 * z, 1.8 * z, 0.3, 0, Math.PI * 2);
-            ctx.ellipse(pt.x + 3.5 * z, pt.y - 1 * z, 3.2 * z, 1.6 * z, -0.4, 0, Math.PI * 2);
+            ctx.roundRect(pt.x - 5.5 * z, pt.y + 14.5 * z, 9.5 * z, 14 * z, 1.2 * z);
             ctx.fill();
-
-            ctx.fillStyle = '#ec4899';
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 0.5 * z, 3.8 * z, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#fbcfe8';
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 1 * z, 2.2 * z, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
             ctx.fillStyle = '#facc15';
+            ctx.fillRect(pt.x - 3 * z, pt.y + 21 * z, 4.5 * z, 1.2 * z);
+
+            // Right Facade: Express Parcel Sorting Bay, Stacked Cardboard Packages & Classic Red Pillar Postbox
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(pt.x + 6 * z, pt.y + 8 * z, 10 * z, 12 * z);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 0.8 * z;
+            ctx.strokeRect(pt.x + 6 * z, pt.y + 8 * z, 10 * z, 12 * z);
+            ctx.fillStyle = '#d97706';
+            ctx.fillRect(pt.x + 7 * z, pt.y + 15 * z, 4.2 * z, 4.2 * z);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x + 11.4 * z, pt.y + 16 * z, 3.8 * z, 3.2 * z);
+            ctx.fillStyle = '#fde68a';
+            ctx.fillRect(pt.x + 8.5 * z, pt.y + 11.8 * z, 4 * z, 3.2 * z);
+
+            // Iconic Red Pillar Postbox with Crown Cap & Letter Slot
+            ctx.fillStyle = '#dc2626';
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 0.5 * z, 1.0 * z, 0, Math.PI * 2);
+            ctx.roundRect(pt.x + 18 * z, pt.y + 12.5 * z, 6.8 * z, 12.5 * z, 2.8 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#7f1d1d';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x + 19.2 * z, pt.y + 15.2 * z, 4.4 * z, 1.3 * z);
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(pt.x + 19.5 * z, pt.y + 18 * z, 3.8 * z, 2.2 * z);
+
+            // Parked Orange "Pos Kilat" Courier Delivery Scooter in Front Right
+            const scX = pt.x + 13 * z;
+            const scY = pt.y + 27.5 * z;
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(scX - 3.5 * z, scY + 1.5 * z, 2.1 * z, 0, Math.PI * 2);
+            ctx.arc(scX + 3.5 * z, scY + 1.5 * z, 2.1 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ea580c';
+            ctx.beginPath();
+            ctx.roundRect(scX - 4 * z, scY - 2 * z, 7.5 * z, 3.5 * z, 1.2 * z);
+            ctx.fill();
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(scX - 5.2 * z, scY - 5.8 * z, 4.5 * z, 4 * z);
+            ctx.strokeStyle = '#fef08a';
+            ctx.lineWidth = 0.6 * z;
+            ctx.strokeRect(scX - 5.2 * z, scY - 5.8 * z, 4.5 * z, 4 * z);
+          } else if (b.id === 'taman_refleksi') {
+            // NORTH-WEST: PUSAT REFLEKSI (Monumental Rotating "Vintage Desk Globe" / Bola Dunia Meja Antik yang Berputar)
+            const globeCx = pt.x;
+            const globeCy = pt.y - 25 * z;
+            const globeR = 19.5 * z;
+            const tiltAngle = -0.36; // ~21 deg classic axial tilt
+
+            // 1. Stepped Antique Walnut & Brass Circular Plaza Plinth on Ground
+            ctx.fillStyle = '#451a03';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 4 * z, 26 * z, 14 * z, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // 3. Four Symmetrical Carved Rosewood Pavilion Pillars
-            [-15, -6, 6, 15].forEach((pxOff) => {
-              const pyOff = Math.abs(pxOff) > 10 ? -1 * z : 4 * z;
-              const px = pt.x + pxOff * z;
-              const py = pt.y + pyOff;
-              ctx.fillStyle = '#9d174d';
-              ctx.fillRect(px - 1.4 * z, py - 21 * z, 2.8 * z, 21 * z);
-              ctx.fillStyle = '#fbcfe8';
-              ctx.fillRect(px - 1.8 * z, py - 2 * z, 3.6 * z, 2 * z);
-            });
-
-            // 4. Neat Double-Tiered Sanctuary Gazebo Roof Canopy with Golden Trim
-            ctx.fillStyle = '#be123c';
+            ctx.fillStyle = '#78350f';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 23 * z, pt.y - 17 * z);
-            ctx.lineTo(pt.x, pt.y - 29 * z);
-            ctx.lineTo(pt.x + 23 * z, pt.y - 17 * z);
-            ctx.lineTo(pt.x, pt.y - 22 * z);
-            ctx.closePath();
+            ctx.ellipse(pt.x, pt.y + 1.5 * z, 24 * z, 12.8 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 1.1 * z;
+            ctx.stroke();
+
+            // Inner parchment/travertine compass medallion floor
+            ctx.fillStyle = isNight ? '#1e293b' : '#fef3c7';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 0.5 * z, 19 * z, 10 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+
+            // 2. Turned Antique Mahogany Desk-Globe Pedestal Base (Kaki Meja Kayu Bubut Antik)
+            // Tier 1: Wide molded mahogany foot
+            const standGrad = ctx.createLinearGradient(pt.x - 14 * z, pt.y, pt.x + 14 * z, pt.y);
+            standGrad.addColorStop(0, '#451a03');
+            standGrad.addColorStop(0.45, '#9a3412');
+            standGrad.addColorStop(0.7, '#78350f');
+            standGrad.addColorStop(1, '#271103');
+            ctx.fillStyle = standGrad;
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 0.5 * z, 13.5 * z, 7.2 * z, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 0.9 * z;
             ctx.stroke();
 
-            ctx.fillStyle = '#e11d48';
+            // Tier 2: Stepped walnut riser ring
+            ctx.fillStyle = '#78350f';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 16 * z, pt.y - 26 * z);
-            ctx.lineTo(pt.x, pt.y - 37 * z);
-            ctx.lineTo(pt.x + 16 * z, pt.y - 26 * z);
-            ctx.lineTo(pt.x, pt.y - 30 * z);
-            ctx.closePath();
+            ctx.ellipse(pt.x, pt.y - 2.2 * z, 9.8 * z, 5.2 * z, 0, 0, Math.PI * 2);
             ctx.fill();
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 0.7 * z;
             ctx.stroke();
 
-            // Golden Lotus Finial at Apex
+            // Turned Central Baluster Column (Tiang Penyangga Bola Dunia)
+            ctx.fillStyle = standGrad;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 4.2 * z, pt.y - 2 * z);
+            ctx.quadraticCurveTo(pt.x - 2.2 * z, pt.y - 6 * z, pt.x - 3.2 * z, pt.y - 10 * z);
+            ctx.lineTo(pt.x + 3.2 * z, pt.y - 10 * z);
+            ctx.quadraticCurveTo(pt.x + 2.2 * z, pt.y - 6 * z, pt.x + 4.2 * z, pt.y - 2 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Polished Brass Pedestal Collar Ring
             ctx.fillStyle = '#fbbf24';
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 38.5 * z, 2.2 * z, 0, Math.PI * 2);
+            ctx.ellipse(pt.x, pt.y - 6.2 * z, 3.8 * z, 1.9 * z, 0, 0, Math.PI * 2);
             ctx.fill();
+
+            // Back half of Horizontal Wooden & Brass Horizon Ring (Cincin Ekuator Penyangga)
+            ctx.strokeStyle = '#92400e';
+            ctx.lineWidth = 2.6 * z;
+            ctx.beginPath();
+            ctx.ellipse(globeCx, globeCy, globeR + 4.2 * z, (globeR + 4.2 * z) * 0.34, 0, Math.PI, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.0 * z;
+            ctx.stroke();
+
+            // 3. ROTATING VINTAGE PARCHMENT & SEPIA-OCEAN GLOBE SPHERE
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(globeCx, globeCy, globeR, 0, Math.PI * 2);
+            ctx.closePath();
+
+            // Warm Vintage Parchment / Sepia-Teal Ocean Base Gradient
+            const oceanGrad = ctx.createRadialGradient(
+              globeCx - 6 * z,
+              globeCy - 7 * z,
+              2 * z,
+              globeCx,
+              globeCy,
+              globeR
+            );
+            oceanGrad.addColorStop(0, '#fef9c3');
+            oceanGrad.addColorStop(0.35, '#fde68a');
+            oceanGrad.addColorStop(0.72, '#eab308');
+            oceanGrad.addColorStop(1, '#a16207');
+            ctx.fillStyle = oceanGrad;
+            ctx.fill();
+
+            // Clip all rotating continents & graticule lines strictly inside the sphere
+            ctx.clip();
+
+            // Rotate coordinate space to match the globe's 21-degree axial tilt
+            ctx.translate(globeCx, globeCy);
+            ctx.rotate(tiltAngle);
+
+            // 3A. Animated Rotating Vintage Continents (Seamless Horizontal Wrap)
+            const wrapSpan = globeR * 2.4;
+            const spinShift = (elapsed * 13 * z) % wrapSpan;
+
+            for (let repeat = -1; repeat <= 1; repeat++) {
+              const baseX = repeat * wrapSpan + spinShift - globeR * 1.2;
+
+              // Continent Group 1: Vintage Eurasia & Nusantara Archipelago
+              ctx.fillStyle = 'rgba(180, 83, 9, 0.72)';
+              ctx.strokeStyle = 'rgba(120, 53, 15, 0.85)';
+              ctx.lineWidth = 0.7 * z;
+              ctx.beginPath();
+              ctx.moveTo(baseX - 6 * z, -9 * z);
+              ctx.bezierCurveTo(baseX + 2 * z, -13 * z, baseX + 12 * z, -11 * z, baseX + 14 * z, -4 * z);
+              ctx.bezierCurveTo(baseX + 11 * z, 1 * z, baseX + 4 * z, 2 * z, baseX - 2 * z, -1 * z);
+              ctx.closePath();
+              ctx.fill();
+              ctx.stroke();
+
+              // Nusantara islands chain near equator
+              ctx.fillStyle = 'rgba(101, 163, 13, 0.75)';
+              ctx.beginPath();
+              ctx.ellipse(baseX + 10 * z, 2.5 * z, 3.2 * z, 1.3 * z, 0.2, 0, Math.PI * 2);
+              ctx.ellipse(baseX + 14.5 * z, 3.2 * z, 2.2 * z, 1.1 * z, -0.1, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Continent Group 2: Vintage Africa Silhouette
+              ctx.fillStyle = 'rgba(161, 98, 7, 0.72)';
+              ctx.beginPath();
+              ctx.moveTo(baseX - 5 * z, 0 * z);
+              ctx.bezierCurveTo(baseX + 1 * z, -1 * z, baseX + 3 * z, 5 * z, baseX - 1 * z, 11 * z);
+              ctx.bezierCurveTo(baseX - 5 * z, 10 * z, baseX - 7 * z, 4 * z, baseX - 5 * z, 0 * z);
+              ctx.closePath();
+              ctx.fill();
+              ctx.stroke();
+
+              // Continent Group 3: Vintage Americas (North & South)
+              ctx.fillStyle = 'rgba(154, 52, 18, 0.68)';
+              ctx.beginPath();
+              ctx.moveTo(baseX + 21 * z, -11 * z);
+              ctx.bezierCurveTo(baseX + 27 * z, -9 * z, baseX + 26 * z, -2 * z, baseX + 22 * z, -1 * z);
+              ctx.bezierCurveTo(baseX + 18 * z, -3 * z, baseX + 18 * z, -8 * z, baseX + 21 * z, -11 * z);
+              ctx.closePath();
+              ctx.fill();
+              ctx.stroke();
+
+              ctx.beginPath();
+              ctx.moveTo(baseX + 23 * z, 1 * z);
+              ctx.bezierCurveTo(baseX + 27 * z, 4 * z, baseX + 25 * z, 11 * z, baseX + 22 * z, 13 * z);
+              ctx.bezierCurveTo(baseX + 19 * z, 9 * z, baseX + 20 * z, 3 * z, baseX + 23 * z, 1 * z);
+              ctx.closePath();
+              ctx.fill();
+              ctx.stroke();
+
+              // Continent Group 4: Vintage Terra Australis
+              ctx.fillStyle = 'rgba(180, 83, 9, 0.7)';
+              ctx.beginPath();
+              ctx.ellipse(baseX + 13 * z, 9 * z, 4.2 * z, 2.5 * z, -0.15, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.stroke();
+            }
+
+            // 3B. Animated 3D Rotating Longitude Meridians (Garis Bujur Berputar)
+            ctx.strokeStyle = 'rgba(120, 53, 15, 0.36)';
+            ctx.lineWidth = 0.75 * z;
+            const numMeridians = 5;
+            for (let m = 0; m < numMeridians; m++) {
+              const mProg = ((elapsed * 0.45 + m / numMeridians) % 1.0);
+              // Map [0..1] to [-1..1] using cosine for authentic spherical perspective compression at edges
+              const nx = -Math.cos(mProg * Math.PI);
+              const rx = Math.abs(nx) * globeR;
+              ctx.beginPath();
+              ctx.ellipse(
+                0,
+                0,
+                Math.max(0.6 * z, rx),
+                globeR,
+                0,
+                nx >= 0 ? -Math.PI / 2 : Math.PI / 2,
+                nx >= 0 ? Math.PI / 2 : (Math.PI * 3) / 2
+              );
+              ctx.stroke();
+            }
+
+            // 3C. Latitude Parallels (Garis Lintang & Garis Khatulistiwa)
+            [-0.6, -0.3, 0.3, 0.6].forEach((latFrac) => {
+              const ly = latFrac * globeR;
+              const halfChord = Math.sqrt(Math.max(0, 1 - latFrac * latFrac)) * globeR;
+              ctx.beginPath();
+              ctx.moveTo(-halfChord, ly);
+              ctx.quadraticCurveTo(0, ly + 2.2 * z, halfChord, ly);
+              ctx.stroke();
+            });
+
+            // Prominent Crimson & Gold Equatorial Band (Garis Khatulistiwa)
+            ctx.strokeStyle = 'rgba(185, 28, 28, 0.78)';
+            ctx.lineWidth = 1.3 * z;
+            ctx.beginPath();
+            ctx.moveTo(-globeR, 0);
+            ctx.quadraticCurveTo(0, 2.8 * z, globeR, 0);
+            ctx.stroke();
+
+            // Tilted Ecliptic Line with Vintage Graduations
+            ctx.strokeStyle = 'rgba(146, 64, 14, 0.55)';
+            ctx.lineWidth = 0.9 * z;
+            ctx.setLineDash([2 * z, 1.5 * z]);
+            ctx.beginPath();
+            ctx.moveTo(-globeR, 6 * z);
+            ctx.lineTo(globeR, -6 * z);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 3D Inner Spherical Shading & Specular Lacquer Shine
+            ctx.rotate(-tiltAngle);
+            const shadeGrad = ctx.createRadialGradient(
+              -globeR * 0.35,
+              -globeR * 0.35,
+              globeR * 0.1,
+              0,
+              0,
+              globeR
+            );
+            shadeGrad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+            shadeGrad.addColorStop(0.25, 'rgba(255, 255, 255, 0.12)');
+            shadeGrad.addColorStop(0.7, 'rgba(69, 26, 3, 0)');
+            shadeGrad.addColorStop(1, 'rgba(69, 26, 3, 0.48)');
+            ctx.fillStyle = shadeGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, globeR, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+
+            // Outer Antique Bronze Rim of the Globe Sphere
+            ctx.strokeStyle = '#92400e';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.arc(globeCx, globeCy, globeR, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 4. FRONT HALF OF HORIZONTAL WOOD & BRASS HORIZON RING
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 3.0 * z;
+            ctx.beginPath();
+            ctx.ellipse(globeCx, globeCy, globeR + 4.2 * z, (globeR + 4.2 * z) * 0.34, 0, 0, Math.PI);
+            ctx.stroke();
+            ctx.strokeStyle = '#fcd34d';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+
+            // 5. HEAVY BURNISHED BRASS MERIDIAN ARC RING & POLAR FINIALS (Busur Kuningan Derajat)
+            ctx.save();
+            ctx.translate(globeCx, globeCy);
+            ctx.rotate(tiltAngle);
+
+            // Curved Brass Support Arm connecting South Pole to Pedestal Stem
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 2.8 * z;
+            ctx.beginPath();
+            ctx.arc(0, 0, globeR + 2.5 * z, -Math.PI / 2, Math.PI / 2 + 0.35);
+            ctx.stroke();
+
+            // Bright Gold Highlight on Brass Meridian Ring
+            ctx.strokeStyle = '#fef08a';
+            ctx.lineWidth = 1.2 * z;
+            ctx.beginPath();
+            ctx.arc(0, 0, globeR + 2.5 * z, -Math.PI / 2, Math.PI / 2 + 0.35);
+            ctx.stroke();
+
+            // Degree Tick Marks along the Brass Meridian Arc
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 0.7 * z;
+            for (let deg = -75; deg <= 90; deg += 15) {
+              const rad = (deg * Math.PI) / 180;
+              const rIn = globeR + 1.4 * z;
+              const rOut = globeR + 3.6 * z;
+              ctx.beginPath();
+              ctx.moveTo(Math.cos(rad) * rIn, Math.sin(rad) * rIn);
+              ctx.lineTo(Math.cos(rad) * rOut, Math.sin(rad) * rOut);
+              ctx.stroke();
+            }
+
+            // North & South Pole Brass Axis Spindles
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(0, -globeR);
+            ctx.lineTo(0, -(globeR + 6.5 * z));
+            ctx.moveTo(0, globeR);
+            ctx.lineTo(0, globeR + 3.5 * z);
+            ctx.stroke();
+
+            // Ornate Brass Finial Knob at North Pole Apex
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(0, -(globeR + 7.2 * z), 2.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#92400e';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+
+            ctx.restore();
           }
 
           // Floating Building Label ONLY when touched, hovered or active
           const shouldShowLabel = isHovered || activeBuilding === b.id || lastTouchedIdRef.current === b.id;
           if (shouldShowLabel) {
-            const tagY = pt.y - (b.id === 'balai_kota' ? 88 : b.id === 'menara_mentor' ? 64 : 54) * z;
+            const tagY = pt.y - (b.id === 'balai_kota' ? 88 : b.id === 'menara_mentor' ? 64 : b.id === 'taman_refleksi' ? 62 : 54) * z;
             const labelText = `${b.icon} ${b.name}`;
             ctx.font = `bold ${Math.round(10 * z)}px sans-serif`;
             const tMetrics = ctx.measureText(labelText);
@@ -5302,6 +6188,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const isTeacherAvatar = Boolean((item.isPlayer && isTeacher) || av.role === 'guru');
           const isSittingNow = Boolean((item.isPlayer && isSittingRef.current) || av.isSitting);
           const isFishingNow = Boolean((item.isPlayer && isFishingRef.current) || av.isFishing);
+          if (
+            item.isPlayer &&
+            heldItemRef.current &&
+            heldItemExpiresAtRef.current &&
+            Date.now() >= heldItemExpiresAtRef.current
+          ) {
+            heldItemRef.current = null;
+            heldItemExpiresAtRef.current = null;
+          }
           const currentHeldItem = item.isPlayer ? heldItemRef.current : av.heldItem;
 
           const currentSeatId = item.isPlayer ? sittingSeatRef.current : av.sittingSeat;
@@ -5389,9 +6284,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
 
-          // Natural leg swing & gentle bobbing (or exact lock to swing seat plank / 2-seater bench slot!)
-          const legSwing = (av.isMoving && !isSittingNow) ? Math.sin(av.walkFrame) * 3.5 * z : 0;
+          const activeEmote = item.isPlayer
+            ? (playerEmoteRef.current && Date.now() < playerEmoteRef.current.expiresAt ? playerEmoteRef.current : null)
+            : (av.activeEmote && Date.now() < av.activeEmote.expiresAt ? av.activeEmote : null);
+
+          const isDancingNow = activeEmote?.type === 'dance';
+          const isWavingNow = activeEmote?.type === 'wave';
+          const isLaughingNow = activeEmote?.type === 'laugh';
+          const isLovingNow = activeEmote?.type === 'love';
+
+          // Natural leg swing & gentle bobbing (plus lively rhythmic dancing or giggle bounce)
+          let legSwing = (av.isMoving && !isSittingNow) ? Math.sin(av.walkFrame) * 3.5 * z : 0;
+          if (isDancingNow && !isSittingNow) {
+            legSwing = Math.sin(elapsed * 10) * 2.8 * z;
+          }
+
           let avY = pt.y + (isSittingNow ? -1.8 * z : (av.isMoving ? -Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0));
+
+          if (isDancingNow) {
+            const danceBounce = !isSittingNow ? Math.abs(Math.sin(elapsed * 10)) * 3.5 * z : Math.sin(elapsed * 8) * 1.5 * z;
+            avY -= danceBounce;
+            if (!isSittingNow && !swingMetrics && !twoPersonBenchLock) {
+              pt.x += Math.sin(elapsed * 7) * 2.4 * z;
+            }
+          } else if (isLaughingNow) {
+            const laughBounce = Math.abs(Math.sin(elapsed * 14)) * 2.6 * z;
+            avY -= laughBounce;
+          }
 
           if (swingMetrics) {
             // Lock avatar hip/seat center with 100% precision onto the wooden swing plank!
@@ -5426,6 +6345,35 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = isFemale ? (isTeacherAvatar ? '#064e3b' : '#e11d48') : '#0f172a';
             ctx.fillRect(pt.x - 4.5 * z + calfKickX, avY + 3.2 * z + calfKickY, 4 * z, 2.2 * z);
             ctx.fillRect(pt.x + 0.8 * z + calfKickX, avY + 3.2 * z + calfKickY, 4 * z, 2.2 * z);
+          } else if (av.role === 'penjaga_literasi') {
+            // PATRA (Ibu Muslim di Sudut Literasi): Long modest Muslimah Gamis skirt & soft shoes
+            ctx.fillStyle = '#115e59';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5.2 * z, avY - 6.5 * z);
+            ctx.lineTo(pt.x + 5.2 * z, avY - 6.5 * z);
+            ctx.lineTo(pt.x + 6.4 * z, avY + 1.2 * z);
+            ctx.lineTo(pt.x - 6.4 * z, avY + 1.2 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#0d9488';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#042f2e';
+            ctx.fillRect(pt.x - 4 * z, avY + 1.2 * z + legSwing * 0.4, 3.5 * z, 2.2 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY + 1.2 * z - legSwing * 0.4, 3.5 * z, 2.2 * z);
+          } else if (av.role === 'barista') {
+            // MA UBA (Ibu Kantin): Long modest canteen skirt + white apron lower hem
+            ctx.fillStyle = '#7c2d12';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5 * z, avY - 6.5 * z);
+            ctx.lineTo(pt.x + 5 * z, avY - 6.5 * z);
+            ctx.lineTo(pt.x + 6 * z, avY + 1 * z);
+            ctx.lineTo(pt.x - 6 * z, avY + 1 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(pt.x - 4 * z, avY + 1 * z, 3.5 * z, 2.3 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY + 1 * z, 3.5 * z, 2.3 * z);
           } else if (isFemale) {
             if (isTeacherAvatar) {
               // Female Teacher: Elegant tailored long slacks or maxi skirt
@@ -5469,7 +6417,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.fillRect(pt.x + 0.5 * z, avY + 1 * z - legSwing, 3.5 * z, 2.5 * z);
             }
           } else {
-            // Male Pants
+            // Male Pants (including Wali Kota Sony's crisp white/slate dress pants & Satpam Surya's dark brown trousers)
             ctx.fillStyle = isTeacherAvatar ? '#1e293b' : av.pantsColor;
             ctx.fillRect(pt.x - 3.5 * z, avY - 5 * z + legSwing, 3 * z, 6 * z);
             ctx.fillRect(pt.x + 0.5 * z, avY - 5 * z - legSwing, 3 * z, 6 * z);
@@ -5508,6 +6456,126 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.fillStyle = '#f59e0b';
               ctx.fillRect(pt.x - 0.8 * z, avY - 11.5 * z, 1.6 * z, 4.5 * z);
             }
+          } else if (av.role === 'kepala_balai') {
+            // SONY (WALI KOTA): Official White Mayor Suit (Jas Dinas Putih Wali Kota), Red Tie, Ceremonial Sash & Golden Garuda Emblem
+            ctx.fillStyle = '#f8fafc';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.6 * z, avY - 14.2 * z, 11.2 * z, 8.8 * z, 2.2 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+            // Red tie & collar
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(pt.x - 0.8 * z, avY - 13 * z, 1.6 * z, 5.2 * z);
+            // Golden Mayor Epaulettes on shoulders
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x - 5.5 * z, avY - 14.4 * z, 2.6 * z, 1.3 * z);
+            ctx.fillRect(pt.x + 2.9 * z, avY - 14.4 * z, 2.6 * z, 1.3 * z);
+            // Golden Mayor Jengkol / Garuda Star Medal on Left Chest
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x + 2.5 * z, avY - 10.8 * z, 1.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 0.5 * z;
+            ctx.stroke();
+            // Brass buttons down center
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x - 0.6 * z, avY - 8 * z, 1.2 * z, 1.2 * z);
+          } else if (av.role === 'penjaga_kota') {
+            // SURYA (SATPAM): Official Security Guard Uniform (Kemeja PDH Krem Satpam, Sabuk Kopel, Tali Kur & Badge Perisai)
+            ctx.fillStyle = '#d6c7b2';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.5 * z, avY - 14 * z, 11 * z, 8.6 * z, 2 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#78716c';
+            ctx.lineWidth = 0.7 * z;
+            ctx.stroke();
+            // Dark brown shoulder straps (pangkat Satpam) & breast pockets
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(pt.x - 5.3 * z, avY - 14.2 * z, 2.4 * z, 1.1 * z);
+            ctx.fillRect(pt.x + 2.9 * z, avY - 14.2 * z, 2.4 * z, 1.1 * z);
+            ctx.fillRect(pt.x - 0.7 * z, avY - 13.2 * z, 1.4 * z, 5.5 * z); // dark tie
+            // White whistle lanyard cord (Tali Kur Satpam) on shoulder
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.0 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 4.2 * z, avY - 13.5 * z);
+            ctx.quadraticCurveTo(pt.x - 2.5 * z, avY - 9.5 * z, pt.x - 4.5 * z, avY - 8 * z);
+            ctx.stroke();
+            // Golden shield badge on chest
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x + 2.4 * z, avY - 11.2 * z, 1.3 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Heavy Black Security Duty Belt (Sabuk Kopel) with Brass Buckle
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 5.5 * z, avY - 6.8 * z, 11 * z, 1.8 * z);
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(pt.x - 1.2 * z, avY - 6.8 * z, 2.4 * z, 1.8 * z);
+          } else if (av.role === 'penjaga_literasi') {
+            // PATRA (IBU MUSLIM): Modest Emerald Tunic / Gamis with Golden Floral Brooch
+            ctx.fillStyle = '#0d9488';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.4 * z, avY - 14 * z, 10.8 * z, 8.8 * z, 2.2 * z);
+            ctx.fill();
+            // Delicate embroidery trim at waist
+            ctx.strokeStyle = '#99f6e4';
+            ctx.lineWidth = 0.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5 * z, avY - 6.2 * z);
+            ctx.lineTo(pt.x + 5 * z, avY - 6.2 * z);
+            ctx.stroke();
+          } else if (av.role === 'barista') {
+            // MA UBA (IBU KANTIN): Warm Orange Blouse with Crisp White Canteen Apron & Front Pocket
+            ctx.fillStyle = '#ea580c';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.4 * z, avY - 14 * z, 10.8 * z, 8.6 * z, 2.2 * z);
+            ctx.fill();
+            // White Canteen Apron Bib & Waist Ties
+            ctx.fillStyle = '#fffbeb';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 3.8 * z, avY - 13 * z, 7.6 * z, 9.5 * z, 1.4 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 0.7 * z;
+            ctx.stroke();
+            // Red front apron pocket
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(pt.x - 2.2 * z, avY - 8.2 * z, 4.4 * z, 2.4 * z);
+          } else if (av.role === 'penjaga_lab') {
+            // MALIK (KUTU BUKU BERKACAMATA): White Collared Shirt + Navy Argyle Sweater Vest + Red Bowtie + Pocket Protector
+            ctx.fillStyle = '#1e3a8a';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.2 * z, avY - 14 * z, 10.4 * z, 8.5 * z, 2.2 * z);
+            ctx.fill();
+            // White shirt V-neck collar
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 2.6 * z, avY - 14 * z);
+            ctx.lineTo(pt.x, avY - 10.5 * z);
+            ctx.lineTo(pt.x + 2.6 * z, avY - 14 * z);
+            ctx.closePath();
+            ctx.fill();
+            //Argyle diamond pattern on vest
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, avY - 9.8 * z);
+            ctx.lineTo(pt.x + 1.8 * z, avY - 8.2 * z);
+            ctx.lineTo(pt.x, avY - 6.6 * z);
+            ctx.lineTo(pt.x - 1.8 * z, avY - 8.2 * z);
+            ctx.closePath();
+            ctx.fill();
+            // Red Nerd Bowtie at collar
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 2.2 * z, avY - 13.6 * z);
+            ctx.lineTo(pt.x + 2.2 * z, avY - 12.0 * z);
+            ctx.lineTo(pt.x + 2.2 * z, avY - 13.6 * z);
+            ctx.lineTo(pt.x - 2.2 * z, avY - 12.0 * z);
+            ctx.closePath();
+            ctx.fill();
           } else {
             // Student Torso
             ctx.fillStyle = av.shirtColor;
@@ -5538,7 +6606,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           // 3. ARMS & HANDS
           const isReadingNow = Boolean(
-            item.isPlayer && (activeLiteracyDoc !== null || (isSittingNow && sittingSeat === 'literacy'))
+            item.isPlayer &&
+              (activeLiteracyDoc !== null ||
+                (isSittingNow && (sittingSeat === 'literacy' || sittingSeat?.startsWith('literacy_'))))
           );
 
           if (isReadingNow) {
@@ -5635,6 +6705,121 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#fed7aa';
             ctx.fillRect(pt.x - 5.5 * z, avY - 7 * z, 2.6 * z, 2.2 * z);
             ctx.fillRect(pt.x + 3 * z, avY - 7 * z, 2.6 * z, 2.2 * z);
+          } else if (av.role === 'kepala_balai') {
+            // SONY (WALI KOTA): Left arm normal swing, Right arm waves warmly to greet citizens!
+            const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.5 * z : 0;
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(pt.x - 7.2 * z, avY - 13 * z - armSwing, 2.2 * z, 6.8 * z);
+            ctx.fillStyle = '#fed7aa';
+            ctx.fillRect(pt.x - 7.2 * z, avY - 6.2 * z - armSwing, 2.2 * z, 2.2 * z);
+
+            // Waving right arm when greeting citizens
+            const waveOffset = Math.sin(elapsed * 7) * 2.2 * z;
+            ctx.strokeStyle = '#f8fafc';
+            ctx.lineWidth = 2.4 * z;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 5 * z, avY - 12.5 * z);
+            ctx.lineTo(pt.x + 8.5 * z, avY - 17.5 * z + waveOffset);
+            ctx.stroke();
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x + 8.8 * z, avY - 18 * z + waveOffset, 1.4 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (av.role === 'penjaga_kota') {
+            // SURYA (SATPAM): Patrol arms + Security Baton / HT at right hand
+            const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0;
+            ctx.fillStyle = '#d6c7b2';
+            ctx.fillRect(pt.x - 7.2 * z, avY - 13 * z - armSwing, 2.2 * z, 7 * z);
+            ctx.fillRect(pt.x + 5 * z, avY - 13 * z + armSwing, 2.2 * z, 7 * z);
+            ctx.fillStyle = '#fed7aa';
+            ctx.fillRect(pt.x - 7.2 * z, avY - 6 * z - armSwing, 2.2 * z, 2.2 * z);
+            ctx.fillRect(pt.x + 5 * z, avY - 6 * z + armSwing, 2.2 * z, 2.2 * z);
+            // Black Security Baton (Pentungan Satpam) in right hand
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 6.2 * z, avY - 5.5 * z + armSwing);
+            ctx.lineTo(pt.x + 9.5 * z, avY - 1.5 * z + armSwing);
+            ctx.stroke();
+          } else if (av.role === 'penjaga_lab') {
+            // MALIK (KUTU BUKU): Holding a stack of thick reference books against chest
+            const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 1.5 * z : 0;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 7.0 * z, avY - 13 * z - armSwing, 2.1 * z, 6.2 * z);
+            ctx.fillRect(pt.x + 4.9 * z, avY - 13 * z, 2.1 * z, 5.5 * z);
+            // Stack of 2 thick books held in right arm
+            ctx.fillStyle = '#059669';
+            ctx.fillRect(pt.x + 2.2 * z, avY - 9.8 * z, 5.2 * z, 2.2 * z);
+            ctx.fillStyle = '#d97706';
+            ctx.fillRect(pt.x + 2.5 * z, avY - 7.6 * z, 5.0 * z, 2.2 * z);
+            ctx.fillStyle = '#fef3c7';
+            ctx.fillRect(pt.x + 2.8 * z, avY - 9.2 * z, 4.2 * z, 0.8 * z);
+            ctx.fillRect(pt.x + 3.0 * z, avY - 7.0 * z, 4.0 * z, 0.8 * z);
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x + 5.2 * z, avY - 6.8 * z, 1.3 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (av.role === 'penjaga_literasi') {
+            // PATRA (IBU MUSLIM DI SUDUT LITERASI): Holding an open golden-emerald book inviting citizens to read
+            const gentleWave = Math.sin(elapsed * 4) * 1.2 * z;
+            ctx.fillStyle = '#0d9488';
+            ctx.fillRect(pt.x - 7.0 * z, avY - 12.8 * z, 2.2 * z, 6.2 * z);
+            ctx.fillRect(pt.x + 4.8 * z, avY - 13 * z + gentleWave * 0.4, 2.2 * z, 6.2 * z);
+            // Book held in left hand
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 8.2 * z, avY - 9.5 * z, 5.2 * z, 4.2 * z, 0.8 * z);
+            ctx.fill();
+            ctx.fillStyle = '#fefce8';
+            ctx.fillRect(pt.x - 7.5 * z, avY - 8.8 * z, 3.8 * z, 2.8 * z);
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x + 5.9 * z, avY - 6.5 * z + gentleWave * 0.4, 1.3 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (av.role === 'barista') {
+            // MA UBA (IBU KANTIN): Holding a warm serving tray with teacup in front of Toko
+            ctx.fillStyle = '#ea580c';
+            ctx.fillRect(pt.x - 7.0 * z, avY - 13 * z, 2.2 * z, 6.2 * z);
+            ctx.fillRect(pt.x + 4.8 * z, avY - 13 * z, 2.2 * z, 5.8 * z);
+            // Silver/wooden canteen serving tray & warm cup
+            ctx.fillStyle = '#94a3b8';
+            ctx.beginPath();
+            ctx.ellipse(pt.x + 5.8 * z, avY - 7.2 * z, 4.2 * z, 1.8 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x + 4.6 * z, avY - 10 * z, 2.4 * z, 2.6 * z);
+          } else if (isDancingNow) {
+            // DANCING ARMS: Alternating disco arm pump & groove
+            const beat = (elapsed * 8) % (Math.PI * 2);
+            const leftArmY = Math.sin(beat) * 5.5 * z;
+            const rightArmY = -Math.sin(beat) * 5.5 * z;
+            const leftPointX = Math.cos(beat) * 2.5 * z;
+            const rightPointX = -Math.cos(beat) * 2.5 * z;
+
+            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.fillRect(pt.x - 7.2 * z + leftPointX, avY - 14 * z + leftArmY, 2.2 * z, 6.5 * z);
+            ctx.fillRect(pt.x + 5.0 * z + rightPointX, avY - 14 * z + rightArmY, 2.2 * z, 6.5 * z);
+            // Hands
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x - 6.1 * z + leftPointX, avY - 7.5 * z + leftArmY, 1.4 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 6.1 * z + rightPointX, avY - 7.5 * z + rightArmY, 1.4 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (isWavingNow) {
+            // WAVING ARM: Right hand held high and waving side-to-side
+            const waveCycle = Math.sin(elapsed * 10) * 3.6 * z;
+            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            // Left arm relaxed
+            ctx.fillRect(pt.x - 7.2 * z, avY - 13 * z, 2.2 * z, 7 * z);
+            // Right arm raised high
+            ctx.fillRect(pt.x + 5.2 * z + waveCycle * 0.4, avY - 18 * z, 2.2 * z, 6.5 * z);
+
+            ctx.fillStyle = '#fed7aa';
+            ctx.fillRect(pt.x - 7.2 * z, avY - 6 * z, 2.2 * z, 2.2 * z);
+            ctx.beginPath();
+            ctx.arc(pt.x + 6.3 * z + waveCycle, avY - 19.5 * z, 1.6 * z, 0, Math.PI * 2);
+            ctx.fill();
           } else {
             const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0;
             ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
@@ -5653,28 +6838,38 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fill();
 
           if (isFemale && !isTeacherAvatar) {
-            // Blushing cheeks for female student
-            ctx.fillStyle = 'rgba(244, 63, 94, 0.45)';
+            // Blushing cheeks for female characters
+            ctx.fillStyle = 'rgba(244, 63, 94, 0.42)';
             ctx.beginPath();
             ctx.arc(pt.x - 3 * z, avY - 17.5 * z, 1.2 * z, 0, Math.PI * 2);
             ctx.arc(pt.x + 3 * z, avY - 17.5 * z, 1.2 * z, 0, Math.PI * 2);
             ctx.fill();
           }
 
-          // 5. HAIR & HIJAB (Distinguished Teacher vs Student)
-          if (isTeacherAvatar && isFemale) {
-            // Female Teacher: Elegant professional Hijab
-            ctx.fillStyle = '#059669'; // Emerald Hijab
+          // 5. HAIR, HIJAB, HATS & GLASSES (Distinguished Teacher, Custom NPCs & Student)
+          if ((isTeacherAvatar && isFemale) || av.role === 'penjaga_literasi') {
+            // Female Teacher or PATRA (Ibu Muslim di Sudut Literasi): Flowing Syar'i Hijab covering chest with Golden Brooch
+            const hijabMain = av.role === 'penjaga_literasi' ? '#0d9488' : '#059669';
+            const hijabEdge = av.role === 'penjaga_literasi' ? '#99f6e4' : '#34d399';
+            ctx.fillStyle = hijabMain;
             ctx.beginPath();
-            ctx.arc(pt.x, avY - 19.5 * z, 6.2 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x, avY - 19.5 * z, 6.4 * z, 0, Math.PI * 2);
             ctx.fill();
-            // Hijab drape over shoulders
+            // Modest Syar'i Khimar / Hijab drape covering shoulders and chest
             ctx.beginPath();
-            ctx.moveTo(pt.x - 6.5 * z, avY - 17 * z);
-            ctx.lineTo(pt.x + 6.5 * z, avY - 17 * z);
-            ctx.lineTo(pt.x + 7.5 * z, avY - 10 * z);
-            ctx.lineTo(pt.x - 7.5 * z, avY - 10 * z);
+            ctx.moveTo(pt.x - 6.6 * z, avY - 17.5 * z);
+            ctx.lineTo(pt.x + 6.6 * z, avY - 17.5 * z);
+            ctx.lineTo(pt.x + 7.8 * z, avY - 9.2 * z);
+            ctx.quadraticCurveTo(pt.x, avY - 6.8 * z, pt.x - 7.8 * z, avY - 9.2 * z);
             ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = hijabEdge;
+            ctx.lineWidth = 0.7 * z;
+            ctx.stroke();
+            // Golden hijab pin brooch on chest drape
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.6 * z, avY - 11.2 * z, 1.1 * z, 0, Math.PI * 2);
             ctx.fill();
             // Inner face opening
             ctx.fillStyle = '#fed7aa';
@@ -5687,6 +6882,99 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.arc(pt.x - 2.5 * z, avY - 17.5 * z, 1 * z, 0, Math.PI * 2);
             ctx.arc(pt.x + 2.5 * z, avY - 17.5 * z, 1 * z, 0, Math.PI * 2);
             ctx.fill();
+          } else if (av.role === 'barista') {
+            // MA UBA (IBU KANTIN): Neat hair bun & Cream-Red Canteen Headscarf / Bandana Ibu Kantin
+            ctx.fillStyle = '#451a03';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 20.5 * z, 5.5 * z, Math.PI, 0);
+            ctx.fill();
+            // Ibu Kantin headscarf / kerudung masak
+            ctx.fillStyle = '#fef3c7';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 21.2 * z, 5.8 * z, Math.PI * 1.05, -Math.PI * 0.05);
+            ctx.fill();
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(pt.x - 5.6 * z, avY - 21.8 * z, 11.2 * z, 1.6 * z);
+          } else if (av.role === 'kepala_balai') {
+            // SONY (WALI KOTA): Official Black Velvet Peci / Kopiah with Golden Mayor Trim & Neat Mustache
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.4 * z, avY - 25.2 * z, 10.8 * z, 4.8 * z, 1.2 * z);
+            ctx.fill();
+            // Golden trim band & Garuda pin on Peci
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 0.9 * z;
+            ctx.strokeRect(pt.x - 5.2 * z, avY - 25.0 * z, 10.4 * z, 4.4 * z);
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 22.8 * z, 1.3 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Dignified small mustache
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(pt.x - 2.0 * z, avY - 16.5 * z, 4.0 * z, 0.9 * z);
+          } else if (av.role === 'penjaga_kota') {
+            // SURYA (SATPAM): Official Security Guard Peaked Cap (Topi Pet Satpam) with Visor & Gold Shield Emblem
+            // Cap crown
+            ctx.fillStyle = '#451a03';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 23.8 * z, 6.2 * z, 2.6 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillRect(pt.x - 5.2 * z, avY - 23.8 * z, 10.4 * z, 3.0 * z);
+            // Black glossy visor brim
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 20.6 * z, 5.8 * z, 1.5 * z, 0, 0, Math.PI);
+            ctx.fill();
+            // Gold cord & Satpam shield badge on front of cap
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 0.9 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5.0 * z, avY - 21.0 * z);
+            ctx.lineTo(pt.x + 5.0 * z, avY - 21.0 * z);
+            ctx.stroke();
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 22.6 * z, 1.4 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (av.role === 'penjaga_lab') {
+            // MALIK (KUTU BUKU BERKACAMATA): Center-parted Geek Hair + Oversized Thick-Rimmed Nerd Glasses with Lens Glint
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 21.2 * z, 5.4 * z, Math.PI, 0);
+            ctx.fill();
+            // Center hair part notch
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, avY - 21.5 * z);
+            ctx.lineTo(pt.x - 0.8 * z, avY - 19.8 * z);
+            ctx.lineTo(pt.x + 0.8 * z, avY - 19.8 * z);
+            ctx.closePath();
+            ctx.fill();
+            // Large Thick-Rimmed Round Nerd Glasses (Kacamata Kutu Buku Tebal)
+            ctx.fillStyle = 'rgba(186, 230, 253, 0.78)';
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.4 * z, avY - 18.2 * z, 2.3 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 2.4 * z, avY - 18.2 * z, 2.3 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.35 * z;
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.4 * z, avY - 18.2 * z, 2.3 * z, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(pt.x + 2.4 * z, avY - 18.2 * z, 2.3 * z, 0, Math.PI * 2);
+            ctx.stroke();
+            // White tape / bridge in the middle of nerd glasses
+            ctx.strokeStyle = '#f8fafc';
+            ctx.lineWidth = 1.2 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 0.3 * z, avY - 18.2 * z);
+            ctx.lineTo(pt.x + 0.3 * z, avY - 18.2 * z);
+            ctx.stroke();
+            // White lens shine reflection
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 3.3 * z, avY - 19.2 * z, 0.9 * z, 0.9 * z);
+            ctx.fillRect(pt.x + 1.5 * z, avY - 19.2 * z, 0.9 * z, 0.9 * z);
           } else if (isTeacherAvatar) {
             // Male Teacher: Smart side-parted hairstyle with glasses
             ctx.fillStyle = '#0f172a';
@@ -5780,53 +7068,186 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
-          // FISHING ANIMATION (When fishing at east pier)
+          // FISHING ANIMATION (Simple Fishing Rod Casting + Bobber & Splash at East Pier)
           if (isFishingNow) {
-            ctx.strokeStyle = '#78350f';
-            ctx.lineWidth = 2 * z;
+            const fishStart = av.fishingStartTime || 0;
+            const fishAgeSec = fishStart > 0 ? Math.max(0, (currentTime - fishStart) / 1000) : 1.5;
+
+            // Phase 1 (0.00s - 0.24s): Wind-up backswing behind shoulder
+            // Phase 2 (0.24s - 0.56s): Forward whip cast toward the pond
+            // Phase 3 (0.56s - 0.90s): Line & bobber fly in a parabolic arc into the water + splash
+            // Phase 4 (0.90s+): Settled fishing stance with gentle rod tip & bobber motion
+            let rodAngle = -0.68; // settled angle (radians relative to horizontal +X)
+            if (fishAgeSec < 0.24) {
+              const p = fishAgeSec / 0.24;
+              // Swing back from -0.7 to -2.15 rad (tilted backward over head)
+              rodAngle = -0.7 - p * 1.45;
+            } else if (fishAgeSec < 0.56) {
+              const p = (fishAgeSec - 0.24) / 0.32;
+              // Ease-out whip forward from -2.15 to -0.52 rad
+              const easeOut = 1 - Math.pow(1 - p, 3);
+              rodAngle = -2.15 + easeOut * 1.63;
+            } else if (fishAgeSec < 0.9) {
+              const p = (fishAgeSec - 0.56) / 0.34;
+              // Settle softly from -0.52 to -0.68 rad
+              rodAngle = -0.52 - p * 0.16;
+            } else {
+              rodAngle = -0.68 + Math.sin(elapsed * 3.5) * 0.04;
+            }
+
+            const handBaseX = pt.x + 4.5 * z;
+            const handBaseY = avY - 8.5 * z;
+            const rodLen = 23 * z;
+            const rodMidX = handBaseX + Math.cos(rodAngle) * (rodLen * 0.78);
+            const rodMidY = handBaseY + Math.sin(rodAngle) * (rodLen * 0.78);
+
+            // Flexible rod tip bends slightly during cast & water tug
+            const tipBendY =
+              fishAgeSec >= 0.24 && fishAgeSec < 0.56
+                ? -4.5 * z
+                : (4.5 + Math.sin(elapsed * 6) * 1.1) * z;
+            const rodTipX = handBaseX + Math.cos(rodAngle) * rodLen + 5.5 * z;
+            const rodTipY = handBaseY + Math.sin(rodAngle) * rodLen + tipBendY;
+
+            // Casting arm reaching forward/upward with the rod handle
+            ctx.strokeStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.lineWidth = 2.6 * z;
+            ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(pt.x + 5 * z, avY - 6 * z);
-            ctx.lineTo(pt.x + 22 * z, avY - 22 * z);
+            ctx.moveTo(pt.x + 3 * z, avY - 11.5 * z);
+            ctx.lineTo(handBaseX + Math.cos(rodAngle) * 3.2 * z, handBaseY + Math.sin(rodAngle) * 3.2 * z);
             ctx.stroke();
 
-            ctx.strokeStyle = '#92400e';
+            // Motion swoosh arc during the forward whip cast (0.24s - 0.58s)
+            if (fishAgeSec >= 0.22 && fishAgeSec <= 0.62) {
+              const swooshAlpha = 1 - Math.abs(fishAgeSec - 0.42) / 0.22;
+              ctx.strokeStyle = `rgba(224, 242, 254, ${Math.max(0, swooshAlpha * 0.75)})`;
+              ctx.lineWidth = 2.2 * z;
+              ctx.beginPath();
+              ctx.arc(handBaseX, handBaseY, rodLen * 0.9, -2.05, rodAngle, false);
+              ctx.stroke();
+            }
+
+            // Wooden bamboo fishing rod shaft & spinning reel
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 2.1 * z;
+            ctx.beginPath();
+            ctx.moveTo(handBaseX, handBaseY);
+            ctx.lineTo(rodMidX, rodMidY);
+            ctx.stroke();
+
+            // Flexible fiberglass rod tip
+            ctx.strokeStyle = '#b45309';
             ctx.lineWidth = 1.2 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x + 22 * z, avY - 22 * z);
-            ctx.quadraticCurveTo(pt.x + 28 * z, avY - 24 * z, pt.x + 32 * z, avY - 16 * z);
+            ctx.moveTo(rodMidX, rodMidY);
+            ctx.quadraticCurveTo(
+              (rodMidX + rodTipX) * 0.5 + 1.5 * z,
+              (rodMidY + rodTipY) * 0.5 - 2.5 * z,
+              rodTipX,
+              rodTipY
+            );
             ctx.stroke();
 
-            const bobberX = pt.x + 36 * z;
-            const bobberY = avY + (4 + Math.sin(elapsed * 6) * 2.5) * z;
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-            ctx.lineWidth = 0.8 * z;
+            // Small golden spinning reel near handle
+            ctx.fillStyle = '#fbbf24';
             ctx.beginPath();
-            ctx.moveTo(pt.x + 32 * z, avY - 16 * z);
-            ctx.lineTo(bobberX, bobberY);
+            ctx.arc(
+              handBaseX + Math.cos(rodAngle) * 4.5 * z,
+              handBaseY + Math.sin(rodAngle) * 4.5 * z + 1.2 * z,
+              1.6 * z,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+
+            // Bobber & fishing line trajectory (Parabolic cast flight -> splash -> floating bobber)
+            const targetBobberX = pt.x + 36 * z;
+            const targetBobberY = avY + (4 + Math.sin(elapsed * 6) * 2.5) * z;
+
+            let bobberX = targetBobberX;
+            let bobberY = targetBobberY;
+            let isInWater = true;
+
+            if (fishAgeSec < 0.36) {
+              // During wind-up & early whip, bobber hangs close to rod tip
+              isInWater = false;
+              bobberX = rodTipX + Math.cos(rodAngle + 0.5) * 4.5 * z;
+              bobberY = rodTipY + 5.5 * z;
+            } else if (fishAgeSec < 0.85) {
+              // Parabolic arc flight from rod tip into the pond water
+              isInWater = false;
+              const flightP = (fishAgeSec - 0.36) / 0.49;
+              const startX = handBaseX + 16 * z;
+              const startY = handBaseY - 18 * z;
+              bobberX = startX + (targetBobberX - startX) * flightP;
+              const arcLift = Math.sin(flightP * Math.PI) * 14 * z;
+              bobberY = startY + (targetBobberY - startY) * flightP - arcLift;
+            }
+
+            // Fishing line from rod tip to bobber
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.78)';
+            ctx.lineWidth = 0.85 * z;
+            ctx.beginPath();
+            ctx.moveTo(rodTipX, rodTipY);
+            if (!isInWater) {
+              ctx.lineTo(bobberX, bobberY);
+            } else {
+              ctx.quadraticCurveTo(
+                (rodTipX + bobberX) * 0.5,
+                (rodTipY + bobberY) * 0.5 + 3 * z,
+                bobberX,
+                bobberY
+              );
+            }
             ctx.stroke();
 
+            // Red & White Fishing Bobber
             ctx.fillStyle = '#ef4444';
             ctx.beginPath();
-            ctx.arc(bobberX, bobberY, 2.5 * z, Math.PI, 0);
+            ctx.arc(bobberX, bobberY, 2.6 * z, Math.PI, 0);
             ctx.fill();
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.arc(bobberX, bobberY, 2.5 * z, 0, Math.PI);
+            ctx.arc(bobberX, bobberY, 2.6 * z, 0, Math.PI);
             ctx.fill();
 
-            const bPhase = (elapsed * 1.5) % 1;
-            ctx.strokeStyle = `rgba(56, 189, 248, ${0.6 * (1 - bPhase)})`;
-            ctx.lineWidth = 0.8 * z;
-            ctx.beginPath();
-            ctx.ellipse(bobberX, bobberY + 2 * z, (3 + bPhase * 8) * z, (1.5 + bPhase * 4) * z, 0, 0, Math.PI * 2);
-            ctx.stroke();
-
-            if (Math.sin(elapsed * 6) > 0.6) {
-              ctx.fillStyle = '#38bdf8';
+            // Initial Water Impact Splash Ring & Droplets (0.85s - 1.30s)
+            if (fishAgeSec >= 0.85 && fishAgeSec < 1.3) {
+              const spP = (fishAgeSec - 0.85) / 0.45;
+              ctx.strokeStyle = `rgba(224, 242, 254, ${(1 - spP) * 0.9})`;
+              ctx.lineWidth = 1.4 * z;
               ctx.beginPath();
-              ctx.arc(bobberX - 2 * z, bobberY - 3 * z, 0.8 * z, 0, Math.PI * 2);
-              ctx.arc(bobberX + 3 * z, bobberY - 4 * z, 1 * z, 0, Math.PI * 2);
-              ctx.fill();
+              ctx.ellipse(bobberX, bobberY + 1.5 * z, (3 + spP * 12) * z, (1.5 + spP * 5.5) * z, 0, 0, Math.PI * 2);
+              ctx.stroke();
+
+              // Flying water droplets on splash impact
+              ctx.fillStyle = `rgba(186, 230, 253, ${1 - spP})`;
+              for (let dp = -1; dp <= 1; dp += 2) {
+                const dx = bobberX + dp * (2.5 + spP * 7) * z;
+                const dy = bobberY - Math.sin(spP * Math.PI) * 6.5 * z;
+                ctx.beginPath();
+                ctx.arc(dx, dy, 1.1 * z, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+
+            // Continuous Pond Ripples & Nibbling Splashes once Bobber is in Water
+            if (isInWater) {
+              const bPhase = (elapsed * 1.5) % 1;
+              ctx.strokeStyle = `rgba(56, 189, 248, ${0.6 * (1 - bPhase)})`;
+              ctx.lineWidth = 0.8 * z;
+              ctx.beginPath();
+              ctx.ellipse(bobberX, bobberY + 2 * z, (3 + bPhase * 8) * z, (1.5 + bPhase * 4) * z, 0, 0, Math.PI * 2);
+              ctx.stroke();
+
+              if (Math.sin(elapsed * 6) > 0.6) {
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(bobberX - 2 * z, bobberY - 3 * z, 0.8 * z, 0, Math.PI * 2);
+                ctx.arc(bobberX + 3 * z, bobberY - 4 * z, 1 * z, 0, Math.PI * 2);
+                ctx.fill();
+              }
             }
           }
 
@@ -5850,8 +7271,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             labelText = `@patra`;
           } else if (av.role === 'penjaga_kolam') {
             labelText = `@tomi`;
-          } else if (av.role === 'pengawas') {
-            labelText = `@naziefa`;
           } else if (av.role === 'kepala_balai') {
             labelText = `@sony`;
           }
@@ -5927,6 +7346,104 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(speech, pt.x, bubbleY);
+          }
+
+          // 8. FLOATING EMOTE BADGE & PARTICLES (Suka ❤️, Lambai 👋, Tertawa 😂, Joget 🎵)
+          if (activeEmote && Date.now() < activeEmote.expiresAt) {
+            const emoteBounce = Math.sin(elapsed * 7) * 2.5 * z;
+            const baseEmoteY = speech ? tagPosY - 34 * z : tagPosY - 14 * z;
+            const emoteY = baseEmoteY + emoteBounce;
+
+            // Floating Emote Bubble with Glow
+            const badgeR = 12 * z;
+            ctx.save();
+            ctx.shadowColor =
+              activeEmote.type === 'love'
+                ? 'rgba(244, 63, 94, 0.7)'
+                : activeEmote.type === 'dance'
+                ? 'rgba(168, 85, 247, 0.7)'
+                : activeEmote.type === 'laugh'
+                ? 'rgba(245, 158, 11, 0.7)'
+                : 'rgba(14, 165, 233, 0.7)';
+            ctx.shadowBlur = 9 * z;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(pt.x, emoteY, badgeR, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle =
+              activeEmote.type === 'love'
+                ? '#f43f5e'
+                : activeEmote.type === 'dance'
+                ? '#a855f7'
+                : activeEmote.type === 'laugh'
+                ? '#f59e0b'
+                : '#0284c7';
+            ctx.lineWidth = 1.6 * z;
+            ctx.stroke();
+            ctx.restore();
+
+            // Emote Icon
+            ctx.font = `${Math.round(13 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(activeEmote.icon, pt.x, emoteY + 0.6 * z);
+
+            // Particles Depending on Emote Type
+            if (isDancingNow) {
+              // Rising musical notes 🎵 🎶 ✨
+              const notes = ['🎵', '🎶', '✨', '🎵'];
+              for (let ni = 0; ni < notes.length; ni++) {
+                const noteProgress = (elapsed * 1.5 + ni * 0.25) % 1;
+                const noteX = pt.x + Math.sin(elapsed * 4 + ni * 1.7) * 16 * z;
+                const noteY = emoteY - 10 * z - noteProgress * 24 * z;
+                ctx.save();
+                ctx.globalAlpha = Math.sin(noteProgress * Math.PI) * 0.95;
+                ctx.font = `bold ${Math.round(11 * z)}px sans-serif`;
+                ctx.fillText(notes[ni], noteX, noteY);
+                ctx.restore();
+              }
+            } else if (isLovingNow) {
+              // Floating hearts ❤️ 💕 ✨
+              const hearts = ['❤️', '💕', '✨', '💖'];
+              for (let hi = 0; hi < hearts.length; hi++) {
+                const hProgress = (elapsed * 1.4 + hi * 0.25) % 1;
+                const hX = pt.x + Math.sin(elapsed * 3.5 + hi * 1.8) * 14 * z;
+                const hY = emoteY - 8 * z - hProgress * 22 * z;
+                ctx.save();
+                ctx.globalAlpha = Math.sin(hProgress * Math.PI) * 0.92;
+                ctx.font = `${Math.round(10 * z)}px sans-serif`;
+                ctx.fillText(hearts[hi], hX, hY);
+                ctx.restore();
+              }
+            } else if (isLaughingNow) {
+              // Laugh tears and giggles 😂 ✨ 💨
+              const laughs = ['😂', '✨', '💨', '✨'];
+              for (let li = 0; li < laughs.length; li++) {
+                const lProgress = (elapsed * 1.8 + li * 0.25) % 1;
+                const lX = pt.x + Math.sin(elapsed * 5 + li * 2) * 15 * z;
+                const lY = emoteY - 8 * z - lProgress * 20 * z;
+                ctx.save();
+                ctx.globalAlpha = Math.sin(lProgress * Math.PI) * 0.9;
+                ctx.font = `${Math.round(10 * z)}px sans-serif`;
+                ctx.fillText(laughs[li], lX, lY);
+                ctx.restore();
+              }
+            } else if (isWavingNow) {
+              // Wave sparkles ✨ 👋
+              const sparkles = ['✨', '👋', '✨'];
+              for (let wi = 0; wi < sparkles.length; wi++) {
+                const wProgress = (elapsed * 1.5 + wi * 0.33) % 1;
+                const wX = pt.x + 8 * z + Math.sin(elapsed * 4 + wi) * 10 * z;
+                const wY = emoteY - 6 * z - wProgress * 18 * z;
+                ctx.save();
+                ctx.globalAlpha = Math.sin(wProgress * Math.PI) * 0.9;
+                ctx.font = `${Math.round(9 * z)}px sans-serif`;
+                ctx.fillText(sparkles[wi], wX, wY);
+                ctx.restore();
+              }
+            }
           }
         } else if (item.type === 'lamp') {
           // STREET LAMP POST (Cast Iron Classical Lamppost with Warm Glowing Lantern)
@@ -6106,23 +7623,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   }, [studentName, studentGender, isTeacher]);
 
   // -------------------------------------------------------------
-  // KAFE ITEM PURCHASES (Deduct XP Saldo)
+  // KAFE ITEM PURCHASES (Deduct XP Saldo & Auto-Expire: Kopi 90s, Roti 60s, Eskrim 30s)
   // -------------------------------------------------------------
   const handleBuyCoffee = () => {
     const cost = 2;
     if (studentPoints < cost) {
       sounds.playClick();
-      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP, saldo kamu ${studentPoints} XP.`);
-      setTimeout(() => setCafeToast(null), 3500);
+      showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP, saldo kamu ${studentPoints} XP.`, 3500);
       return;
     }
 
     const success = onDeductPoints ? onDeductPoints(cost, 'Kopi Hangat Kafe') : true;
     if (success) {
       sounds.playRewardXp();
-      setHeldItem('kopi');
+      setIsCafeMenuOpen(false);
+      setPendingConfirmation(null);
+      equipHeldItem('kopi'); // Hilang otomatis dari tangan dalam 90 detik
       const remaining = studentPoints - cost;
-      setCafeToast(`☕ Menikmati kopi hangat di Kafe Warga! (-2 XP) • Sisa Saldo: ${remaining} XP`);
+      showToast(`☕ Menikmati kopi hangat! (-2 XP • 90 detik) • Sisa Saldo: ${remaining} XP`, 3600);
       baristaSpeechRef.current = {
         text: `Kopi hangat siap, selamat menikmati! ☕ (-2 XP)`,
         expiresAt: Date.now() + 5000,
@@ -6131,7 +7649,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         text: 'Mantap kopinya! ☕',
         expiresAt: Date.now() + 5000,
       };
-      setTimeout(() => setCafeToast(null), 3800);
     }
   };
 
@@ -6139,17 +7656,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const cost = 1;
     if (studentPoints < cost) {
       sounds.playClick();
-      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP, saldo kamu ${studentPoints} XP.`);
-      setTimeout(() => setCafeToast(null), 3500);
+      showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP, saldo kamu ${studentPoints} XP.`, 3500);
       return;
     }
 
     const success = onDeductPoints ? onDeductPoints(cost, 'Roti Panggang Kafe') : true;
     if (success) {
       sounds.playRewardXp();
-      setHeldItem('roti');
+      setIsCafeMenuOpen(false);
+      setPendingConfirmation(null);
+      equipHeldItem('roti'); // Hilang otomatis dari tangan dalam 60 detik
       const remaining = studentPoints - cost;
-      setCafeToast(`🍞 Roti lezat baru dipanggang! (-1 XP) • Sisa Saldo: ${remaining} XP`);
+      showToast(`🍞 Roti lezat baru dipanggang! (-1 XP • 60 detik) • Sisa Saldo: ${remaining} XP`, 3600);
       baristaSpeechRef.current = {
         text: `Roti hangat baru dipanggang! 🍞 (-1 XP)`,
         expiresAt: Date.now() + 5000,
@@ -6158,7 +7676,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         text: 'Enak banget rotinya! 🍞',
         expiresAt: Date.now() + 5000,
       };
-      setTimeout(() => setCafeToast(null), 3800);
     }
   };
 
@@ -6166,17 +7683,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const cost = 1;
     if (studentPoints < cost) {
       sounds.playClick();
-      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP, saldo kamu ${studentPoints} XP.`);
-      setTimeout(() => setCafeToast(null), 3500);
+      showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP, saldo kamu ${studentPoints} XP.`, 3500);
       return;
     }
 
     const success = onDeductPoints ? onDeductPoints(cost, 'Eskrim Kafe') : true;
     if (success) {
       sounds.playRewardXp();
-      setHeldItem('eskrim');
+      setIsCafeMenuOpen(false);
+      setPendingConfirmation(null);
+      equipHeldItem('eskrim'); // Hilang otomatis dari tangan dalam 30 detik
       const remaining = studentPoints - cost;
-      setCafeToast(`🍦 Eskrim manis menyegarkan harimu! (-1 XP) • Sisa Saldo: ${remaining} XP`);
+      showToast(`🍦 Eskrim manis menyegarkan! (-1 XP • 30 detik) • Sisa Saldo: ${remaining} XP`, 3600);
       baristaSpeechRef.current = {
         text: `Eskrim manis spesial untukmu! 🍦 (-1 XP)`,
         expiresAt: Date.now() + 5000,
@@ -6185,7 +7703,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         text: 'Segar banget eskrimnya! 🍦',
         expiresAt: Date.now() + 5000,
       };
-      setTimeout(() => setCafeToast(null), 3800);
     }
   };
 
@@ -6195,6 +7712,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const handleWaterTree = (treeIdx: number) => {
     const nowPerf = performance.now();
     const existingCycle = treeCyclesRef.current[treeIdx];
+    setPendingConfirmation(null);
+    setIsCafeMenuOpen(false);
 
     // Check if tree is currently in its 15-second apple fruiting phase
     if (existingCycle && existingCycle.appleStartTime !== null) {
@@ -6202,8 +7721,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       if (appleElapsed < 15.0) {
         const secsLeft = Math.max(1, Math.ceil(15.0 - appleElapsed));
         sounds.playClick();
-        setCafeToast(`🍎 Pohon sedang berbuah apel merah! Siklus baru dapat dimulai dalam ${secsLeft} detik.`);
-        setTimeout(() => setCafeToast(null), 3000);
+        showToast(`🍎 Pohon sedang berbuah apel merah! Siklus baru dapat dimulai dalam ${secsLeft} detik.`, 3000);
         return;
       }
     }
@@ -6211,8 +7729,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const cost = 1;
     if (studentPoints < cost) {
       sounds.playClick();
-      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk menyiram pohon (saldo kamu ${studentPoints} XP).`);
-      setTimeout(() => setCafeToast(null), 3500);
+      showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk menyiram pohon (saldo kamu ${studentPoints} XP).`, 3500);
       return;
     }
 
@@ -6247,7 +7764,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       };
 
       if (isThirdWatering) {
-        setCafeToast(`🍎 Siraman ke-3 (3/3)! Pohon berbuah apel merah segar selama 15 detik (-1 XP) • Sisa: ${remaining} XP`);
+        showToast(`🍎 Siraman ke-3 (3/3)! Pohon berbuah apel merah segar selama 15 detik (-1 XP) • Sisa: ${remaining} XP`, 3500);
         playerSpeechRef.current = {
           text: 'Siraman ke-3! Pohonnya berbuah apel 🍎✨',
           expiresAt: Date.now() + 4500,
@@ -6259,14 +7776,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           setTreeCycles((prev) => ({ ...prev, [treeIdx]: resetCycle }));
         }, 15000);
       } else {
-        setCafeToast(`💧 Pohon disiram (${nextCount}/3)! Siram ${3 - nextCount}x lagi agar muncul buah apel (-1 XP) • Sisa: ${remaining} XP`);
+        showToast(`💧 Pohon disiram (${nextCount}/3)! Siram ${3 - nextCount}x lagi agar muncul buah apel (-1 XP) • Sisa: ${remaining} XP`, 3500);
         playerSpeechRef.current = {
           text: `Menyiram pohon (${nextCount}/3) 💧🌱`,
           expiresAt: Date.now() + 3500,
         };
       }
       sendHeartbeatRef.current?.();
-      setTimeout(() => setCafeToast(null), 3500);
     }
   };
 
@@ -6283,19 +7799,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
   const handleStartFishing = () => {
     if (isFishing) return;
+    setPendingConfirmation(null);
+    setIsCafeMenuOpen(false);
     const cost = 3;
     if (studentPoints < cost) {
       sounds.playClick();
-      setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk memancing (saldo kamu ${studentPoints} XP).`);
-      setTimeout(() => setCafeToast(null), 3500);
+      showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk memancing (saldo kamu ${studentPoints} XP).`, 3500);
       return;
     }
 
     const success = onDeductPoints ? onDeductPoints(cost, 'Memancing Ikan Kota') : true;
     if (success) {
       sounds.playClick();
+      fishingStartTimeRef.current = performance.now();
       setIsFishing(true);
-      setCafeToast('🎣 Memasang umpan... Melempar joran ke perairan dermaga kota (-3 XP)');
+      showToast('🎣 Mengayunkan joran & melempar kail ke Kolam Pancing... (-3 XP)', 3500);
       playerSpeechRef.current = {
         text: 'Mancing dulu ah, semoga dapat ikan besar! 🎣',
         expiresAt: Date.now() + 3500,
@@ -6306,15 +7824,25 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setIsFishing(false);
         sounds.playRewardXp();
         const randomCatch = FISH_REWARDS[Math.floor(Math.random() * FISH_REWARDS.length)];
-        setCafeToast(`🎉 Hore! Kamu berhasil menangkap ${randomCatch.icon} ${randomCatch.name}!`);
+        showToast(`🎉 Hore! Kamu berhasil menangkap ${randomCatch.icon} ${randomCatch.name}!`, 4500);
         playerSpeechRef.current = {
           text: `Dapat ${randomCatch.name}! Hore! 🎣✨`,
           expiresAt: Date.now() + 5000,
         };
-        setTimeout(() => setCafeToast(null), 4500);
       }, 3500);
     }
   };
+
+  // Check if cafeToast is a standalone notification (buying from cafe, standing up, or jumping to citizen)
+  // vs contextual feedback that belongs inside the active nearbyAction card
+  const isStandaloneToast = Boolean(
+    cafeToast &&
+      (cafeToast.startsWith('☕') ||
+        cafeToast.startsWith('🍞') ||
+        cafeToast.startsWith('🍦') ||
+        cafeToast.startsWith('🧭') ||
+        cafeToast.startsWith('🚶'))
+  );
 
   return (
     <div
@@ -6325,336 +7853,437 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       {/* Isometric Canvas */}
       <canvas ref={canvasRef} className="block w-full h-full" />
 
-      {/* POP-UP KONFIRMASI MASUK BANGUNAN / KAFE */}
-      {pendingConfirmation && (
-        <aside
-          aria-label="Konfirmasi Masuk Bangunan"
-          className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-md pointer-events-auto animate-fade-in-down"
-        >
-          <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-3 sm:p-3.5 shadow-[0_12px_36px_rgba(0,0,0,0.8)] flex items-center justify-between gap-3">
-            {/* Left: Building Icon & Name */}
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500/20 via-slate-800 to-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                {pendingConfirmation.icon}
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1">
-                  <span>📍 Dekat Bangunan</span>
-                </div>
-                <h4 className="text-xs sm:text-sm font-extrabold text-white truncate leading-tight">
-                  {pendingConfirmation.name}
-                </h4>
-                <p className="text-[10px] sm:text-[11px] text-slate-300 truncate">
-                  {pendingConfirmation.tagline}
-                </p>
-              </div>
+      {/* ============================================================= */}
+      {/* UNIFIED NON-OVERLAPPING TOP HUD STACK (HP & LAPTOP)           */}
+      {/* Row 1: Warga Online + Held Item Countdown Pill                */}
+      {/* Row 2: Single Mutually-Exclusive Popup / Action / Toast Slot  */}
+      {/* ============================================================= */}
+      <div className="absolute top-12 sm:top-14 left-2.5 right-2.5 sm:left-4 sm:right-4 z-30 pointer-events-none flex flex-col gap-2">
+        {/* ROW 1: STATUS PILLS (Left: Warga Online & Radar | Right: Active Held Item + Countdown) */}
+        <div className="w-full flex flex-wrap items-start justify-between gap-1.5">
+          {/* Left: Online Citizens Badge & Quick Teleport Chips */}
+          <div className="flex flex-col items-start gap-1 max-w-[62vw] sm:max-w-[380px] pointer-events-auto">
+            <div className="bg-[#121e2c]/92 backdrop-blur-md border border-emerald-500/45 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-emerald-300 font-mono">{onlineCount}</span>
+              <span className="text-slate-200">Warga Online</span>
             </div>
 
-            {/* Right: Enter and Dismiss Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => {
-                  sounds.playOpenModal();
-                  const target = pendingConfirmation;
-                  setPendingConfirmation(null);
-                  if (target.type === 'cafe') {
-                    setIsCafeMenuOpen(true);
-                  } else {
-                    onSelectBuildingRef.current(target.id as BuildingId);
-                  }
-                }}
-                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 border border-emerald-400/40 transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
-              >
-                <span>🚪 Masuk</span>
-              </button>
-              <button
-                onClick={() => {
-                  sounds.playClick();
-                  setPendingConfirmation(null);
-                }}
-                className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition cursor-pointer"
-                title="Abaikan"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </aside>
-      )}
-
-      {/* POP-UP AKSI LITERASI, KURSI TAMAN, MENYIRAM POHON / MEMANCING */}
-      {!pendingConfirmation && nearbyAction && (
-        <aside
-          aria-label="Aksi Lingkungan Kota"
-          className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-sm pointer-events-auto animate-fade-in-down"
-        >
-          {nearbyAction.type === 'tree' ? (
-            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-emerald-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                  {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime ? '🍎' : '🌳'}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-400">
-                    Pohon Rindang Kota • Siklus {treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3
-                  </div>
-                  <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                    {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime
-                      ? 'Sedang Berbuah Apel (15d)'
-                      : `Siram Pohon (${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3)`}
-                  </h4>
-                  <p className="text-[10px] text-slate-300 truncate">
-                    {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime
-                      ? 'Buah apel merah hilang otomatis setelah 15 detik'
-                      : 'Siram 3 kali agar pohon mengeluarkan buah apel'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
-                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold border border-emerald-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
-              >
-                <span>💧 Siram ({Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)</span>
-                <span className="text-[10px] font-mono text-amber-300 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-500/30">
-                  -1 XP
-                </span>
-              </button>
-            </div>
-          ) : nearbyAction.type === 'literacy' ? (
-            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-cyan-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                  📖
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-bold tracking-wider uppercase text-cyan-400">
-                    Sudut Literasi Warga
-                  </div>
-                  <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                    Baca Buku & Majalah DKV
-                  </h4>
-                  <p className="text-[10px] text-slate-300 truncate">
-                    Komik, Majalah, atau Koran (-1 XP)
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  sounds.playOpenModal();
-                  setIsLiteracyModalOpen(true);
-                }}
-                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold border border-cyan-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
-              >
-                <span>📖 Baca</span>
-                <span className="text-[10px] font-mono text-amber-300 bg-cyan-950/80 px-1 py-0.5 rounded border border-cyan-500/30">
-                  -1 XP
-                </span>
-              </button>
-            </div>
-          ) : nearbyAction.type === 'bench' ? (
-            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                  {nearbyAction.benchId?.startsWith('swing')
-                    ? '🎠'
-                    : nearbyAction.benchId?.startsWith('campfire')
-                    ? '🔥'
-                    : '🪑'}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
-                    {nearbyAction.benchName || 'Kursi Taman'}
-                  </div>
-                  <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                    {nearbyAction.benchId?.startsWith('swing')
-                      ? (isSittingRef.current ? 'Turun dari Ayunan' : 'Naik & Berayun (-1 XP)')
-                      : nearbyAction.benchId?.startsWith('campfire')
-                      ? (isSittingRef.current ? 'Bangun dari Api Unggun' : 'Duduk Menghangatkan Tubuh')
-                      : (isSittingRef.current ? 'Bangun dari Bangku' : 'Duduk Santai (Muat 2 Orang)')}
-                  </h4>
-                  <p className="text-[10px] text-slate-300 truncate">
-                    {nearbyAction.benchId?.startsWith('swing')
-                      ? 'Setiap warga yang naik ayunan membayar 1 XP'
-                      : nearbyAction.benchId?.startsWith('campfire')
-                      ? 'Hangatkan tubuh bersama warga di sudut api unggun'
-                      : 'Bangku minimalis air mancur muat untuk 2 orang'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  sounds.playClick();
-                  if (isSittingRef.current) {
-                    const wasSwing = sittingSeatRef.current?.startsWith('swing');
-                    const wasCampfire = sittingSeatRef.current?.startsWith('campfire');
-                    setIsSitting(false);
-                    setSittingSeat(null);
-                    setCafeToast(
-                      wasSwing
-                        ? '🚶 Turun dari ayunan taman.'
-                        : wasCampfire
-                        ? '🚶 Berdiri dari bangku penghangat api unggun.'
-                        : '🚶 Berdiri kembali dari bangku taman.'
-                    );
-                    setTimeout(() => setCafeToast(null), 2500);
-                    sendHeartbeatRef.current?.();
-                  } else {
-                    const seat = nearbyAction.benchId || 'fountain_1_a';
-                    if (seat.startsWith('swing')) {
-                      const targetSwing = REFLECTION_SWINGS.find((s) => s.id === seat) || REFLECTION_SWINGS[0];
-                      rideSwingWithXp(targetSwing);
-                    } else {
-                      const matchedGroup = ALL_TWO_PERSON_BENCHES.find((g) =>
-                        g.seats.some((s) => s.id === seat)
-                      );
-                      if (matchedGroup) {
-                        const slotIdx: 0 | 1 = matchedGroup.seats[1].id === seat ? 1 : 0;
-                        sitOnTwoPersonBench(matchedGroup, slotIdx);
-                      } else if (seat === 'literacy' && playerRef.current) {
-                        setIsSitting(true);
-                        setSittingSeat('literacy');
-                        playerRef.current.wx = -3.7;
-                        playerRef.current.wy = 1.8;
-                        playerRef.current.facing = 'down-right';
-                        playerRef.current.targetWx = playerRef.current.wx;
-                        playerRef.current.targetWy = playerRef.current.wy;
-                        playerRef.current.isMoving = false;
-                        playerRef.current.walkFrame = 0;
+            {onlineRemoteList.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1">
+                {onlineRemoteList.slice(0, 6).map((cit) => (
+                  <button
+                    key={cit.id}
+                    type="button"
+                    onClick={() => {
+                      sounds.playClick();
+                      const rem = remotePlayersRef.current.get(cit.id);
+                      if (rem && playerRef.current) {
+                        if (isSittingRef.current) {
+                          setIsSitting(false);
+                          setSittingSeat(null);
+                        }
+                        playerRef.current.targetWx = Math.max(-6.5, Math.min(6.5, rem.wx + 0.55));
+                        playerRef.current.targetWy = Math.max(-6.5, Math.min(6.5, rem.wy + 0.35));
+                        playerRef.current.isMoving = true;
+                        clickRippleRef.current = {
+                          wx: playerRef.current.targetWx,
+                          wy: playerRef.current.targetWy,
+                          time: performance.now(),
+                        };
                         sendHeartbeatRef.current?.();
-                        setCafeToast('🪑 Duduk santai di Bangku Taman Literasi.');
-                        setTimeout(() => setCafeToast(null), 2500);
+                        showToast(`🧭 Menuju lokasi ${cit.role === 'guru' ? 'Guru' : 'Siswa'} @${cit.handle}`, 2500);
                       }
-                    }
-                  }
-                }}
-                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
-              >
-                <span>
-                  {nearbyAction.benchId?.startsWith('swing')
-                    ? (isSittingRef.current ? '🚶 Turun' : '🎠 Naik Ayunan')
-                    : nearbyAction.benchId?.startsWith('campfire')
-                    ? (isSittingRef.current ? '🚶 Berdiri' : '🔥 Hangatkan')
-                    : (isSittingRef.current ? '🚶 Berdiri' : '🪑 Duduk')}
-                </span>
-                {nearbyAction.benchId?.startsWith('swing') && !isSittingRef.current && (
-                  <span className="text-[10px] font-mono text-amber-200 bg-amber-950/80 px-1 py-0.5 rounded border border-amber-400/30">
-                    -1 XP
-                  </span>
-                )}
-              </button>
-            </div>
-          ) : (
-            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-sky-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                  🎣
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-bold tracking-wider uppercase text-sky-400">
-                    Dermaga Air Kota
-                  </div>
-                  <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                    Spot Memancing Warga
-                  </h4>
-                  <p className="text-[10px] text-slate-300 truncate">
-                    Santai memancing & dapatkan ikan unik
-                  </p>
-                </div>
+                    }}
+                    className={`px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-bold border shadow-md backdrop-blur-md flex items-center gap-1 transition active:scale-95 cursor-pointer ${
+                      cit.role === 'guru'
+                        ? 'bg-amber-950/90 border-amber-400/60 text-amber-200 hover:bg-amber-900/90'
+                        : 'bg-[#121e2c]/90 border-emerald-400/50 text-emerald-200 hover:bg-slate-800/90'
+                    }`}
+                    title={`Klik untuk menghampiri ${cit.name} (@${cit.handle})`}
+                  >
+                    <span>{cit.role === 'guru' ? '👨‍🏫' : '👦'}</span>
+                    <span className="truncate max-w-[75px] sm:max-w-[90px]">@{cit.handle}</span>
+                    <span className="text-[8.5px] opacity-85">
+                      {cit.isSitting ? '🪑' : cit.isMoving ? '🚶' : '🟢'}
+                    </span>
+                  </button>
+                ))}
               </div>
+            )}
+          </div>
+
+          {/* Right: Held Item Badge with Live Auto-Disappear Countdown (90s Kopi, 60s Roti, 30s Eskrim) */}
+          {heldItem && (
+            <div className="pointer-events-auto bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-full px-2.5 sm:px-3 py-1 flex items-center gap-1.5 text-xs font-bold text-amber-200 shadow-xl animate-fade-in-down ml-auto shrink-0">
+              <span className="text-sm sm:text-base">
+                {heldItem === 'kopi' ? '☕' : heldItem === 'roti' ? '🥐' : '🍦'}
+              </span>
+              <span className="text-[10.5px] sm:text-xs whitespace-nowrap">
+                {heldItem === 'kopi' ? 'Kopi Hangat' : heldItem === 'roti' ? 'Roti Panggang' : 'Eskrim Segar'}
+              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300">
+                {heldItemRemainingSec}d
+              </span>
               <button
-                onClick={handleStartFishing}
-                disabled={isFishing}
-                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold border border-sky-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                onClick={() => {
+                  sounds.playClick();
+                  equipHeldItem(null);
+                }}
+                className="w-4 h-4 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-[10px] cursor-pointer"
+                title="Habiskan / Simpan"
               >
-                <span>{isFishing ? '⏳ Menunggu...' : '🎣 Mancing'}</span>
-                <span className="text-[10px] font-mono text-amber-300 bg-sky-950/80 px-1 py-0.5 rounded border border-sky-500/30">
-                  -3 XP
-                </span>
+                ✕
               </button>
             </div>
           )}
-        </aside>
-      )}
-
-      {/* FLOATING HELD ITEM BADGE (Coffee, Bread, or Ice Cream) */}
-      {heldItem && (
-        <div className="absolute bottom-20 sm:bottom-6 left-3 sm:left-6 z-30 pointer-events-auto bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-full px-3 py-1.5 flex items-center gap-2 text-xs font-bold text-amber-200 shadow-xl animate-fade-in-up">
-          <span className="text-base">{heldItem === 'kopi' ? '☕' : heldItem === 'roti' ? '🥐' : '🍦'}</span>
-          <span className="text-[11px] sm:text-xs">
-            {heldItem === 'kopi' ? 'Memegang Kopi Hangat' : heldItem === 'roti' ? 'Memegang Roti Panggang' : 'Memegang Eskrim Segar'}
-          </span>
-          <button
-            onClick={() => {
-              sounds.playClick();
-              setHeldItem(null);
-            }}
-            className="w-4 h-4 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-[10px] cursor-pointer ml-1"
-            title="Habiskan / Simpan"
-          >
-            ✕
-          </button>
         </div>
-      )}
 
-      {/* Floating Cafe Card ONLY when Touched/Clicked */}
-      {isCafeMenuOpen && cafeScreenPos.visible && (
-        <div
-          className="absolute transform -translate-x-1/2 -translate-y-full pointer-events-auto transition-transform animate-fade-in-up z-30"
-          style={{ left: `${cafeScreenPos.x}px`, top: `${cafeScreenPos.y}px` }}
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="bg-[#121e2c]/95 backdrop-blur-md text-white px-3.5 py-3 rounded-2xl border border-slate-700/80 shadow-[0_12px_36px_0_rgba(0,0,0,0.65)] flex flex-col items-center gap-2.5 min-w-[260px] max-w-[90vw]">
-            <div className="w-full flex items-center justify-between border-b border-slate-700/70 pb-1.5">
-              <div className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5 whitespace-nowrap">
-                <span className="font-extrabold text-white">Toko Roti & Kafe</span>
-                <span className="text-slate-500">•</span>
-                <span className="text-amber-400 font-mono text-[10px]">🪙 {studentPoints} XP</span>
+        {/* ROW 2: SINGLE MUTUALLY-EXCLUSIVE POPUP SLOT (Never overlaps on Mobile HP or Laptop) */}
+        <div className="w-full flex justify-center">
+          {isCafeMenuOpen ? (
+            /* 1. MENU TOKO ROTI & KAFE */
+            <aside
+              aria-label="Menu Toko Roti & Kafe"
+              className="w-full max-w-md pointer-events-auto animate-fade-in-down"
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-[#121e2c]/95 backdrop-blur-md text-white px-3.5 py-3 rounded-2xl border border-amber-400/50 shadow-[0_12px_36px_rgba(0,0,0,0.8)] flex flex-col items-center gap-2.5">
+                <div className="w-full flex items-center justify-between border-b border-slate-700/70 pb-1.5">
+                  <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+                    <span>☕</span>
+                    <span className="font-extrabold text-white">Toko Roti & Kafe Warga</span>
+                    <span className="text-slate-500">•</span>
+                    <span className="text-amber-400 font-mono text-[11px]">🪙 {studentPoints} XP</span>
+                  </div>
+                  <button
+                    onClick={() => setIsCafeMenuOpen(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                    title="Tutup Menu Kafe"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {cafeToast && (
+                  <div className="w-full text-center text-[11px] font-bold text-amber-300 bg-amber-950/60 border border-amber-500/40 rounded-xl px-2.5 py-1">
+                    {cafeToast}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-2 w-full">
+                  <button
+                    onClick={handleBuyCoffee}
+                    className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-2.5 py-2 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                  >
+                    <span className="text-lg">☕</span>
+                    <span className="text-[11px] mt-0.5">Kopi (-2 XP)</span>
+                    <span className="text-[9.5px] text-emerald-200/90 font-normal">Tahan 90 detik</span>
+                  </button>
+                  <button
+                    onClick={handleBuyBread}
+                    className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-2.5 py-2 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                  >
+                    <span className="text-lg">🍞</span>
+                    <span className="text-[11px] mt-0.5">Roti (-1 XP)</span>
+                    <span className="text-[9.5px] text-emerald-200/90 font-normal">Tahan 60 detik</span>
+                  </button>
+                  <button
+                    onClick={handleBuyIceCream}
+                    className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-2.5 py-2 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                  >
+                    <span className="text-lg">🍦</span>
+                    <span className="text-[11px] mt-0.5">Eskrim (-1 XP)</span>
+                    <span className="text-[9.5px] text-emerald-200/90 font-normal">Tahan 30 detik</span>
+                  </button>
+                </div>
               </div>
+            </aside>
+          ) : isStandaloneToast && cafeToast ? (
+            /* 2. STANDALONE TOAST (Pembelian Kopi/Roti/Eskrim, Berdiri, atau Navigasi Warga) */
+            <div
+              role="status"
+              className="pointer-events-auto bg-[#121e2c]/95 backdrop-blur-md text-emerald-300 font-bold text-xs sm:text-sm px-4 py-2 rounded-2xl border border-emerald-500/45 shadow-2xl animate-fade-in-down flex items-center gap-2 max-w-md text-center"
+            >
+              <span>✨</span>
+              <span>{cafeToast}</span>
               <button
-                onClick={() => setIsCafeMenuOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
-                title="Tutup Menu Kafe"
+                onClick={() => showToast(null, 0)}
+                className="ml-1 text-slate-400 hover:text-white text-xs cursor-pointer"
+                title="Tutup"
               >
-                <X className="w-3.5 h-3.5" />
+                ✕
               </button>
             </div>
+          ) : pendingConfirmation ? (
+            /* 3. POP-UP KONFIRMASI MASUK BANGUNAN / KAFE */
+            <aside
+              aria-label="Konfirmasi Masuk Bangunan"
+              className="w-full max-w-md pointer-events-auto animate-fade-in-down"
+            >
+              <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-2.5 sm:p-3.5 shadow-[0_12px_36px_rgba(0,0,0,0.8)] flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-sky-500/20 via-slate-800 to-amber-500/20 border border-amber-400/40 flex items-center justify-center text-lg sm:text-xl shrink-0 shadow-sm">
+                    {pendingConfirmation.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1">
+                      <span>📍 Dekat Bangunan</span>
+                    </div>
+                    <h4 className="text-xs sm:text-sm font-extrabold text-white truncate leading-tight">
+                      {pendingConfirmation.name}
+                    </h4>
+                    <p className="text-[10px] sm:text-[11px] text-slate-300 truncate">
+                      {pendingConfirmation.tagline}
+                    </p>
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => {
+                      sounds.playOpenModal();
+                      const target = pendingConfirmation;
+                      setPendingConfirmation(null);
+                      if (target.type === 'cafe') {
+                        setIsCafeMenuOpen(true);
+                      } else {
+                        onSelectBuildingRef.current(target.id as BuildingId);
+                      }
+                    }}
+                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 border border-emerald-400/40 transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                  >
+                    <span>🚪 Masuk</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      sounds.playClick();
+                      setPendingConfirmation(null);
+                    }}
+                    className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition cursor-pointer"
+                    title="Abaikan"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </aside>
+          ) : nearbyAction ? (
+            /* 4. POP-UP AKSI KONTEKSTUAL (POHON, LITERASI, DUDUK/AYUNAN, MEMANCING) DENGAN STATUS INLINE TANPA MENIMPA */
+            <aside
+              aria-label="Aksi Lingkungan Kota"
+              className="w-full max-w-md pointer-events-auto animate-fade-in-down"
+            >
+              {nearbyAction.type === 'tree' ? (
+                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-emerald-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                      {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime ? '🍎' : '🌳'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-400">
+                        Pohon Rindang Kota • Siklus {treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                        {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime
+                          ? 'Sedang Berbuah Apel (15d)'
+                          : `Siram Pohon (${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3)`}
+                      </h4>
+                      <p className={`text-[10px] truncate ${cafeToast ? 'text-emerald-300 font-semibold' : 'text-slate-300'}`}>
+                        {cafeToast ||
+                          (treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime
+                            ? 'Buah apel merah hilang otomatis setelah 15 detik'
+                            : 'Siram 3 kali agar pohon mengeluarkan buah apel')}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
+                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold border border-emerald-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <span>💧 Siram ({Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)</span>
+                    <span className="text-[10px] font-mono text-amber-300 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-500/30">
+                      -1 XP
+                    </span>
+                  </button>
+                </div>
+              ) : nearbyAction.type === 'literacy' ? (
+                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-cyan-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                      📖
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-wider uppercase text-cyan-400">
+                        Sudut Literasi Warga
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                        Baca Buku & Majalah DKV
+                      </h4>
+                      <p className={`text-[10px] truncate ${cafeToast ? 'text-cyan-300 font-semibold' : 'text-slate-300'}`}>
+                        {cafeToast || 'Komik, Majalah, atau Koran (-1 XP)'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      sounds.playOpenModal();
+                      setIsLiteracyModalOpen(true);
+                    }}
+                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold border border-cyan-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <span>📖 Baca</span>
+                    <span className="text-[10px] font-mono text-amber-300 bg-cyan-950/80 px-1 py-0.5 rounded border border-cyan-500/30">
+                      -1 XP
+                    </span>
+                  </button>
+                </div>
+              ) : nearbyAction.type === 'bench' ? (
+                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                      {nearbyAction.benchId?.startsWith('swing')
+                        ? '🎠'
+                        : nearbyAction.benchId?.startsWith('campfire')
+                        ? '🔥'
+                        : '🪑'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
+                        {nearbyAction.benchName || 'Kursi Taman'}
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                        {nearbyAction.benchId?.startsWith('swing')
+                          ? isSittingRef.current
+                            ? 'Sedang Naik Ayunan'
+                            : 'Naik & Berayun (-1 XP)'
+                          : nearbyAction.benchId?.startsWith('campfire')
+                          ? isSittingRef.current
+                            ? 'Menghangatkan Tubuh di Api Unggun'
+                            : 'Duduk Menghangatkan Tubuh'
+                          : isSittingRef.current
+                          ? 'Sedang Duduk Santai'
+                          : 'Duduk Santai (Muat 2 Orang)'}
+                      </h4>
+                      <p className={`text-[10px] truncate ${cafeToast ? 'text-amber-300 font-semibold' : 'text-slate-300'}`}>
+                        {cafeToast ||
+                          (nearbyAction.benchId?.startsWith('swing')
+                            ? 'Setiap warga yang naik ayunan membayar 1 XP'
+                            : nearbyAction.benchId?.startsWith('campfire')
+                            ? 'Hangatkan tubuh bersama warga di sudut api unggun'
+                            : 'Bangku minimalis air mancur muat untuk 2 orang')}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      sounds.playClick();
+                      if (isSittingRef.current) {
+                        const wasSwing = sittingSeatRef.current?.startsWith('swing');
+                        const wasCampfire = sittingSeatRef.current?.startsWith('campfire');
+                        setIsSitting(false);
+                        setSittingSeat(null);
+                        showToast(
+                          wasSwing
+                            ? '🚶 Turun dari ayunan taman.'
+                            : wasCampfire
+                            ? '🚶 Berdiri dari bangku penghangat api unggun.'
+                            : '🚶 Berdiri kembali dari bangku taman.',
+                          2200
+                        );
+                        sendHeartbeatRef.current?.();
+                      } else {
+                        const seat = nearbyAction.benchId || 'fountain_1_a';
+                        if (seat.startsWith('swing')) {
+                          const targetSwing = REFLECTION_SWINGS.find((s) => s.id === seat) || REFLECTION_SWINGS[0];
+                          rideSwingWithXp(targetSwing);
+                        } else {
+                          const matchedGroup = ALL_TWO_PERSON_BENCHES.find((g) =>
+                            g.seats.some((s) => s.id === seat)
+                          );
+                          if (matchedGroup) {
+                            const slotIdx: 0 | 1 = matchedGroup.seats[1].id === seat ? 1 : 0;
+                            sitOnTwoPersonBench(matchedGroup, slotIdx);
+                          } else if (seat === 'literacy' && playerRef.current) {
+                            sitOnTwoPersonBench(LITERACY_BENCHES[0], 0);
+                          }
+                        }
+                      }
+                    }}
+                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <span>
+                      {nearbyAction.benchId?.startsWith('swing')
+                        ? isSittingRef.current
+                          ? '🚶 Turun'
+                          : '🎠 Naik Ayunan'
+                        : nearbyAction.benchId?.startsWith('campfire')
+                        ? isSittingRef.current
+                          ? '🚶 Berdiri'
+                          : '🔥 Hangatkan'
+                        : isSittingRef.current
+                        ? '🚶 Berdiri'
+                        : '🪑 Duduk'}
+                    </span>
+                    {nearbyAction.benchId?.startsWith('swing') && !isSittingRef.current && (
+                      <span className="text-[10px] font-mono text-amber-200 bg-amber-950/80 px-1 py-0.5 rounded border border-amber-400/30">
+                        -1 XP
+                      </span>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-sky-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                      🎣
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-wider uppercase text-sky-400">
+                        Dermaga Air Kota
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                        {isFishing ? 'Sedang Memancing Ikan...' : 'Spot Memancing Warga'}
+                      </h4>
+                      <p className={`text-[10px] truncate ${cafeToast ? 'text-sky-300 font-semibold' : 'text-slate-300'}`}>
+                        {cafeToast || 'Santai memancing & dapatkan ikan unik'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleStartFishing}
+                    disabled={isFishing}
+                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold border border-sky-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <span>{isFishing ? '⏳ Menunggu...' : '🎣 Mancing'}</span>
+                    <span className="text-[10px] font-mono text-amber-300 bg-sky-950/80 px-1 py-0.5 rounded border border-sky-500/30">
+                      -3 XP
+                    </span>
+                  </button>
+                </div>
+              )}
+            </aside>
+          ) : cafeToast ? (
+            /* 5. FALLBACK SINGLE TOAST NOTIFICATION */
+            <div
+              role="status"
+              className="pointer-events-auto bg-[#121e2c]/95 backdrop-blur-md text-emerald-300 font-bold text-xs sm:text-sm px-4 py-2 rounded-2xl border border-emerald-500/45 shadow-2xl animate-fade-in-down flex items-center gap-2 max-w-md text-center"
+            >
+              <span>✨</span>
+              <span>{cafeToast}</span>
               <button
-                onClick={handleBuyCoffee}
-                className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                onClick={() => showToast(null, 0)}
+                className="ml-1 text-slate-400 hover:text-white text-xs cursor-pointer"
+                title="Tutup"
               >
-                <span className="text-base">☕</span>
-                <span className="text-[10px] mt-0.5">Kopi (-2 XP)</span>
-              </button>
-              <button
-                onClick={handleBuyBread}
-                className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
-              >
-                <span className="text-base">🍞</span>
-                <span className="text-[10px] mt-0.5">Roti (-1 XP)</span>
-              </button>
-              <button
-                onClick={handleBuyIceCream}
-                className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
-              >
-                <span className="text-base">🍦</span>
-                <span className="text-[10px] mt-0.5">Eskrim (-1 XP)</span>
+                ✕
               </button>
             </div>
-          </div>
+          ) : null}
         </div>
-      )}
-
-      {/* Floating Cafe Toast Notification */}
-      {cafeToast && (
-        <div className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-40 bg-[#121e2c]/95 backdrop-blur-md text-emerald-300 font-bold text-xs sm:text-sm px-4 py-2 rounded-full border border-emerald-500/40 shadow-2xl animate-fade-in-up flex items-center gap-2 max-w-[90vw] text-center">
-          <span>✨</span>
-          <span>{cafeToast}</span>
-        </div>
-      )}
+      </div>
 
       {/* LITERACY READING CORNER MODAL (-1 XP for Komik, Majalah, Koran) */}
       {isLiteracyModalOpen && (
@@ -6691,7 +8320,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   const cost = 1;
                   if (studentPoints < cost) {
                     sounds.playClick();
-                    setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`);
+                    showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`, 3000);
                     return;
                   }
                   const success = onDeductPoints ? onDeductPoints(cost, 'Baca Komik DKV') : true;
@@ -6699,16 +8328,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     sounds.playRewardXp();
                     setActiveLiteracyDoc('komik');
                     setIsSitting(true);
-                    setSittingSeat('literacy');
+                    setSittingSeat('literacy_1_a');
                     if (playerRef.current) {
-                      playerRef.current.wx = -3.7;
-                      playerRef.current.wy = 1.8;
-                      playerRef.current.targetWx = -3.7;
-                      playerRef.current.targetWy = 1.8;
+                      playerRef.current.wx = -3.72;
+                      playerRef.current.wy = 1.52;
+                      playerRef.current.targetWx = -3.72;
+                      playerRef.current.targetWy = 1.52;
                       playerRef.current.isMoving = false;
                     }
-                    setCafeToast('📚 Membaca Komik Desain Kreatif (-1 XP)');
-                    setTimeout(() => setCafeToast(null), 3000);
+                    showToast('📚 Membaca Komik Desain Kreatif (-1 XP)', 3000);
                   }
                 }}
                 className={`p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1.5 ${
@@ -6728,7 +8356,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   const cost = 1;
                   if (studentPoints < cost) {
                     sounds.playClick();
-                    setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`);
+                    showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`, 3000);
                     return;
                   }
                   const success = onDeductPoints ? onDeductPoints(cost, 'Baca Majalah Desain') : true;
@@ -6736,16 +8364,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     sounds.playRewardXp();
                     setActiveLiteracyDoc('majalah');
                     setIsSitting(true);
-                    setSittingSeat('literacy');
+                    setSittingSeat('literacy_1_a');
                     if (playerRef.current) {
-                      playerRef.current.wx = -3.7;
-                      playerRef.current.wy = 1.8;
-                      playerRef.current.targetWx = -3.7;
-                      playerRef.current.targetWy = 1.8;
+                      playerRef.current.wx = -3.72;
+                      playerRef.current.wy = 1.52;
+                      playerRef.current.targetWx = -3.72;
+                      playerRef.current.targetWy = 1.52;
                       playerRef.current.isMoving = false;
                     }
-                    setCafeToast('📰 Membaca Majalah Seni Rupa (-1 XP)');
-                    setTimeout(() => setCafeToast(null), 3000);
+                    showToast('📰 Membaca Majalah Seni Rupa (-1 XP)', 3000);
                   }
                 }}
                 className={`p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1.5 ${
@@ -6765,7 +8392,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   const cost = 1;
                   if (studentPoints < cost) {
                     sounds.playClick();
-                    setCafeToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`);
+                    showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`, 3000);
                     return;
                   }
                   const success = onDeductPoints ? onDeductPoints(cost, 'Baca Koran Kora') : true;
@@ -6773,18 +8400,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     sounds.playRewardXp();
                     setActiveLiteracyDoc('koran');
                     setIsSitting(true);
-                    setSittingSeat('literacy');
+                    setSittingSeat('literacy_1_a');
                     if (playerRef.current) {
-                      playerRef.current.wx = -3.7;
-                      playerRef.current.wy = 1.8;
-                      playerRef.current.targetWx = -3.7;
-                      playerRef.current.targetWy = 1.8;
+                      playerRef.current.wx = -3.72;
+                      playerRef.current.wy = 1.52;
+                      playerRef.current.targetWx = -3.72;
+                      playerRef.current.targetWy = 1.52;
                       playerRef.current.isMoving = false;
                     }
-                    setCafeToast('🗞️ Membaca Koran Warga Kora (-1 XP)');
-                    setTimeout(() => setCafeToast(null), 3000);
+                    showToast('🗞️ Membaca Koran Warga Kora (-1 XP)', 3000);
                   }
                 }}
+
                 className={`p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1.5 ${
                   activeLiteracyDoc === 'koran'
                     ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-lg'
@@ -6855,57 +8482,127 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         </div>
       )}
 
-      {/* ONLINE CITIZENS BADGE & LIVE RADAR (Real-Time Multi-Device Guru & Siswa Presence) */}
-      <div className="absolute top-13 sm:top-15 left-2.5 sm:left-4 z-20 flex flex-col items-start gap-1.5 max-w-[88vw] pointer-events-auto">
-        <div className="bg-[#121e2c]/92 backdrop-blur-md border border-emerald-500/45 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5 sm:gap-2">
-          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="text-emerald-300 font-mono">{onlineCount}</span>
-          <span className="text-slate-200">Warga Online</span>
-        </div>
+      {/* ============================================================= */}
+      {/* CIRCULAR / RADIAL EMOTE PICKER OVERLAY (Suka, Lambai, Tertawa, Joget) */}
+      {/* ============================================================= */}
+      {isEmoteMenuOpen && (
+        <div
+          className="absolute z-40 pointer-events-none select-none transition-all duration-150"
+          style={{
+            left: `${Math.max(65, Math.min((containerRef.current?.clientWidth || 800) - 65, playerScreenPos.x))}px`,
+            top: `${Math.max(75, Math.min((containerRef.current?.clientHeight || 600) - 75, playerScreenPos.y))}px`,
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          {/* Circular Connecting Glow Ring */}
+          <div className="absolute inset-0 -m-16 rounded-full border border-sky-400/40 bg-slate-950/50 backdrop-blur-sm shadow-[0_0_30px_rgba(56,189,248,0.35)] pointer-events-auto" />
+          <div className="absolute inset-0 -m-14 rounded-full border border-dashed border-sky-300/30 pointer-events-none animate-spin" style={{ animationDuration: '24s' }} />
 
-        {onlineRemoteList.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 max-w-[280px] sm:max-w-[380px]">
-            {onlineRemoteList.slice(0, 6).map((cit) => (
+          {/* Radial Buttons Container */}
+          <div className="relative w-32 h-32 flex items-center justify-center pointer-events-auto">
+            {/* Center Dismiss Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                sounds.playClick();
+                setIsEmoteMenuOpen(false);
+              }}
+              className="w-10 h-10 rounded-full bg-slate-900/95 border border-slate-600/80 hover:border-slate-400 text-slate-300 hover:text-white flex items-center justify-center shadow-lg transition transform hover:scale-110 active:scale-95 cursor-pointer z-10"
+              title="Tutup Menu Emosi"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* 1. TOP (-90deg): 🎵 JOGET (Icon Music - Otomatis Avatar Berjoget) */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 flex flex-col items-center">
               <button
-                key={cit.id}
                 type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  const rem = remotePlayersRef.current.get(cit.id);
-                  if (rem && playerRef.current) {
-                    if (isSittingRef.current) {
-                      setIsSitting(false);
-                      setSittingSeat(null);
-                    }
-                    playerRef.current.targetWx = Math.max(-6.5, Math.min(6.5, rem.wx + 0.55));
-                    playerRef.current.targetWy = Math.max(-6.5, Math.min(6.5, rem.wy + 0.35));
-                    playerRef.current.isMoving = true;
-                    clickRippleRef.current = { wx: playerRef.current.targetWx, wy: playerRef.current.targetWy, time: performance.now() };
-                    sendHeartbeatRef.current?.();
-                    setCafeToast(`🧭 Menuju lokasi ${cit.role === 'guru' ? 'Guru' : 'Siswa'} @${cit.handle}`);
-                    setTimeout(() => setCafeToast(null), 2500);
-                  }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerEmote('dance');
                 }}
-                className={`px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-bold border shadow-md backdrop-blur-md flex items-center gap-1 transition active:scale-95 cursor-pointer ${
-                  cit.role === 'guru'
-                    ? 'bg-amber-950/90 border-amber-400/60 text-amber-200 hover:bg-amber-900/90'
-                    : 'bg-[#121e2c]/90 border-emerald-400/50 text-emerald-200 hover:bg-slate-800/90'
-                }`}
-                title={`Klik untuk menghampiri ${cit.name} (@${cit.handle})`}
+                className="group relative w-12 h-12 rounded-full bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 border-2 border-purple-200/90 shadow-lg shadow-purple-600/60 flex items-center justify-center text-2xl transition transform hover:scale-125 active:scale-90 cursor-pointer animate-pulse"
+                title="Joget (Avatar otomatis berjoget musik)"
               >
-                <span>{cit.role === 'guru' ? '👨‍🏫' : '👦'}</span>
-                <span className="truncate max-w-[85px]">@{cit.handle}</span>
-                <span className="text-[8.5px] opacity-85">
-                  {cit.isSitting ? '🪑' : cit.isMoving ? '🚶' : '🟢'}
+                <span className="drop-shadow">🎵</span>
+                <span className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/95 border border-purple-400/60 text-purple-200 text-[10px] font-extrabold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
+                  Joget
                 </span>
               </button>
-            ))}
-          </div>
-        )}
-      </div>
+              <span className="mt-1 text-[9px] font-extrabold text-purple-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] bg-slate-950/75 px-1.5 py-0.5 rounded-full border border-purple-500/40">
+                Joget
+              </span>
+            </div>
 
-      {/* Zoom & Center Controls */}
-      <div className="absolute right-4 bottom-20 z-30 flex flex-col gap-2">
+            {/* 2. RIGHT (0deg): ❤️ SUKA (Love) */}
+            <div className="absolute right-0 top-1/2 translate-x-4 -translate-y-1/2 flex flex-col items-center">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerEmote('love');
+                }}
+                className="group relative w-12 h-12 rounded-full bg-gradient-to-tr from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 border-2 border-rose-200/90 shadow-lg shadow-rose-600/60 flex items-center justify-center text-2xl transition transform hover:scale-125 active:scale-90 cursor-pointer"
+                title="Suka (Apresiasi cinta)"
+              >
+                <span className="drop-shadow">❤️</span>
+                <span className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/95 border border-rose-400/60 text-rose-200 text-[10px] font-extrabold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
+                  Suka
+                </span>
+              </button>
+              <span className="mt-1 text-[9px] font-extrabold text-rose-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] bg-slate-950/75 px-1.5 py-0.5 rounded-full border border-rose-500/40">
+                Suka
+              </span>
+            </div>
+
+            {/* 3. BOTTOM (90deg): 😂 TERTAWA (Icon Tertawa) */}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-4 flex flex-col items-center">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerEmote('laugh');
+                }}
+                className="group relative w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 border-2 border-amber-200/90 shadow-lg shadow-amber-500/60 flex items-center justify-center text-2xl transition transform hover:scale-125 active:scale-90 cursor-pointer"
+                title="Tertawa (Gembira)"
+              >
+                <span className="drop-shadow">😂</span>
+                <span className="absolute -bottom-7 px-2 py-0.5 rounded-full bg-slate-900/95 border border-amber-400/60 text-amber-200 text-[10px] font-extrabold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
+                  Tertawa
+                </span>
+              </button>
+              <span className="mt-1 text-[9px] font-extrabold text-amber-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] bg-slate-950/75 px-1.5 py-0.5 rounded-full border border-amber-500/40">
+                Tertawa
+              </span>
+            </div>
+
+            {/* 4. LEFT (180deg): 👋 LAMBAI (Tangan) */}
+            <div className="absolute left-0 top-1/2 -translate-x-4 -translate-y-1/2 flex flex-col items-center">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerEmote('wave');
+                }}
+                className="group relative w-12 h-12 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 border-2 border-sky-200/90 shadow-lg shadow-sky-500/60 flex items-center justify-center text-2xl transition transform hover:scale-125 active:scale-90 cursor-pointer"
+                title="Lambai (Sapa Warga)"
+              >
+                <span className="drop-shadow">👋</span>
+                <span className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/95 border border-sky-400/60 text-sky-200 text-[10px] font-extrabold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
+                  Lambai
+                </span>
+              </button>
+              <span className="mt-1 text-[9px] font-extrabold text-sky-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] bg-slate-950/75 px-1.5 py-0.5 rounded-full border border-sky-500/40">
+                Lambai
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zoom & Center Controls (Positioned cleanly above mobile chat panel & at bottom-right on laptop) */}
+      <div className="absolute right-2.5 sm:right-4 bottom-[calc(max(0.85rem,env(safe-area-inset-bottom))+15.5rem)] sm:bottom-20 z-30 flex flex-col gap-2">
         <button
           onClick={handleZoomIn}
           className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer"

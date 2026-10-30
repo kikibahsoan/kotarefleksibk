@@ -264,7 +264,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                 <div>
                   <h3 className="text-lg font-bold text-white">Belum Ada Refleksi untuk Ditinjau</h3>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-                    Kamu belum menulis refleksi pembelajaran. Pergilah ke Taman Refleksi untuk menulis refleksimu!
+                    Kamu belum menulis refleksi pembelajaran. Pergilah ke Pusat Refleksi untuk menulis refleksimu (+3 Poin)!
                   </p>
                 </div>
                 <button
@@ -274,7 +274,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                   }}
                   className="px-5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold inline-flex items-center gap-2 transition"
                 >
-                  <span>Buka Taman Refleksi</span>
+                  <span>Buka Pusat Refleksi (+3 Poin)</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

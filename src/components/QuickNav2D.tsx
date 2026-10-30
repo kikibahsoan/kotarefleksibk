@@ -13,7 +13,7 @@ interface QuickNav2DProps {
 const BUILDING_ICONS: Record<BuildingId, string> = {
   balai_kota: '🏛️',
   perpustakaan: '📚',
-  taman_refleksi: '🌸',
+  taman_refleksi: '🌍',
   menara_mentor: '📡',
   bengkel_latihan: '🛠️',
   kantor_pos: '📮',
@@ -23,8 +23,8 @@ const BUILDING_ICONS: Record<BuildingId, string> = {
 
 const BUILDING_DESCRIPTIONS: Record<BuildingId, string> = {
   balai_kota: 'Misi hari ini, pengumuman sekolah, dan target pembelajaran aktif.',
-  perpustakaan: 'Baca materi, rangkuman, dan tonton video penjelasan praktikum.',
-  taman_refleksi: 'Tulis refleksi pemahaman 3 pertanyaan dan pilih skala bintang.',
+  perpustakaan: 'Baca rak 5 buku materi detail, tulis jurnal 4F, dan arsip refleksi.',
+  taman_refleksi: 'Tulis refleksi pemahaman 3 pertanyaan dan dapatkan +3 XP per refleksi.',
   menara_mentor: 'Umpan balik personal AI Mentor Kota dan rencana belajar 3 langkah.',
   bengkel_latihan: 'Kuis cepat dan tantangan kejuruan untuk menambah poin XP.',
   kantor_pos: 'Kirim surat pertanyaan atau kesulitan langsung ke gurumu.',

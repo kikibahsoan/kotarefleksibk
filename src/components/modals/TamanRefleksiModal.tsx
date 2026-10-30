@@ -53,7 +53,7 @@ export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert('Fitur input suara belum didukung di browser ini. Silakan ketik langsung di kolom teks.');
+      setError('Fitur input suara belum didukung di browser ini. Silakan ketik langsung di kolom teks.');
       return;
     }
 
@@ -201,19 +201,19 @@ export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-sm animate-backdrop-fade">
       <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100 animate-fade-in-up">
         {/* Header */}
-        <div className="bg-gradient-to-r from-pink-700 via-rose-700 to-fuchsia-700 px-6 py-5 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-r from-amber-700 via-orange-700 to-rose-700 px-6 py-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl shadow-inner">
-              🌸
+              🌍
             </div>
             <div>
-              <h2 className="text-xl font-extrabold font-display leading-tight">Taman Refleksi</h2>
-              <p className="text-xs text-pink-100 font-medium">Refleksikan Belajarmu & Terima Masukan Personal</p>
+              <h2 className="text-xl font-extrabold font-display leading-tight">Pusat Refleksi</h2>
+              <p className="text-xs text-amber-100 font-medium">Refleksikan Belajarmu & Terima Masukan Personal (+3 Poin)</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            aria-label="Tutup Taman Refleksi"
+            aria-label="Tutup Pusat Refleksi"
             className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"
           >
             <X className="w-5 h-5 text-white" />
@@ -497,7 +497,7 @@ export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
               ) : (
                 <>
                   <Send className="w-5 h-5" />
-                  <span>Kirim Refleksi & Dapatkan Umpan Balik AI (+30 Poin)</span>
+                  <span>Kirim Refleksi & Dapatkan Umpan Balik AI (+3 Poin)</span>
                 </>
               )}
             </button>

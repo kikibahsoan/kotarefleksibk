@@ -94,12 +94,12 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
       return;
     }
 
-    // Update login timestamp & save
+    // Update login timestamp & grant 5 XP (koin) on student login
     const loggedStudent: Student = {
       ...target,
       lastLogin: new Date().toISOString().slice(0, 10),
       streakDays: target.streakDays || 1,
-      points: target.points || 20,
+      points: 5,
       badges: target.badges && target.badges.length > 0 ? target.badges : ['reflektor_pertama'],
     };
 
@@ -147,7 +147,15 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => onLoginStudent(validExistingStudent)}
+              onClick={() => {
+                const resumed: Student = {
+                  ...validExistingStudent,
+                  points: validExistingStudent.isTeacher ? 10 : 5,
+                };
+                StorageService.saveOrUpdateStudent(resumed);
+                StorageService.setCurrentStudent(resumed);
+                onLoginStudent(resumed);
+              }}
               className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow transition"
             >
               Lanjutkan →

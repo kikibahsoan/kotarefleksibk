@@ -21,7 +21,13 @@ import { ThreeTownCanvas, BUILDINGS_INFO } from './components/ThreeTownCanvas.ts
 import { StudentWelcome } from './components/StudentWelcome.tsx';
 import { TeacherPinModal } from './components/TeacherPinModal.tsx';
 import { QuickNav2D } from './components/QuickNav2D.tsx';
-import { BalaiKotaModal } from './components/modals/BalaiKotaModal.tsx';
+import {
+  BalaiKotaModal,
+  TownMissionDef,
+  getOrInitUserRandomMissions,
+  getCompletedMissionIds,
+  saveCompletedMissionIds,
+} from './components/modals/BalaiKotaModal.tsx';
 import { PerpustakaanModal } from './components/modals/PerpustakaanModal.tsx';
 import { TamanRefleksiModal } from './components/modals/TamanRefleksiModal.tsx';
 import { MenaraMentorModal } from './components/modals/MenaraMentorModal.tsx';
@@ -33,6 +39,7 @@ import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
 import { LofiAudioControl } from './components/LofiAudioControl.tsx';
 import { getTimePeriodWita, TimePeriod } from './utils/lofiAudio.ts';
+import { sounds } from './utils/audio.ts';
 import { PublicChatMessage } from './types/index.ts';
 import {
   LogOut,
@@ -52,6 +59,9 @@ import confetti from 'canvas-confetti';
 
 export default function App() {
   const [student, setStudent] = useState<Student | null>(() => StorageService.getCurrentStudent());
+  const studentRef = useRef<Student | null>(student);
+  studentRef.current = student;
+
   const [materis, setMateris] = useState<Materi[]>(() => StorageService.getMateri());
   const [objectives, setObjectives] = useState<LearningObjective[]>(() => StorageService.getObjectives());
   const [reflections, setReflections] = useState<Reflection[]>(() => StorageService.getReflections());
@@ -59,6 +69,22 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>(() => StorageService.getMessages());
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => StorageService.getQuizQuestions());
   const [settings, setSettings] = useState<TownSettings>(() => StorageService.getSettings());
+
+  // Randomized 5 missions per user (3 XP per mission, auto-completed without claim button)
+  const [assignedMissions, setAssignedMissions] = useState<TownMissionDef[]>(() =>
+    student ? getOrInitUserRandomMissions(student.id, false) : []
+  );
+  const assignedMissionsRef = useRef<TownMissionDef[]>(assignedMissions);
+  assignedMissionsRef.current = assignedMissions;
+
+  const [completedMissionIds, setCompletedMissionIds] = useState<string[]>(() =>
+    student ? getCompletedMissionIds(student.id) : []
+  );
+  const completedMissionIdsRef = useRef<string[]>(completedMissionIds);
+  completedMissionIdsRef.current = completedMissionIds;
+
+  const [missionToast, setMissionToast] = useState<string | null>(null);
+  const missionToastTimerRef = useRef<number | null>(null);
 
   const [activeBuilding, setActiveBuilding] = useState<BuildingId | null>(null);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
@@ -190,65 +216,115 @@ export default function App() {
   }, [student?.id]);
 
   // Add points to student saldo (from missions, reflection, quiz, chat)
-  const handleAddPoints = (amount: number, _reason?: string) => {
-    if (!student) return;
-    const newPoints = student.points + amount;
-    const myReflections = reflections.filter((r) => r.studentId === student.id);
-    const myMessages = messages.filter((m) => m.studentId === student.id);
-    const newBadges = evaluateBadges(student, myReflections, 1, myMessages.length);
+  const handleAddPoints = useCallback(
+    (amount: number, _reason?: string) => {
+      const current = studentRef.current;
+      if (!current) return;
+      const newPoints = current.points + amount;
+      const myReflections = reflections.filter((r) => r.studentId === current.id);
+      const myMessages = messages.filter((m) => m.studentId === current.id);
+      const newBadges = evaluateBadges(current, myReflections, 1, myMessages.length);
 
+      const updatedStudent: Student = {
+        ...current,
+        points: newPoints,
+        badges: newBadges,
+      };
+
+      studentRef.current = updatedStudent;
+      setStudent(updatedStudent);
+      StorageService.saveOrUpdateStudent(updatedStudent);
+      StorageService.setCurrentStudent(updatedStudent);
+
+      try {
+        confetti({
+          particleCount: 45,
+          spread: 65,
+          origin: { y: 0.65 },
+        });
+      } catch (e) {
+        // Safe fallback
+      }
+    },
+    [reflections, messages]
+  );
+
+  // Automatically complete a randomized mission and award +3 XP (no manual claim button)
+  const completeMissionIfActive = useCallback(
+    (missionId: string) => {
+      const current = studentRef.current;
+      if (!current) return;
+      const activeList = assignedMissionsRef.current;
+      const completedList = completedMissionIdsRef.current;
+
+      const foundMission = activeList.find((m) => m.id === missionId);
+      if (!foundMission || completedList.includes(missionId)) {
+        return;
+      }
+
+      const nextCompleted = [...completedList, missionId];
+      completedMissionIdsRef.current = nextCompleted;
+      setCompletedMissionIds(nextCompleted);
+      saveCompletedMissionIds(current.id, nextCompleted);
+
+      sounds.playRewardXp();
+      handleAddPoints(3, foundMission.title);
+
+      if (missionToastTimerRef.current) {
+        window.clearTimeout(missionToastTimerRef.current);
+      }
+      setMissionToast(`🎯 Misi Tuntas: "${foundMission.title}" (+3 XP otomatis masuk ke saldo!)`);
+      missionToastTimerRef.current = window.setTimeout(() => {
+        setMissionToast(null);
+        missionToastTimerRef.current = null;
+      }, 3600);
+    },
+    [handleAddPoints]
+  );
+
+  const handleSelectBuilding = useCallback(
+    (buildingId: BuildingId) => {
+      setActiveBuilding(buildingId);
+      if (buildingId === 'perpustakaan') {
+        completeMissionIfActive('m_perpustakaan');
+      } else if (buildingId === 'menara_mentor') {
+        completeMissionIfActive('m_mentor');
+      } else if (buildingId === 'monumen_warga') {
+        completeMissionIfActive('m_papan');
+      } else if (buildingId === 'pasar_prestasi') {
+        completeMissionIfActive('m_pasar');
+      }
+    },
+    [completeMissionIfActive]
+  );
+
+  // Deduct points from student/teacher saldo automatically when used in town
+  const handleDeductPoints = useCallback((amount: number, _reason?: string): boolean => {
+    const current = studentRef.current;
+    if (!current) return false;
+    if (current.points < amount) {
+      return false;
+    }
+    const newPoints = Math.max(0, current.points - amount);
     const updatedStudent: Student = {
-      ...student,
+      ...current,
       points: newPoints,
-      badges: newBadges,
     };
-
+    studentRef.current = updatedStudent;
     setStudent(updatedStudent);
     StorageService.saveOrUpdateStudent(updatedStudent);
-
-    try {
-      confetti({
-        particleCount: 50,
-        spread: 70,
-        origin: { y: 0.65 },
-      });
-    } catch (e) {
-      // Safe fallback
-    }
-  };
-
-  const handleSelectBuilding = useCallback((buildingId: BuildingId) => {
-    setActiveBuilding(buildingId);
-  }, []);
-
-  // Deduct points from student saldo (buying coffee -2, bread -1, ice cream -1)
-  const handleDeductPoints = useCallback((amount: number, _reason?: string): boolean => {
-    let success = false;
-    setStudent((prevStudent) => {
-      if (!prevStudent) return null;
-      if (prevStudent.points < amount) {
-        success = false;
-        return prevStudent;
-      }
-      success = true;
-      const newPoints = Math.max(0, prevStudent.points - amount);
-      const updatedStudent: Student = {
-        ...prevStudent,
-        points: newPoints,
-      };
-      StorageService.saveOrUpdateStudent(updatedStudent);
-      return updatedStudent;
-    });
-    return success;
+    StorageService.setCurrentStudent(updatedStudent);
+    return true;
   }, []);
 
   const handleSendWorldChat = (text: string) => {
-    if (!student) return;
+    const current = studentRef.current;
+    if (!current) return;
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
 
-    const cleanHandle = student.name
+    const cleanHandle = current.name
       .split(' ')
       .slice(0, 2)
       .join('_')
@@ -257,22 +333,25 @@ export default function App() {
 
     const newMsg: PublicChatMessage = {
       id: `pchat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      senderId: student.id,
-      senderName: student.name,
-      senderHandle: `@${cleanHandle || (student.isTeacher ? 'guru_dkv' : 'siswa')}`,
-      className: student.className,
-      roomNumber: (student.className.includes('DKV 3') ? 3 : 2) as 1 | 2 | 3,
+      senderId: current.id,
+      senderName: current.name,
+      senderHandle: `@${cleanHandle || (current.isTeacher ? 'guru_dkv' : 'siswa')}`,
+      className: current.className,
+      roomNumber: (current.className.includes('DKV 3') ? 3 : 2) as 1 | 2 | 3,
       content: text,
       timestamp: `${hours}.${minutes}`,
       createdAt: now.toISOString(),
-      avatarColor: student.isTeacher ? '#f59e0b' : '#38bdf8',
-      isTeacher: Boolean(student.isTeacher),
+      avatarColor: current.isTeacher ? '#f59e0b' : '#38bdf8',
+      isTeacher: Boolean(current.isTeacher),
     };
 
     // Update only chat state locally immediately with newest at the BOTTOM
     setPublicChats((prev) => [...prev.filter((m) => m.id !== newMsg.id), newMsg].slice(-25));
     setLatestChat(newMsg);
     playChimeSound();
+
+    // Automatically complete chat mission (+3 XP) if assigned
+    completeMissionIfActive('m_chat');
 
     // Persist and send to chat server asynchronously without blocking UI or triggering full data reloads
     StorageService.addPublicChatMessage(newMsg).catch(() => {});
@@ -294,13 +373,19 @@ export default function App() {
         studentNumber: '01',
         password: '0101315814',
         gender: 'L',
-        points: 120,
+        points: 5,
         badges: ['reflektor_pertama', 'penjelajah_rajin'],
         lastLogin: new Date().toISOString().slice(0, 10),
         streakDays: 3,
       };
+      studentRef.current = demoStudent;
       setStudent(demoStudent);
       StorageService.setCurrentStudent(demoStudent);
+      StorageService.saveOrUpdateStudent(demoStudent);
+      const randomMissions = getOrInitUserRandomMissions(demoStudent.id, true);
+      setAssignedMissions(randomMissions);
+      setCompletedMissionIds([]);
+      saveCompletedMissionIds(demoStudent.id, []);
     }
   }, [student]);
 
@@ -308,19 +393,35 @@ export default function App() {
   useEffect(() => {
     if (student && student.className.includes('DKV 1')) {
       StorageService.setCurrentStudent(null);
+      studentRef.current = null;
       setStudent(null);
     }
   }, [student]);
 
-  // Handle Student Login
+  // Handle Student Login (Students get 5 XP on login, Teachers get 10 XP)
   const handleLoginStudent = (newStudent: Student) => {
-    setStudent(newStudent);
-    StorageService.setCurrentStudent(newStudent);
-    StorageService.saveOrUpdateStudent(newStudent);
+    const loginXp = newStudent.isTeacher ? 10 : 5;
+    const studentWithLoginXp: Student = {
+      ...newStudent,
+      points: loginXp,
+    };
+    studentRef.current = studentWithLoginXp;
+    setStudent(studentWithLoginXp);
+    StorageService.setCurrentStudent(studentWithLoginXp);
+    StorageService.saveOrUpdateStudent(studentWithLoginXp);
+
+    // Randomize missions on login
+    const randomMissions = getOrInitUserRandomMissions(studentWithLoginXp.id, true);
+    assignedMissionsRef.current = randomMissions;
+    setAssignedMissions(randomMissions);
+    completedMissionIdsRef.current = [];
+    setCompletedMissionIds([]);
+    saveCompletedMissionIds(studentWithLoginXp.id, []);
   };
 
   // Handle Logout
   const handleLogout = () => {
+    studentRef.current = null;
     setStudent(null);
     StorageService.setCurrentStudent(null);
     setActiveBuilding(null);
@@ -342,31 +443,26 @@ export default function App() {
       feedback: newFeedback,
     });
 
-    // Award +30 XP and recalculate badges
-    if (student) {
-      const newPoints = student.points + 30;
-      const myReflections = updatedReflections.filter((r) => r.studentId === student.id);
-      const myMessages = messages.filter((m) => m.studentId === student.id);
-      const newBadges = evaluateBadges(student, myReflections, 1, myMessages.length);
+    // Complete reflection mission (+3 XP automatic) or update badges
+    const current = studentRef.current;
+    if (current) {
+      const hasReflectionMission =
+        assignedMissionsRef.current.some((m) => m.id === 'm_refleksi') &&
+        !completedMissionIdsRef.current.includes('m_refleksi');
 
-      const updatedStudent: Student = {
-        ...student,
-        points: newPoints,
-        badges: newBadges,
-      };
-
-      setStudent(updatedStudent);
-      StorageService.saveOrUpdateStudent(updatedStudent);
-
-      // Trigger celebratory confetti
-      try {
-        confetti({
-          particleCount: 60,
-          spread: 70,
-          origin: { y: 0.7 },
-        });
-      } catch (e) {
-        // Safe fallback
+      if (hasReflectionMission) {
+        completeMissionIfActive('m_refleksi');
+      } else {
+        sounds.playRewardXp();
+        handleAddPoints(3, 'Kirim Refleksi di Pusat Refleksi');
+        if (missionToastTimerRef.current) {
+          window.clearTimeout(missionToastTimerRef.current);
+        }
+        setMissionToast('🌍 Refleksi terkirim di Pusat Refleksi! (+3 Poin otomatis masuk ke saldo!)');
+        missionToastTimerRef.current = window.setTimeout(() => {
+          setMissionToast(null);
+          missionToastTimerRef.current = null;
+        }, 3600);
       }
     }
   };
@@ -394,26 +490,29 @@ export default function App() {
     StorageService.setFeedbacks(updated);
   };
 
-  // Answer Quiz Correctly
+  // Answer Quiz Correctly (+1 XP per correct question)
   const handleAnswerCorrect = (pointsEarned: number) => {
-    if (!student) return;
-    const newPoints = student.points + pointsEarned;
-    const myReflections = reflections.filter((r) => r.studentId === student.id);
-    const myMessages = messages.filter((m) => m.studentId === student.id);
-    const newBadges = evaluateBadges(student, myReflections, 2, myMessages.length);
+    const current = studentRef.current;
+    if (!current) return;
+    const newPoints = current.points + pointsEarned;
+    const myReflections = reflections.filter((r) => r.studentId === current.id);
+    const myMessages = messages.filter((m) => m.studentId === current.id);
+    const newBadges = evaluateBadges(current, myReflections, 2, myMessages.length);
 
     const updatedStudent: Student = {
-      ...student,
+      ...current,
       points: newPoints,
       badges: newBadges,
     };
+    studentRef.current = updatedStudent;
     setStudent(updatedStudent);
     StorageService.saveOrUpdateStudent(updatedStudent);
+    StorageService.setCurrentStudent(updatedStudent);
 
     try {
       confetti({
-        particleCount: 40,
-        spread: 60,
+        particleCount: 30,
+        spread: 55,
         origin: { y: 0.8 },
       });
     } catch (e) {
@@ -423,12 +522,13 @@ export default function App() {
 
   // Send Message from Kantor Pos
   const handleSendMessage = (content: string) => {
-    if (!student) return;
+    const current = studentRef.current;
+    if (!current) return;
     const newMsg: Message = {
       id: `msg-${Date.now().toString(36)}`,
-      studentId: student.id,
-      studentName: student.name,
-      className: student.className,
+      studentId: current.id,
+      studentName: current.name,
+      className: current.className,
       content,
       status: 'unread',
       createdAt: new Date().toLocaleString('id-ID', {
@@ -444,12 +544,22 @@ export default function App() {
     // Sync to Google Apps Script
     StorageService.syncWithGAS('send_message', { message: newMsg });
 
-    // Update student badges if first time
-    const myReflections = reflections.filter((r) => r.studentId === student.id);
-    const newBadges = evaluateBadges(student, myReflections, 0, updatedMessages.length);
-    const updatedStudent: Student = { ...student, badges: newBadges };
-    setStudent(updatedStudent);
-    StorageService.saveOrUpdateStudent(updatedStudent);
+    // Complete Kantor Pos mission (+3 XP automatic) if assigned
+    const hasPosMission =
+      assignedMissionsRef.current.some((m) => m.id === 'm_pos') &&
+      !completedMissionIdsRef.current.includes('m_pos');
+
+    if (hasPosMission) {
+      completeMissionIfActive('m_pos');
+    } else {
+      const myReflections = reflections.filter((r) => r.studentId === current.id);
+      const newBadges = evaluateBadges(current, myReflections, 0, updatedMessages.length);
+      const updatedStudent: Student = { ...current, badges: newBadges };
+      studentRef.current = updatedStudent;
+      setStudent(updatedStudent);
+      StorageService.saveOrUpdateStudent(updatedStudent);
+      StorageService.setCurrentStudent(updatedStudent);
+    }
   };
 
   // Teacher Reply to Message
@@ -580,15 +690,25 @@ export default function App() {
                 studentNumber: 'GURU-DKV',
                 password: '',
                 gender: teacherGender,
-                points: 999,
+                points: 10,
                 badges: ['guru_pembimbing', 'penjelajah_rajin'],
                 lastLogin: new Date().toISOString().slice(0, 10),
                 streakDays: 5,
                 isTeacher: true,
                 subject: teacherSubject,
               };
+              studentRef.current = teacherUser;
               setStudent(teacherUser);
               StorageService.setCurrentStudent(teacherUser);
+              StorageService.saveOrUpdateStudent(teacherUser);
+
+              const randomMissions = getOrInitUserRandomMissions(teacherUser.id, true);
+              assignedMissionsRef.current = randomMissions;
+              setAssignedMissions(randomMissions);
+              completedMissionIdsRef.current = [];
+              setCompletedMissionIds([]);
+              saveCompletedMissionIds(teacherUser.id, []);
+
               if (info?.name) {
                 setLoggedTeacherName(info.name);
               }
@@ -797,6 +917,14 @@ export default function App() {
         />
       )}
 
+      {/* Automatic Mission Completion Notification Banner */}
+      {missionToast && (
+        <div className="fixed bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 z-40 px-4 py-2.5 rounded-2xl bg-emerald-950/95 border border-emerald-400/60 text-emerald-100 text-xs sm:text-sm font-extrabold shadow-2xl flex items-center gap-2 pointer-events-none animate-in fade-in slide-in-from-bottom-2 max-w-[92vw]">
+          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+          <span className="truncate">{missionToast}</span>
+        </div>
+      )}
+
       {/* BUILDING MODALS */}
       {activeBuilding === 'balai_kota' && (
         <BalaiKotaModal
@@ -806,9 +934,8 @@ export default function App() {
           materis={materis}
           studentName={student.name}
           studentXp={student.points}
-          onAddPoints={handleAddPoints}
-          reflectionsCount={reflections.filter((r) => r.studentId === student.id).length}
-          hasSharedChatToday={hasSharedChatToday}
+          assignedMissions={assignedMissions}
+          completedMissionIds={completedMissionIds}
         />
       )}
 
@@ -816,8 +943,9 @@ export default function App() {
         <PerpustakaanModal
           onClose={() => setActiveBuilding(null)}
           materis={materis}
-          onNavigateBuilding={(id) => setActiveBuilding(id)}
+          onNavigateBuilding={(id) => handleSelectBuilding(id)}
           onSelectMateriForReflection={(mId) => setPreselectedMateriForReflection(mId)}
+          onAddXp={handleAddPoints}
         />
       )}
 
@@ -832,7 +960,7 @@ export default function App() {
           student={student}
           preselectedMateriId={preselectedMateriForReflection}
           onSubmitReflection={handleSubmitReflection}
-          onNavigateBuilding={(id) => setActiveBuilding(id)}
+          onNavigateBuilding={(id) => handleSelectBuilding(id)}
         />
       )}
 
@@ -843,7 +971,7 @@ export default function App() {
           reflections={reflections}
           student={student}
           onUpdateFeedbackSteps={handleUpdateFeedbackSteps}
-          onNavigateBuilding={(id) => setActiveBuilding(id)}
+          onNavigateBuilding={(id) => handleSelectBuilding(id)}
         />
       )}
 
@@ -853,6 +981,7 @@ export default function App() {
           questions={quizQuestions}
           student={student}
           onAnswerCorrect={handleAnswerCorrect}
+          onCompleteQuiz={() => completeMissionIfActive('m_bengkel')}
         />
       )}
 
@@ -884,7 +1013,7 @@ export default function App() {
       {isQuickNavOpen && (
         <QuickNav2D
           onClose={() => setIsQuickNavOpen(false)}
-          onSelectBuilding={(id) => setActiveBuilding(id)}
+          onSelectBuilding={(id) => handleSelectBuilding(id)}
           newMateriBuildingIds={newMateriBuildingIds}
           onOpenTeacher={() => setIsTeacherPinModalOpen(true)}
         />
@@ -904,14 +1033,24 @@ export default function App() {
               studentNumber: 'GURU-DKV',
               password: '',
               gender: teacherGender,
-              points: 999,
+              points: 10,
               badges: ['guru_pembimbing', 'penjelajah_rajin'],
               lastLogin: new Date().toISOString().slice(0, 10),
               streakDays: 5,
               isTeacher: true,
             };
+            studentRef.current = teacherUser;
             setStudent(teacherUser);
             StorageService.setCurrentStudent(teacherUser);
+            StorageService.saveOrUpdateStudent(teacherUser);
+
+            const randomMissions = getOrInitUserRandomMissions(teacherUser.id, true);
+            assignedMissionsRef.current = randomMissions;
+            setAssignedMissions(randomMissions);
+            completedMissionIdsRef.current = [];
+            setCompletedMissionIds([]);
+            saveCompletedMissionIds(teacherUser.id, []);
+
             if (teacherInfo?.name) {
               setLoggedTeacherName(teacherInfo.name);
             }
