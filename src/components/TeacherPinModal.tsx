@@ -16,6 +16,8 @@ export interface TeacherLoginResult {
   gender?: 'L' | 'P';
   subject?: string;
   destination?: 'town' | 'panel';
+  points?: number;
+  isMasterPin?: boolean;
 }
 
 interface TeacherPinModalProps {
@@ -57,6 +59,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
         username: currentTeacher.username,
         gender: currentTeacher.gender,
         subject: selectedSubject || currentTeacher.subjects[0],
+        points: 10,
       });
     } else {
       sounds.playClick();
@@ -70,9 +73,11 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
     if (clean === expectedPin || clean === 'Kiki123!') {
       sounds.playRewardXp();
       setAuthenticatedTeacher({
-        name: 'Guru Pembimbing DKV',
-        username: 'guru.dkv',
+        name: 'kikybahsoan',
+        username: 'kikybahsoan',
         gender: 'L',
+        points: 999,
+        isMasterPin: true,
       });
       return;
     }
@@ -86,6 +91,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
         username: matched.username,
         gender: matched.gender,
         subject: matched.subjects[0],
+        points: 10,
       });
       return;
     }
@@ -116,18 +122,32 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
                 Autentikasi Berhasil
               </span>
               <h3 className="text-lg font-black text-white mt-2">
-                Selamat Datang, Bapak/Ibu!
+                Selamat Datang, {authenticatedTeacher.isMasterPin ? 'Master PIN' : 'Bapak/Ibu'}!
               </h3>
               <p className="text-sm font-extrabold text-amber-300 mt-0.5">
                 {authenticatedTeacher.name}
               </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Guru Pembimbing DKV • SMKN 2 Gorontalo
-              </p>
+              {authenticatedTeacher.isMasterPin ? (
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <span className="text-xs px-3 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/60 text-amber-300 font-bold">
+                    Master PIN • 999 XP
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 mt-1">
+                  Guru Pembimbing DKV • SMKN 2 Gorontalo
+                </p>
+              )}
             </div>
 
             {(() => {
               const matchedT = TEACHER_ACCOUNTS.find((t) => t.username === authenticatedTeacher.username) || currentTeacher;
+              const subjectsList = authenticatedTeacher.isMasterPin
+                ? [
+                    'Master Guru (Seluruh Mapel DKV)',
+                    ...matchedT.subjects,
+                  ]
+                : matchedT.subjects;
               return (
                 <div className="space-y-3 max-w-sm mx-auto text-left">
                   <div>
@@ -135,11 +155,11 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
                       Pilih Mata Pelajaran / Konsentrasi Keahlian
                     </label>
                     <select
-                      value={selectedSubject}
+                      value={selectedSubject || subjectsList[0]}
                       onChange={(e) => setSelectedSubject(e.target.value)}
                       className="w-full text-xs font-semibold py-2 px-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                     >
-                      {matchedT.subjects.map((subj) => (
+                      {subjectsList.map((subj) => (
                         <option key={subj} value={subj}>
                           {subj}
                         </option>
@@ -149,14 +169,21 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => onSuccess({ ...authenticatedTeacher, subject: selectedSubject || matchedT.subjects[0], destination: 'town' })}
+                    onClick={() =>
+                      onSuccess({
+                        ...authenticatedTeacher,
+                        points: authenticatedTeacher.isMasterPin ? 999 : (authenticatedTeacher.points || 10),
+                        subject: selectedSubject || subjectsList[0],
+                        destination: 'town',
+                      })
+                    }
                     className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-xl flex items-center gap-3 transition transform hover:scale-[1.02] active:scale-95 cursor-pointer border border-emerald-400/40 text-left"
                   >
                     <span className="text-2xl shrink-0">🏛️</span>
                     <div className="flex-1">
-                      <div className="font-extrabold">Masuk ke Kota (Sebagai Guru)</div>
+                      <div className="font-extrabold">Masuk ke Kota (Sebagai {authenticatedTeacher.isMasterPin ? 'Master' : 'Guru'})</div>
                       <div className="text-[10px] text-emerald-100/90 font-normal mt-0.5">
-                        Jelajahi kota Refleksia dengan avatar guru & mata pelajaran terpilih
+                        Jelajahi kota Refleksia dengan akun {authenticatedTeacher.name} {authenticatedTeacher.isMasterPin ? '(999 XP)' : ''}
                       </div>
                     </div>
                   </button>
@@ -299,7 +326,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
               <form onSubmit={handlePinLogin} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Ketik Kata Sandi / Master PIN
+                    Ketik Master PIN (Akun kikybahsoan • 999 XP)
                   </label>
                   <div className="relative">
                     <input
@@ -310,7 +337,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
                         setPinInput(e.target.value);
                         setError(null);
                       }}
-                      placeholder="Masukkan kata sandi guru..."
+                      placeholder="Masukkan Master PIN (default: Kiki123!)..."
                       className="w-full text-center text-sm font-bold py-2.5 px-10 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-500"
                     />
                     <button

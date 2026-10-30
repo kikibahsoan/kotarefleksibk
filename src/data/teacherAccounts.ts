@@ -95,4 +95,16 @@ export const TEACHER_ACCOUNTS: TeacherAccount[] = [
       'Dasar-Dasar Program Keahlian DKV'
     ],
   },
+  {
+    no: 9,
+    name: 'NAZIEFAH',
+    username: 'naziefah',
+    defaultPassword: 'Smkn2@012345',
+    gender: 'P',
+    subjects: [
+      'Dasar-Dasar Program Keahlian DKV',
+      'Konsentrasi Keahlian (Karya Desain)',
+      'Informatika'
+    ],
+  },
 ];

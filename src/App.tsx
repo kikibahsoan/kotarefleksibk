@@ -58,7 +58,22 @@ import {
 import confetti from 'canvas-confetti';
 
 export default function App() {
-  const [student, setStudent] = useState<Student | null>(() => StorageService.getCurrentStudent());
+  const [student, setStudent] = useState<Student | null>(() => {
+    const cur = StorageService.getCurrentStudent();
+    if (cur && (cur.id === 'teacher-kikybahsoan' || cur.name.toLowerCase() === 'kikybahsoan' || cur.id === 'teacher-guru.dkv')) {
+      const updated: Student = {
+        ...cur,
+        id: 'teacher-kikybahsoan',
+        name: 'kikybahsoan',
+        className: 'Master Guru',
+        points: 999,
+      };
+      StorageService.setCurrentStudent(updated);
+      StorageService.saveOrUpdateStudent(updated);
+      return updated;
+    }
+    return cur;
+  });
   const studentRef = useRef<Student | null>(student);
   studentRef.current = student;
 
@@ -683,15 +698,18 @@ export default function App() {
             onSuccess={(info) => {
               const teacherGender = info?.gender || 'L';
               const teacherSubject = info?.subject || 'Kreatif, Inovatif, dan Kewirausahaan';
+              const isMaster = info?.isMasterPin || info?.username === 'kikybahsoan' || info?.name === 'kikybahsoan';
               const teacherUser: Student = {
                 id: `teacher-${info?.username || 'guru'}`,
-                name: info?.name || 'Guru Pembimbing DKV',
-                className: 'DKV',
-                studentNumber: 'GURU-DKV',
+                name: info?.name || 'kikybahsoan',
+                className: isMaster ? 'Master Guru' : 'DKV',
+                studentNumber: isMaster ? 'MASTER-DKV' : 'GURU-DKV',
                 password: '',
                 gender: teacherGender,
-                points: 10,
-                badges: ['guru_pembimbing', 'penjelajah_rajin'],
+                points: info?.points !== undefined ? info.points : (isMaster ? 999 : 10),
+                badges: isMaster
+                  ? ['guru_pembimbing', 'penjelajah_rajin', 'master_refleksi', 'bintang_kota']
+                  : ['guru_pembimbing', 'penjelajah_rajin'],
                 lastLogin: new Date().toISOString().slice(0, 10),
                 streakDays: 5,
                 isTeacher: true,
@@ -1026,15 +1044,18 @@ export default function App() {
           expectedPin={settings.teacherPin}
           onSuccess={(teacherInfo) => {
             const teacherGender = teacherInfo?.gender || 'L';
+            const isMaster = teacherInfo?.isMasterPin || teacherInfo?.username === 'kikybahsoan' || teacherInfo?.name === 'kikybahsoan';
             const teacherUser: Student = {
               id: `teacher-${teacherInfo?.username || 'guru'}`,
-              name: teacherInfo?.name || 'Guru Pembimbing DKV',
-              className: 'Guru Pembimbing DKV',
-              studentNumber: 'GURU-DKV',
+              name: teacherInfo?.name || 'kikybahsoan',
+              className: isMaster ? 'Master Guru' : 'Guru Pembimbing DKV',
+              studentNumber: isMaster ? 'MASTER-DKV' : 'GURU-DKV',
               password: '',
               gender: teacherGender,
-              points: 10,
-              badges: ['guru_pembimbing', 'penjelajah_rajin'],
+              points: teacherInfo?.points !== undefined ? teacherInfo.points : (isMaster ? 999 : 10),
+              badges: isMaster
+                ? ['guru_pembimbing', 'penjelajah_rajin', 'master_refleksi', 'bintang_kota']
+                : ['guru_pembimbing', 'penjelajah_rajin'],
               lastLogin: new Date().toISOString().slice(0, 10),
               streakDays: 5,
               isTeacher: true,

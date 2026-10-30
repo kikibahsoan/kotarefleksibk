@@ -8483,119 +8483,106 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       )}
 
       {/* ============================================================= */}
-      {/* CIRCULAR / RADIAL EMOTE PICKER OVERLAY (Suka, Lambai, Tertawa, Joget) */}
+      {/* MINIMALIST CIRCULAR / RADIAL EMOTE PICKER (Suka, Lambai, Tertawa, Joget) */}
       {/* ============================================================= */}
       {isEmoteMenuOpen && (
         <div
           className="absolute z-40 pointer-events-none select-none transition-all duration-150"
           style={{
-            left: `${Math.max(65, Math.min((containerRef.current?.clientWidth || 800) - 65, playerScreenPos.x))}px`,
-            top: `${Math.max(75, Math.min((containerRef.current?.clientHeight || 600) - 75, playerScreenPos.y))}px`,
+            left: `${Math.max(85, Math.min((containerRef.current?.clientWidth || 800) - 85, playerScreenPos.x))}px`,
+            top: `${Math.max(85, Math.min((containerRef.current?.clientHeight || 600) - 85, playerScreenPos.y))}px`,
             transform: 'translate(-50%, -50%)',
           }}
         >
-          {/* Circular Connecting Glow Ring */}
-          <div className="absolute inset-0 -m-16 rounded-full border border-sky-400/40 bg-slate-950/50 backdrop-blur-sm shadow-[0_0_30px_rgba(56,189,248,0.35)] pointer-events-auto" />
-          <div className="absolute inset-0 -m-14 rounded-full border border-dashed border-sky-300/30 pointer-events-none animate-spin" style={{ animationDuration: '24s' }} />
-
-          {/* Radial Buttons Container */}
-          <div className="relative w-32 h-32 flex items-center justify-center pointer-events-auto">
-            {/* Center Dismiss Button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                sounds.playClick();
-                setIsEmoteMenuOpen(false);
-              }}
-              className="w-10 h-10 rounded-full bg-slate-900/95 border border-slate-600/80 hover:border-slate-400 text-slate-300 hover:text-white flex items-center justify-center shadow-lg transition transform hover:scale-110 active:scale-95 cursor-pointer z-10"
-              title="Tutup Menu Emosi"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          {/* Pure Floating Radial Emote Buttons (Tanpa Cincin Latar Belakang & Tanpa Tombol Keluar) */}
+          <div className="relative w-36 h-36 flex items-center justify-center pointer-events-auto">
 
             {/* 1. TOP (-90deg): 🎵 JOGET (Icon Music - Otomatis Avatar Berjoget) */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 flex flex-col items-center">
+            <div
+              className="absolute flex flex-col items-center"
+              style={{ left: '50%', top: 'calc(50% - 56px)', transform: 'translate(-50%, -50%)' }}
+            >
+              {/* Outward text label placed above the button to eliminate any collision with center button */}
+              <span className="mb-1 px-1.5 py-0.5 rounded-full bg-slate-900/90 border border-purple-500/40 text-[9px] font-bold text-purple-200 whitespace-nowrap shadow-sm pointer-events-none">
+                Joget
+              </span>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   triggerEmote('dance');
                 }}
-                className="group relative w-12 h-12 rounded-full bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 border-2 border-purple-200/90 shadow-lg shadow-purple-600/60 flex items-center justify-center text-2xl transition transform hover:scale-125 active:scale-90 cursor-pointer animate-pulse"
+                className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 border border-purple-200/80 shadow-md shadow-purple-950/50 flex items-center justify-center text-xl transition transform hover:scale-115 active:scale-90 cursor-pointer animate-pulse"
                 title="Joget (Avatar otomatis berjoget musik)"
               >
                 <span className="drop-shadow">🎵</span>
-                <span className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/95 border border-purple-400/60 text-purple-200 text-[10px] font-extrabold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
-                  Joget
-                </span>
               </button>
-              <span className="mt-1 text-[9px] font-extrabold text-purple-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] bg-slate-950/75 px-1.5 py-0.5 rounded-full border border-purple-500/40">
-                Joget
-              </span>
             </div>
 
             {/* 2. RIGHT (0deg): ❤️ SUKA (Love) */}
-            <div className="absolute right-0 top-1/2 translate-x-4 -translate-y-1/2 flex flex-col items-center">
+            <div
+              className="absolute flex items-center"
+              style={{ left: 'calc(50% + 56px)', top: '50%', transform: 'translate(-50%, -50%)' }}
+            >
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   triggerEmote('love');
                 }}
-                className="group relative w-12 h-12 rounded-full bg-gradient-to-tr from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 border-2 border-rose-200/90 shadow-lg shadow-rose-600/60 flex items-center justify-center text-2xl transition transform hover:scale-125 active:scale-90 cursor-pointer"
+                className="w-10 h-10 rounded-full bg-gradient-to-tr from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 border border-rose-200/80 shadow-md shadow-rose-950/50 flex items-center justify-center text-xl transition transform hover:scale-115 active:scale-90 cursor-pointer"
                 title="Suka (Apresiasi cinta)"
               >
                 <span className="drop-shadow">❤️</span>
-                <span className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/95 border border-rose-400/60 text-rose-200 text-[10px] font-extrabold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
-                  Suka
-                </span>
               </button>
-              <span className="mt-1 text-[9px] font-extrabold text-rose-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] bg-slate-950/75 px-1.5 py-0.5 rounded-full border border-rose-500/40">
+              {/* Outward text label placed to the right */}
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-900/90 border border-rose-500/40 text-[9px] font-bold text-rose-200 whitespace-nowrap shadow-sm pointer-events-none">
                 Suka
               </span>
             </div>
 
             {/* 3. BOTTOM (90deg): 😂 TERTAWA (Icon Tertawa) */}
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-4 flex flex-col items-center">
+            <div
+              className="absolute flex flex-col items-center"
+              style={{ left: '50%', top: 'calc(50% + 56px)', transform: 'translate(-50%, -50%)' }}
+            >
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   triggerEmote('laugh');
                 }}
-                className="group relative w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 border-2 border-amber-200/90 shadow-lg shadow-amber-500/60 flex items-center justify-center text-2xl transition transform hover:scale-125 active:scale-90 cursor-pointer"
+                className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 border border-amber-200/80 shadow-md shadow-amber-950/50 flex items-center justify-center text-xl transition transform hover:scale-115 active:scale-90 cursor-pointer"
                 title="Tertawa (Gembira)"
               >
                 <span className="drop-shadow">😂</span>
-                <span className="absolute -bottom-7 px-2 py-0.5 rounded-full bg-slate-900/95 border border-amber-400/60 text-amber-200 text-[10px] font-extrabold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
-                  Tertawa
-                </span>
               </button>
-              <span className="mt-1 text-[9px] font-extrabold text-amber-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] bg-slate-950/75 px-1.5 py-0.5 rounded-full border border-amber-500/40">
+              {/* Outward text label placed below the button */}
+              <span className="mt-1 px-1.5 py-0.5 rounded-full bg-slate-900/90 border border-amber-500/40 text-[9px] font-bold text-amber-200 whitespace-nowrap shadow-sm pointer-events-none">
                 Tertawa
               </span>
             </div>
 
             {/* 4. LEFT (180deg): 👋 LAMBAI (Tangan) */}
-            <div className="absolute left-0 top-1/2 -translate-x-4 -translate-y-1/2 flex flex-col items-center">
+            <div
+              className="absolute flex items-center"
+              style={{ left: 'calc(50% - 56px)', top: '50%', transform: 'translate(-50%, -50%)' }}
+            >
+              {/* Outward text label placed to the left */}
+              <span className="mr-1.5 px-1.5 py-0.5 rounded-full bg-slate-900/90 border border-sky-500/40 text-[9px] font-bold text-sky-200 whitespace-nowrap shadow-sm pointer-events-none">
+                Lambai
+              </span>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   triggerEmote('wave');
                 }}
-                className="group relative w-12 h-12 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 border-2 border-sky-200/90 shadow-lg shadow-sky-500/60 flex items-center justify-center text-2xl transition transform hover:scale-125 active:scale-90 cursor-pointer"
+                className="w-10 h-10 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 border border-sky-200/80 shadow-md shadow-sky-950/50 flex items-center justify-center text-xl transition transform hover:scale-115 active:scale-90 cursor-pointer"
                 title="Lambai (Sapa Warga)"
               >
                 <span className="drop-shadow">👋</span>
-                <span className="absolute -top-7 px-2 py-0.5 rounded-full bg-slate-900/95 border border-sky-400/60 text-sky-200 text-[10px] font-extrabold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
-                  Lambai
-                </span>
               </button>
-              <span className="mt-1 text-[9px] font-extrabold text-sky-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] bg-slate-950/75 px-1.5 py-0.5 rounded-full border border-sky-500/40">
-                Lambai
-              </span>
             </div>
           </div>
         </div>
