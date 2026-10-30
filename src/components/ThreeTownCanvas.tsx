@@ -94,10 +94,11 @@ export const TREES_LIST: [number, number][] = [
   [-6.4, 2.2],
   [-6.0, -4.4],
   [-6.0, 4.4],
-  // South edge
-  [0, 6.6],
-  [-2.2, 6.4],
-  [2.2, 6.4],
+  // South edge (flanking the Welcome Gapura at [0, 6.15])
+  [-1.5, 6.4],
+  [1.5, 6.4],
+  [-2.8, 6.4],
+  [2.8, 6.4],
   [-4.4, 6.0],
   [4.4, 6.0],
   // East edge (leaving [4.6, -2.2] clear for Kolam)
@@ -108,7 +109,7 @@ export const TREES_LIST: [number, number][] = [
   // Mid-park groves
   [-5.2, -1.8],
   [5.2, 1.8],
-  [-3.8, 3.8],
+  [-3.8, 3.4],
   [3.8, 3.8],
   // Central park trees
   [-1.4, -1.4],
@@ -217,7 +218,7 @@ interface Star {
   alpha: number;
 }
 
-// The 4 outer corners/ends of the 15x15 map where online avatars from other devices spawn
+// The 4 outer corners/ends of the 15x15 map
 export const MAP_CORNERS: [number, number][] = [
   [-5.5, -5.5], // Ujung Barat Laut (North-West)
   [5.5, -5.5],  // Ujung Timur Laut (North-East)
@@ -236,40 +237,249 @@ function hashString(str: string): number {
 
 export type BenchId =
   | 'fountain_1'
+  | 'fountain_1_a'
+  | 'fountain_1_b'
   | 'fountain_2'
+  | 'fountain_2_a'
+  | 'fountain_2_b'
   | 'fountain_3'
+  | 'fountain_3_a'
+  | 'fountain_3_b'
   | 'fountain_4'
+  | 'fountain_4_a'
+  | 'fountain_4_b'
+  | 'campfire_1'
+  | 'campfire_1_a'
+  | 'campfire_1_b'
+  | 'campfire_2'
+  | 'campfire_2_a'
+  | 'campfire_2_b'
   | 'literacy'
   | 'fountain_east'
   | 'fountain_west'
   | 'fountain_north'
   | 'fountain_south'
   | 'swing_left'
-  | 'swing_right';
+  | 'swing_right'
+  | 'swing_2_left'
+  | 'swing_2_right';
 
-export const FOUNTAIN_FRONT_BENCHES: Array<{
+export interface TwoPersonSeatSlot {
   id: BenchId;
+  label: string;
+  wx: number;
+  wy: number;
+  screenOffsetX: number;
+}
+
+export interface TwoPersonBenchGroup {
+  groupId: 'fountain_1' | 'fountain_2' | 'fountain_3' | 'fountain_4' | 'campfire_1' | 'campfire_2';
+  name: string;
+  kind: 'fountain_minimalist' | 'campfire';
+  wx: number;
+  wy: number;
+  facing: 'down-left' | 'down-right' | 'up-left' | 'up-right';
+  seats: [TwoPersonSeatSlot, TwoPersonSeatSlot];
+}
+
+// 4 Tempat Duduk Minimalis di Sekitar Air Mancur (Masing-Masing Muat 2 Orang = Total 8 Kursi)
+export const FOUNTAIN_MINIMALIST_BENCHES: TwoPersonBenchGroup[] = [
+  {
+    groupId: 'fountain_1',
+    name: 'Bangku Minimalis 1 (Barat Air Mancur)',
+    kind: 'fountain_minimalist',
+    wx: -1.25,
+    wy: 0.65,
+    facing: 'down-right',
+    seats: [
+      { id: 'fountain_1_a', label: 'Bangku Minimalis 1 • Kursi Kiri (1/2)', wx: -1.32, wy: 0.72, screenOffsetX: -6.2 },
+      { id: 'fountain_1_b', label: 'Bangku Minimalis 1 • Kursi Kanan (2/2)', wx: -1.18, wy: 0.58, screenOffsetX: 6.2 },
+    ],
+  },
+  {
+    groupId: 'fountain_2',
+    name: 'Bangku Minimalis 2 (Depan Kiri Air Mancur)',
+    kind: 'fountain_minimalist',
+    wx: -0.55,
+    wy: 1.35,
+    facing: 'up-right',
+    seats: [
+      { id: 'fountain_2_a', label: 'Bangku Minimalis 2 • Kursi Kiri (1/2)', wx: -0.62, wy: 1.28, screenOffsetX: -6.2 },
+      { id: 'fountain_2_b', label: 'Bangku Minimalis 2 • Kursi Kanan (2/2)', wx: -0.48, wy: 1.42, screenOffsetX: 6.2 },
+    ],
+  },
+  {
+    groupId: 'fountain_3',
+    name: 'Bangku Minimalis 3 (Depan Kanan Air Mancur)',
+    kind: 'fountain_minimalist',
+    wx: 0.55,
+    wy: 1.35,
+    facing: 'up-left',
+    seats: [
+      { id: 'fountain_3_a', label: 'Bangku Minimalis 3 • Kursi Kiri (1/2)', wx: 0.48, wy: 1.42, screenOffsetX: -6.2 },
+      { id: 'fountain_3_b', label: 'Bangku Minimalis 3 • Kursi Kanan (2/2)', wx: 0.62, wy: 1.28, screenOffsetX: 6.2 },
+    ],
+  },
+  {
+    groupId: 'fountain_4',
+    name: 'Bangku Minimalis 4 (Timur Air Mancur)',
+    kind: 'fountain_minimalist',
+    wx: 1.25,
+    wy: 0.65,
+    facing: 'down-left',
+    seats: [
+      { id: 'fountain_4_a', label: 'Bangku Minimalis 4 • Kursi Kiri (1/2)', wx: 1.18, wy: 0.58, screenOffsetX: -6.2 },
+      { id: 'fountain_4_b', label: 'Bangku Minimalis 4 • Kursi Kanan (2/2)', wx: 1.32, wy: 0.72, screenOffsetX: 6.2 },
+    ],
+  },
+];
+
+// Api Unggun di Sudut Kota (Sudut Barat Daya [-4.65, 4.65]) & 2 Bangku Penghangat Tubuh di Sampingnya
+export const CAMPFIRE_COORDS = { wx: -4.65, wy: 4.65 };
+
+export const CAMPFIRE_BENCHES: TwoPersonBenchGroup[] = [
+  {
+    groupId: 'campfire_1',
+    name: 'Bangku Api Unggun Kiri (Penghangat Tubuh)',
+    kind: 'campfire',
+    wx: -5.32,
+    wy: 4.72,
+    facing: 'down-right',
+    seats: [
+      { id: 'campfire_1_a', label: 'Bangku Api Unggun Kiri • Kursi 1', wx: -5.38, wy: 4.78, screenOffsetX: -5.8 },
+      { id: 'campfire_1_b', label: 'Bangku Api Unggun Kiri • Kursi 2', wx: -5.26, wy: 4.66, screenOffsetX: 5.8 },
+    ],
+  },
+  {
+    groupId: 'campfire_2',
+    name: 'Bangku Api Unggun Kanan (Penghangat Tubuh)',
+    kind: 'campfire',
+    wx: -3.98,
+    wy: 4.72,
+    facing: 'down-left',
+    seats: [
+      { id: 'campfire_2_a', label: 'Bangku Api Unggun Kanan • Kursi 1', wx: -4.04, wy: 4.66, screenOffsetX: -5.8 },
+      { id: 'campfire_2_b', label: 'Bangku Api Unggun Kanan • Kursi 2', wx: -3.92, wy: 4.78, screenOffsetX: 5.8 },
+    ],
+  },
+];
+
+export const ALL_TWO_PERSON_BENCHES: TwoPersonBenchGroup[] = [
+  ...FOUNTAIN_MINIMALIST_BENCHES,
+  ...CAMPFIRE_BENCHES,
+];
+
+// Legacy flat export kept for compatibility
+export const FOUNTAIN_FRONT_BENCHES = FOUNTAIN_MINIMALIST_BENCHES.map((b) => ({
+  id: b.seats[0].id,
+  name: b.name,
+  wx: b.wx,
+  wy: b.wy,
+  facing: b.facing,
+}));
+
+// 2 Tempat Ayunan di Kota Refleksia (Masing-Masing 2 Kursi Ayunan, Naik Bayar 1 XP)
+export interface SwingStructureDef {
+  id: 'swing_struct_1' | 'swing_struct_2';
+  title: string;
+  badgeText: string;
+  wx: number;
+  wy: number;
+  leftSeatId: 'swing_left' | 'swing_2_left';
+  rightSeatId: 'swing_right' | 'swing_2_right';
+}
+
+export const SWING_STRUCTURES: SwingStructureDef[] = [
+  {
+    id: 'swing_struct_1',
+    title: '🎠 AYUNAN 1 • REFLEKSI',
+    badgeText: '🎠 Tempat Ayunan 1 (-1 XP)',
+    wx: -2.8,
+    wy: -4.05,
+    leftSeatId: 'swing_left',
+    rightSeatId: 'swing_right',
+  },
+  {
+    id: 'swing_struct_2',
+    title: '🎠 AYUNAN 2 • TAMAN TIMUR',
+    badgeText: '🎠 Tempat Ayunan 2 (-1 XP)',
+    wx: 2.8,
+    wy: -4.05,
+    leftSeatId: 'swing_2_left',
+    rightSeatId: 'swing_2_right',
+  },
+];
+
+export interface SwingSeatDef {
+  id: 'swing_left' | 'swing_right' | 'swing_2_left' | 'swing_2_right';
+  structId: 'swing_struct_1' | 'swing_struct_2';
+  structWx: number;
+  structWy: number;
+  isLeft: boolean;
   name: string;
   wx: number;
   wy: number;
   facing: 'down-left' | 'down-right' | 'up-left' | 'up-right';
-}> = [
-  { id: 'fountain_1', name: 'Bangku Depan 1 (Kiri)', wx: -1.25, wy: 0.65, facing: 'down-right' },
-  { id: 'fountain_2', name: 'Bangku Depan 2 (Tengah Kiri)', wx: -0.55, wy: 1.35, facing: 'up-right' },
-  { id: 'fountain_3', name: 'Bangku Depan 3 (Tengah Kanan)', wx: 0.55, wy: 1.35, facing: 'up-left' },
-  { id: 'fountain_4', name: 'Bangku Depan 4 (Kanan)', wx: 1.25, wy: 0.65, facing: 'down-left' },
+}
+
+export const REFLECTION_SWINGS: SwingSeatDef[] = [
+  {
+    id: 'swing_left',
+    structId: 'swing_struct_1',
+    structWx: -2.8,
+    structWy: -4.05,
+    isLeft: true,
+    name: 'Tempat Ayunan 1 (Kursi Kiri)',
+    wx: -2.90,
+    wy: -3.95,
+    facing: 'down-right',
+  },
+  {
+    id: 'swing_right',
+    structId: 'swing_struct_1',
+    structWx: -2.8,
+    structWy: -4.05,
+    isLeft: false,
+    name: 'Tempat Ayunan 1 (Kursi Kanan)',
+    wx: -2.70,
+    wy: -4.15,
+    facing: 'down-right',
+  },
+  {
+    id: 'swing_2_left',
+    structId: 'swing_struct_2',
+    structWx: 2.8,
+    structWy: -4.05,
+    isLeft: true,
+    name: 'Tempat Ayunan 2 (Kursi Kiri)',
+    wx: 2.70,
+    wy: -4.15,
+    facing: 'down-left',
+  },
+  {
+    id: 'swing_2_right',
+    structId: 'swing_struct_2',
+    structWx: 2.8,
+    structWy: -4.05,
+    isLeft: false,
+    name: 'Tempat Ayunan 2 (Kursi Kanan)',
+    wx: 2.90,
+    wy: -3.95,
+    facing: 'down-left',
+  },
 ];
 
-export const REFLECTION_SWINGS: Array<{
-  id: BenchId;
-  name: string;
-  wx: number;
-  wy: number;
-  facing: 'down-left' | 'down-right' | 'up-left' | 'up-right';
-}> = [
-  { id: 'swing_left', name: 'Ayunan Kiri Taman Refleksi', wx: -2.90, wy: -3.95, facing: 'down-right' },
-  { id: 'swing_right', name: 'Ayunan Kanan Taman Refleksi', wx: -2.70, wy: -4.15, facing: 'down-right' },
-];
+export const isSwingSeatId = (seatId?: string | null): seatId is SwingSeatDef['id'] => {
+  return (
+    seatId === 'swing_left' ||
+    seatId === 'swing_right' ||
+    seatId === 'swing_2_left' ||
+    seatId === 'swing_2_right'
+  );
+};
+
+// Gapura Selamat Datang di Ujung Selatan Peta [wx: 0, wy: 6.15]
+export const WELCOME_GATE_COORDS = { wx: 0, wy: 6.15 };
 
 export interface TreeWaterCycle {
   count: number; // 0, 1, 2, or 3
@@ -406,6 +616,139 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   timeOfDayRef.current = timeOfDay;
   const timePeriodRef = useRef<TimePeriod>(timePeriod || getTimePeriodWita());
   timePeriodRef.current = timePeriod || getTimePeriodWita();
+  const studentPointsRef = useRef(studentPoints);
+  studentPointsRef.current = studentPoints;
+  const onDeductPointsRef = useRef(onDeductPoints);
+  onDeductPointsRef.current = onDeductPoints;
+
+  // Helper to check if a specific seat ID is occupied by any remote online player
+  const isSeatOccupiedByRemote = (seatId: BenchId): boolean => {
+    for (const rem of remotePlayersRef.current.values()) {
+      if (rem.isSitting && rem.sittingSeat === seatId) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Helper to sit on a 2-person minimalist fountain bench or campfire warming bench
+  const sitOnTwoPersonBench = (
+    group: TwoPersonBenchGroup,
+    preferredIdx: 0 | 1 = 0
+  ): boolean => {
+    const p = playerRef.current;
+    if (!p) return false;
+
+    const firstSlot = group.seats[preferredIdx];
+    const secondSlot = group.seats[preferredIdx === 0 ? 1 : 0];
+
+    let chosenSlot: TwoPersonSeatSlot | null = null;
+    if (!isSeatOccupiedByRemote(firstSlot.id)) {
+      chosenSlot = firstSlot;
+    } else if (!isSeatOccupiedByRemote(secondSlot.id)) {
+      chosenSlot = secondSlot;
+    }
+
+    if (!chosenSlot) {
+      sounds.playClick();
+      setCafeToast(`🪑 ${group.name} sudah penuh (2/2 orang). Silakan pilih bangku di sebelahnya!`);
+      setTimeout(() => setCafeToast(null), 2800);
+      return false;
+    }
+
+    sounds.playClick();
+    p.wx = chosenSlot.wx;
+    p.wy = chosenSlot.wy;
+    p.targetWx = chosenSlot.wx;
+    p.targetWy = chosenSlot.wy;
+    p.isMoving = false;
+    p.walkFrame = 0;
+    p.facing = group.facing;
+    setIsSitting(true);
+    setSittingSeat(chosenSlot.id);
+    clickRippleRef.current = { wx: chosenSlot.wx, wy: chosenSlot.wy, time: performance.now() };
+
+    if (group.kind === 'campfire') {
+      setCafeToast(`🔥 Duduk di ${group.name} untuk menghangatkan tubuh di dekat Api Unggun!`);
+      playerSpeechRef.current = {
+        text: 'Hangatnya api unggun di sudut kota! 🔥✨',
+        expiresAt: Date.now() + 4800,
+      };
+    } else {
+      const otherOccupied = isSeatOccupiedByRemote(
+        chosenSlot.id === firstSlot.id ? secondSlot.id : firstSlot.id
+      );
+      setCafeToast(
+        `🪑 Duduk santai di ${group.name} (${otherOccupied ? '2/2 terisi bersama warga' : '1/2 kapasitas'}).`
+      );
+    }
+    setTimeout(() => setCafeToast(null), 3000);
+    sendHeartbeatRef.current?.();
+    return true;
+  };
+
+  // Helper to ride a swing at either of the 2 Swing Locations (costs 1 XP each time)
+  const rideSwingWithXp = (preferredSwing: SwingSeatDef): boolean => {
+    const p = playerRef.current;
+    if (!p) return false;
+
+    // If already sitting on this exact swing, do nothing
+    if (isSittingRef.current && sittingSeatRef.current === preferredSwing.id) {
+      return true;
+    }
+
+    // Check if preferred swing seat is occupied by a remote player; if so, check partner seat on same swing structure
+    let targetSwing = preferredSwing;
+    if (isSeatOccupiedByRemote(preferredSwing.id)) {
+      const partner = REFLECTION_SWINGS.find(
+        (s) => s.structId === preferredSwing.structId && s.id !== preferredSwing.id
+      );
+      if (partner && !isSeatOccupiedByRemote(partner.id)) {
+        targetSwing = partner;
+      } else {
+        sounds.playClick();
+        setCafeToast('🎠 Kedua kursi di tempat ayunan ini sedang dinaiki warga lain!');
+        setTimeout(() => setCafeToast(null), 2800);
+        return false;
+      }
+    }
+
+    const cost = 1;
+    if (studentPointsRef.current < cost) {
+      sounds.playClick();
+      setCafeToast(
+        `⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk naik ayunan (saldo kamu ${studentPointsRef.current} XP).`
+      );
+      setTimeout(() => setCafeToast(null), 3200);
+      return false;
+    }
+
+    const ok = onDeductPointsRef.current
+      ? onDeductPointsRef.current(cost, `Naik ${targetSwing.name}`)
+      : true;
+    if (!ok) return false;
+
+    sounds.playRewardXp();
+    const remaining = Math.max(0, studentPointsRef.current - cost);
+    p.wx = targetSwing.wx;
+    p.wy = targetSwing.wy;
+    p.targetWx = targetSwing.wx;
+    p.targetWy = targetSwing.wy;
+    p.isMoving = false;
+    p.walkFrame = 0;
+    p.facing = targetSwing.facing;
+    setIsSitting(true);
+    setSittingSeat(targetSwing.id);
+    clickRippleRef.current = { wx: targetSwing.wx, wy: targetSwing.wy, time: performance.now() };
+    setCafeToast(`🎠 Naik & berayun di ${targetSwing.name} (-1 XP) • Sisa Saldo: ${remaining} XP`);
+    playerSpeechRef.current = {
+      text: 'Asyiknya naik ayunan! 🎠✨ (-1 XP)',
+      expiresAt: Date.now() + 4500,
+    };
+    setTimeout(() => setCafeToast(null), 3200);
+    sendHeartbeatRef.current?.();
+    return true;
+  };
 
   // React to incoming public chat messages
   useEffect(() => {
@@ -485,8 +828,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         const isRemTeacher = rem.role === 'guru' || Boolean(rem.isTeacher);
         const remRole: 'guru' | 'siswa' = isRemTeacher ? 'guru' : 'siswa';
         const remGender: 'L' | 'P' = rem.gender === 'P' ? 'P' : 'L';
-        const incomingWx = typeof rem.wx === 'number' && !isNaN(rem.wx) ? rem.wx : 1.5;
-        const incomingWy = typeof rem.wy === 'number' && !isNaN(rem.wy) ? rem.wy : 1.8;
+        const incomingWx = typeof rem.wx === 'number' && !isNaN(rem.wx) ? rem.wx : 0.0;
+        const incomingWy = typeof rem.wy === 'number' && !isNaN(rem.wy) ? rem.wy : 6.38;
         const incomingTargetWx = typeof rem.targetWx === 'number' && !isNaN(rem.targetWx) ? rem.targetWx : incomingWx;
         const incomingTargetWy = typeof rem.targetWy === 'number' && !isNaN(rem.targetWy) ? rem.targetWy : incomingWy;
 
@@ -510,7 +853,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             isMoving: Boolean(rem.isMoving),
             pauseTimer: 0,
             walkFrame: typeof rem.walkFrame === 'number' ? rem.walkFrame : 0,
-            facing: rem.facing || 'down-left',
+            facing: rem.facing || 'up-left',
             isSitting: Boolean(rem.isSitting),
             sittingSeat: rem.sittingSeat,
             isFishing: Boolean(rem.isFishing),
@@ -596,14 +939,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         shirtColor: p?.shirtColor || (isTeacher ? (studentGender === 'P' ? '#047857' : '#1e3a8a') : (studentGender === 'P' ? '#ec4899' : '#2563eb')),
         pantsColor: p?.pantsColor || (isTeacher ? (studentGender === 'P' ? '#065f46' : '#1e293b') : (studentGender === 'P' ? '#be185d' : '#1e293b')),
         hairColor: p?.hairColor || (studentGender === 'P' ? '#6b3410' : '#0f172a'),
-        wx: p ? Number(p.wx.toFixed(3)) : 1.5,
-        wy: p ? Number(p.wy.toFixed(3)) : 1.8,
-        targetWx: p ? Number(p.targetWx.toFixed(3)) : 1.5,
-        targetWy: p ? Number(p.targetWy.toFixed(3)) : 1.8,
+        wx: p ? Number(p.wx.toFixed(3)) : 0.0,
+        wy: p ? Number(p.wy.toFixed(3)) : 6.38,
+        targetWx: p ? Number(p.targetWx.toFixed(3)) : 0.0,
+        targetWy: p ? Number(p.targetWy.toFixed(3)) : 6.38,
         speed: p ? p.speed : 1.35,
         isMoving: Boolean(p?.isMoving),
         walkFrame: p ? Number(p.walkFrame.toFixed(2)) : 0,
-        facing: p?.facing || 'down-left',
+        facing: p?.facing || 'up-left',
         isSitting: Boolean(isSittingRef.current),
         sittingSeat: sittingSeatRef.current || undefined,
         isFishing: Boolean(isFishingRef.current),
@@ -824,7 +1167,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     };
 
     // -----------------------------------------------------------
-    // CITIZENS & AVATARS MATCHING SCREENSHOT
+    // CITIZENS & AVATARS: SPAWN AT SOUTHERN MAP EDGE BY WELCOME GAPURA
+    // ("SELAMAT DATANG DI REFLEKSIA CITY")
     // -----------------------------------------------------------
     const studentHandle = studentName
       .split(' ')
@@ -833,26 +1177,26 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       .toLowerCase()
       .replace(/[^a-z0-9_]/g, '') || (isTeacher ? 'guru_dkv' : 'siswa');
 
-    // Deterministic non-overlapping plaza spawn offset per device so Guru & Siswa never overlap at (1.5, 1.8)
+    // Deterministic non-overlapping spawn offset at the Welcome Gate (Ujung Selatan Peta [wx: 0, wy: 6.38])
     const devSeedStr = `${clientDeviceIdRef.current}_${studentHandle}_${isTeacher ? 'guru' : 'siswa'}`;
     let seedHash = 0;
     for (let i = 0; i < devSeedStr.length; i++) {
       seedHash = (seedHash * 31 + devSeedStr.charCodeAt(i)) % 1000;
     }
     const spawnSlot = seedHash % 8;
-    const PLAZA_SPAWN_OFFSETS: Array<[number, number]> = [
-      [1.45, 1.75],
-      [0.95, 1.55],
-      [1.75, 1.35],
-      [0.35, 1.85],
-      [1.15, 2.05],
-      [-0.35, 1.85],
-      [1.85, 0.95],
-      [-0.95, 1.55],
+    const WELCOME_GATE_SPAWN_OFFSETS: Array<[number, number]> = [
+      [0.0, 6.38],
+      [-0.32, 6.42],
+      [0.32, 6.42],
+      [-0.18, 6.54],
+      [0.18, 6.54],
+      [-0.50, 6.36],
+      [0.50, 6.36],
+      [0.0, 6.58],
     ];
-    const [initWx, initWy] = PLAZA_SPAWN_OFFSETS[spawnSlot] || [1.45, 1.75];
+    const [initWx, initWy] = WELCOME_GATE_SPAWN_OFFSETS[spawnSlot] || [0.0, 6.38];
 
-    // 1. Player (Siswa / Guru)
+    // 1. Player (Siswa / Guru) spawning right at the Welcome Gapura at the edge of the map
     const isPlayerTeacher = Boolean(isTeacher);
     const player: AvatarData = {
       id: isPlayerTeacher ? 'guru_player' : 'siswa',
@@ -876,10 +1220,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       isMoving: false,
       pauseTimer: 0,
       walkFrame: 0,
-      facing: 'down-left',
+      facing: 'up-left',
     };
     playerRef.current = player;
-    // Immediately announce our spawn position to all other devices
+    playerSpeechRef.current = {
+      text: 'Selamat datang di Refleksia City! 🏛️✨',
+      expiresAt: Date.now() + 5500,
+    };
+    // Immediately announce our spawn position at the Welcome Gate to all other devices
     sendHeartbeatRef.current?.();
 
     // -----------------------------------------------------------
@@ -1221,8 +1569,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 4. Check Click on Benches (4 Front Fountain Benches + 1 Literacy Bench)
-      const sitAtBench = (
+      // 4. Check Click on Benches (4 Minimalist Fountain Benches [2-seater], 2 Campfire Benches [2-seater], 1 Literacy Bench) & 2 Swing Structures (-1 XP)
+      const sitAtSingleBench = (
         seatId: BenchId,
         targetX: number,
         targetY: number,
@@ -1245,38 +1593,42 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         sendHeartbeatRef.current?.();
       };
 
-      for (const bench of FOUNTAIN_FRONT_BENCHES) {
-        const benchDist = Math.hypot(wx - bench.wx, wy - bench.wy);
-        if (benchDist < 1.05) {
-          sitAtBench(bench.id, bench.wx, bench.wy, bench.facing, bench.name);
+      // 4a. Check Click on 4 Minimalist 2-Seater Fountain Benches + 2 Campfire Benches
+      for (const group of ALL_TWO_PERSON_BENCHES) {
+        const groupDist = Math.hypot(wx - group.wx, wy - group.wy);
+        if (groupDist < 1.05) {
+          const distA = Math.hypot(wx - group.seats[0].wx, wy - group.seats[0].wy);
+          const distB = Math.hypot(wx - group.seats[1].wx, wy - group.seats[1].wy);
+          const preferredIdx: 0 | 1 = distB < distA ? 1 : 0;
+          sitOnTwoPersonBench(group, preferredIdx);
           return;
         }
       }
 
+      // 4b. Check Click directly on Campfire in Corner [-4.65, 4.65] -> Sit on nearest available Campfire Bench to warm up!
+      if (Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 1.25) {
+        const distLeft = Math.hypot(wx - CAMPFIRE_BENCHES[0].wx, wy - CAMPFIRE_BENCHES[0].wy);
+        const distRight = Math.hypot(wx - CAMPFIRE_BENCHES[1].wx, wy - CAMPFIRE_BENCHES[1].wy);
+        const firstGroup = distRight < distLeft ? CAMPFIRE_BENCHES[1] : CAMPFIRE_BENCHES[0];
+        const secondGroup = distRight < distLeft ? CAMPFIRE_BENCHES[0] : CAMPFIRE_BENCHES[1];
+        if (!sitOnTwoPersonBench(firstGroup, 0)) {
+          sitOnTwoPersonBench(secondGroup, 0);
+        }
+        return;
+      }
+
+      // 4c. Check Click on 2 Swing Locations (4 Swing Seats, costs 1 XP to ride)
       for (const swing of REFLECTION_SWINGS) {
         const swingDist = Math.hypot(wx - swing.wx, wy - swing.wy);
         if (swingDist < 0.95) {
-          sounds.playClick();
-          player.targetWx = swing.wx;
-          player.targetWy = swing.wy;
-          player.wx = swing.wx;
-          player.wy = swing.wy;
-          player.isMoving = false;
-          player.walkFrame = 0;
-          player.facing = swing.facing;
-          setIsSitting(true);
-          setSittingSeat(swing.id);
-          clickRippleRef.current = { wx: swing.wx, wy: swing.wy, time: performance.now() };
-          setCafeToast(`🎠 Duduk santai dan berayun di ${swing.name}!`);
-          setTimeout(() => setCafeToast(null), 2500);
-          sendHeartbeatRef.current?.();
+          rideSwingWithXp(swing);
           return;
         }
       }
 
       const litBenchDist = Math.hypot(wx - (-3.7), wy - 1.8);
       if (litBenchDist < 1.05) {
-        sitAtBench('literacy', -3.7, 1.8, 'down-right', 'Bangku Sudut Literasi');
+        sitAtSingleBench('literacy', -3.7, 1.8, 'down-right', 'Bangku Sudut Literasi');
         return;
       }
 
@@ -1355,17 +1707,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const onPointerMove = (e: MouseEvent) => {
       const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
 
-      if (
+      const isOverInteractiveSpot =
         Math.hypot(wx - cafeWx, wy - cafeWy) < 2.0 ||
         Math.hypot(wx - 4.6, wy - (-2.2)) < 2.2 ||
         Math.hypot(wx - (-4.3), wy - 1.8) < 2.0 ||
-        Math.hypot(wx - 1.45, wy - 0.0) < 1.05 ||
-        Math.hypot(wx - (-1.45), wy - 0.0) < 1.05 ||
-        Math.hypot(wx - 0.0, wy - (-1.45)) < 1.05 ||
-        Math.hypot(wx - 0.0, wy - 1.45) < 1.05 ||
         Math.hypot(wx - (-3.7), wy - 1.8) < 1.05 ||
-        Math.hypot(wx - (-2.8), wy - (-4.05)) < 1.15
-      ) {
+        Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 1.35 ||
+        ALL_TWO_PERSON_BENCHES.some((g) => Math.hypot(wx - g.wx, wy - g.wy) < 1.05) ||
+        SWING_STRUCTURES.some((s) => Math.hypot(wx - s.wx, wy - s.wy) < 1.15);
+
+      if (isOverInteractiveSpot) {
         canvas.style.cursor = 'pointer';
         hoveredBuildingRef = null;
         setHoveredBuilding(null);
@@ -1550,17 +1901,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // Proximity checks: East Fishing Dock & Kolam [4.6, -2.2], West Literacy Corner [-4.3, 1.8], 4 Front Fountain Benches, 2 Swings + Literacy Bench
+      // Proximity checks: East Fishing Dock & Kolam [4.6, -2.2], West Literacy Corner [-4.3, 1.8], 4 Minimalist Fountain Benches (2-seater), 2 Campfire Benches, 2 Swing Structures + Literacy Bench
       const fishDist = Math.hypot(player.wx - 4.6, player.wy - (-2.2));
       const litDist = Math.hypot(player.wx - (-4.3), player.wy - 1.8);
       const litBenchDist = Math.hypot(player.wx - (-3.7), player.wy - 1.8);
 
       let nearBench: { id: BenchId; name: string } | null = null;
-      for (const b of FOUNTAIN_FRONT_BENCHES) {
-        if (Math.hypot(player.wx - b.wx, player.wy - b.wy) < 0.95) {
-          nearBench = { id: b.id, name: b.name };
+      for (const group of ALL_TWO_PERSON_BENCHES) {
+        if (Math.hypot(player.wx - group.wx, player.wy - group.wy) < 1.05) {
+          const distA = Math.hypot(player.wx - group.seats[0].wx, player.wy - group.seats[0].wy);
+          const distB = Math.hypot(player.wx - group.seats[1].wx, player.wy - group.seats[1].wy);
+          const chosenSeat = distB < distA ? group.seats[1] : group.seats[0];
+          nearBench = { id: chosenSeat.id, name: group.name };
           break;
         }
+      }
+      if (!nearBench && Math.hypot(player.wx - CAMPFIRE_COORDS.wx, player.wy - CAMPFIRE_COORDS.wy) < 1.35) {
+        nearBench = { id: 'campfire_1_a', name: 'Bangku Api Unggun (Penghangat Tubuh)' };
       }
       if (!nearBench) {
         for (const s of REFLECTION_SWINGS) {
@@ -1587,10 +1944,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       if (isSittingRef.current) {
         if (nearbyActionRef.current?.type !== 'bench') {
           const currentSeat = sittingSeatRef.current;
-          let seatName = 'Kursi Taman Depan';
-          const match = FOUNTAIN_FRONT_BENCHES.find((b) => b.id === currentSeat)
-            || REFLECTION_SWINGS.find((s) => s.id === currentSeat);
-          if (match) seatName = match.name;
+          let seatName = 'Kursi Taman Kota';
+          const matchedTwoPersonGroup = ALL_TWO_PERSON_BENCHES.find(
+            (g) => g.groupId === currentSeat || g.seats[0].id === currentSeat || g.seats[1].id === currentSeat
+          );
+          const matchedSwing = REFLECTION_SWINGS.find((s) => s.id === currentSeat);
+          if (matchedTwoPersonGroup) seatName = matchedTwoPersonGroup.name;
+          else if (matchedSwing) seatName = matchedSwing.name;
           else if (currentSeat === 'literacy') seatName = 'Bangku Sudut Literasi';
           setNearbyAction({ type: 'bench', benchId: currentSeat || undefined, benchName: seatName });
         }
@@ -1931,8 +2291,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         // Outer promenade loop road at |gx| == 5 or |gy| == 5
         if (Math.abs(gx) === 5 && Math.abs(gy) <= 5) return true;
         if (Math.abs(gy) === 5 && Math.abs(gx) <= 5) return true;
-        // Connecting central spokes to north/south/east/west
-        if (gx === 0 && Math.abs(gy) <= 6) return true;
+        // Connecting central spokes to north/east/west, and South Welcome Gate avenue all the way to gy = 7
+        if (gx === 0 && gy >= -6 && gy <= 7) return true;
+        if (Math.abs(gx) <= 1 && gy === 6) return true;
         if (gy === 0 && Math.abs(gx) <= 6) return true;
         // Central ring
         if (Math.abs(gx) <= 1 && Math.abs(gy) <= 1) return true;
@@ -1940,8 +2301,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (gx >= 3 && gx <= 5 && gy === -2) return true;
         // Walkway spur to West Sudut Literasi at [-4.3, 1.8]
         if (gx <= -3 && gx >= -5 && gy === 2) return true;
-        // Garden path to Swings behind Taman Refleksi at [-3, -4]
+        // Garden paths to Tempat Ayunan 1 [-3..-2, -4] and Tempat Ayunan 2 [2..3, -4]
         if ((gx === -3 || gx === -2) && gy === -4) return true;
+        if ((gx === 2 || gx === 3) && gy === -4) return true;
+        // Cozy corner stone patio for Api Unggun & Bangku Hangat at [-5..-4, 4..5]
+        if ((gx === -5 || gx === -4) && (gy === 4 || gy === 5)) return true;
         return false;
       };
 
@@ -2095,8 +2459,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'lamp'; wx: number; wy: number; depth: number }
         | { type: 'fishing_spot'; wx: number; wy: number; depth: number }
         | { type: 'literacy_corner'; wx: number; wy: number; depth: number }
-        | { type: 'bench'; wx: number; wy: number; depth: number; id: BenchId }
-        | { type: 'swings_structure'; wx: number; wy: number; depth: number };
+        | { type: 'bench'; wx: number; wy: number; depth: number; id: BenchId; twoPersonGroup?: TwoPersonBenchGroup }
+        | { type: 'swings_structure'; struct: SwingStructureDef; wx: number; wy: number; depth: number }
+        | { type: 'campfire_spot'; wx: number; wy: number; depth: number }
+        | { type: 'welcome_gate'; wx: number; wy: number; depth: number };
 
       const drawItems: DrawItem[] = [];
 
@@ -2107,14 +2473,29 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       drawItems.push({ type: 'cafe', depth: cafeWx + cafeWy });
 
-      const playerOnSwing = Boolean(
-        isSittingRef.current && (sittingSeatRef.current === 'swing_left' || sittingSeatRef.current === 'swing_right')
-      );
+      const getAvatarRenderDepth = (avData: AvatarData, isLocalPlayer: boolean): number => {
+        const sittingNow = isLocalPlayer ? isSittingRef.current : Boolean(avData.isSitting);
+        const seatId = (isLocalPlayer ? sittingSeatRef.current : avData.sittingSeat) as BenchId | undefined;
+        if (sittingNow && seatId) {
+          const swingDef = REFLECTION_SWINGS.find((s) => s.id === seatId);
+          if (swingDef) {
+            return swingDef.structWx + swingDef.structWy + 0.02;
+          }
+          const benchGroup = ALL_TWO_PERSON_BENCHES.find(
+            (g) => g.groupId === seatId || g.seats[0].id === seatId || g.seats[1].id === seatId
+          );
+          if (benchGroup) {
+            return benchGroup.wx + benchGroup.wy + 0.02;
+          }
+        }
+        return avData.wx + avData.wy;
+      };
+
       drawItems.push({
         type: 'avatar',
         data: player,
         isPlayer: true,
-        depth: playerOnSwing ? (-2.8 + -4.05) + 0.02 : player.wx + player.wy,
+        depth: getAvatarRenderDepth(player, true),
       });
 
       npcs.forEach((npc) => {
@@ -2123,14 +2504,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       // Real-time Online Avatars from other devices
       remotePlayersRef.current.forEach((remotePlayer) => {
-        const remOnSwing = Boolean(
-          remotePlayer.isSitting && (remotePlayer.sittingSeat === 'swing_left' || remotePlayer.sittingSeat === 'swing_right')
-        );
         drawItems.push({
           type: 'avatar',
           data: remotePlayer,
           isPlayer: false,
-          depth: remOnSwing ? (-2.8 + -4.05) + 0.02 : remotePlayer.wx + remotePlayer.wy,
+          depth: getAvatarRenderDepth(remotePlayer, false),
         });
       });
 
@@ -2151,21 +2529,53 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // 3. Bench next to Sudut Literasi at [-3.7, 1.8]
       drawItems.push({ type: 'bench', wx: -3.7, wy: 1.8, depth: -3.7 + 1.8, id: 'literacy' });
 
-      // 4. Exactly 4 Benches in FRONT of the Central Fountain
-      FOUNTAIN_FRONT_BENCHES.forEach((b) => {
-        drawItems.push({ type: 'bench', wx: b.wx, wy: b.wy, depth: b.wx + b.wy, id: b.id });
+      // 4. 4 Minimalist 2-Seater Benches around Central Fountain + 2 Campfire Benches
+      ALL_TWO_PERSON_BENCHES.forEach((group) => {
+        drawItems.push({
+          type: 'bench',
+          wx: group.wx,
+          wy: group.wy,
+          depth: group.wx + group.wy,
+          id: group.seats[0].id,
+          twoPersonGroup: group,
+        });
       });
 
-      // 5. Dual Wooden Swings behind Taman Refleksi at [-2.8, -4.05]
-      drawItems.push({ type: 'swings_structure', wx: -2.8, wy: -4.05, depth: -2.8 + -4.05 });
+      // 5. 2 Tempat Ayunan (Behind Taman Refleksi [-2.8, -4.05] & Taman Timur [2.8, -4.05])
+      SWING_STRUCTURES.forEach((st) => {
+        drawItems.push({
+          type: 'swings_structure',
+          struct: st,
+          wx: st.wx,
+          wy: st.wy,
+          depth: st.wx + st.wy,
+        });
+      });
+
+      // 6. Api Unggun di Sudut Kota [-4.65, 4.65]
+      drawItems.push({
+        type: 'campfire_spot',
+        wx: CAMPFIRE_COORDS.wx,
+        wy: CAMPFIRE_COORDS.wy,
+        depth: CAMPFIRE_COORDS.wx + CAMPFIRE_COORDS.wy,
+      });
+
+      // 7. Gapura Selamat Datang di Ujung Selatan Peta [0, 6.15]
+      drawItems.push({
+        type: 'welcome_gate',
+        wx: WELCOME_GATE_COORDS.wx,
+        wy: WELCOME_GATE_COORDS.wy,
+        depth: WELCOME_GATE_COORDS.wx + WELCOME_GATE_COORDS.wy + 0.65,
+      });
 
       drawItems.sort((a, b) => a.depth - b.depth);
 
-      // Shared helper for exact 3D isometric front-to-back (kemuka-kebelakang) swing seat & chain geometry
-      const getSwingSeatMetrics = (seatId: 'swing_left' | 'swing_right') => {
-        const structPt = toScreen(-2.8, -4.05, 0, camera.x, camera.y);
+      // Shared helper for exact 3D isometric front-to-back (kemuka-kebelakang) swing seat & chain geometry across BOTH swing structures
+      const getSwingSeatMetrics = (seatId: SwingSeatDef['id']) => {
+        const swingDef = REFLECTION_SWINGS.find((s) => s.id === seatId) || REFLECTION_SWINGS[0];
+        const structPt = toScreen(swingDef.structWx, swingDef.structWy, 0, camera.x, camera.y);
         const z = zoomLevelRef.current;
-        const isLeft = seatId === 'swing_left';
+        const isLeft = swingDef.isLeft;
         const anchorX = structPt.x + (isLeft ? -10 * z : 10 * z);
         const anchorY = structPt.y - 29 * z;
 
@@ -2210,51 +2620,136 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // Render Each Item
       drawItems.forEach((item) => {
         if (item.type === 'bench') {
-          // FOUNTAIN FRONT BENCH (Polished teak wood planks with dark cast-iron frame)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
+          const group = item.twoPersonGroup;
 
-          // Ground shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-          ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y + 1 * z, 14 * z, 6 * z, 0, 0, Math.PI * 2);
-          ctx.fill();
+          if (group && group.kind === 'fountain_minimalist') {
+            // 4 TEMPAT DUDUK MINIMALIS DI SEKITAR AIR MANCUR (Muat 2 Orang / 2-Seater Minimalist Architectural Bench)
+            // Soft elliptical ground shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 1.5 * z, 16 * z, 5.8 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
 
-          // Dark cast-iron frame/legs
-          ctx.fillStyle = isNight ? '#0f172a' : '#334155';
-          ctx.fillRect(pt.x - 11 * z, pt.y - 3 * z, 2.5 * z, 7 * z);
-          ctx.fillRect(pt.x + 8.5 * z, pt.y - 3 * z, 2.5 * z, 7 * z);
-          ctx.fillRect(pt.x - 11 * z, pt.y + 2 * z, 22 * z, 2 * z);
+            // Matte Charcoal Minimalist U-Loop Steel Legs (Left, Center Support, Right)
+            ctx.fillStyle = isNight ? '#0f172a' : '#1e293b';
+            ctx.fillRect(pt.x - 13 * z, pt.y - 3 * z, 2.2 * z, 6.5 * z);
+            ctx.fillRect(pt.x - 0.8 * z, pt.y - 2 * z, 1.6 * z, 5 * z);
+            ctx.fillRect(pt.x + 10.8 * z, pt.y - 3 * z, 2.2 * z, 6.5 * z);
+            // Minimalist steel under-frame beam
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(pt.x - 13 * z, pt.y - 0.5 * z, 26 * z, 1.8 * z);
 
-          // Teak wooden seat slats
-          ctx.fillStyle = '#b45309';
-          ctx.beginPath();
-          ctx.moveTo(pt.x - 12 * z, pt.y - 4 * z);
-          ctx.lineTo(pt.x + 12 * z, pt.y - 4 * z);
-          ctx.lineTo(pt.x + 10 * z, pt.y + 1 * z);
-          ctx.lineTo(pt.x - 14 * z, pt.y + 1 * z);
-          ctx.closePath();
-          ctx.fill();
-          ctx.strokeStyle = '#78350f';
-          ctx.lineWidth = 0.8 * z;
-          ctx.stroke();
+            // Sleek Floating Minimalist Nordic Teak/Cedar Wood Deck (Wide for 2 People)
+            ctx.fillStyle = '#d97706';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 14.5 * z, pt.y - 4.5 * z, 29 * z, 4.2 * z, 1.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#92400e';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
 
-          // Teak backrest slats
-          ctx.fillStyle = '#d97706';
-          ctx.fillRect(pt.x - 12 * z, pt.y - 11 * z, 24 * z, 3 * z);
-          ctx.fillRect(pt.x - 12 * z, pt.y - 7 * z, 24 * z, 2.5 * z);
+            // 2 Minimalist Seat Pads (Left Seat 1 & Right Seat 2) so 2-person capacity is visually unmistakable
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 13 * z, pt.y - 4.1 * z, 11.8 * z, 3.0 * z, 1 * z);
+            ctx.roundRect(pt.x + 1.2 * z, pt.y - 4.1 * z, 11.8 * z, 3.0 * z, 1 * z);
+            ctx.fill();
 
-          // Armrest curves
-          ctx.strokeStyle = isNight ? '#0f172a' : '#334155';
-          ctx.lineWidth = 1.2 * z;
-          ctx.beginPath();
-          ctx.arc(pt.x - 11 * z, pt.y - 3 * z, 3 * z, Math.PI, 0);
-          ctx.arc(pt.x + 10 * z, pt.y - 3 * z, 3 * z, Math.PI, 0);
-          ctx.stroke();
+            // Center divider groove between Seat 1 and Seat 2
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 1.0 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 4.5 * z);
+            ctx.lineTo(pt.x, pt.y - 0.3 * z);
+            ctx.stroke();
+
+            // Minimalist brushed steel backrest posts
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(pt.x - 9.5 * z, pt.y - 9.5 * z, 1.5 * z, 5.2 * z);
+            ctx.fillRect(pt.x + 8 * z, pt.y - 9.5 * z, 1.5 * z, 5.2 * z);
+
+            // Floating Minimalist Single-Bar Backrest
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 13.5 * z, pt.y - 10.5 * z, 27 * z, 2.8 * z, 1.2 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 0.7 * z;
+            ctx.stroke();
+          } else if (group && group.kind === 'campfire') {
+            // BANGKU PENGHANGAT TUBUH DI SAMPING API UNGGUN (Warm Rustic Timber 2-Seater Log Bench)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 1.5 * z, 15.5 * z, 5.5 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Warm firelight reflection on bench base
+            ctx.fillStyle = 'rgba(251, 146, 60, 0.18)';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 1 * z, 17 * z, 6.5 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Sturdy hewn log legs
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(pt.x - 12 * z, pt.y - 3 * z, 3.2 * z, 6.5 * z);
+            ctx.fillRect(pt.x + 8.8 * z, pt.y - 3 * z, 3.2 * z, 6.5 * z);
+
+            // Warm cedar plank seat (fits 2 people)
+            ctx.fillStyle = '#b45309';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 14 * z, pt.y - 4.5 * z, 28 * z, 4.2 * z, 1.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+
+            // Warm wool seat cushions for 2 people beside the fire
+            ctx.fillStyle = '#ea580c';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 12.2 * z, pt.y - 4.0 * z, 11 * z, 2.8 * z, 1 * z);
+            ctx.roundRect(pt.x + 1.2 * z, pt.y - 4.0 * z, 11 * z, 2.8 * z, 1 * z);
+            ctx.fill();
+
+            // Low backrest rail
+            ctx.fillStyle = '#92400e';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 13 * z, pt.y - 9.5 * z, 26 * z, 2.8 * z, 1.2 * z);
+            ctx.fill();
+          } else {
+            // LITERACY BENCH
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 1 * z, 14 * z, 6 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = isNight ? '#0f172a' : '#334155';
+            ctx.fillRect(pt.x - 11 * z, pt.y - 3 * z, 2.5 * z, 7 * z);
+            ctx.fillRect(pt.x + 8.5 * z, pt.y - 3 * z, 2.5 * z, 7 * z);
+            ctx.fillRect(pt.x - 11 * z, pt.y + 2 * z, 22 * z, 2 * z);
+
+            ctx.fillStyle = '#b45309';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 12 * z, pt.y - 4 * z);
+            ctx.lineTo(pt.x + 12 * z, pt.y - 4 * z);
+            ctx.lineTo(pt.x + 10 * z, pt.y + 1 * z);
+            ctx.lineTo(pt.x - 14 * z, pt.y + 1 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+
+            ctx.fillStyle = '#d97706';
+            ctx.fillRect(pt.x - 12 * z, pt.y - 11 * z, 24 * z, 3 * z);
+            ctx.fillRect(pt.x - 12 * z, pt.y - 7 * z, 24 * z, 2.5 * z);
+          }
         } else if (item.type === 'swings_structure') {
-          // DUAL WOODEN SWINGS BEHIND TAMAN REFLEKSI (Isometric Front-to-Back Pendulum Swing)
+          // 2 TEMPAT AYUNAN KOTA REFLEKSIA (Masing-Masing 2 Kursi Ayunan, Naik Bayar 1 XP)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
+          const st = item.struct;
 
           // Ground shadow for A-frame structure and floor patch
           ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
@@ -2266,9 +2761,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.strokeStyle = '#572506';
           ctx.lineWidth = 3.2 * z;
           ctx.beginPath();
-          ctx.moveTo(pt.x - 24 * z, pt.y + 2 * z); // Rear-left foot
-          ctx.lineTo(pt.x - 20 * z, pt.y - 30 * z); // Left apex
-          ctx.lineTo(pt.x - 15 * z, pt.y + 8 * z); // Front-left foot
+          ctx.moveTo(pt.x - 24 * z, pt.y + 2 * z);
+          ctx.lineTo(pt.x - 20 * z, pt.y - 30 * z);
+          ctx.lineTo(pt.x - 15 * z, pt.y + 8 * z);
           ctx.stroke();
 
           // Left A-frame cross brace
@@ -2281,9 +2776,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Right A-Frame timber support legs (angled front-to-back)
           ctx.lineWidth = 3.2 * z;
           ctx.beginPath();
-          ctx.moveTo(pt.x + 15 * z, pt.y - 1 * z); // Rear-right foot
-          ctx.lineTo(pt.x + 20 * z, pt.y - 30 * z); // Right apex
-          ctx.lineTo(pt.x + 24 * z, pt.y + 7 * z); // Front-right foot
+          ctx.moveTo(pt.x + 15 * z, pt.y - 1 * z);
+          ctx.lineTo(pt.x + 20 * z, pt.y - 30 * z);
+          ctx.lineTo(pt.x + 24 * z, pt.y + 7 * z);
           ctx.stroke();
 
           // Right A-frame cross brace
@@ -2307,8 +2802,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(pt.x + 20 * z, pt.y - 30 * z, 2 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Hanging Swings (Left: id = 'swing_left', Right: id = 'swing_right')
-          const swingIds: Array<'swing_left' | 'swing_right'> = ['swing_left', 'swing_right'];
+          // Hanging Swings for this Swing Structure
+          const swingIds: Array<SwingSeatDef['id']> = [st.leftSeatId, st.rightSeatId];
 
           swingIds.forEach((swId) => {
             const m = getSwingSeatMetrics(swId);
@@ -2336,15 +2831,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.strokeStyle = isNight ? '#cbd5e1' : '#57534e';
             ctx.lineWidth = 1.3 * z;
             ctx.beginPath();
-            // Left chain
             ctx.moveTo(m.anchorX - 4.2 * z, m.anchorY);
             ctx.lineTo(m.seatX - 4.5 * z, m.seatY);
-            // Right chain
             ctx.moveTo(m.anchorX + 4.2 * z, m.anchorY);
             ctx.lineTo(m.seatX + 4.5 * z, m.seatY);
             ctx.stroke();
 
-            // 3D Isometric Wooden Swing Seat Board (tilts slightly with the forward/backward swing angle)
+            // 3D Isometric Wooden Swing Seat Board
             const seatTilt = m.sway * 1.2 * z;
             ctx.fillStyle = '#d97706';
             ctx.beginPath();
@@ -2363,14 +2856,333 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillRect(m.seatX - 6.2 * z, m.seatY + 1.2 * z, 11.4 * z, 1.5 * z);
           });
 
-          // Small decorative brass plaque on top beam: "AYUNAN REFLEKSI"
+          // Brass plaque on top beam
           ctx.fillStyle = '#fbbf24';
-          ctx.fillRect(pt.x - 11 * z, pt.y - 34 * z, 22 * z, 3 * z);
+          ctx.fillRect(pt.x - 13 * z, pt.y - 34.5 * z, 26 * z, 3.5 * z);
           ctx.fillStyle = '#451a03';
-          ctx.font = `bold ${Math.round(2.6 * z)}px sans-serif`;
+          ctx.font = `bold ${Math.round(2.7 * z)}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('🎠 AYUNAN REFLEKSI', pt.x, pt.y - 32.5 * z);
+          ctx.fillText(st.title, pt.x, pt.y - 32.8 * z);
+
+          // Floating Badge above Swing Structure showing 1 XP cost
+          const swBadgeY = pt.y - 44 * z;
+          ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
+          const swM = ctx.measureText(st.badgeText);
+          const swW = swM.width + 12 * z;
+          const swH = 16 * z;
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - swW / 2, swBadgeY - swH / 2, swW, swH, 8 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 1.2 * z;
+          ctx.stroke();
+          ctx.fillStyle = '#fde047';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(st.badgeText, pt.x, swBadgeY);
+        } else if (item.type === 'campfire_spot') {
+          // API UNGGUN DI SUDUT KOTA [-4.65, 4.65] (Dikelilingi Bangku Penghangat Tubuh)
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+
+          // 1. Warm Radial Ground Firelight Aura (Pulses gently with the flames)
+          const firePulse = 1 + Math.sin(elapsed * 7.5) * 0.08 + Math.cos(elapsed * 11.2) * 0.05;
+          const glowRx = 52 * z * firePulse;
+          const glowRy = 26 * z * firePulse;
+          const fireGlow = ctx.createRadialGradient(pt.x, pt.y, 2 * z, pt.x, pt.y, glowRx);
+          fireGlow.addColorStop(0, 'rgba(254, 240, 138, 0.72)');
+          fireGlow.addColorStop(0.28, 'rgba(251, 146, 60, 0.45)');
+          fireGlow.addColorStop(0.65, 'rgba(234, 88, 12, 0.16)');
+          fireGlow.addColorStop(1, 'rgba(234, 88, 12, 0)');
+          ctx.fillStyle = fireGlow;
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y, glowRx, glowRy, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 2. Dark ash & glowing charcoal bed
+          ctx.fillStyle = '#1c1917';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y, 14 * z, 7.5 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#dc2626';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y, 9 * z, 4.8 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 3. Ring of 10 River Cobblestones around the fire pit
+          for (let stIdx = 0; stIdx < 10; stIdx++) {
+            const ang = (stIdx / 10) * Math.PI * 2;
+            const sx = pt.x + Math.cos(ang) * 14 * z;
+            const sy = pt.y + Math.sin(ang) * 7.2 * z;
+            ctx.fillStyle = stIdx % 2 === 0 ? '#64748b' : '#475569';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, 3.6 * z, 2.4 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+            // Warm inner rim highlight from fire
+            ctx.fillStyle = 'rgba(251, 146, 60, 0.45)';
+            ctx.beginPath();
+            ctx.arc(sx - Math.cos(ang) * 1.1 * z, sy - Math.sin(ang) * 0.6 * z, 1.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // 4. Crossed Firewood Logs (Kayu Bakar)
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 3.4 * z;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 9.5 * z, pt.y + 2.5 * z);
+          ctx.lineTo(pt.x + 9.5 * z, pt.y - 3.5 * z);
+          ctx.moveTo(pt.x - 8.5 * z, pt.y - 3.0 * z);
+          ctx.lineTo(pt.x + 8.5 * z, pt.y + 3.0 * z);
+          ctx.stroke();
+
+          // 5. Animated Multi-Layer Flickering Campfire Flames
+          const sway1 = Math.sin(elapsed * 8.5) * 2.2 * z;
+          const sway2 = Math.cos(elapsed * 10.5) * 1.8 * z;
+          const flameH = (18 + Math.sin(elapsed * 9.2) * 3.2) * z;
+
+          // Outer crimson-orange flame
+          ctx.fillStyle = '#ea580c';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 8.5 * z, pt.y);
+          ctx.quadraticCurveTo(pt.x - 9 * z, pt.y - flameH * 0.55, pt.x + sway1, pt.y - flameH);
+          ctx.quadraticCurveTo(pt.x + 9 * z, pt.y - flameH * 0.55, pt.x + 8.5 * z, pt.y);
+          ctx.closePath();
+          ctx.fill();
+
+          // Left & Right secondary flame tongues
+          ctx.fillStyle = '#f97316';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 7 * z, pt.y);
+          ctx.quadraticCurveTo(pt.x - 8 * z, pt.y - flameH * 0.45, pt.x - 4 * z + sway2, pt.y - flameH * 0.78);
+          ctx.quadraticCurveTo(pt.x, pt.y - flameH * 0.4, pt.x + 2 * z, pt.y);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 2 * z, pt.y);
+          ctx.quadraticCurveTo(pt.x, pt.y - flameH * 0.4, pt.x + 4.5 * z - sway2, pt.y - flameH * 0.75);
+          ctx.quadraticCurveTo(pt.x + 8 * z, pt.y - flameH * 0.45, pt.x + 7 * z, pt.y);
+          ctx.closePath();
+          ctx.fill();
+
+          // Middle bright amber-gold flame
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 5.2 * z, pt.y);
+          ctx.quadraticCurveTo(pt.x - 5 * z, pt.y - flameH * 0.45, pt.x + sway2 * 0.7, pt.y - flameH * 0.76);
+          ctx.quadraticCurveTo(pt.x + 5 * z, pt.y - flameH * 0.45, pt.x + 5.2 * z, pt.y);
+          ctx.closePath();
+          ctx.fill();
+
+          // Inner white-yellow hot core flame
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 2.8 * z, pt.y);
+          ctx.quadraticCurveTo(pt.x - 2.5 * z, pt.y - flameH * 0.3, pt.x + sway1 * 0.4, pt.y - flameH * 0.48);
+          ctx.quadraticCurveTo(pt.x + 2.5 * z, pt.y - flameH * 0.3, pt.x + 2.8 * z, pt.y);
+          ctx.closePath();
+          ctx.fill();
+
+          // 6. Rising Glowing Sparks / Embers & Warm Smoke Wisps
+          for (let sp = 0; sp < 6; sp++) {
+            const spProg = (elapsed * 0.85 + sp * 0.17) % 1;
+            const spX = pt.x + Math.sin(elapsed * 4 + sp * 1.9) * (6 * z) * (0.4 + spProg);
+            const spY = pt.y - (8 + spProg * 28) * z;
+            const spAlpha = Math.max(0, 1 - spProg);
+            ctx.fillStyle = sp % 2 === 0 ? `rgba(254, 240, 138, ${spAlpha})` : `rgba(249, 115, 22, ${spAlpha})`;
+            ctx.beginPath();
+            ctx.arc(spX, spY, (1.6 - spProg * 0.8) * z, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Floating Badge above Campfire
+          const cfTagY = pt.y - 42 * z;
+          const cfLabel = '🔥 Api Unggun & Bangku Hangat';
+          ctx.font = `bold ${Math.round(8.8 * z)}px sans-serif`;
+          const cfM = ctx.measureText(cfLabel);
+          const cfW = cfM.width + 14 * z;
+          const cfH = 18 * z;
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - cfW / 2, cfTagY - cfH / 2, cfW, cfH, 9 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#f97316';
+          ctx.lineWidth = 1.4 * z;
+          ctx.stroke();
+          ctx.fillStyle = '#fed7aa';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(cfLabel, pt.x, cfTagY);
+        } else if (item.type === 'welcome_gate') {
+          // GAPURA SELAMAT DATANG DI UJUNG PETA [wx: 0, wy: 6.15] ("SELAMAT DATANG DI REFLEKSIA CITY")
+          const leftBase = toScreen(-0.92, item.wy, 0, camera.x, camera.y);
+          const rightBase = toScreen(0.92, item.wy, 0, camera.x, camera.y);
+          const centerBase = toScreen(0, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          const pillarH = 44 * z;
+
+          // Ground shadows under Left & Right Gate Pillars
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+          ctx.beginPath();
+          ctx.ellipse(leftBase.x, leftBase.y + 2 * z, 11 * z, 5.5 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(rightBase.x, rightBase.y + 2 * z, 11 * z, 5.5 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Draw Left & Right Ornate Gapura Pillars
+          [leftBase, rightBase].forEach((pBase) => {
+            // Stepped carved stone pedestal base
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(pBase.x - 7.5 * z, pBase.y - 6 * z, 15 * z, 8 * z);
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillRect(pBase.x - 6.5 * z, pBase.y - 9 * z, 13 * z, 3.5 * z);
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 0.9 * z;
+            ctx.strokeRect(pBase.x - 7.5 * z, pBase.y - 6 * z, 15 * z, 8 * z);
+
+            // Tall crimson & royal-gold column shaft
+            ctx.fillStyle = '#991b1b';
+            ctx.fillRect(pBase.x - 4.8 * z, pBase.y - pillarH, 9.6 * z, pillarH - 8 * z);
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(pBase.x - 3.2 * z, pBase.y - pillarH, 4.5 * z, pillarH - 8 * z);
+
+            // Golden ornamental rings along column
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(pBase.x - 5.5 * z, pBase.y - 16 * z, 11 * z, 2.4 * z);
+            ctx.fillRect(pBase.x - 5.5 * z, pBase.y - 28 * z, 11 * z, 2.4 * z);
+            ctx.fillRect(pBase.x - 6.0 * z, pBase.y - pillarH + 1 * z, 12 * z, 3 * z);
+          });
+
+          // High Arch Crossbeam connecting Left & Right Pillars above the entrance road
+          const leftTopX = leftBase.x;
+          const leftTopY = leftBase.y - pillarH;
+          const rightTopX = rightBase.x;
+          const rightTopY = rightBase.y - pillarH;
+
+          // Lower ornamental golden-crimson arch beam
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 7 * z;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(leftTopX - 6 * z, leftTopY + 3 * z);
+          ctx.lineTo(rightTopX + 6 * z, rightTopY + 3 * z);
+          ctx.stroke();
+
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 4.2 * z;
+          ctx.beginPath();
+          ctx.moveTo(leftTopX - 5 * z, leftTopY + 3 * z);
+          ctx.lineTo(rightTopX + 5 * z, rightTopY + 3 * z);
+          ctx.stroke();
+
+          // Hanging Warm Glowing Welcome Lanterns under both ends of the Gapura arch
+          [
+            { lx: leftTopX + 10 * z, ly: leftTopY + 7 * z },
+            { lx: rightTopX - 10 * z, ly: rightTopY + 7 * z },
+          ].forEach(({ lx, ly }) => {
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.moveTo(lx, ly - 4 * z);
+            ctx.lineTo(lx, ly + 1 * z);
+            ctx.stroke();
+
+            const lGlow = ctx.createRadialGradient(lx, ly + 4 * z, 1 * z, lx, ly + 4 * z, 12 * z);
+            lGlow.addColorStop(0, 'rgba(254, 240, 138, 0.95)');
+            lGlow.addColorStop(0.5, 'rgba(251, 191, 36, 0.4)');
+            lGlow.addColorStop(1, 'rgba(251, 191, 36, 0)');
+            ctx.fillStyle = lGlow;
+            ctx.beginPath();
+            ctx.arc(lx, ly + 4 * z, 12 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(lx, ly + 4 * z, 3.6 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#fde047';
+            ctx.lineWidth = 1 * z;
+            ctx.stroke();
+          });
+
+          // Grand Banner Signboard at the Crown of the Gapura:
+          // "SELAMAT DATANG DI REFLEKSIA CITY"
+          const bannerCenterX = centerBase.x;
+          const bannerCenterY = (leftTopY + rightTopY) / 2 - 10 * z;
+
+          // Traditional/Modern Crown Roof Peak above the Signboard
+          ctx.fillStyle = '#b45309';
+          ctx.beginPath();
+          ctx.moveTo(bannerCenterX - 96 * z, bannerCenterY - 8 * z);
+          ctx.lineTo(bannerCenterX, bannerCenterY - 24 * z);
+          ctx.lineTo(bannerCenterX + 96 * z, bannerCenterY - 8 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#fde047';
+          ctx.lineWidth = 1.5 * z;
+          ctx.stroke();
+
+          // Golden Spire Finial at Apex of Gapura
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath();
+          ctx.arc(bannerCenterX, bannerCenterY - 26 * z, 3.2 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Wide Illuminated Signboard Plaque
+          const titleText = '🏛️ SELAMAT DATANG DI REFLEKSIA CITY ✨';
+          ctx.font = `900 ${Math.round(9.2 * z)}px sans-serif`;
+          const tm = ctx.measureText(titleText);
+          const boardW = Math.max(176 * z, tm.width + 24 * z);
+          const boardH = 22 * z;
+
+          // Outer golden frame shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+          ctx.beginPath();
+          ctx.roundRect(bannerCenterX - boardW / 2 + 2 * z, bannerCenterY - boardH / 2 + 2 * z, boardW, boardH, 7 * z);
+          ctx.fill();
+
+          // Deep royal navy & emerald gradient plaque background
+          const boardGrad = ctx.createLinearGradient(
+            bannerCenterX - boardW / 2,
+            bannerCenterY - boardH / 2,
+            bannerCenterX + boardW / 2,
+            bannerCenterY + boardH / 2
+          );
+          boardGrad.addColorStop(0, '#0f172a');
+          boardGrad.addColorStop(0.5, '#1e3a8a');
+          boardGrad.addColorStop(1, '#0f172a');
+          ctx.fillStyle = boardGrad;
+          ctx.beginPath();
+          ctx.roundRect(bannerCenterX - boardW / 2, bannerCenterY - boardH / 2, boardW, boardH, 7 * z);
+          ctx.fill();
+
+          // Double gold border
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 2.0 * z;
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(254, 240, 138, 0.5)';
+          ctx.lineWidth = 0.8 * z;
+          ctx.beginPath();
+          ctx.roundRect(
+            bannerCenterX - boardW / 2 + 2.5 * z,
+            bannerCenterY - boardH / 2 + 2.5 * z,
+            boardW - 5 * z,
+            boardH - 5 * z,
+            5 * z
+          );
+          ctx.stroke();
+
+          // Crisp Glowing Gold & White Welcome Text
+          ctx.fillStyle = '#fef08a';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(titleText, bannerCenterX, bannerCenterY);
         } else if (item.type === 'literacy_corner') {
           // SUDUT LITERASI WARGA (West End Reading Gazebo, Bookshelf & Reading Corner)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
@@ -4190,10 +5002,31 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const currentHeldItem = item.isPlayer ? heldItemRef.current : av.heldItem;
 
           const currentSeatId = item.isPlayer ? sittingSeatRef.current : av.sittingSeat;
-          const isOnSwing = Boolean(isSittingNow && (currentSeatId === 'swing_left' || currentSeatId === 'swing_right'));
-          const swingMetrics = isOnSwing
-            ? getSwingSeatMetrics(currentSeatId as 'swing_left' | 'swing_right')
+          const isOnSwing = Boolean(isSittingNow && isSwingSeatId(currentSeatId));
+          const swingMetrics = isOnSwing && currentSeatId
+            ? getSwingSeatMetrics(currentSeatId as 'swing_left' | 'swing_right' | 'swing_2_left' | 'swing_2_right')
             : null;
+          const isCampfireSeat = Boolean(isSittingNow && currentSeatId && currentSeatId.startsWith('campfire_'));
+
+          // Check if sitting on any 2-person bench (4 Fountain Minimalist Benches or 2 Campfire Benches)
+          let twoPersonBenchLock: { screenX: number; screenY: number } | null = null;
+          if (isSittingNow && currentSeatId && !isOnSwing) {
+            for (const bGroup of ALL_TWO_PERSON_BENCHES) {
+              const matchedSlot = bGroup.seats.find((s) => s.id === currentSeatId);
+              if (matchedSlot) {
+                const bPt = toScreen(bGroup.wx, bGroup.wy, 0, camera.x, camera.y);
+                twoPersonBenchLock = {
+                  screenX: bPt.x + matchedSlot.screenOffsetX * z,
+                  screenY: bPt.y - 2.2 * z,
+                };
+                break;
+              }
+            }
+          }
+
+          if (twoPersonBenchLock) {
+            pt.x = twoPersonBenchLock.screenX;
+          }
 
           // Soft ground shadow (when on swing, shadow is already drawn under the swinging seat)
           if (!isOnSwing) {
@@ -4201,6 +5034,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.beginPath();
             ctx.ellipse(pt.x + 1, pt.y + 1, 8 * z, 4 * z, 0, 0, Math.PI * 2);
             ctx.fill();
+          }
+
+          // Warm orange firelight aura when warming body on a Campfire Bench
+          if (isCampfireSeat) {
+            ctx.save();
+            const warmPulse = (11 + Math.sin(elapsed * 5) * 1.5) * z;
+            const warmGrad = ctx.createRadialGradient(pt.x, pt.y - 8 * z, 2 * z, pt.x, pt.y - 8 * z, warmPulse * 1.4);
+            warmGrad.addColorStop(0, 'rgba(251, 146, 60, 0.32)');
+            warmGrad.addColorStop(1, 'rgba(251, 146, 60, 0)');
+            ctx.fillStyle = warmGrad;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 8 * z, warmPulse * 1.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
           }
 
           // Subtle live online aura ring under remote online Guru & Siswa avatars
@@ -4239,7 +5086,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
 
-          // Natural leg swing & gentle bobbing (or exact lock to swing seat plank when on swing!)
+          // Natural leg swing & gentle bobbing (or exact lock to swing seat plank / 2-seater bench slot!)
           const legSwing = (av.isMoving && !isSittingNow) ? Math.sin(av.walkFrame) * 3.5 * z : 0;
           let avY = pt.y + (isSittingNow ? -1.8 * z : (av.isMoving ? -Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0));
 
@@ -4247,6 +5094,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             // Lock avatar hip/seat center with 100% precision onto the wooden swing plank!
             pt.x = swingMetrics.seatX;
             avY = swingMetrics.seatY + 1.2 * z;
+          } else if (twoPersonBenchLock) {
+            pt.x = twoPersonBenchLock.screenX;
+            avY = twoPersonBenchLock.screenY;
           }
 
           // 1. LEGS & PANTS / SKIRT
@@ -5320,7 +6170,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                  {nearbyAction.benchId?.startsWith('swing') ? '🎠' : '🪑'}
+                  {nearbyAction.benchId?.startsWith('swing')
+                    ? '🎠'
+                    : nearbyAction.benchId?.startsWith('campfire')
+                    ? '🔥'
+                    : '🪑'}
                 </div>
                 <div className="min-w-0">
                   <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
@@ -5328,13 +6182,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   </div>
                   <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
                     {nearbyAction.benchId?.startsWith('swing')
-                      ? (isSittingRef.current ? 'Turun dari Ayunan' : 'Duduk & Berayun')
-                      : (isSittingRef.current ? 'Bangun dari Kursi' : 'Duduk Santai di Kursi')}
+                      ? (isSittingRef.current ? 'Turun dari Ayunan' : 'Naik & Berayun (-1 XP)')
+                      : nearbyAction.benchId?.startsWith('campfire')
+                      ? (isSittingRef.current ? 'Bangun dari Api Unggun' : 'Duduk Menghangatkan Tubuh')
+                      : (isSittingRef.current ? 'Bangun dari Bangku' : 'Duduk Santai (Muat 2 Orang)')}
                   </h4>
                   <p className="text-[10px] text-slate-300 truncate">
                     {nearbyAction.benchId?.startsWith('swing')
-                      ? 'Rasakan semilir angin sejuk di belakang Taman Refleksi'
-                      : 'Nikmati suasana tenang kota Refleksia'}
+                      ? 'Setiap warga yang naik ayunan membayar 1 XP'
+                      : nearbyAction.benchId?.startsWith('campfire')
+                      ? 'Hangatkan tubuh bersama warga di sudut api unggun'
+                      : 'Bangku minimalis air mancur muat untuk 2 orang'}
                   </p>
                 </div>
               </div>
@@ -5343,45 +6201,61 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   sounds.playClick();
                   if (isSittingRef.current) {
                     const wasSwing = sittingSeatRef.current?.startsWith('swing');
+                    const wasCampfire = sittingSeatRef.current?.startsWith('campfire');
                     setIsSitting(false);
                     setSittingSeat(null);
-                    setCafeToast(wasSwing ? '🚶 Turun dari ayunan Taman Refleksi.' : '🚶 Berdiri kembali dari kursi taman.');
+                    setCafeToast(
+                      wasSwing
+                        ? '🚶 Turun dari ayunan taman.'
+                        : wasCampfire
+                        ? '🚶 Berdiri dari bangku penghangat api unggun.'
+                        : '🚶 Berdiri kembali dari bangku taman.'
+                    );
                     setTimeout(() => setCafeToast(null), 2500);
                     sendHeartbeatRef.current?.();
                   } else {
-                    const seat = nearbyAction.benchId || 'fountain_1';
-                    setIsSitting(true);
-                    setSittingSeat(seat);
-                    if (playerRef.current) {
-                      const targetBench = FOUNTAIN_FRONT_BENCHES.find((b) => b.id === seat)
-                        || REFLECTION_SWINGS.find((s) => s.id === seat);
-                      if (targetBench) {
-                        playerRef.current.wx = targetBench.wx;
-                        playerRef.current.wy = targetBench.wy;
-                        playerRef.current.facing = targetBench.facing;
-                      } else if (seat === 'literacy') {
+                    const seat = nearbyAction.benchId || 'fountain_1_a';
+                    if (seat.startsWith('swing')) {
+                      const targetSwing = REFLECTION_SWINGS.find((s) => s.id === seat) || REFLECTION_SWINGS[0];
+                      rideSwingWithXp(targetSwing);
+                    } else {
+                      const matchedGroup = ALL_TWO_PERSON_BENCHES.find((g) =>
+                        g.seats.some((s) => s.id === seat)
+                      );
+                      if (matchedGroup) {
+                        const slotIdx: 0 | 1 = matchedGroup.seats[1].id === seat ? 1 : 0;
+                        sitOnTwoPersonBench(matchedGroup, slotIdx);
+                      } else if (seat === 'literacy' && playerRef.current) {
+                        setIsSitting(true);
+                        setSittingSeat('literacy');
                         playerRef.current.wx = -3.7;
                         playerRef.current.wy = 1.8;
                         playerRef.current.facing = 'down-right';
+                        playerRef.current.targetWx = playerRef.current.wx;
+                        playerRef.current.targetWy = playerRef.current.wy;
+                        playerRef.current.isMoving = false;
+                        playerRef.current.walkFrame = 0;
+                        sendHeartbeatRef.current?.();
+                        setCafeToast('🪑 Duduk santai di Bangku Taman Literasi.');
+                        setTimeout(() => setCafeToast(null), 2500);
                       }
-                      playerRef.current.targetWx = playerRef.current.wx;
-                      playerRef.current.targetWy = playerRef.current.wy;
-                      playerRef.current.isMoving = false;
-                      playerRef.current.walkFrame = 0;
-                      sendHeartbeatRef.current?.();
                     }
-                    const name = nearbyAction.benchName || 'Bangku Taman';
-                    setCafeToast(seat.startsWith('swing') ? `🎠 Duduk santai dan berayun di ${name}!` : `🪑 Duduk santai di ${name}.`);
-                    setTimeout(() => setCafeToast(null), 2500);
                   }
                 }}
                 className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
               >
                 <span>
                   {nearbyAction.benchId?.startsWith('swing')
-                    ? (isSittingRef.current ? '🚶 Turun' : '🎠 Berayun')
+                    ? (isSittingRef.current ? '🚶 Turun' : '🎠 Naik Ayunan')
+                    : nearbyAction.benchId?.startsWith('campfire')
+                    ? (isSittingRef.current ? '🚶 Berdiri' : '🔥 Hangatkan')
                     : (isSittingRef.current ? '🚶 Berdiri' : '🪑 Duduk')}
                 </span>
+                {nearbyAction.benchId?.startsWith('swing') && !isSittingRef.current && (
+                  <span className="text-[10px] font-mono text-amber-200 bg-amber-950/80 px-1 py-0.5 rounded border border-amber-400/30">
+                    -1 XP
+                  </span>
+                )}
               </button>
             </div>
           ) : (
