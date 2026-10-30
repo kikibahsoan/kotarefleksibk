@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BuildingId, PublicChatMessage } from '../types/index.ts';
 import { sounds } from '../utils/audio.ts';
+import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
 import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2 } from 'lucide-react';
 
 interface ThreeTownCanvasProps {
@@ -11,6 +12,7 @@ interface ThreeTownCanvasProps {
   studentGender?: string;
   isTeacher?: boolean;
   timeOfDay?: 'day' | 'night' | 'auto';
+  timePeriod?: TimePeriod;
   latestMessage?: PublicChatMessage | null;
   studentPoints?: number;
   onDeductPoints?: (amount: number, reason: string) => boolean;
@@ -231,6 +233,49 @@ function hashString(str: string): number {
   return hash;
 }
 
+export type BenchId =
+  | 'fountain_1'
+  | 'fountain_2'
+  | 'fountain_3'
+  | 'fountain_4'
+  | 'literacy'
+  | 'fountain_east'
+  | 'fountain_west'
+  | 'fountain_north'
+  | 'fountain_south'
+  | 'swing_left'
+  | 'swing_right';
+
+export const FOUNTAIN_FRONT_BENCHES: Array<{
+  id: BenchId;
+  name: string;
+  wx: number;
+  wy: number;
+  facing: 'down-left' | 'down-right' | 'up-left' | 'up-right';
+}> = [
+  { id: 'fountain_1', name: 'Bangku Depan 1 (Kiri)', wx: -1.25, wy: 0.65, facing: 'down-right' },
+  { id: 'fountain_2', name: 'Bangku Depan 2 (Tengah Kiri)', wx: -0.55, wy: 1.35, facing: 'up-right' },
+  { id: 'fountain_3', name: 'Bangku Depan 3 (Tengah Kanan)', wx: 0.55, wy: 1.35, facing: 'up-left' },
+  { id: 'fountain_4', name: 'Bangku Depan 4 (Kanan)', wx: 1.25, wy: 0.65, facing: 'down-left' },
+];
+
+export const REFLECTION_SWINGS: Array<{
+  id: BenchId;
+  name: string;
+  wx: number;
+  wy: number;
+  facing: 'down-left' | 'down-right' | 'up-left' | 'up-right';
+}> = [
+  { id: 'swing_left', name: 'Ayunan Kiri Taman Refleksi', wx: -2.90, wy: -3.95, facing: 'down-right' },
+  { id: 'swing_right', name: 'Ayunan Kanan Taman Refleksi', wx: -2.70, wy: -4.15, facing: 'down-right' },
+];
+
+export interface TreeWaterCycle {
+  count: number; // 0, 1, 2, or 3
+  lastWateredTime: number; // performance.now()
+  appleStartTime: number | null; // performance.now() when 3rd watering triggers 15s apples
+}
+
 export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTownCanvas({
   onSelectBuilding,
   activeBuilding,
@@ -239,6 +284,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   studentGender = 'L',
   isTeacher = false,
   timeOfDay = 'night',
+  timePeriod,
   latestMessage,
   studentPoints = 100,
   onDeductPoints,
@@ -265,17 +311,27 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const heldItemRef = useRef<'kopi' | 'roti' | 'eskrim' | null>(null);
   heldItemRef.current = heldItem;
 
-  // Watered trees state (index -> timestamp)
-  const [wateredTrees, setWateredTrees] = useState<Record<number, number>>({});
-  const wateredTreesRef = useRef<Record<number, number>>({});
-  wateredTreesRef.current = wateredTrees;
+  // Tree 3-step watering & 15-second apple fruiting cycle state (treeIndex -> TreeWaterCycle)
+  const [treeCycles, setTreeCycles] = useState<Record<number, TreeWaterCycle>>({});
+  const treeCyclesRef = useRef<Record<number, TreeWaterCycle>>({});
+  treeCyclesRef.current = treeCycles;
 
-  // Sitting state on fountain benches or literacy corner
+  // Active minimalist water spray effect from avatar to tree { treeIndex, startTime, avatarWx, avatarWy, treeWx, treeWy }
+  const activeWaterSprayRef = useRef<{
+    treeIndex: number;
+    startTime: number;
+    avatarWx: number;
+    avatarWy: number;
+    treeWx: number;
+    treeWy: number;
+  } | null>(null);
+
+  // Sitting state on 4 front fountain benches, dual swings, or literacy corner
   const [isSitting, setIsSitting] = useState(false);
   const isSittingRef = useRef(false);
   isSittingRef.current = isSitting;
-  const [sittingSeat, setSittingSeat] = useState<'fountain_east' | 'fountain_west' | 'literacy' | null>(null);
-  const sittingSeatRef = useRef<'fountain_east' | 'fountain_west' | 'literacy' | null>(null);
+  const [sittingSeat, setSittingSeat] = useState<BenchId | null>(null);
+  const sittingSeatRef = useRef<BenchId | null>(null);
   sittingSeatRef.current = sittingSeat;
 
   // Literacy corner reading modal
@@ -286,13 +342,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [nearbyAction, setNearbyAction] = useState<{
     type: 'tree' | 'fishing' | 'literacy' | 'bench';
     treeIndex?: number;
-    benchId?: 'fountain_east' | 'fountain_west' | 'literacy';
+    benchId?: BenchId;
     benchName?: string;
   } | null>(null);
   const nearbyActionRef = useRef<{
     type: 'tree' | 'fishing' | 'literacy' | 'bench';
     treeIndex?: number;
-    benchId?: 'fountain_east' | 'fountain_west' | 'literacy';
+    benchId?: BenchId;
     benchName?: string;
   } | null>(null);
   nearbyActionRef.current = nearbyAction;
@@ -317,6 +373,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
   // Player avatar object reference for direct snapping/controls
   const playerRef = useRef<AvatarData | null>(null);
+  const lastMoveBroadcastTimeRef = useRef<number>(0);
 
   // Remote online players from other devices
   const remotePlayersRef = useRef<Map<string, AvatarData>>(new Map());
@@ -328,6 +385,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   onSelectBuildingRef.current = onSelectBuilding;
   const timeOfDayRef = useRef(timeOfDay);
   timeOfDayRef.current = timeOfDay;
+  const timePeriodRef = useRef<TimePeriod>(timePeriod || getTimePeriodWita());
+  timePeriodRef.current = timePeriod || getTimePeriodWita();
 
   // React to incoming public chat messages
   useEffect(() => {
@@ -359,7 +418,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
   // -----------------------------------------------------------
   // REAL-TIME MULTI-DEVICE PRESENCE SYNCHRONIZATION
-  // Other devices online spawn at the 4 corners of the map and disappear when offline
+  // Instant SSE + Heartbeat + Polling so online citizens from any device are read and their movements are visible
   // -----------------------------------------------------------
   useEffect(() => {
     let isMounted = true;
@@ -381,38 +440,39 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     const mySessionId = `${isTeacher ? 'guru' : 'siswa'}_${studentName.replace(/\s+/g, '_').toLowerCase()}_${clientDeviceId}`;
 
-    const handleIncomingOthers = (others: any[]) => {
-      if (!isMounted) return;
+    const handleIncomingOthers = (others: any[], isFullList = false) => {
+      if (!isMounted || !Array.isArray(others)) return;
       const activeIds = new Set<string>();
 
       others.forEach((rem: any) => {
         if (!rem || !rem.id || rem.id === mySessionId) return;
         activeIds.add(rem.id);
 
+        const incomingWx = typeof rem.wx === 'number' && !isNaN(rem.wx) ? rem.wx : 1.5;
+        const incomingWy = typeof rem.wy === 'number' && !isNaN(rem.wy) ? rem.wy : 1.8;
+        const incomingTargetWx = typeof rem.targetWx === 'number' && !isNaN(rem.targetWx) ? rem.targetWx : incomingWx;
+        const incomingTargetWy = typeof rem.targetWy === 'number' && !isNaN(rem.targetWy) ? rem.targetWy : incomingWy;
+
         let existing = remotePlayersRef.current.get(rem.id);
         if (!existing) {
-          // When a remote player comes online, spawn them at one of the 4 outer corners of the map!
-          const cornerIdx = Math.abs(hashString(rem.id)) % 4;
-          const [cornerWx, cornerWy] = MAP_CORNERS[cornerIdx];
-
           existing = {
             id: rem.id,
             role: rem.role || 'siswa',
             handle: rem.handle || 'warga',
             name: rem.name || rem.handle,
             roleLabel: rem.roleLabel || (rem.role === 'guru' ? 'GURU DKV' : 'Warga'),
-            wx: cornerWx,
-            wy: cornerWy,
-            targetWx: typeof rem.targetWx === 'number' ? rem.targetWx : (typeof rem.wx === 'number' ? rem.wx : cornerWx),
-            targetWy: typeof rem.targetWy === 'number' ? rem.targetWy : (typeof rem.wy === 'number' ? rem.wy : cornerWy),
-            speed: rem.speed || 1.35,
+            wx: incomingWx,
+            wy: incomingWy,
+            targetWx: incomingTargetWx,
+            targetWy: incomingTargetWy,
+            speed: typeof rem.speed === 'number' && rem.speed > 0 ? rem.speed : 1.35,
             shirtColor: rem.shirtColor || (rem.gender === 'P' ? '#ec4899' : '#2563eb'),
             pantsColor: rem.pantsColor || (rem.gender === 'P' ? '#be185d' : '#1e293b'),
             hairColor: rem.hairColor || '#0f172a',
             gender: rem.gender || 'L',
             isMoving: Boolean(rem.isMoving),
             pauseTimer: 0,
-            walkFrame: 0,
+            walkFrame: typeof rem.walkFrame === 'number' ? rem.walkFrame : 0,
             facing: rem.facing || 'down-left',
             isSitting: Boolean(rem.isSitting),
             sittingSeat: rem.sittingSeat,
@@ -426,22 +486,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           };
           remotePlayersRef.current.set(rem.id, existing);
         } else {
-          // Update remote position and smooth target movement
-          const newTargetWx = typeof rem.targetWx === 'number' ? rem.targetWx : (typeof rem.wx === 'number' ? rem.wx : existing.targetWx);
-          const newTargetWy = typeof rem.targetWy === 'number' ? rem.targetWy : (typeof rem.wy === 'number' ? rem.wy : existing.targetWy);
-          existing.targetWx = newTargetWx;
-          existing.targetWy = newTargetWy;
-          existing.speed = rem.speed || existing.speed;
+          // If the remote player is actively moving toward targetWx/targetWy, set target to their destination;
+          // if they stopped or are mid-step, guide them smoothly through their reported wx/wy to targetWx/targetWy
+          existing.targetWx = rem.isMoving ? incomingTargetWx : incomingWx;
+          existing.targetWy = rem.isMoving ? incomingTargetWy : incomingWy;
+          existing.speed = typeof rem.speed === 'number' && rem.speed > 0 ? rem.speed : 1.35;
 
-          // If remote player is far from target (> 4.5 tiles), snap wx/wy so they catch up properly
-          const distFromCurrent = Math.hypot(existing.wx - (typeof rem.wx === 'number' ? rem.wx : newTargetWx), existing.wy - (typeof rem.wy === 'number' ? rem.wy : newTargetWy));
-          if (distFromCurrent > 4.5) {
-            existing.wx = typeof rem.wx === 'number' ? rem.wx : newTargetWx;
-            existing.wy = typeof rem.wy === 'number' ? rem.wy : newTargetWy;
+          const distFromActual = Math.hypot(existing.wx - incomingWx, existing.wy - incomingWy);
+          if (Boolean(rem.isSitting)) {
+            // Snap immediately to bench/swing seat when sitting
+            existing.wx = incomingWx;
+            existing.wy = incomingWy;
+            existing.targetWx = incomingWx;
+            existing.targetWy = incomingWy;
+          } else if (distFromActual > 2.2) {
+            // Catch up if drifted more than 2.2 tiles from actual device position
+            existing.wx = incomingWx;
+            existing.wy = incomingWy;
+          } else if (!rem.isMoving && distFromActual > 0.04) {
+            // Walk the remaining sub-tile delta smoothly to exact stopped position
+            existing.targetWx = incomingWx;
+            existing.targetWy = incomingWy;
           }
 
+          existing.isMoving = Boolean(rem.isMoving) || distFromActual > 0.08;
           existing.isSitting = Boolean(rem.isSitting);
           existing.sittingSeat = rem.sittingSeat;
+          if (rem.facing) existing.facing = rem.facing;
           existing.isFishing = Boolean(rem.isFishing);
           existing.heldItem = rem.heldItem || null;
           existing.role = rem.role || existing.role;
@@ -457,10 +528,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       });
 
-      // When players go offline, remove them so they disappear from the map!
-      for (const [id] of remotePlayersRef.current.entries()) {
-        if (!activeIds.has(id)) {
-          remotePlayersRef.current.delete(id);
+      // Remove disconnected players when receiving full list from server
+      if (isFullList) {
+        for (const [id] of remotePlayersRef.current.entries()) {
+          if (!activeIds.has(id)) {
+            remotePlayersRef.current.delete(id);
+          }
+        }
+      } else {
+        const now = Date.now();
+        for (const [id, pl] of remotePlayersRef.current.entries()) {
+          if (pl.lastPing && now - pl.lastPing > 12000) {
+            remotePlayersRef.current.delete(id);
+          }
         }
       }
 
@@ -496,7 +576,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         speechTimer: playerSpeechRef.current ? Math.max(0, (playerSpeechRef.current.expiresAt - Date.now()) / 1000) : 0,
       };
 
-      // 1. BroadcastChannel for local instant reaction across browser windows
+      // 1. BroadcastChannel for local instant reaction across browser tabs
       if (presenceChannel) {
         try {
           presenceChannel.postMessage({ type: 'presence_update', player: payload });
@@ -513,7 +593,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (res.ok && isMounted) {
           const json = await res.json();
           if (json.success && Array.isArray(json.onlinePlayers)) {
-            handleIncomingOthers(json.onlinePlayers);
+            handleIncomingOthers(json.onlinePlayers, true);
           }
         }
       } catch (err) {
@@ -524,21 +604,78 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     // Store instant trigger in ref so movements can be immediately synced
     sendHeartbeatRef.current = sendHeartbeat;
 
+    // Real-time Server-Sent Events (SSE) Stream with auto-reconnect
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: number | null = null;
+
+    const connectSSE = () => {
+      if (!isMounted) return;
+      try {
+        if (eventSource) eventSource.close();
+        eventSource = new EventSource('/api/presence/stream');
+        eventSource.onmessage = (event) => {
+          if (!isMounted) return;
+          try {
+            const data = JSON.parse(event.data);
+            if ((data.type === 'sync' || data.type === 'init') && Array.isArray(data.onlinePlayers || data.players)) {
+              handleIncomingOthers(data.onlinePlayers || data.players, true);
+            } else if ((data.type === 'player_update' || data.type === 'update')) {
+              if (Array.isArray(data.onlinePlayers)) {
+                handleIncomingOthers(data.onlinePlayers, true);
+              } else if (data.player) {
+                handleIncomingOthers([data.player], false);
+              }
+            } else if (data.type === 'leave') {
+              const leftId = data.leftId || data.id;
+              if (leftId) {
+                remotePlayersRef.current.delete(leftId);
+              }
+              if (Array.isArray(data.onlinePlayers)) {
+                handleIncomingOthers(data.onlinePlayers, true);
+              } else {
+                setOnlineCount(remotePlayersRef.current.size + 1);
+              }
+            }
+          } catch (err) {}
+        };
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          if (isMounted && !reconnectTimer) {
+            reconnectTimer = window.setTimeout(() => {
+              reconnectTimer = null;
+              connectSSE();
+            }, 2500);
+          }
+        };
+      } catch (e) {}
+    };
+    connectSSE();
+
     if (presenceChannel) {
       presenceChannel.onmessage = (event) => {
         if (event.data?.type === 'presence_update' && event.data.player) {
-          handleIncomingOthers([event.data.player]);
+          handleIncomingOthers([event.data.player], false);
+        } else if (event.data?.type === 'presence_leave' && event.data.id) {
+          remotePlayersRef.current.delete(event.data.id);
+          setOnlineCount(remotePlayersRef.current.size + 1);
         }
       };
     }
 
-    const interval = setInterval(sendHeartbeat, 1000);
+    const interval = setInterval(sendHeartbeat, 750);
     sendHeartbeat();
 
     const onUnload = () => {
       sendHeartbeatRef.current = null;
       try {
-        navigator.sendBeacon('/api/presence/leave', JSON.stringify({ id: mySessionId }));
+        if (presenceChannel) {
+          presenceChannel.postMessage({ type: 'presence_leave', id: mySessionId });
+        }
+        const blob = new Blob([JSON.stringify({ id: mySessionId })], { type: 'application/json' });
+        navigator.sendBeacon('/api/presence/leave', blob);
       } catch (e) {}
     };
     window.addEventListener('beforeunload', onUnload);
@@ -547,6 +684,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       isMounted = false;
       sendHeartbeatRef.current = null;
       clearInterval(interval);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (eventSource) eventSource.close();
       if (presenceChannel) presenceChannel.close();
       window.removeEventListener('beforeunload', onUnload);
       onUnload();
@@ -985,42 +1124,62 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 4. Check Click on Benches
-      const eastBenchDist = Math.hypot(wx - 1.25, wy - 0.0);
-      const westBenchDist = Math.hypot(wx - (-1.25), wy - 0.0);
+      // 4. Check Click on Benches (4 Front Fountain Benches + 1 Literacy Bench)
+      const sitAtBench = (
+        seatId: BenchId,
+        targetX: number,
+        targetY: number,
+        facingDir: 'down-left' | 'down-right' | 'up-left' | 'up-right',
+        name: string
+      ) => {
+        sounds.playClick();
+        player.targetWx = targetX;
+        player.targetWy = targetY;
+        player.wx = targetX;
+        player.wy = targetY;
+        player.isMoving = false;
+        player.walkFrame = 0;
+        player.facing = facingDir;
+        setIsSitting(true);
+        setSittingSeat(seatId);
+        clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now() };
+        setCafeToast(`🪑 Duduk santai di ${name}.`);
+        setTimeout(() => setCafeToast(null), 2500);
+        sendHeartbeatRef.current?.();
+      };
+
+      for (const bench of FOUNTAIN_FRONT_BENCHES) {
+        const benchDist = Math.hypot(wx - bench.wx, wy - bench.wy);
+        if (benchDist < 1.05) {
+          sitAtBench(bench.id, bench.wx, bench.wy, bench.facing, bench.name);
+          return;
+        }
+      }
+
+      for (const swing of REFLECTION_SWINGS) {
+        const swingDist = Math.hypot(wx - swing.wx, wy - swing.wy);
+        if (swingDist < 0.95) {
+          sounds.playClick();
+          player.targetWx = swing.wx;
+          player.targetWy = swing.wy;
+          player.wx = swing.wx;
+          player.wy = swing.wy;
+          player.isMoving = false;
+          player.walkFrame = 0;
+          player.facing = swing.facing;
+          setIsSitting(true);
+          setSittingSeat(swing.id);
+          clickRippleRef.current = { wx: swing.wx, wy: swing.wy, time: performance.now() };
+          setCafeToast(`🎠 Duduk santai dan berayun di ${swing.name}!`);
+          setTimeout(() => setCafeToast(null), 2500);
+          sendHeartbeatRef.current?.();
+          return;
+        }
+      }
+
       const litBenchDist = Math.hypot(wx - (-3.7), wy - 1.8);
-      if (eastBenchDist < 1.0) {
-        sounds.playClick();
-        player.targetWx = 1.25;
-        player.targetWy = 0.0;
-        player.isMoving = true;
-        clickRippleRef.current = { wx: 1.25, wy: 0.0, time: performance.now() };
-        setIsSitting(true);
-        setSittingSeat('fountain_east');
-        setCafeToast('🪑 Duduk santai di kursi air mancur timur.');
-        setTimeout(() => setCafeToast(null), 2500);
-        return;
-      } else if (westBenchDist < 1.0) {
-        sounds.playClick();
-        player.targetWx = -1.25;
-        player.targetWy = 0.0;
-        player.isMoving = true;
-        clickRippleRef.current = { wx: -1.25, wy: 0.0, time: performance.now() };
-        setIsSitting(true);
-        setSittingSeat('fountain_west');
-        setCafeToast('🪑 Duduk santai di kursi air mancur barat.');
-        setTimeout(() => setCafeToast(null), 2500);
-        return;
-      } else if (litBenchDist < 1.0) {
-        sounds.playClick();
-        player.targetWx = -3.7;
-        player.targetWy = 1.8;
-        player.isMoving = true;
-        clickRippleRef.current = { wx: -3.7, wy: 1.8, time: performance.now() };
-        setIsSitting(true);
-        setSittingSeat('literacy');
-        setCafeToast('🪑 Duduk santai di bangku sudut literasi.');
-        setTimeout(() => setCafeToast(null), 2500);
+      if (litBenchDist < 1.05) {
+        sitAtBench('literacy', -3.7, 1.8, 'down-right', 'Bangku Sudut Literasi');
         return;
       }
 
@@ -1103,9 +1262,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         Math.hypot(wx - cafeWx, wy - cafeWy) < 2.0 ||
         Math.hypot(wx - 4.6, wy - (-2.2)) < 2.2 ||
         Math.hypot(wx - (-4.3), wy - 1.8) < 2.0 ||
-        Math.hypot(wx - 1.25, wy - 0.0) < 1.0 ||
-        Math.hypot(wx - (-1.25), wy - 0.0) < 1.0 ||
-        Math.hypot(wx - (-3.7), wy - 1.8) < 1.0
+        Math.hypot(wx - 1.45, wy - 0.0) < 1.05 ||
+        Math.hypot(wx - (-1.45), wy - 0.0) < 1.05 ||
+        Math.hypot(wx - 0.0, wy - (-1.45)) < 1.05 ||
+        Math.hypot(wx - 0.0, wy - 1.45) < 1.05 ||
+        Math.hypot(wx - (-3.7), wy - 1.8) < 1.05 ||
+        Math.hypot(wx - (-2.8), wy - (-4.05)) < 1.15
       ) {
         canvas.style.cursor = 'pointer';
         hoveredBuildingRef = null;
@@ -1153,10 +1315,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       lastTime = currentTime;
       const elapsed = currentTime / 1000;
       beaconBlink += delta * 4;
-
-      const isNight =
-        timeOfDayRef.current === 'night' ||
-        (timeOfDayRef.current === 'auto' && (new Date().getHours() >= 18 || new Date().getHours() < 6));
 
       const currentTileW = BASE_TILE_W * zoomLevelRef.current;
       const currentTileH = BASE_TILE_H * zoomLevelRef.current;
@@ -1285,15 +1443,39 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         } else {
           player.isMoving = false;
           player.walkFrame = 0;
+          sendHeartbeatRef.current?.();
+        }
+
+        // Live broadcast position while walking every 120ms so other devices see movement in real-time
+        if (currentTime - lastMoveBroadcastTimeRef.current > 120) {
+          lastMoveBroadcastTimeRef.current = currentTime;
+          sendHeartbeatRef.current?.();
         }
       }
 
-      // Proximity checks: East Fishing Dock & Kolam [4.6, -2.2], West Literacy Corner [-4.3, 1.8], Bench [-3.7, 1.8]
+      // Proximity checks: East Fishing Dock & Kolam [4.6, -2.2], West Literacy Corner [-4.3, 1.8], 4 Front Fountain Benches, 2 Swings + Literacy Bench
       const fishDist = Math.hypot(player.wx - 4.6, player.wy - (-2.2));
       const litDist = Math.hypot(player.wx - (-4.3), player.wy - 1.8);
       const litBenchDist = Math.hypot(player.wx - (-3.7), player.wy - 1.8);
-      const eastBenchDist = Math.hypot(player.wx - 1.25, player.wy - 0.0);
-      const westBenchDist = Math.hypot(player.wx - (-1.25), player.wy - 0.0);
+
+      let nearBench: { id: BenchId; name: string } | null = null;
+      for (const b of FOUNTAIN_FRONT_BENCHES) {
+        if (Math.hypot(player.wx - b.wx, player.wy - b.wy) < 0.95) {
+          nearBench = { id: b.id, name: b.name };
+          break;
+        }
+      }
+      if (!nearBench) {
+        for (const s of REFLECTION_SWINGS) {
+          if (Math.hypot(player.wx - s.wx, player.wy - s.wy) < 1.05) {
+            nearBench = { id: s.id, name: s.name };
+            break;
+          }
+        }
+      }
+      if (!nearBench && litBenchDist < 0.95) {
+        nearBench = { id: 'literacy', name: 'Bangku Sudut Literasi' };
+      }
 
       let nearTreeIdx = -1;
       for (let tIdx = 0; tIdx < trees.length; tIdx++) {
@@ -1307,19 +1489,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       if (isSittingRef.current) {
         if (nearbyActionRef.current?.type !== 'bench') {
-          setNearbyAction({ type: 'bench', benchName: 'Kursi Taman' });
+          const currentSeat = sittingSeatRef.current;
+          let seatName = 'Kursi Taman Depan';
+          const match = FOUNTAIN_FRONT_BENCHES.find((b) => b.id === currentSeat)
+            || REFLECTION_SWINGS.find((s) => s.id === currentSeat);
+          if (match) seatName = match.name;
+          else if (currentSeat === 'literacy') seatName = 'Bangku Sudut Literasi';
+          setNearbyAction({ type: 'bench', benchId: currentSeat || undefined, benchName: seatName });
         }
-      } else if (eastBenchDist < 0.85) {
-        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'fountain_east') {
-          setNearbyAction({ type: 'bench', benchId: 'fountain_east', benchName: 'Kursi Timur Air Mancur' });
-        }
-      } else if (westBenchDist < 0.85) {
-        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'fountain_west') {
-          setNearbyAction({ type: 'bench', benchId: 'fountain_west', benchName: 'Kursi Barat Air Mancur' });
-        }
-      } else if (litBenchDist < 0.85) {
-        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== 'literacy') {
-          setNearbyAction({ type: 'bench', benchId: 'literacy', benchName: 'Kursi Sudut Literasi' });
+      } else if (nearBench) {
+        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== nearBench.id) {
+          setNearbyAction({ type: 'bench', benchId: nearBench.id, benchName: nearBench.name });
         }
       } else if (litDist < 1.05) {
         if (nearbyActionRef.current?.type !== 'literacy') {
@@ -1399,81 +1579,220 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (rem.speechTimer <= 0) rem.speechText = undefined;
         }
 
+        if (rem.isSitting) {
+          rem.isMoving = false;
+          rem.walkFrame = 0;
+          return;
+        }
+
         const rdx = rem.targetWx - rem.wx;
         const rdy = rem.targetWy - rem.wy;
         const rdist = Math.hypot(rdx, rdy);
 
-        if (rdist > 0.08) {
-          const rstep = Math.min(rdist, (rem.speed || 1.35) * delta);
+        if (rdist > 0.04) {
+          // Smooth catch-up speed if slightly behind, otherwise natural walking speed
+          const catchupMultiplier = rdist > 1.0 ? 1.35 : 1.0;
+          const rstep = Math.min(rdist, (rem.speed || 1.35) * catchupMultiplier * delta);
           rem.wx += (rdx / rdist) * rstep;
           rem.wy += (rdy / rdist) * rstep;
           rem.isMoving = true;
-          rem.walkFrame += delta * 10;
-          if (rdx >= 0) rem.facing = 'down-right';
-          else rem.facing = 'down-left';
+          rem.walkFrame += delta * 8.5;
+          if (rdx >= 0 && rdy >= 0) rem.facing = 'down-right';
+          else if (rdx < 0 && rdy >= 0) rem.facing = 'down-left';
+          else if (rdx >= 0 && rdy < 0) rem.facing = 'up-right';
+          else rem.facing = 'up-left';
         } else {
+          rem.wx = rem.targetWx;
+          rem.wy = rem.targetWy;
           rem.isMoving = false;
           rem.walkFrame = 0;
         }
       });
 
       // ---------------------------------------------------------
-      // 1. SKY BACKGROUND (Matching Screenshot Colors)
+      // 1. SKY BACKGROUND & ATMOSPHERE (5 Periods: Subuh, Pagi, Siang, Sore, Malam)
       // ---------------------------------------------------------
       ctx.clearRect(0, 0, width, height);
 
-      if (!isNight) {
-        // DAYTIME: Clean sky blue `#7ec8f8`
-        ctx.fillStyle = '#87ceeb';
+      const currentPeriod: TimePeriod = timePeriodRef.current || 'siang';
+      const isNight = currentPeriod === 'malam' || currentPeriod === 'subuh';
+
+      // Atmosphere ground & pathway colors for 5 times of day
+      let grassColor = '#4a7c52';
+      let grassBorder = '#3d6944';
+      let pathColor = '#fcfaf2';
+      let pathBorder = '#e5dfd0';
+
+      if (currentPeriod === 'subuh') {
+        // SUBUH (04:30 - 06:00 WITA) - Soft twilight violet to rosy dawn horizon gradient
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+        skyGrad.addColorStop(0, '#1e1b4b');
+        skyGrad.addColorStop(0.4, '#3730a3');
+        skyGrad.addColorStop(0.75, '#86198f');
+        skyGrad.addColorStop(1, '#f472b6');
+        ctx.fillStyle = skyGrad;
         ctx.fillRect(0, 0, width, height);
 
-        // Fluffy pill cumulus clouds
+        // Faint morning stars fading away
+        stars.slice(0, 24).forEach((star) => {
+          ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha * 0.4})`;
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, star.size * 0.8, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // Soft rosy dawn sun rising near eastern horizon
+        const sunX = width - 85;
+        const sunY = height * 0.45;
+        const dawnGlow = ctx.createRadialGradient(sunX, sunY, 5, sunX, sunY, 70);
+        dawnGlow.addColorStop(0, 'rgba(254, 240, 138, 0.9)');
+        dawnGlow.addColorStop(0.35, 'rgba(244, 114, 182, 0.55)');
+        dawnGlow.addColorStop(1, 'rgba(244, 114, 182, 0)');
+        ctx.fillStyle = dawnGlow;
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 70, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        grassColor = '#134e4a';
+        grassBorder = '#0f3a37';
+        pathColor = '#475569';
+        pathBorder = '#334155';
+      } else if (currentPeriod === 'pagi') {
+        // PAGI (06:00 - 11:00 WITA) - Fresh cheerful sky blue gradient
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+        skyGrad.addColorStop(0, '#38bdf8');
+        skyGrad.addColorStop(1, '#bae6fd');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Fluffy pill clouds drifting
         clouds.forEach((cloud) => {
           cloud.x += cloud.speed * delta;
           if (cloud.x > width + 100) cloud.x = -150;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.beginPath();
+          ctx.roundRect(cloud.x, cloud.y, cloud.w, cloud.h, cloud.h / 2);
+          ctx.fill();
+        });
 
+        // Rising golden morning sun
+        const sunX = width - 90;
+        const sunY = 75;
+        const sunRadius = 26;
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fde047';
+        for (let r = 0; r < 10; r++) {
+          const angle = (r / 10) * Math.PI * 2 + elapsed * 0.1;
+          const rInner = sunRadius + 4;
+          const rOuter = sunRadius + 16;
+          ctx.beginPath();
+          ctx.moveTo(sunX + Math.cos(angle - 0.12) * rInner, sunY + Math.sin(angle - 0.12) * rInner);
+          ctx.lineTo(sunX + Math.cos(angle) * rOuter, sunY + Math.sin(angle) * rOuter);
+          ctx.lineTo(sunX + Math.cos(angle + 0.12) * rInner, sunY + Math.sin(angle + 0.12) * rInner);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        grassColor = '#22c55e';
+        grassBorder = '#16a34a';
+        pathColor = '#fcfaf2';
+        pathBorder = '#e2e8f0';
+      } else if (currentPeriod === 'siang') {
+        // SIANG (11:00 - 15:00 WITA) - Brilliant daylight azure gradient
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+        skyGrad.addColorStop(0, '#0284c7');
+        skyGrad.addColorStop(1, '#7dd3fc');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Clouds
+        clouds.forEach((cloud) => {
+          cloud.x += cloud.speed * delta;
+          if (cloud.x > width + 100) cloud.x = -150;
           ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
           ctx.beginPath();
           ctx.roundRect(cloud.x, cloud.y, cloud.w, cloud.h, cloud.h / 2);
           ctx.fill();
         });
 
-        // Cartoon Sun in Top-Right with Triangular Rays (Exact Match)
-        const sunX = width - 90;
-        const sunY = 75;
-        const sunRadius = 26;
+        // High brilliant sun with lens flare halo
+        const sunX = width / 2;
+        const sunY = 48;
+        const sunRadius = 24;
+        const middayGlow = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 80);
+        middayGlow.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+        middayGlow.addColorStop(0.3, 'rgba(254, 240, 138, 0.4)');
+        middayGlow.addColorStop(1, 'rgba(254, 240, 138, 0)');
+        ctx.fillStyle = middayGlow;
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 80, 0, Math.PI * 2);
+        ctx.fill();
 
-        ctx.fillStyle = '#facc15';
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        // 10 Triangular Radiating Sun Rays
-        ctx.fillStyle = '#fde047';
-        for (let r = 0; r < 10; r++) {
-          const angle = (r / 10) * Math.PI * 2 + elapsed * 0.1;
-          const rInner = sunRadius + 4;
-          const rOuter = sunRadius + 16;
-          const p1x = sunX + Math.cos(angle - 0.12) * rInner;
-          const p1y = sunY + Math.sin(angle - 0.12) * rInner;
-          const p2x = sunX + Math.cos(angle) * rOuter;
-          const p2y = sunY + Math.sin(angle) * rOuter;
-          const p3x = sunX + Math.cos(angle + 0.12) * rInner;
-          const p3y = sunY + Math.sin(angle + 0.12) * rInner;
+        grassColor = '#16a34a';
+        grassBorder = '#15803d';
+        pathColor = '#f8fafc';
+        pathBorder = '#cbd5e1';
+      } else if (currentPeriod === 'sore') {
+        // SORE (15:00 - 18:30 WITA) - Dramatic golden hour amber & crimson gradient
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+        skyGrad.addColorStop(0, '#4c1d95');
+        skyGrad.addColorStop(0.35, '#c2410c');
+        skyGrad.addColorStop(0.7, '#ea580c');
+        skyGrad.addColorStop(1, '#fde047');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, width, height);
 
+        // Sunset tinted clouds
+        clouds.forEach((cloud) => {
+          cloud.x += cloud.speed * delta;
+          if (cloud.x > width + 100) cloud.x = -150;
+          ctx.fillStyle = 'rgba(253, 164, 175, 0.75)';
           ctx.beginPath();
-          ctx.moveTo(p1x, p1y);
-          ctx.lineTo(p2x, p2y);
-          ctx.lineTo(p3x, p3y);
-          ctx.closePath();
+          ctx.roundRect(cloud.x, cloud.y, cloud.w, cloud.h, cloud.h / 2);
           ctx.fill();
-        }
+        });
+
+        // Warm setting sun sinking low in west
+        const sunX = 90;
+        const sunY = height * 0.42;
+        const sunsetGlow = ctx.createRadialGradient(sunX, sunY, 5, sunX, sunY, 75);
+        sunsetGlow.addColorStop(0, 'rgba(254, 240, 138, 0.95)');
+        sunsetGlow.addColorStop(0.4, 'rgba(249, 115, 22, 0.6)');
+        sunsetGlow.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        ctx.fillStyle = sunsetGlow;
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 75, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, 22, 0, Math.PI * 2);
+        ctx.fill();
+
+        grassColor = '#4d7c0f';
+        grassBorder = '#3f6212';
+        pathColor = '#fed7aa';
+        pathBorder = '#fdba74';
       } else {
-        // NIGHTTIME: Solid pitch dark space `#0b101b`
+        // MALAM (18:30 - 04:30 WITA) - Deep cosmic dark space
         ctx.fillStyle = '#0b101b';
         ctx.fillRect(0, 0, width, height);
 
-        // Diagonal constellation star trail (Exact Match to Screenshot 2)
+        // Constellation star trail
         stars.forEach((star) => {
           ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
           ctx.beginPath();
@@ -1481,11 +1800,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fill();
         });
 
-        // Bright Crescent Moon in Top-Right
+        // Glowing crescent moon
         const moonX = width - 85;
         const moonY = 65;
         const moonR = 24;
-
         ctx.fillStyle = '#fef08a';
         ctx.beginPath();
         ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
@@ -1495,6 +1813,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         ctx.beginPath();
         ctx.arc(moonX + 8, moonY - 3, moonR * 0.9, 0, Math.PI * 2);
         ctx.fill();
+
+        grassColor = '#0f291e';
+        grassBorder = '#0a1c15';
+        pathColor = '#1e293b';
+        pathBorder = '#334155';
       }
 
       // ---------------------------------------------------------
@@ -1502,11 +1825,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // (15x15 Grid, Green Lawn & Cream Paved Pathways)
       // ---------------------------------------------------------
       const GRID_RADIUS = 7; // -7 to +7 tiles (15x15 = 225 isometric tiles)
-
-      const grassColor = isNight ? '#163323' : '#4a7c52';
-      const grassBorder = isNight ? '#0f241a' : '#3d6944';
-      const pathColor = isNight ? '#334155' : '#fcfaf2';
-      const pathBorder = isNight ? '#475569' : '#e5dfd0';
 
       // Helper to check if tile (gx, gy) is a paved walkway across 15x15 island
       const isPathway = (gx: number, gy: number) => {
@@ -1525,6 +1843,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (gx >= 3 && gx <= 5 && gy === -2) return true;
         // Walkway spur to West Sudut Literasi at [-4.3, 1.8]
         if (gx <= -3 && gx >= -5 && gy === 2) return true;
+        // Garden path to Swings behind Taman Refleksi at [-3, -4]
+        if ((gx === -3 || gx === -2) && gy === -4) return true;
         return false;
       };
 
@@ -1678,7 +1998,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'lamp'; wx: number; wy: number; depth: number }
         | { type: 'fishing_spot'; wx: number; wy: number; depth: number }
         | { type: 'literacy_corner'; wx: number; wy: number; depth: number }
-        | { type: 'bench'; wx: number; wy: number; depth: number; id: 'fountain_east' | 'fountain_west' | 'literacy' };
+        | { type: 'bench'; wx: number; wy: number; depth: number; id: BenchId }
+        | { type: 'swings_structure'; wx: number; wy: number; depth: number };
 
       const drawItems: DrawItem[] = [];
 
@@ -1689,7 +2010,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       drawItems.push({ type: 'cafe', depth: cafeWx + cafeWy });
 
-      drawItems.push({ type: 'avatar', data: player, isPlayer: true, depth: player.wx + player.wy });
+      const playerOnSwing = Boolean(
+        isSittingRef.current && (sittingSeatRef.current === 'swing_left' || sittingSeatRef.current === 'swing_right')
+      );
+      drawItems.push({
+        type: 'avatar',
+        data: player,
+        isPlayer: true,
+        depth: playerOnSwing ? (-2.8 + -4.05) + 0.02 : player.wx + player.wy,
+      });
 
       npcs.forEach((npc) => {
         drawItems.push({ type: 'avatar', data: npc, isPlayer: false, depth: npc.wx + npc.wy });
@@ -1697,7 +2026,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       // Real-time Online Avatars from other devices
       remotePlayersRef.current.forEach((remotePlayer) => {
-        drawItems.push({ type: 'avatar', data: remotePlayer, isPlayer: false, depth: remotePlayer.wx + remotePlayer.wy });
+        const remOnSwing = Boolean(
+          remotePlayer.isSitting && (remotePlayer.sittingSeat === 'swing_left' || remotePlayer.sittingSeat === 'swing_right')
+        );
+        drawItems.push({
+          type: 'avatar',
+          data: remotePlayer,
+          isPlayer: false,
+          depth: remOnSwing ? (-2.8 + -4.05) + 0.02 : remotePlayer.wx + remotePlayer.wy,
+        });
       });
 
       trees.forEach(([tx, ty], tIdx) => {
@@ -1717,16 +2054,66 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // 3. Bench next to Sudut Literasi at [-3.7, 1.8]
       drawItems.push({ type: 'bench', wx: -3.7, wy: 1.8, depth: -3.7 + 1.8, id: 'literacy' });
 
-      // 4. Kursi Taman Samping Air Mancur (East & West Benches)
-      drawItems.push({ type: 'bench', wx: 1.25, wy: 0.0, depth: 1.25, id: 'fountain_east' });
-      drawItems.push({ type: 'bench', wx: -1.25, wy: 0.0, depth: -1.25, id: 'fountain_west' });
+      // 4. Exactly 4 Benches in FRONT of the Central Fountain
+      FOUNTAIN_FRONT_BENCHES.forEach((b) => {
+        drawItems.push({ type: 'bench', wx: b.wx, wy: b.wy, depth: b.wx + b.wy, id: b.id });
+      });
+
+      // 5. Dual Wooden Swings behind Taman Refleksi at [-2.8, -4.05]
+      drawItems.push({ type: 'swings_structure', wx: -2.8, wy: -4.05, depth: -2.8 + -4.05 });
 
       drawItems.sort((a, b) => a.depth - b.depth);
+
+      // Shared helper for exact 3D isometric front-to-back (kemuka-kebelakang) swing seat & chain geometry
+      const getSwingSeatMetrics = (seatId: 'swing_left' | 'swing_right') => {
+        const structPt = toScreen(-2.8, -4.05, 0, camera.x, camera.y);
+        const z = zoomLevelRef.current;
+        const isLeft = seatId === 'swing_left';
+        const anchorX = structPt.x + (isLeft ? -10 * z : 10 * z);
+        const anchorY = structPt.y - 29 * z;
+
+        let isOccupied = Boolean(isSittingRef.current && sittingSeatRef.current === seatId);
+        if (!isOccupied) {
+          remotePlayersRef.current.forEach((r) => {
+            if (r.isSitting && r.sittingSeat === seatId) isOccupied = true;
+          });
+        }
+
+        // Front-to-back (kemuka = +1 toward front-right/viewer, kebelakang = -1 toward rear-left)
+        const sway = isOccupied
+          ? Math.sin(elapsed * 3.2)
+          : Math.sin(elapsed * 1.5 + (isLeft ? 0 : 1.2)) * 0.08;
+
+        // Isometric forward-backward travel along the swing direction perpendicular to the top beam
+        const fwdX = sway * 5.2 * z;
+        const fwdGroundY = sway * 6.8 * z;
+        // Circular pendulum upward lift at both front peak and back peak
+        const arcLiftY = (1 - Math.cos(sway * 0.78)) * 6.5 * z;
+
+        const seatX = anchorX + fwdX;
+        const seatY = (structPt.y - 5.5 * z) + fwdGroundY - arcLiftY;
+        const shadowX = anchorX + fwdX;
+        const shadowY = (structPt.y + 3 * z) + fwdGroundY * 0.8;
+        const shadowScale = Math.max(0.6, 1 - (1 - Math.cos(sway * 0.78)) * 0.35);
+
+        return {
+          structPt,
+          anchorX,
+          anchorY,
+          seatX,
+          seatY,
+          shadowX,
+          shadowY,
+          shadowScale,
+          sway,
+          isOccupied,
+        };
+      };
 
       // Render Each Item
       drawItems.forEach((item) => {
         if (item.type === 'bench') {
-          // FOUNTAIN SIDE BENCH (Polished teak wood planks with dark cast-iron frame)
+          // FOUNTAIN FRONT BENCH (Polished teak wood planks with dark cast-iron frame)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
@@ -1767,6 +2154,126 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(pt.x - 11 * z, pt.y - 3 * z, 3 * z, Math.PI, 0);
           ctx.arc(pt.x + 10 * z, pt.y - 3 * z, 3 * z, Math.PI, 0);
           ctx.stroke();
+        } else if (item.type === 'swings_structure') {
+          // DUAL WOODEN SWINGS BEHIND TAMAN REFLEKSI (Isometric Front-to-Back Pendulum Swing)
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+
+          // Ground shadow for A-frame structure and floor patch
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 4 * z, 32 * z, 11 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Left A-Frame timber support legs (angled front-to-back for stability)
+          ctx.strokeStyle = '#572506';
+          ctx.lineWidth = 3.2 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 24 * z, pt.y + 2 * z); // Rear-left foot
+          ctx.lineTo(pt.x - 20 * z, pt.y - 30 * z); // Left apex
+          ctx.lineTo(pt.x - 15 * z, pt.y + 8 * z); // Front-left foot
+          ctx.stroke();
+
+          // Left A-frame cross brace
+          ctx.lineWidth = 2 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 22.2 * z, pt.y - 11 * z);
+          ctx.lineTo(pt.x - 17.5 * z, pt.y - 9 * z);
+          ctx.stroke();
+
+          // Right A-Frame timber support legs (angled front-to-back)
+          ctx.lineWidth = 3.2 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x + 15 * z, pt.y - 1 * z); // Rear-right foot
+          ctx.lineTo(pt.x + 20 * z, pt.y - 30 * z); // Right apex
+          ctx.lineTo(pt.x + 24 * z, pt.y + 7 * z); // Front-right foot
+          ctx.stroke();
+
+          // Right A-frame cross brace
+          ctx.lineWidth = 2 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x + 17.5 * z, pt.y - 13 * z);
+          ctx.lineTo(pt.x + 22.2 * z, pt.y - 10 * z);
+          ctx.stroke();
+
+          // Top horizontal timber crossbeam with beveled ends
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(pt.x - 25 * z, pt.y - 32 * z, 50 * z, 4.5 * z);
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 1 * z;
+          ctx.strokeRect(pt.x - 25 * z, pt.y - 32 * z, 50 * z, 4.5 * z);
+
+          // Iron bolt plates & suspension rings at crossbeam
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.arc(pt.x - 20 * z, pt.y - 30 * z, 2 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x + 20 * z, pt.y - 30 * z, 2 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Hanging Swings (Left: id = 'swing_left', Right: id = 'swing_right')
+          const swingIds: Array<'swing_left' | 'swing_right'> = ['swing_left', 'swing_right'];
+
+          swingIds.forEach((swId) => {
+            const m = getSwingSeatMetrics(swId);
+
+            // Ground shadow moving forward and backward directly beneath the swinging seat
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+            ctx.beginPath();
+            ctx.ellipse(
+              m.shadowX,
+              m.shadowY,
+              6.5 * m.shadowScale * z,
+              3.2 * m.shadowScale * z,
+              0,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+
+            // Iron hook brackets on top crossbeam
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(m.anchorX - 5 * z, m.anchorY - 1 * z, 2 * z, 2.2 * z);
+            ctx.fillRect(m.anchorX + 3 * z, m.anchorY - 1 * z, 2 * z, 2.2 * z);
+
+            // Dual hanging iron chains / ropes from crossbeam to seat (swinging forward & backward)
+            ctx.strokeStyle = isNight ? '#cbd5e1' : '#57534e';
+            ctx.lineWidth = 1.3 * z;
+            ctx.beginPath();
+            // Left chain
+            ctx.moveTo(m.anchorX - 4.2 * z, m.anchorY);
+            ctx.lineTo(m.seatX - 4.5 * z, m.seatY);
+            // Right chain
+            ctx.moveTo(m.anchorX + 4.2 * z, m.anchorY);
+            ctx.lineTo(m.seatX + 4.5 * z, m.seatY);
+            ctx.stroke();
+
+            // 3D Isometric Wooden Swing Seat Board (tilts slightly with the forward/backward swing angle)
+            const seatTilt = m.sway * 1.2 * z;
+            ctx.fillStyle = '#d97706';
+            ctx.beginPath();
+            ctx.moveTo(m.seatX - 6 * z, m.seatY - 1.5 * z - seatTilt * 0.4);
+            ctx.lineTo(m.seatX + 6 * z, m.seatY - 1.5 * z - seatTilt * 0.4);
+            ctx.lineTo(m.seatX + 5.2 * z, m.seatY + 1.8 * z + seatTilt * 0.4);
+            ctx.lineTo(m.seatX - 6.8 * z, m.seatY + 1.8 * z + seatTilt * 0.4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+
+            // Front thickness edge of wooden seat plank
+            ctx.fillStyle = '#92400e';
+            ctx.fillRect(m.seatX - 6.2 * z, m.seatY + 1.2 * z, 11.4 * z, 1.5 * z);
+          });
+
+          // Small decorative brass plaque on top beam: "AYUNAN REFLEKSI"
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillRect(pt.x - 11 * z, pt.y - 34 * z, 22 * z, 3 * z);
+          ctx.fillStyle = '#451a03';
+          ctx.font = `bold ${Math.round(2.6 * z)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🎠 AYUNAN REFLEKSI', pt.x, pt.y - 32.5 * z);
         } else if (item.type === 'literacy_corner') {
           // SUDUT LITERASI WARGA (West End Reading Gazebo, Bookshelf & Reading Corner)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
@@ -2146,10 +2653,37 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.textBaseline = 'middle';
           ctx.fillText(dockLabel, pt.x, dockTagY);
         } else if (item.type === 'tree') {
-          // Double-Sphere Tree (Noticeably Enlarged, Lush & Sculpted matching screenshot)
+          // Double-Sphere Tree (Minimalist Watering + 3-Watering Cycle -> 15s Red Apples -> Auto Reset)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
-          const isWatered = Boolean(wateredTreesRef.current[item.index] && Date.now() - wateredTreesRef.current[item.index] < 10 * 60 * 1000);
+          const cycle = treeCyclesRef.current[item.index];
+          const elapsedSinceWatered = cycle && cycle.lastWateredTime ? (currentTime - cycle.lastWateredTime) / 1000 : 999;
+          const isRecentlyWatered = elapsedSinceWatered >= 0 && elapsedSinceWatered < 1.8;
+
+          let appleElapsed = -1;
+          if (cycle && cycle.appleStartTime !== null) {
+            appleElapsed = (currentTime - cycle.appleStartTime) / 1000;
+            if (appleElapsed >= 15.0) {
+              // 15 seconds of apples completed -> automatically reset tree cycle back to 0/3!
+              treeCyclesRef.current[item.index] = {
+                count: 0,
+                lastWateredTime: 0,
+                appleStartTime: null,
+              };
+              appleElapsed = -1;
+            }
+          }
+          const hasApples = appleElapsed >= 0 && appleElapsed < 15.0;
+          const isLush = isRecentlyWatered || hasApples || (cycle && cycle.count > 0 && elapsedSinceWatered < 15.0);
+
+          // Only make tree transparent if avatar is specifically BEHIND tree canopy and tree is NOT being watered/fruiting
+          const isBehindTree = (player.wy < item.wy - 0.2) && (Math.abs(player.wx - item.wx) < 0.95) && (item.wy - player.wy < 1.7);
+          const isTreeTransparent = isBehindTree && !isRecentlyWatered && !hasApples;
+
+          ctx.save();
+          if (isTreeTransparent) {
+            ctx.globalAlpha = 0.45;
+          }
 
           // Ground shadow (enlarged)
           ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
@@ -2165,93 +2699,160 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fillRect(pt.x + 0.5 * z, pt.y - 24 * z, 3 * z, 24 * z);
 
           // Lower large sphere (Teal/Emerald green with isometric shading)
-          ctx.fillStyle = isWatered ? '#047857' : (isNight ? '#064e3b' : '#059669');
+          ctx.fillStyle = isLush ? '#047857' : (isNight ? '#064e3b' : '#059669');
           ctx.beginPath();
           ctx.arc(pt.x, pt.y - 32 * z, 22 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Lower sphere highlight
-          ctx.fillStyle = isWatered ? '#10b981' : (isNight ? '#047857' : '#10b981');
+          ctx.fillStyle = isLush ? '#10b981' : (isNight ? '#047857' : '#10b981');
           ctx.beginPath();
           ctx.arc(pt.x - 4 * z, pt.y - 36 * z, 16 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Upper overlapping bright mint/lime sphere
-          ctx.fillStyle = isWatered ? '#10b981' : (isNight ? '#047857' : '#10b981');
+          ctx.fillStyle = isLush ? '#10b981' : (isNight ? '#047857' : '#10b981');
           ctx.beginPath();
           ctx.arc(pt.x + 1 * z, pt.y - 48 * z, 16 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Upper sphere soft top highlight
-          ctx.fillStyle = isWatered ? '#34d399' : (isNight ? '#059669' : '#34d399');
+          ctx.fillStyle = isLush ? '#34d399' : (isNight ? '#059669' : '#34d399');
           ctx.beginPath();
           ctx.arc(pt.x - 2 * z, pt.y - 52 * z, 11 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Top foliage bud
-          ctx.fillStyle = isWatered ? '#6ee7b7' : (isNight ? '#10b981' : '#6ee7b7');
+          ctx.fillStyle = isLush ? '#6ee7b7' : (isNight ? '#10b981' : '#6ee7b7');
           ctx.beginPath();
           ctx.arc(pt.x, pt.y - 59 * z, 6 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Watered tree: marked with bright red apples & rising water sparkles
-          if (isWatered) {
-            // Bright Red Apples (Buah Apel Merah 🍎) hanging from foliage
-            const applePositions = [
-              [-11, -34],
-              [10, -36],
-              [-4, -48],
-              [8, -46],
-              [-12, -24],
-              [5, -26],
-            ];
+          // 1. EFEK POHON TERSIRAM MINIMALIS (Clean & subtle for 1.8s when watered)
+          if (isRecentlyWatered) {
+            const fade = Math.max(0, 1 - elapsedSinceWatered / 1.8);
+            ctx.save();
+            // 8 delicate minimalist vertical rain droplets over the tree crown
+            for (let r = 0; r < 8; r++) {
+              const offset = ((r - 3.5) * 4.5) * z;
+              const dropProg = ((elapsedSinceWatered * 2.4 + r * 0.27) % 1.0);
+              const rx = pt.x + offset;
+              const ry = pt.y - (68 - dropProg * 36) * z;
 
-            applePositions.forEach(([ax, ay]) => {
-              const appleX = pt.x + ax * z;
-              const appleY = pt.y + ay * z;
-
-              // Little brown stem & green leaf
-              ctx.strokeStyle = '#451a03';
-              ctx.lineWidth = 0.9 * z;
+              ctx.strokeStyle = `rgba(186, 230, 253, ${0.75 * fade})`;
+              ctx.lineWidth = 1.0 * z;
               ctx.beginPath();
-              ctx.moveTo(appleX, appleY - 2.8 * z);
-              ctx.lineTo(appleX + 0.5 * z, appleY - 4.5 * z);
+              ctx.moveTo(rx, ry);
+              ctx.lineTo(rx, ry + 4.2 * z);
               ctx.stroke();
+            }
 
-              ctx.fillStyle = '#16a34a';
-              ctx.beginPath();
-              ctx.ellipse(appleX + 1.8 * z, appleY - 4 * z, 1.8 * z, 1.0 * z, Math.PI / 4, 0, Math.PI * 2);
-              ctx.fill();
+            // Single minimalist expanding water ring ripple around tree crown
+            const ringR = (10 + (elapsedSinceWatered / 1.8) * 14) * z;
+            ctx.strokeStyle = `rgba(125, 211, 252, ${0.55 * fade})`;
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y - 38 * z, ringR, ringR * 0.45, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
 
-              // Plump Red Apple body
-              ctx.fillStyle = '#dc2626';
-              ctx.beginPath();
-              ctx.arc(appleX, appleY, 3.4 * z, 0, Math.PI * 2);
-              ctx.fill();
+          // 2. BUAH APEL MERAH (Muncul setelah 3x disiram, bertahan selama 15 detik lalu hilang otomatis)
+          if (hasApples) {
+            let appleAlpha = 1.0;
+            if (appleElapsed < 0.5) {
+              // 0s to 0.5s: smooth pop-in
+              appleAlpha = appleElapsed / 0.5;
+            } else if (appleElapsed <= 12.5) {
+              // 0.5s to 12.5s: ripe bright red apples
+              appleAlpha = 1.0;
+            } else {
+              // 12.5s to 15.0s: smooth fade to 0 before cycle resets
+              appleAlpha = Math.max(0, (15.0 - appleElapsed) / 2.5);
+            }
 
-              ctx.fillStyle = '#ef4444';
-              ctx.beginPath();
-              ctx.arc(appleX - 0.5 * z, appleY - 0.5 * z, 2.7 * z, 0, Math.PI * 2);
-              ctx.fill();
+            if (appleAlpha > 0.01) {
+              ctx.save();
+              ctx.globalAlpha = appleAlpha * (isTreeTransparent ? 0.45 : 1.0);
 
-              // White specular shine gleam
-              ctx.fillStyle = '#ffffff';
-              ctx.beginPath();
-              ctx.arc(appleX - 1 * z, appleY - 1.2 * z, 0.9 * z, 0, Math.PI * 2);
-              ctx.fill();
-            });
+              const applePositions = [
+                [-11, -34],
+                [10, -36],
+                [-4, -48],
+                [8, -46],
+                [-12, -24],
+                [5, -26],
+                [-1, -40],
+              ];
 
-            // Rising water sparkle particles
-            for (let s = 0; s < 3; s++) {
-              const sPhase = (elapsed * 2 + s * 1.5) % 3;
-              const sY = pt.y - (30 + sPhase * 18) * z;
-              const sX = pt.x + Math.sin(elapsed * 3 + s * 2) * 14 * z;
-              ctx.fillStyle = `rgba(254, 240, 138, ${1 - sPhase / 3})`;
-              ctx.beginPath();
-              ctx.arc(sX, sY, 1.5 * z, 0, Math.PI * 2);
-              ctx.fill();
+              applePositions.forEach(([ax, ay], aIdx) => {
+                const appleBob = Math.sin(elapsed * 3.5 + aIdx) * 0.5 * z;
+                const appleX = pt.x + ax * z;
+                const appleY = pt.y + ay * z + appleBob;
+
+                // Little brown stem
+                ctx.strokeStyle = '#451a03';
+                ctx.lineWidth = 0.9 * z;
+                ctx.beginPath();
+                ctx.moveTo(appleX, appleY - 2.8 * z);
+                ctx.lineTo(appleX + 0.5 * z, appleY - 4.5 * z);
+                ctx.stroke();
+
+                // Tiny green leaf
+                ctx.fillStyle = '#16a34a';
+                ctx.beginPath();
+                ctx.ellipse(appleX + 1.8 * z, appleY - 4 * z, 1.8 * z, 1.0 * z, Math.PI / 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Plump Red Apple body
+                ctx.fillStyle = '#dc2626';
+                ctx.beginPath();
+                ctx.arc(appleX, appleY, 3.4 * z, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Soft bright red highlight
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(appleX - 0.5 * z, appleY - 0.5 * z, 2.7 * z, 0, Math.PI * 2);
+                ctx.fill();
+
+                // White specular shine gleam
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(appleX - 1 * z, appleY - 1.2 * z, 0.9 * z, 0, Math.PI * 2);
+                ctx.fill();
+              });
+
+              ctx.restore();
             }
           }
+
+          // Minimalist watering progress pill above tree when near or active (💧 1/3, 💧 2/3, or 🍎 15s)
+          const distPlayerToThisTree = Math.hypot(player.wx - item.wx, player.wy - item.wy);
+          const activeCount = cycle ? cycle.count : 0;
+          if ((distPlayerToThisTree < 1.35 && activeCount > 0) || isRecentlyWatered || hasApples) {
+            const badgeText = hasApples
+              ? `🍎 ${Math.max(1, Math.ceil(15 - appleElapsed))}d`
+              : `💧 ${activeCount}/3`;
+            const badgeY = pt.y - 68 * z;
+            ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
+            const bm = ctx.measureText(badgeText);
+            const bw = bm.width + 8 * z;
+            const bh = 12 * z;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - bw / 2, badgeY - bh / 2, bw, bh, 6 * z);
+            ctx.fill();
+            ctx.strokeStyle = hasApples ? '#ef4444' : '#38bdf8';
+            ctx.lineWidth = 1 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(badgeText, pt.x, badgeY);
+          }
+
+          ctx.restore();
         } else if (item.type === 'building') {
           const b = item.info;
           const [bx, , by] = b.position;
@@ -2274,16 +2875,27 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fill();
 
           if (b.id === 'balai_kota') {
-            // NORTH: GEDUNG KUBAH EMAS (Balai Kota - High Architectural Detail)
-            // 3-step marble plinth base
+            // NORTH: GEDUNG KUBAH EMAS (Balai Kota - Neoclassical Palace Architecture)
+            // 3-step marble plinth base with tread shading
+            ctx.fillStyle = '#94a3b8';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 42 * z, pt.y + 15 * z);
+            ctx.lineTo(pt.x, pt.y + 36 * z);
+            ctx.lineTo(pt.x + 42 * z, pt.y + 15 * z);
+            ctx.lineTo(pt.x + 42 * z, pt.y + 25 * z);
+            ctx.lineTo(pt.x, pt.y + 46 * z);
+            ctx.lineTo(pt.x - 42 * z, pt.y + 25 * z);
+            ctx.closePath();
+            ctx.fill();
+
             ctx.fillStyle = '#cbd5e1';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 40 * z, pt.y + 16 * z);
-            ctx.lineTo(pt.x, pt.y + 36 * z);
-            ctx.lineTo(pt.x + 40 * z, pt.y + 16 * z);
-            ctx.lineTo(pt.x + 40 * z, pt.y + 24 * z);
-            ctx.lineTo(pt.x, pt.y + 44 * z);
-            ctx.lineTo(pt.x - 40 * z, pt.y + 24 * z);
+            ctx.moveTo(pt.x - 39 * z, pt.y + 17 * z);
+            ctx.lineTo(pt.x, pt.y + 37 * z);
+            ctx.lineTo(pt.x + 39 * z, pt.y + 17 * z);
+            ctx.lineTo(pt.x + 39 * z, pt.y + 23 * z);
+            ctx.lineTo(pt.x, pt.y + 43 * z);
+            ctx.lineTo(pt.x - 39 * z, pt.y + 23 * z);
             ctx.closePath();
             ctx.fill();
 
@@ -2299,7 +2911,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.closePath();
             ctx.fill();
 
-            // Left shaded wall
+            // Left shaded wall with subtle masonry lines
             ctx.fillStyle = '#e2e8f0';
             ctx.beginPath();
             ctx.moveTo(pt.x - 36 * z, pt.y - 22 * z);
@@ -2316,7 +2928,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             for (let c = -30; c <= -6; c += 8) {
               ctx.fillRect(pt.x + c * z, pt.y - 14 * z, 5 * z, 34 * z);
               ctx.strokeRect(pt.x + c * z, pt.y - 14 * z, 5 * z, 34 * z);
-              // Column capitals
+              // Column capitals & torus bases
               ctx.fillStyle = '#cbd5e1';
               ctx.fillRect(pt.x + (c - 1) * z, pt.y - 16 * z, 7 * z, 3 * z);
               ctx.fillRect(pt.x + (c - 1) * z, pt.y + 18 * z, 7 * z, 3 * z);
@@ -2326,18 +2938,46 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             // Arched grand double doors in center
             ctx.fillStyle = '#78350f';
             ctx.beginPath();
-            ctx.arc(pt.x - 17 * z, pt.y + 4 * z, 6 * z, Math.PI, 0);
-            ctx.rect(pt.x - 23 * z, pt.y + 4 * z, 12 * z, 16 * z);
+            ctx.arc(pt.x - 17 * z, pt.y + 4 * z, 6.5 * z, Math.PI, 0);
+            ctx.rect(pt.x - 23.5 * z, pt.y + 4 * z, 13 * z, 17 * z);
             ctx.fill();
             // Door frame & gold brass knobs
             ctx.strokeStyle = '#f59e0b';
             ctx.lineWidth = 1 * z;
             ctx.stroke();
+            // Transom fanlight glass window over door
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.arc(pt.x - 17 * z, pt.y + 4 * z, 5 * z, Math.PI, 0);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 0.6 * z;
+            ctx.stroke();
+
+            // Brass handles
             ctx.fillStyle = '#fbbf24';
             ctx.beginPath();
-            ctx.arc(pt.x - 19 * z, pt.y + 12 * z, 1.2 * z, 0, Math.PI * 2);
-            ctx.arc(pt.x - 15 * z, pt.y + 12 * z, 1.2 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 19 * z, pt.y + 13 * z, 1.2 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 15 * z, pt.y + 13 * z, 1.2 * z, 0, Math.PI * 2);
             ctx.fill();
+
+            // Wall sconce carriage lamps flanking doors
+            [-26, -8].forEach((lx) => {
+              ctx.strokeStyle = '#d97706';
+              ctx.lineWidth = 1 * z;
+              ctx.beginPath();
+              ctx.moveTo(pt.x + lx * z, pt.y + 6 * z);
+              ctx.lineTo(pt.x + lx * z, pt.y + 2 * z);
+              ctx.stroke();
+              ctx.fillStyle = '#fef08a';
+              ctx.beginPath();
+              ctx.arc(pt.x + lx * z, pt.y + 2 * z, 2 * z, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = 'rgba(254, 240, 138, 0.35)';
+              ctx.beginPath();
+              ctx.arc(pt.x + lx * z, pt.y + 2 * z, 4.5 * z, 0, Math.PI * 2);
+              ctx.fill();
+            });
 
             // Right wall multi-pane reflective windows
             ctx.fillStyle = '#38bdf8';
@@ -2345,21 +2985,51 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               for (let col = 7; col <= 27; col += 10) {
                 const wx = pt.x + col * z;
                 const wy = pt.y - (6 - r * 16) * z;
-                ctx.fillRect(wx, wy, 6 * z, 10 * z);
+                ctx.fillRect(wx, wy, 6.5 * z, 10 * z);
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 0.8 * z;
-                ctx.strokeRect(wx, wy, 6 * z, 10 * z);
+                ctx.strokeRect(wx, wy, 6.5 * z, 10 * z);
+
+                // Terracotta planter boxes with colorful flowers under lower windows
+                if (r === 1) {
+                  ctx.fillStyle = '#b45309';
+                  ctx.fillRect(wx - 0.5 * z, wy + 10 * z, 7.5 * z, 2.6 * z);
+                  ctx.fillStyle = '#ef4444';
+                  ctx.beginPath();
+                  ctx.arc(wx + 1.5 * z, wy + 10 * z, 1.3 * z, 0, Math.PI * 2);
+                  ctx.arc(wx + 5.5 * z, wy + 10 * z, 1.3 * z, 0, Math.PI * 2);
+                  ctx.fill();
+                  ctx.fillStyle = '#facc15';
+                  ctx.beginPath();
+                  ctx.arc(wx + 3.5 * z, wy + 9.5 * z, 1.2 * z, 0, Math.PI * 2);
+                  ctx.fill();
+                  ctx.fillStyle = '#38bdf8'; // restore
+                }
               }
             }
 
-            // Pediment triangular gable
+            // Dentil molding band under triangular pediment
+            ctx.fillStyle = '#cbd5e1';
+            for (let d = -34; d <= -2; d += 4) {
+              ctx.fillRect(pt.x + d * z, pt.y - 21 * z, 2.2 * z, 2 * z);
+            }
+
+            // Pediment triangular gable with carved gold seal
             ctx.fillStyle = '#f1f5f9';
             ctx.beginPath();
             ctx.moveTo(pt.x - 34 * z, pt.y - 20 * z);
-            ctx.lineTo(pt.x - 16 * z, pt.y - 34 * z);
+            ctx.lineTo(pt.x - 17 * z, pt.y - 34 * z);
             ctx.lineTo(pt.x, pt.y - 20 * z);
             ctx.closePath();
             ctx.fill();
+            // Golden circular medallion in pediment
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(pt.x - 17 * z, pt.y - 25 * z, 3.2 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
 
             // Golden Dome on top with embossed ribs
             ctx.fillStyle = '#f59e0b';
@@ -2388,7 +3058,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.stroke();
             }
 
-            // Grand Golden Spire with finial ball
+            // Grand Golden Spire with glowing pinnacle light
             ctx.strokeStyle = '#fde047';
             ctx.lineWidth = 3 * z;
             ctx.beginPath();
@@ -2398,6 +3068,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#facc15';
             ctx.beginPath();
             ctx.arc(pt.x, pt.y - 75 * z, 3 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            const spireGlow = ctx.createRadialGradient(pt.x, pt.y - 75 * z, 1 * z, pt.x, pt.y - 75 * z, 9 * z);
+            spireGlow.addColorStop(0, 'rgba(254, 240, 138, 0.9)');
+            spireGlow.addColorStop(0.5, 'rgba(250, 204, 21, 0.35)');
+            spireGlow.addColorStop(1, 'rgba(250, 204, 21, 0)');
+            ctx.fillStyle = spireGlow;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 75 * z, 9 * z, 0, Math.PI * 2);
             ctx.fill();
 
             // Red-and-White Flag on Left Post
@@ -2415,16 +3094,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
             // Gilded Brass Plaque in front
             ctx.fillStyle = '#0f172a';
-            ctx.fillRect(pt.x - 16 * z, pt.y + 32 * z, 32 * z, 9 * z);
+            ctx.fillRect(pt.x - 18 * z, pt.y + 32 * z, 36 * z, 9.5 * z);
             ctx.strokeStyle = '#facc15';
             ctx.lineWidth = 1 * z;
-            ctx.strokeRect(pt.x - 16 * z, pt.y + 32 * z, 32 * z, 9 * z);
+            ctx.strokeRect(pt.x - 18 * z, pt.y + 32 * z, 36 * z, 9.5 * z);
             ctx.fillStyle = '#facc15';
             ctx.font = `bold ${Math.round(6.5 * z)}px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText('BALAI KOTA', pt.x, pt.y + 39 * z);
+            ctx.fillText('🏛️ BALAI KOTA', pt.x, pt.y + 39 * z);
           } else if (b.id === 'menara_mentor') {
-            // EAST: DEWAN KOTA & TELECOM TRANSMISSION TOWER
+            // EAST: DEWAN KOTA & TELECOM TRANSMISSION TOWER (Studio ON AIR)
             // Base hall
             ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
@@ -2468,41 +3147,62 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.stroke();
             }
 
+            // Dual wall-mounted broadcast horn speakers
+            [-18, -2].forEach((sx) => {
+              ctx.fillStyle = '#475569';
+              ctx.fillRect(pt.x + sx * z, pt.y - 10 * z, 3 * z, 3.5 * z);
+              ctx.fillStyle = '#94a3b8';
+              ctx.beginPath();
+              ctx.moveTo(pt.x + (sx + 3) * z, pt.y - 10 * z);
+              ctx.lineTo(pt.x + (sx + 5.5) * z, pt.y - 12 * z);
+              ctx.lineTo(pt.x + (sx + 5.5) * z, pt.y - 5.5 * z);
+              ctx.lineTo(pt.x + (sx + 3) * z, pt.y - 6.5 * z);
+              ctx.closePath();
+              ctx.fill();
+            });
+
             // Blue arched glass portal doors
             ctx.fillStyle = '#0284c7';
             ctx.beginPath();
             ctx.arc(pt.x - 12 * z, pt.y + 16 * z, 5 * z, Math.PI, 0);
             ctx.rect(pt.x - 17 * z, pt.y + 16 * z, 10 * z, 12 * z);
             ctx.fill();
+            // Aluminum door trim & entry mat
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 18 * z, pt.y + 28 * z, 12 * z, 3 * z);
 
-            // Illuminated Red "● ON AIR" Badge
+            // Illuminated Red "● ON AIR" Badge with Pulsing Glow
+            const neonPulse = 0.85 + Math.sin(elapsed * 5) * 0.15;
             ctx.fillStyle = '#dc2626';
             ctx.beginPath();
             ctx.roundRect(pt.x + 6 * z, pt.y - 12 * z, 22 * z, 9 * z, 3 * z);
             ctx.fill();
-            ctx.strokeStyle = '#fca5a5';
-            ctx.lineWidth = 1 * z;
+            ctx.strokeStyle = `rgba(254, 202, 202, ${neonPulse})`;
+            ctx.lineWidth = 1.2 * z;
             ctx.stroke();
-            // Blinking neon text
+            // Neon Text
             ctx.fillStyle = '#ffffff';
             ctx.font = `bold ${Math.round(5.5 * z)}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.fillText('● ON AIR', pt.x + 17 * z, pt.y - 5.5 * z);
 
-            // Animated Audio Frequency Equalizer Display
+            // Animated Audio Frequency Equalizer Display (6 channels)
             ctx.fillStyle = '#0f172a';
-            ctx.fillRect(pt.x + 6 * z, pt.y + 0.5 * z, 22 * z, 8 * z);
+            ctx.fillRect(pt.x + 5 * z, pt.y + 0.5 * z, 24 * z, 8 * z);
             ctx.strokeStyle = '#0284c7';
             ctx.lineWidth = 0.6 * z;
-            ctx.strokeRect(pt.x + 6 * z, pt.y + 0.5 * z, 22 * z, 8 * z);
-            const eqColors = ['#10b981', '#34d399', '#38bdf8', '#38bdf8', '#f59e0b'];
-            for (let eq = 0; eq < 5; eq++) {
-              const barH = (2 + Math.abs(Math.sin(elapsed * 6 + eq * 1.8)) * 4.5) * z;
+            ctx.strokeRect(pt.x + 5 * z, pt.y + 0.5 * z, 24 * z, 8 * z);
+            const eqColors = ['#10b981', '#34d399', '#38bdf8', '#38bdf8', '#f59e0b', '#ef4444'];
+            for (let eq = 0; eq < 6; eq++) {
+              const barH = (2 + Math.abs(Math.sin(elapsed * 6 + eq * 1.5)) * 4.8) * z;
               ctx.fillStyle = eqColors[eq];
-              ctx.fillRect(pt.x + (8 + eq * 3.8) * z, pt.y + 7.5 * z - barH, 2.4 * z, barH);
+              ctx.fillRect(pt.x + (6.5 + eq * 3.6) * z, pt.y + 7.5 * z - barH, 2.2 * z, barH);
             }
 
-            // Tall 4-tier Telecom Transmission Lattice Tower
+            // Tall 5-tier Telecom Transmission Lattice Tower
             const towerX = pt.x + 38 * z;
             const towerY = pt.y + 12 * z;
             ctx.strokeStyle = '#64748b';
@@ -2531,12 +3231,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.stroke();
             }
 
+            // Black coaxial cable harness running from tower base to studio
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.2 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 24 * z, pt.y + 6 * z);
+            ctx.quadraticCurveTo(pt.x + 30 * z, pt.y + 10 * z, towerX - 6 * z, towerY - 4 * z);
+            ctx.stroke();
+
             // Blinking Red Aviation Beacon with Pulsed Glow Aura
             const beaconIsOn = Math.floor(beaconBlink) % 2 === 0;
             if (beaconIsOn) {
-              ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+              ctx.fillStyle = 'rgba(239, 68, 68, 0.45)';
               ctx.beginPath();
-              ctx.arc(towerX, towerY - 70 * z, 8 * z, 0, Math.PI * 2);
+              ctx.arc(towerX, towerY - 70 * z, 8.5 * z, 0, Math.PI * 2);
               ctx.fill();
             }
             ctx.fillStyle = beaconIsOn ? '#ef4444' : '#7f1d1d';
@@ -2564,7 +3272,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#f59e0b';
             ctx.fillRect(towerX - 22 * z, towerY - 12 * z, 11 * z, 4 * z);
           } else if (b.id === 'perpustakaan') {
-            // WEST: PERPUSTAKAAN KAMPUS (Detailed Modern Blue Facade)
+            // WEST: PERPUSTAKAAN KAMPUS (Detailed Modern Blue Facade & Classical Book Hall)
+            // Stone foundation plinth
+            ctx.fillStyle = '#cbd5e1';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 34 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x, pt.y + 36 * z);
+            ctx.lineTo(pt.x + 34 * z, pt.y + 18 * z);
+            ctx.lineTo(pt.x + 32 * z, pt.y + 15 * z);
+            ctx.lineTo(pt.x, pt.y + 33 * z);
+            ctx.lineTo(pt.x - 32 * z, pt.y + 15 * z);
+            ctx.closePath();
+            ctx.fill();
+
             // Main structure
             ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
@@ -2599,6 +3319,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.closePath();
             ctx.fill();
 
+            // Golden Open-Book Crest on Upper Pediment
+            ctx.fillStyle = '#fef3c7';
+            ctx.fillRect(pt.x - 5.5 * z, pt.y - 25 * z, 5 * z, 4 * z);
+            ctx.fillRect(pt.x + 0.5 * z, pt.y - 25 * z, 5 * z, 4 * z);
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 0.8 * z;
+            ctx.strokeRect(pt.x - 5.5 * z, pt.y - 25 * z, 11 * z, 4 * z);
+
             // Rooftop Clock Tower & Bell Turret
             ctx.fillStyle = '#1e40af';
             ctx.fillRect(pt.x - 9 * z, pt.y - 50 * z, 18 * z, 15 * z);
@@ -2609,6 +3337,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x + 11 * z, pt.y - 50 * z);
             ctx.closePath();
             ctx.fill();
+            // Weathervane finial on bell turret
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 62 * z);
+            ctx.lineTo(pt.x, pt.y - 67 * z);
+            ctx.moveTo(pt.x - 2.5 * z, pt.y - 65 * z);
+            ctx.lineTo(pt.x + 2.5 * z, pt.y - 65 * z);
+            ctx.stroke();
+
             // Clock Face
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
@@ -2627,13 +3365,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x, pt.y - 45 * z);
             ctx.stroke();
 
-            // Blue square grid windows (4x2 on front, 4x2 on side) with book spine silhouettes
-            ctx.fillStyle = '#38bdf8';
+            // Blue square grid windows with visible colorful bookshelf spines inside
+            const spineColors = ['#ef4444', '#f59e0b', '#10b981', '#a855f7'];
             for (let r = 0; r < 2; r++) {
               for (let c = -24; c <= -8; c += 8) {
                 const wx = pt.x + c * z;
                 const wy = pt.y - (4 - r * 14) * z;
+                ctx.fillStyle = isNight ? '#fef08a' : '#38bdf8';
                 ctx.fillRect(wx, wy, 6 * z, 8 * z);
+                // Tiny colorful book spines on shelf
+                ctx.fillStyle = spineColors[(Math.abs(c) + r) % spineColors.length];
+                ctx.fillRect(wx + 1 * z, wy + 4.5 * z, 1.4 * z, 3 * z);
+                ctx.fillStyle = spineColors[(Math.abs(c) + r + 1) % spineColors.length];
+                ctx.fillRect(wx + 3 * z, wy + 4 * z, 1.4 * z, 3.5 * z);
                 // Glass frame
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 0.8 * z;
@@ -2642,20 +3386,30 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               for (let c = 8; c <= 24; c += 8) {
                 const wx = pt.x + c * z;
                 const wy = pt.y - (4 - r * 14) * z;
+                ctx.fillStyle = isNight ? '#fef08a' : '#38bdf8';
                 ctx.fillRect(wx, wy, 6 * z, 8 * z);
+                ctx.fillStyle = spineColors[(c + r) % spineColors.length];
+                ctx.fillRect(wx + 1 * z, wy + 4.5 * z, 1.4 * z, 3 * z);
+                ctx.fillStyle = spineColors[(c + r + 2) % spineColors.length];
+                ctx.fillRect(wx + 3 * z, wy + 4 * z, 1.4 * z, 3.5 * z);
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 0.8 * z;
                 ctx.strokeRect(wx, wy, 6 * z, 8 * z);
               }
             }
 
-            // Arched portico entrance with blue awning
+            // Arched portico entrance with blue awning & reading lamps
             ctx.fillStyle = '#2563eb';
             ctx.fillRect(pt.x - 8 * z, pt.y + 16 * z, 16 * z, 6 * z);
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(pt.x - 6 * z, pt.y + 22 * z, 12 * z, 11 * z);
+            // Book return dropbox beside entrance
+            ctx.fillStyle = '#1e40af';
+            ctx.fillRect(pt.x + 7.5 * z, pt.y + 25 * z, 3.5 * z, 7 * z);
+            ctx.fillStyle = '#93c5fd';
+            ctx.fillRect(pt.x + 8 * z, pt.y + 26.5 * z, 2.5 * z, 1 * z);
 
-            // Planter box with green shrubs at entrance
+            // Planter box with green shrubs & blooming flowers at entrance
             ctx.fillStyle = '#78350f';
             ctx.fillRect(pt.x - 22 * z, pt.y + 24 * z, 10 * z, 4 * z);
             ctx.fillRect(pt.x + 12 * z, pt.y + 24 * z, 10 * z, 4 * z);
@@ -2665,7 +3419,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.arc(pt.x + 17 * z, pt.y + 23 * z, 5 * z, 0, Math.PI * 2);
             ctx.fill();
           } else if (b.id === 'pasar_prestasi') {
-            // SOUTH-WEST: TOKO POIN (PASAR PRESTASI)
+            // SOUTH-WEST: TOKO POIN (PASAR PRESTASI - Luxury Boutique & Trophy Gallery)
             // Boutique store body
             ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
@@ -2687,6 +3441,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x - 28 * z, pt.y + 18 * z);
             ctx.closePath();
             ctx.fill();
+
+            // Golden Crown Parapet Molding along roof edge
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 28 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 32 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y - 18 * z);
+            ctx.stroke();
 
             // Festive Red & White Scalloped Awning
             const awnW = 50 * z;
@@ -2719,29 +3482,43 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
 
             // Large glass bay showcase window
-            ctx.fillStyle = '#38bdf8';
+            ctx.fillStyle = isNight ? '#fef9c3' : '#38bdf8';
             ctx.fillRect(pt.x - 20 * z, pt.y + 16 * z, 16 * z, 11 * z);
             ctx.strokeStyle = '#cbd5e1';
             ctx.strokeRect(pt.x - 20 * z, pt.y + 16 * z, 16 * z, 11 * z);
 
-            // Golden Trophy Cup inside display
+            // Velvet Display Pedestal & Golden Trophy Cup + Star Medal inside window
+            ctx.fillStyle = '#991b1b';
+            ctx.fillRect(pt.x - 14.5 * z, pt.y + 24 * z, 5 * z, 3 * z);
             ctx.fillStyle = '#f59e0b';
             ctx.beginPath();
             ctx.arc(pt.x - 12 * z, pt.y + 20 * z, 3 * z, 0, Math.PI);
-            ctx.rect(pt.x - 13 * z, pt.y + 23 * z, 2 * z, 3 * z);
+            ctx.rect(pt.x - 13 * z, pt.y + 22.5 * z, 2 * z, 2 * z);
             ctx.fill();
-
-            // Entrance door
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(pt.x + 2 * z, pt.y + 16 * z, 12 * z, 13 * z);
-
-            // Golden star badge above
+            // Ribbon medal beside trophy
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(pt.x - 7.5 * z, pt.y + 19 * z, 1.6 * z, 3 * z);
             ctx.fillStyle = '#facc15';
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 8 * z, 5 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 6.7 * z, pt.y + 23 * z, 1.8 * z, 0, Math.PI * 2);
             ctx.fill();
+
+            // Entrance door with red carpet welcome mat
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x + 2 * z, pt.y + 16 * z, 12 * z, 13 * z);
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(pt.x + 3 * z, pt.y + 28.5 * z, 10 * z, 2.5 * z);
+
+            // Golden star emblem & crown badge above
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 8 * z, 5.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 1 * z;
+            ctx.stroke();
           } else if (b.id === 'bengkel_latihan') {
-            // SOUTH-EAST: LAB DKV & TEFA (Modern Creative Workshop & Control Tower)
+            // SOUTH-EAST: LAB DKV & TEFA (Modern Creative Workshop, Solar Studio & Control Tower)
             // Workshop hangar with sawtooth industrial roof
             ctx.fillStyle = '#f8fafc';
             ctx.fillRect(pt.x - 30 * z, pt.y - 12 * z, 42 * z, 30 * z);
@@ -2750,16 +3527,40 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#2563eb';
             ctx.fillRect(pt.x - 30 * z, pt.y - 18 * z, 42 * z, 6 * z);
 
-            // Sawtooth triangles
-            ctx.fillStyle = '#1d4ed8';
+            // Sawtooth triangles with angled solar glass panels
             for (let st = -28; st <= 2; st += 10) {
+              ctx.fillStyle = '#1d4ed8';
               ctx.beginPath();
               ctx.moveTo(pt.x + st * z, pt.y - 18 * z);
               ctx.lineTo(pt.x + (st + 8) * z, pt.y - 25 * z);
               ctx.lineTo(pt.x + (st + 8) * z, pt.y - 18 * z);
               ctx.closePath();
               ctx.fill();
+              // Skylight glass reflection strip
+              ctx.strokeStyle = '#7dd3fc';
+              ctx.lineWidth = 1.2 * z;
+              ctx.beginPath();
+              ctx.moveTo(pt.x + (st + 2) * z, pt.y - 19.5 * z);
+              ctx.lineTo(pt.x + (st + 7.5) * z, pt.y - 24 * z);
+              ctx.stroke();
             }
+
+            // Rooftop HVAC Ventilation Unit with spinning fan blades
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillRect(pt.x - 24 * z, pt.y - 17 * z, 9 * z, 4.5 * z);
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.arc(pt.x - 19.5 * z, pt.y - 14.8 * z, 1.8 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Digital LED Studio Ticker Sign ("DKV • TEFA")
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 25 * z, pt.y - 9.5 * z, 22 * z, 5 * z);
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = `bold ${Math.max(4, Math.round(3.6 * z))}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('DKV • TEFA', pt.x - 14 * z, pt.y - 7 * z);
 
             // Hazard-striped roll-up shutter garage door
             ctx.fillStyle = '#f59e0b';
@@ -2776,9 +3577,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             // Cylindrical Glass Control Tower with Blue Dome
             ctx.fillStyle = '#e2e8f0';
             ctx.fillRect(pt.x + 14 * z, pt.y - 26 * z, 16 * z, 44 * z);
-            // Glass observation windows on tower
-            ctx.fillStyle = '#38bdf8';
+            // Glass observation windows on tower (2 tiers)
+            ctx.fillStyle = isNight ? '#fde047' : '#38bdf8';
             ctx.fillRect(pt.x + 15 * z, pt.y - 20 * z, 14 * z, 8 * z);
+            ctx.fillRect(pt.x + 15 * z, pt.y - 8 * z, 14 * z, 7 * z);
 
             // Dome on tower
             ctx.fillStyle = '#0284c7';
@@ -2808,7 +3610,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
             ctx.stroke();
           } else if (b.id === 'kantor_pos') {
-            // NORTH-EAST: KANTOR POS KILAT (Post Office)
+            // NORTH-EAST: KANTOR POS KILAT (Express Post Office & Courier Hub)
             ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
             ctx.moveTo(pt.x - 26 * z, pt.y - 16 * z);
@@ -2819,6 +3621,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x - 26 * z, pt.y + 16 * z);
             ctx.closePath();
             ctx.fill();
+
+            // Classic Airmail Red-White-Blue Trim Band across facade
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(pt.x - 24 * z, pt.y + 3 * z, 48 * z, 1.8 * z);
+            ctx.fillStyle = '#2563eb';
+            ctx.fillRect(pt.x - 24 * z, pt.y + 5 * z, 48 * z, 1.8 * z);
 
             // Classic crimson postal roof
             ctx.fillStyle = '#dc2626';
@@ -2881,9 +3689,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 0.7 * z;
             ctx.strokeRect(pt.x + 7.8 * z, pt.y + 15 * z, 0.9 * z, 5 * z);
 
-            // Service counter windows
-            ctx.fillStyle = '#38bdf8';
-            ctx.fillRect(pt.x - 18 * z, pt.y + 8 * z, 10 * z, 8 * z);
+            // Service counter windows with red canopy
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(pt.x - 19 * z, pt.y + 6.5 * z, 12 * z, 2.5 * z);
+            ctx.fillStyle = isNight ? '#fef08a' : '#38bdf8';
+            ctx.fillRect(pt.x - 18 * z, pt.y + 9 * z, 10 * z, 7.5 * z);
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(pt.x - 4 * z, pt.y + 16 * z, 10 * z, 13 * z);
           } else if (b.id === 'taman_refleksi') {
@@ -2895,40 +3705,109 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
 
             // Lotus reflection pool
-            ctx.fillStyle = '#38bdf8';
+            ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, 14 * z, 0, Math.PI * 2);
             ctx.fill();
 
-            // Lotus flower in center
-            ctx.fillStyle = '#ec4899';
+            // Animated orange koi fish swimming in reflection pool
+            for (let k = 0; k < 2; k++) {
+              const koiAngle = elapsed * 1.5 + k * Math.PI;
+              const koiDist = 8.5 * z;
+              const kx = pt.x + Math.cos(koiAngle) * koiDist;
+              const ky = pt.y + Math.sin(koiAngle) * (koiDist * 0.55);
+              ctx.fillStyle = '#f97316';
+              ctx.beginPath();
+              ctx.ellipse(kx, ky, 2.8 * z, 1.2 * z, koiAngle, 0, Math.PI * 2);
+              ctx.fill();
+              // White dorsal fin shimmer
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.arc(kx, ky, 0.8 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            // Lotus flower in center with lily pads
+            ctx.fillStyle = '#15803d';
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y, 4 * z, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, 1.5 * z, 0, Math.PI * 2);
+            ctx.ellipse(pt.x - 3 * z, pt.y + 2 * z, 3.5 * z, 2 * z, 0.3, 0, Math.PI * 2);
+            ctx.ellipse(pt.x + 3 * z, pt.y - 1 * z, 3.2 * z, 1.8 * z, -0.4, 0, Math.PI * 2);
             ctx.fill();
 
-            // Gazebo trellis pillars
-            ctx.fillStyle = '#db2777';
+            // Blooming pink lotus blossom
+            ctx.fillStyle = '#ec4899';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 4.2 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fbcfe8';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 0.5 * z, 2.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 1.2 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Bamboo fountain spout (Shishi-odoshi) pouring clear water into pool
+            const spoutX = pt.x - 14 * z;
+            const spoutY = pt.y - 4 * z;
+            ctx.strokeStyle = '#84cc16';
+            ctx.lineWidth = 2.2 * z;
+            ctx.beginPath();
+            ctx.moveTo(spoutX - 4 * z, spoutY - 6 * z);
+            ctx.lineTo(spoutX, spoutY);
+            ctx.stroke();
+            // Trickling clear water stream
+            ctx.strokeStyle = 'rgba(186, 230, 253, 0.85)';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.moveTo(spoutX, spoutY);
+            ctx.lineTo(spoutX + 2 * z, spoutY + 4 * z);
+            ctx.stroke();
+
+            // Gazebo trellis carved rosewood pillars with climbing vines
+            ctx.fillStyle = '#9d174d';
             for (let a = 0; a < 4; a++) {
               const ang = (a * Math.PI) / 2 + 0.4;
               const px = pt.x + Math.cos(ang) * 16 * z;
               const py = pt.y + Math.sin(ang) * 16 * z;
-              ctx.fillRect(px - 1.5 * z, py - 18 * z, 3 * z, 18 * z);
+              ctx.fillRect(px - 1.6 * z, py - 20 * z, 3.2 * z, 20 * z);
+              // Small green ivy vine leaves on pillar
+              ctx.fillStyle = '#16a34a';
+              ctx.beginPath();
+              ctx.arc(px - 0.5 * z, py - 10 * z, 1.5 * z, 0, Math.PI * 2);
+              ctx.arc(px + 0.8 * z, py - 15 * z, 1.3 * z, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = '#9d174d';
             }
 
-            // Rose pagoda roof canopy
-            ctx.fillStyle = '#f43f5e';
+            // Lower flared eaves pagoda canopy
+            ctx.fillStyle = '#be123c';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 20 * z, pt.y - 18 * z);
-            ctx.lineTo(pt.x, pt.y - 32 * z);
-            ctx.lineTo(pt.x + 20 * z, pt.y - 18 * z);
+            ctx.moveTo(pt.x - 22 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 30 * z);
+            ctx.lineTo(pt.x + 22 * z, pt.y - 18 * z);
+            ctx.lineTo(pt.x, pt.y - 24 * z);
             ctx.closePath();
             ctx.fill();
 
-            // Japanese Stone Lantern (Tōrō) beside the pond
+            // Upper tier pagoda roof canopy with curled eaves
+            ctx.fillStyle = '#f43f5e';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 16 * z, pt.y - 28 * z);
+            ctx.lineTo(pt.x, pt.y - 40 * z);
+            ctx.lineTo(pt.x + 16 * z, pt.y - 28 * z);
+            ctx.lineTo(pt.x, pt.y - 33 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Gilded pagoda roof finial
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y - 41 * z, 2.2 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Japanese Stone Lantern (Kasuga Tōrō) beside the pond with glowing paper window
             const slX = pt.x + 18 * z;
             const slY = pt.y + 8 * z;
             ctx.fillStyle = isNight ? '#334155' : '#94a3b8';
@@ -2939,19 +3818,26 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             // Fire chamber with warm light
             ctx.fillStyle = '#fef08a';
             ctx.fillRect(slX - 2.8 * z, slY - 13.5 * z, 5.6 * z, 4.5 * z);
-            // Roof cap
+            // Warm lantern halo at night
+            if (isNight) {
+              ctx.fillStyle = 'rgba(254, 240, 138, 0.35)';
+              ctx.beginPath();
+              ctx.arc(slX, slY - 11 * z, 6 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            // Roof cap with curved finial
             ctx.fillStyle = isNight ? '#1e293b' : '#64748b';
             ctx.beginPath();
-            ctx.moveTo(slX - 5 * z, slY - 13.5 * z);
-            ctx.lineTo(slX, slY - 17 * z);
-            ctx.lineTo(slX + 5 * z, slY - 13.5 * z);
+            ctx.moveTo(slX - 5.5 * z, slY - 13.5 * z);
+            ctx.lineTo(slX, slY - 18 * z);
+            ctx.lineTo(slX + 5.5 * z, slY - 13.5 * z);
             ctx.closePath();
             ctx.fill();
 
             // Gently drifting pink cherry blossom petals over the water
-            for (let pet = 0; pet < 5; pet++) {
-              const petAngle = elapsed * 0.8 + pet * 1.3;
-              const petR = (8 + (pet * 2.5)) * z;
+            for (let pet = 0; pet < 6; pet++) {
+              const petAngle = elapsed * 0.8 + pet * 1.1;
+              const petR = (8 + (pet * 2.2)) * z;
               const px = pt.x + Math.cos(petAngle) * petR;
               const py = pt.y + Math.sin(petAngle) * (petR * 0.6) + Math.sin(elapsed * 2 + pet) * 2 * z;
               ctx.fillStyle = '#fbcfe8';
@@ -2961,31 +3847,41 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
-          // Floating Building Label with icon & smooth rounded badge (elevated for Balai Kota & ON AIR)
-          const tagY = pt.y - (b.id === 'balai_kota' ? 88 : b.id === 'menara_mentor' ? 64 : 54) * z;
-          const labelText = `${b.icon} ${b.name}`;
-          ctx.font = `bold ${Math.round(10 * z)}px sans-serif`;
-          const tMetrics = ctx.measureText(labelText);
-          const tagW = tMetrics.width + 16 * z;
-          const tagH = 20 * z;
+          // Floating Building Label ONLY when touched, hovered or active
+          const shouldShowLabel = isHovered || activeBuilding === b.id || lastTouchedIdRef.current === b.id;
+          if (shouldShowLabel) {
+            const tagY = pt.y - (b.id === 'balai_kota' ? 88 : b.id === 'menara_mentor' ? 64 : 54) * z;
+            const labelText = `${b.icon} ${b.name}`;
+            ctx.font = `bold ${Math.round(10 * z)}px sans-serif`;
+            const tMetrics = ctx.measureText(labelText);
+            const tagW = tMetrics.width + 16 * z;
+            const tagH = 20 * z;
 
-          ctx.fillStyle = isHovered ? '#0f172a' : 'rgba(15, 23, 42, 0.88)';
-          ctx.beginPath();
-          ctx.roundRect(pt.x - tagW / 2, tagY - tagH / 2, tagW, tagH, 10 * z);
-          ctx.fill();
-          ctx.strokeStyle = isHovered ? '#38bdf8' : 'rgba(148, 163, 184, 0.6)';
-          ctx.lineWidth = isHovered ? 2 : 1.2;
-          ctx.stroke();
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - tagW / 2, tagY - tagH / 2, tagW, tagH, 10 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+            ctx.stroke();
 
-          ctx.fillStyle = '#ffffff';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(labelText, pt.x, tagY);
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(labelText, pt.x, tagY);
+          }
           ctx.restore();
         } else if (item.type === 'cafe') {
           // SOUTH: TOKO ROTI & KAFE WARGA (Enriched Bakery & Espresso Stall)
           const pt = toScreen(cafeWx, cafeWy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
+
+          const cafeDistToPlayer = Math.hypot(player.wx - cafeWx, player.wy - cafeWy);
+          const isCafeTransparent = cafeDistToPlayer < 2.0;
+          ctx.save();
+          if (isCafeTransparent) {
+            ctx.globalAlpha = 0.45;
+          }
 
           setCafeScreenPos({
             x: pt.x,
@@ -3055,26 +3951,29 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           }
 
-          // Floating Pill Badge above Toko Roti awning: 🥐 Toko Roti & Kafe
-          const trBadgeY = pt.y - 38 * z;
-          ctx.save();
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-          const trLabel = '🥐 Toko Roti & Kafe';
-          ctx.font = `bold ${Math.round(9.5 * z)}px sans-serif`;
-          const trMetrics = ctx.measureText(trLabel);
-          const trW = trMetrics.width + 16 * z;
-          const trH = 19 * z;
-          ctx.beginPath();
-          ctx.roundRect(pt.x - trW / 2, trBadgeY - trH / 2, trW, trH, 9.5 * z);
-          ctx.fill();
-          ctx.strokeStyle = '#f59e0b';
-          ctx.lineWidth = 1.2 * z;
-          ctx.stroke();
-          ctx.fillStyle = '#fef3c7';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(trLabel, pt.x, trBadgeY);
-          ctx.restore();
+          // Floating Pill Badge above Toko Roti awning ONLY when touched/opened
+          const isCafeTouched = lastTouchedIdRef.current === 'cafe' || isCafeMenuOpen;
+          if (isCafeTouched) {
+            const trBadgeY = pt.y - 38 * z;
+            ctx.save();
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            const trLabel = '🥐 Toko Roti & Kafe';
+            ctx.font = `bold ${Math.round(9.5 * z)}px sans-serif`;
+            const trMetrics = ctx.measureText(trLabel);
+            const trW = trMetrics.width + 16 * z;
+            const trH = 19 * z;
+            ctx.beginPath();
+            ctx.roundRect(pt.x - trW / 2, trBadgeY - trH / 2, trW, trH, 9.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#fef3c7';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(trLabel, pt.x, trBadgeY);
+            ctx.restore();
+          }
 
           // Signboard "TOKO ROTI & KAFE" on front counter
           ctx.fillStyle = '#fef3c7';
@@ -3178,17 +4077,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.font = `bold ${Math.round(2.2 * z)}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillText('FLOUR', barrelX + 11 * z, barrelY + 2.5 * z);
+          ctx.restore();
         } else if (item.type === 'avatar') {
           // AVATARS (Smooth, Natural Leg Swing, Arm Swing, and Gentle Bobbing)
           const av = item.data;
           const pt = toScreen(av.wx, av.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
-
-          // Soft ground shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
-          ctx.beginPath();
-          ctx.ellipse(pt.x + 1, pt.y + 1, 8 * z, 4 * z, 0, 0, Math.PI * 2);
-          ctx.fill();
 
           const isFemale = item.isPlayer
             ? studentGender === 'P'
@@ -3198,7 +4092,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const isFishingNow = Boolean((item.isPlayer && isFishingRef.current) || av.isFishing);
           const currentHeldItem = item.isPlayer ? heldItemRef.current : av.heldItem;
 
-          // Spawning Portal Effect for Remote Online Avatars at Map Corners
+          const currentSeatId = item.isPlayer ? sittingSeatRef.current : av.sittingSeat;
+          const isOnSwing = Boolean(isSittingNow && (currentSeatId === 'swing_left' || currentSeatId === 'swing_right'));
+          const swingMetrics = isOnSwing
+            ? getSwingSeatMetrics(currentSeatId as 'swing_left' | 'swing_right')
+            : null;
+
+          // Soft ground shadow (when on swing, shadow is already drawn under the swinging seat)
+          if (!isOnSwing) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+            ctx.beginPath();
+            ctx.ellipse(pt.x + 1, pt.y + 1, 8 * z, 4 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Spawning Portal Effect for Remote Online Avatars
           if (av.isOnlineRemote && av.spawnTime && currentTime - av.spawnTime < 3500) {
             const spawnFade = 1 - (currentTime - av.spawnTime) / 3500;
             ctx.save();
@@ -3222,29 +4130,40 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
 
-          // Natural leg swing & gentle bobbing (disabled when sitting)
+          // Natural leg swing & gentle bobbing (or exact lock to swing seat plank when on swing!)
           const legSwing = (av.isMoving && !isSittingNow) ? Math.sin(av.walkFrame) * 3.5 * z : 0;
-          const avY = pt.y + (isSittingNow ? 3.2 * z : (av.isMoving ? -Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0));
+          let avY = pt.y + (isSittingNow ? -1.8 * z : (av.isMoving ? -Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0));
+
+          if (swingMetrics) {
+            // Lock avatar hip/seat center with 100% precision onto the wooden swing plank!
+            pt.x = swingMetrics.seatX;
+            avY = swingMetrics.seatY + 1.2 * z;
+          }
 
           // 1. LEGS & PANTS / SKIRT
           if (isSittingNow) {
-            // SITTING ANIMATION: Legs folded forward over the bench surface
+            // SITTING ANIMATION: Legs folded forward resting comfortably over the bench/swing surface
+            const swayVal = swingMetrics ? swingMetrics.sway : 0;
+            // When swinging forward (kemuka, sway > 0), calves kick forward/outward; when swinging backward (kebelakang, sway < 0), calves tuck back
+            const calfKickX = isOnSwing ? swayVal * 2.2 * z : 0;
+            const calfKickY = isOnSwing ? -Math.max(0, swayVal) * 1.6 * z : 0;
+
             ctx.fillStyle = isTeacherAvatar
               ? (isFemale ? '#065f46' : '#1e293b')
               : (isFemale ? (av.pantsColor || '#be185d') : av.pantsColor);
 
-            // Horizontal thighs resting on bench
-            ctx.fillRect(pt.x - 4 * z, avY - 5.5 * z, 3.8 * z, 3.5 * z);
-            ctx.fillRect(pt.x + 0.5 * z, avY - 5.5 * z, 3.8 * z, 3.5 * z);
+            // Horizontal thighs resting flat on bench/swing plank
+            ctx.fillRect(pt.x - 4 * z, avY - 4 * z, 3.8 * z, 3.2 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY - 4 * z, 3.8 * z, 3.2 * z);
 
-            // Vertical calves bent downward
-            ctx.fillRect(pt.x - 4 * z, avY - 2.5 * z, 3.2 * z, 4 * z);
-            ctx.fillRect(pt.x + 1 * z, avY - 2.5 * z, 3.2 * z, 4 * z);
+            // Vertical calves hanging downward from bench/swing (pumping forward & backward on swing)
+            ctx.fillRect(pt.x - 4 * z + calfKickX, avY - 1 * z + calfKickY, 3.2 * z, 4.2 * z);
+            ctx.fillRect(pt.x + 1 * z + calfKickX, avY - 1 * z + calfKickY, 3.2 * z, 4.2 * z);
 
-            // Shoes resting on floor
+            // Shoes resting on ground / swinging in air
             ctx.fillStyle = isFemale ? (isTeacherAvatar ? '#064e3b' : '#e11d48') : '#0f172a';
-            ctx.fillRect(pt.x - 4.5 * z, avY + 1.2 * z, 4 * z, 2.2 * z);
-            ctx.fillRect(pt.x + 0.8 * z, avY + 1.2 * z, 4 * z, 2.2 * z);
+            ctx.fillRect(pt.x - 4.5 * z + calfKickX, avY + 3.2 * z + calfKickY, 4 * z, 2.2 * z);
+            ctx.fillRect(pt.x + 0.8 * z + calfKickX, avY + 3.2 * z + calfKickY, 4 * z, 2.2 * z);
           } else if (isFemale) {
             if (isTeacherAvatar) {
               // Female Teacher: Elegant tailored long slacks or maxi skirt
@@ -3411,6 +4330,40 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.fillRect(pt.x - 4.2 * z, avY - (8.8 - pl * 1.5) * z, 3 * z, 0.7 * z);
               ctx.fillRect(pt.x + 1.2 * z, avY - (8.8 - pl * 1.5) * z, 3 * z, 0.7 * z);
             }
+          } else if (isOnSwing && swingMetrics) {
+            // Gripping the left & right swing chains with exact chain alignment
+            const handChainT = 0.68; // 68% down from top beam to seat
+            const leftHandX = swingMetrics.anchorX - 4.2 * z + ((swingMetrics.seatX - 4.5 * z) - (swingMetrics.anchorX - 4.2 * z)) * handChainT;
+            const leftHandY = swingMetrics.anchorY + (swingMetrics.seatY - swingMetrics.anchorY) * handChainT;
+            const rightHandX = swingMetrics.anchorX + 4.2 * z + ((swingMetrics.seatX + 4.5 * z) - (swingMetrics.anchorX + 4.2 * z)) * handChainT;
+            const rightHandY = swingMetrics.anchorY + (swingMetrics.seatY - swingMetrics.anchorY) * handChainT;
+
+            // Sleeves reaching from shoulders to the chains
+            ctx.strokeStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.lineWidth = 2.4 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 4.8 * z, avY - 12.5 * z);
+            ctx.lineTo(leftHandX, leftHandY);
+            ctx.moveTo(pt.x + 4.8 * z, avY - 12.5 * z);
+            ctx.lineTo(rightHandX, rightHandY);
+            ctx.stroke();
+
+            // Hands gripping the chains
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(leftHandX, leftHandY, 1.5 * z, 0, Math.PI * 2);
+            ctx.arc(rightHandX, rightHandY, 1.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Re-draw lower front chain segment passing through the hands to the seat so avatar sits inside the chains
+            ctx.strokeStyle = isNight ? '#cbd5e1' : '#57534e';
+            ctx.lineWidth = 1.2 * z;
+            ctx.beginPath();
+            ctx.moveTo(leftHandX, leftHandY);
+            ctx.lineTo(swingMetrics.seatX - 4.5 * z, swingMetrics.seatY);
+            ctx.moveTo(rightHandX, rightHandY);
+            ctx.lineTo(swingMetrics.seatX + 4.5 * z, swingMetrics.seatY);
+            ctx.stroke();
           } else if (isSittingNow) {
             // Resting arms on lap / knees
             ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
@@ -3737,6 +4690,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const z = zoomLevelRef.current;
           const lampHeight = 35 * z;
 
+          const distToPlayer = Math.hypot(player.wx - item.wx, player.wy - item.wy);
+          const isLampTransparent = distToPlayer < 1.2;
+          ctx.save();
+          if (isLampTransparent) {
+            ctx.globalAlpha = 0.45;
+          }
+
           // Small circular cast-iron base plate
           ctx.fillStyle = isNight ? '#1e293b' : '#475569';
           ctx.beginPath();
@@ -3767,7 +4727,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const lanternW = 7.5 * z;
           const lanternH = 9.5 * z;
 
-          if (isNight) {
+          const isLampLit = currentPeriod === 'malam' || currentPeriod === 'subuh' || currentPeriod === 'sore';
+
+          if (isLampLit) {
             // Bright radiating lantern halo
             const lanternGlow = ctx.createRadialGradient(pt.x, lanternY, 2 * z, pt.x, lanternY, 26 * z);
             lanternGlow.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
@@ -3817,8 +4779,41 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.beginPath();
           ctx.arc(pt.x, lanternY - lanternH / 2 - 5 * z, 1.2 * z, 0, Math.PI * 2);
           ctx.fill();
+
+          ctx.restore();
         }
       });
+
+      // -----------------------------------------------------------
+      // MINIMALIST WATER ARC EFFECT FROM AVATAR TO TREE (1.0s)
+      // -----------------------------------------------------------
+      if (activeWaterSprayRef.current) {
+        const spray = activeWaterSprayRef.current;
+        const sprayElapsed = (currentTime - spray.startTime) / 1000;
+        if (sprayElapsed >= 0 && sprayElapsed < 1.0) {
+          const fade = 1 - sprayElapsed / 1.0;
+          const z = zoomLevelRef.current;
+          const avPt = toScreen(spray.avatarWx, spray.avatarWy, 12, camera.x, camera.y);
+          const treePt = toScreen(spray.treeWx, spray.treeWy, 36, camera.x, camera.y);
+
+          ctx.save();
+          const midX = (avPt.x + treePt.x) / 2;
+          const midY = Math.min(avPt.y, treePt.y) - 24 * z;
+
+          // Clean minimalist thin sky-blue water stream
+          ctx.strokeStyle = `rgba(125, 211, 252, ${0.65 * fade})`;
+          ctx.lineWidth = 1.4 * z;
+          ctx.setLineDash([3 * z, 3 * z]);
+          ctx.beginPath();
+          ctx.moveTo(avPt.x, avPt.y);
+          ctx.quadraticCurveTo(midX, midY, treePt.x, treePt.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        } else {
+          activeWaterSprayRef.current = null;
+        }
+      }
 
       // ---------------------------------------------------------
       // 5. NOCTURNAL GLOWING FIREFLIES (Kecil & Mengitari Pohon)
@@ -3951,9 +4946,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   };
 
   // -------------------------------------------------------------
-  // TREE WATERING ACTION (-1 XP Saldo)
+  // TREE WATERING ACTION (3x Siram -> Muncul Buah Apel 15 Detik -> Hilang Otomatis)
   // -------------------------------------------------------------
   const handleWaterTree = (treeIdx: number) => {
+    const nowPerf = performance.now();
+    const existingCycle = treeCyclesRef.current[treeIdx];
+
+    // Check if tree is currently in its 15-second apple fruiting phase
+    if (existingCycle && existingCycle.appleStartTime !== null) {
+      const appleElapsed = (nowPerf - existingCycle.appleStartTime) / 1000;
+      if (appleElapsed < 15.0) {
+        const secsLeft = Math.max(1, Math.ceil(15.0 - appleElapsed));
+        sounds.playClick();
+        setCafeToast(`🍎 Pohon sedang berbuah apel merah! Siklus baru dapat dimulai dalam ${secsLeft} detik.`);
+        setTimeout(() => setCafeToast(null), 3000);
+        return;
+      }
+    }
+
     const cost = 1;
     if (studentPoints < cost) {
       sounds.playClick();
@@ -3966,12 +4976,52 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     if (success) {
       sounds.playRewardXp();
       const remaining = studentPoints - cost;
-      setWateredTrees((prev) => ({ ...prev, [treeIdx]: Date.now() }));
-      setCafeToast(`🌱 Berhasil menyiram pohon! Kota menjadi makin asri & rindang (-1 XP) • Sisa: ${remaining} XP`);
-      playerSpeechRef.current = {
-        text: 'Segar sekali pohonnya! 🌱✨',
-        expiresAt: Date.now() + 4500,
+      const prevCount =
+        existingCycle && existingCycle.appleStartTime === null && existingCycle.count < 3
+          ? existingCycle.count
+          : 0;
+      const nextCount = prevCount + 1;
+      const isThirdWatering = nextCount >= 3;
+
+      const updatedCycle: TreeWaterCycle = {
+        count: nextCount,
+        lastWateredTime: nowPerf,
+        appleStartTime: isThirdWatering ? nowPerf : null,
       };
+
+      treeCyclesRef.current[treeIdx] = updatedCycle;
+      setTreeCycles((prev) => ({ ...prev, [treeIdx]: updatedCycle }));
+
+      const treePos = TREES_LIST[treeIdx] || [0, 0];
+      activeWaterSprayRef.current = {
+        treeIndex: treeIdx,
+        startTime: nowPerf,
+        avatarWx: playerRef.current ? playerRef.current.wx : 0,
+        avatarWy: playerRef.current ? playerRef.current.wy : 0,
+        treeWx: treePos[0],
+        treeWy: treePos[1],
+      };
+
+      if (isThirdWatering) {
+        setCafeToast(`🍎 Siraman ke-3 (3/3)! Pohon berbuah apel merah segar selama 15 detik (-1 XP) • Sisa: ${remaining} XP`);
+        playerSpeechRef.current = {
+          text: 'Siraman ke-3! Pohonnya berbuah apel 🍎✨',
+          expiresAt: Date.now() + 4500,
+        };
+        // Schedule UI state sync after 15 seconds when apples disappear
+        window.setTimeout(() => {
+          const resetCycle: TreeWaterCycle = { count: 0, lastWateredTime: 0, appleStartTime: null };
+          treeCyclesRef.current[treeIdx] = resetCycle;
+          setTreeCycles((prev) => ({ ...prev, [treeIdx]: resetCycle }));
+        }, 15000);
+      } else {
+        setCafeToast(`💧 Pohon disiram (${nextCount}/3)! Siram ${3 - nextCount}x lagi agar muncul buah apel (-1 XP) • Sisa: ${remaining} XP`);
+        playerSpeechRef.current = {
+          text: `Menyiram pohon (${nextCount}/3) 💧🌱`,
+          expiresAt: Date.now() + 3500,
+        };
+      }
+      sendHeartbeatRef.current?.();
       setTimeout(() => setCafeToast(null), 3500);
     }
   };
@@ -4098,17 +5148,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             <div className="bg-[#121e2c]/95 backdrop-blur-md border border-emerald-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                  🌳
+                  {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime ? '🍎' : '🌳'}
                 </div>
                 <div className="min-w-0">
                   <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-400">
-                    Pohon Rindang Kota
+                    Pohon Rindang Kota • Siklus {treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3
                   </div>
                   <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                    Siram Pohon Hijau
+                    {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime
+                      ? 'Sedang Berbuah Apel (15d)'
+                      : `Siram Pohon (${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3)`}
                   </h4>
                   <p className="text-[10px] text-slate-300 truncate">
-                    Rawat tanaman asri & suburkan kota
+                    {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime
+                      ? 'Buah apel merah hilang otomatis setelah 15 detik'
+                      : 'Siram 3 kali agar pohon mengeluarkan buah apel'}
                   </p>
                 </div>
               </div>
@@ -4116,7 +5170,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
                 className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold border border-emerald-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
               >
-                <span>💧 Siram</span>
+                <span>💧 Siram ({Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)</span>
                 <span className="text-[10px] font-mono text-amber-300 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-500/30">
                   -1 XP
                 </span>
@@ -4157,17 +5211,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                  🪑
+                  {nearbyAction.benchId?.startsWith('swing') ? '🎠' : '🪑'}
                 </div>
                 <div className="min-w-0">
                   <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
                     {nearbyAction.benchName || 'Kursi Taman'}
                   </div>
                   <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                    {isSittingRef.current ? 'Bangun dari Kursi' : 'Duduk Santai di Kursi'}
+                    {nearbyAction.benchId?.startsWith('swing')
+                      ? (isSittingRef.current ? 'Turun dari Ayunan' : 'Duduk & Berayun')
+                      : (isSittingRef.current ? 'Bangun dari Kursi' : 'Duduk Santai di Kursi')}
                   </h4>
                   <p className="text-[10px] text-slate-300 truncate">
-                    Nikmati suasana tenang kota Refleksia
+                    {nearbyAction.benchId?.startsWith('swing')
+                      ? 'Rasakan semilir angin sejuk di belakang Taman Refleksi'
+                      : 'Nikmati suasana tenang kota Refleksia'}
                   </p>
                 </div>
               </div>
@@ -4175,36 +5233,46 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 onClick={() => {
                   sounds.playClick();
                   if (isSittingRef.current) {
+                    const wasSwing = sittingSeatRef.current?.startsWith('swing');
                     setIsSitting(false);
                     setSittingSeat(null);
-                    setCafeToast('🚶 Berdiri kembali dari kursi taman.');
+                    setCafeToast(wasSwing ? '🚶 Turun dari ayunan Taman Refleksi.' : '🚶 Berdiri kembali dari kursi taman.');
                     setTimeout(() => setCafeToast(null), 2500);
+                    sendHeartbeatRef.current?.();
                   } else {
-                    const seat = nearbyAction.benchId || 'fountain_east';
+                    const seat = nearbyAction.benchId || 'fountain_1';
                     setIsSitting(true);
                     setSittingSeat(seat);
                     if (playerRef.current) {
-                      if (seat === 'fountain_east') {
-                        playerRef.current.wx = 1.25;
-                        playerRef.current.wy = 0.0;
-                      } else if (seat === 'fountain_west') {
-                        playerRef.current.wx = -1.25;
-                        playerRef.current.wy = 0.0;
+                      const targetBench = FOUNTAIN_FRONT_BENCHES.find((b) => b.id === seat)
+                        || REFLECTION_SWINGS.find((s) => s.id === seat);
+                      if (targetBench) {
+                        playerRef.current.wx = targetBench.wx;
+                        playerRef.current.wy = targetBench.wy;
+                        playerRef.current.facing = targetBench.facing;
                       } else if (seat === 'literacy') {
                         playerRef.current.wx = -3.7;
                         playerRef.current.wy = 1.8;
+                        playerRef.current.facing = 'down-right';
                       }
                       playerRef.current.targetWx = playerRef.current.wx;
                       playerRef.current.targetWy = playerRef.current.wy;
                       playerRef.current.isMoving = false;
+                      playerRef.current.walkFrame = 0;
+                      sendHeartbeatRef.current?.();
                     }
-                    setCafeToast('🪑 Duduk santai di bangku taman.');
+                    const name = nearbyAction.benchName || 'Bangku Taman';
+                    setCafeToast(seat.startsWith('swing') ? `🎠 Duduk santai dan berayun di ${name}!` : `🪑 Duduk santai di ${name}.`);
                     setTimeout(() => setCafeToast(null), 2500);
                   }
                 }}
                 className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
               >
-                <span>{isSittingRef.current ? '🚶 Berdiri' : '🪑 Duduk'}</span>
+                <span>
+                  {nearbyAction.benchId?.startsWith('swing')
+                    ? (isSittingRef.current ? '🚶 Turun' : '🎠 Berayun')
+                    : (isSittingRef.current ? '🚶 Berdiri' : '🪑 Duduk')}
+                </span>
               </button>
             </div>
           ) : (

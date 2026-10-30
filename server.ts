@@ -478,19 +478,57 @@ interface ServerOnlinePlayer {
 }
 
 const onlinePlayersMap = new Map<string, ServerOnlinePlayer>();
+const sseClients = new Set<express.Response>();
 
-function purgeInactivePlayers() {
-  const timeoutMs = 15000; // 15 seconds of inactivity
-  const now = Date.now();
-  for (const [id, player] of onlinePlayersMap.entries()) {
-    if (now - player.lastSeen > timeoutMs) {
-      onlinePlayersMap.delete(id);
+function broadcastPresence(payload: any) {
+  const data = `data: ${JSON.stringify(payload)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(data);
+    } catch {
+      sseClients.delete(client);
     }
   }
 }
 
-// Inactive cleanup interval
-setInterval(purgeInactivePlayers, 5000);
+function purgeInactivePlayers() {
+  const timeoutMs = 12000; // 12 seconds of inactivity
+  const now = Date.now();
+  let changed = false;
+  for (const [id, player] of onlinePlayersMap.entries()) {
+    if (now - player.lastSeen > timeoutMs) {
+      onlinePlayersMap.delete(id);
+      changed = true;
+    }
+  }
+  if (changed) {
+    broadcastPresence({
+      type: 'sync',
+      onlinePlayers: Array.from(onlinePlayersMap.values()),
+    });
+  }
+}
+
+// Inactive cleanup interval (check every 3 seconds)
+setInterval(purgeInactivePlayers, 3000);
+
+// SSE Stream for Instant Real-Time Multi-Device Presence
+app.get('/api/presence/stream', (_req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  sseClients.add(res);
+
+  // Send initial players immediately on connection
+  const initial = Array.from(onlinePlayersMap.values());
+  res.write(`data: ${JSON.stringify({ type: 'sync', onlinePlayers: initial })}\n\n`);
+
+  _req.on('close', () => {
+    sseClients.delete(res);
+  });
+});
 
 // Heartbeat & sync player position/state across all devices
 app.post('/api/presence/heartbeat', (req, res) => {
@@ -529,6 +567,14 @@ app.post('/api/presence/heartbeat', (req, res) => {
 
   onlinePlayersMap.set(data.id, player);
 
+  // Broadcast instantly to all other devices listening on SSE
+  broadcastPresence({
+    type: 'player_update',
+    player,
+    senderId: data.id,
+    onlinePlayers: Array.from(onlinePlayersMap.values()),
+  });
+
   // Return all other active online players from other devices/browsers
   const others = Array.from(onlinePlayersMap.values()).filter((p) => p.id !== data.id);
   res.json({
@@ -550,10 +596,25 @@ app.get('/api/presence/online', (_req, res) => {
 });
 
 // Explicit player disconnect
-app.post('/api/presence/leave', (req, res) => {
-  const { id } = req.body;
+app.post('/api/presence/leave', express.text({ type: '*/*' }), (req, res) => {
+  let id: string | undefined;
+  if (typeof req.body === 'string') {
+    try {
+      const parsed = JSON.parse(req.body);
+      id = parsed?.id;
+    } catch {
+      id = undefined;
+    }
+  } else if (req.body && typeof req.body === 'object') {
+    id = req.body.id;
+  }
   if (id && onlinePlayersMap.has(id)) {
     onlinePlayersMap.delete(id);
+    broadcastPresence({
+      type: 'leave',
+      leftId: id,
+      onlinePlayers: Array.from(onlinePlayersMap.values()),
+    });
   }
   res.json({ success: true });
 });

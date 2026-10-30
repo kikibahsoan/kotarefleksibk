@@ -32,12 +32,11 @@ import { RuangGuruModal } from './components/modals/RuangGuruModal.tsx';
 import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal.tsx';
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
 import { LofiAudioControl } from './components/LofiAudioControl.tsx';
+import { getTimePeriodWita, TimePeriod } from './utils/lofiAudio.ts';
 import { PublicChatMessage } from './types/index.ts';
 import {
   LogOut,
   Sparkles,
-  Sun,
-  Moon,
   Volume2,
   VolumeX,
   Compass,
@@ -68,7 +67,7 @@ export default function App() {
   const [teacherModalInitialTab, setTeacherModalInitialTab] = useState<'refleksi' | 'materi' | 'pesan' | 'pengaturan' | 'konsultasi'>('refleksi');
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
   const [preselectedMateriForReflection, setPreselectedMateriForReflection] = useState<string | undefined>(undefined);
-  const [timeOfDay, setTimeOfDay] = useState<'day' | 'night' | 'auto'>('night');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(() => getTimePeriodWita());
 
   // Live WITA Clock (Waktu Indonesia Tengah - Asia/Makassar)
   const [currentTimeWita, setCurrentTimeWita] = useState(() => {
@@ -84,6 +83,7 @@ export default function App() {
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
+      setTimePeriod(getTimePeriodWita(now));
       setCurrentTimeWita(
         new Intl.DateTimeFormat('id-ID', {
           timeZone: 'Asia/Makassar',
@@ -643,8 +643,16 @@ export default function App() {
   return (
     <div
       className={`relative w-full h-[100dvh] min-h-[100dvh] overflow-hidden ${
-        timeOfDay === 'day' ? 'bg-[#38bdf8]' : 'bg-[#0c1527]'
-      } select-none transition-colors duration-500`}
+        timePeriod === 'subuh'
+          ? 'bg-[#151a36]'
+          : timePeriod === 'pagi'
+          ? 'bg-[#60a5fa]'
+          : timePeriod === 'siang'
+          ? 'bg-[#38bdf8]'
+          : timePeriod === 'sore'
+          ? 'bg-[#9a3412]'
+          : 'bg-[#0c1527]'
+      } select-none transition-colors duration-700`}
     >
       {/* 2D Isometric Town Canvas */}
       <ThreeTownCanvas
@@ -654,7 +662,7 @@ export default function App() {
         studentName={student.name}
         studentGender={student.gender}
         isTeacher={student.isTeacher}
-        timeOfDay={timeOfDay}
+        timePeriod={timePeriod}
         latestMessage={latestChat}
         studentPoints={student.points}
         onDeductPoints={handleDeductPoints}
@@ -761,8 +769,8 @@ export default function App() {
               <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
             </button>
 
-            {/* Lo-Fi Background Music Controller */}
-            <LofiAudioControl />
+            {/* Radio Background Music Controller (Dynamic 5 Time-of-Day Stations) */}
+            <LofiAudioControl timePeriod={timePeriod} />
 
             {/* Audio Toggle (Desktop only) */}
             <button
@@ -772,22 +780,6 @@ export default function App() {
               aria-label="Toggle Suara"
             >
               {audioEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
-            </button>
-
-            {/* Day / Night Toggle */}
-            <button
-              onClick={() => {
-                setTimeOfDay((prev) => (prev === 'day' ? 'night' : 'day'));
-              }}
-              className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0"
-              title={timeOfDay === 'day' ? 'Waktu Pagi (Klik untuk ganti ke Malam)' : 'Waktu Malam (Klik untuk ganti ke Pagi)'}
-              aria-label="Waktu Kota"
-            >
-              {timeOfDay === 'day' ? (
-                <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 animate-spin-slow" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200" />
-              )}
             </button>
           </div>
         </header>

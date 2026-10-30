@@ -223,9 +223,6 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
                 <KeyRound className="w-4 h-4 text-amber-400" />
                 Password Akun Murid <span className="text-red-400">*</span>
               </span>
-              <span className="text-[10px] text-slate-400 font-normal">
-                NISN / Password Resmi
-              </span>
             </label>
             <div className="relative">
               <input
