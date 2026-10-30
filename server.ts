@@ -448,7 +448,7 @@ app.post('/api/chat/report', (req, res) => {
 });
 
 // =========================================================================
-// REAL-TIME PRESENCE & MULTI-DEVICE ONLINE AVATARS SYNC (24 JAM REAL-TIME)
+// REAL-TIME PRESENCE & MULTI-DEVICE ONLINE AVATARS SYNC
 // =========================================================================
 interface ServerOnlinePlayer {
   id: string;
@@ -472,59 +472,13 @@ interface ServerOnlinePlayer {
   sittingSeat?: string;
   isFishing?: boolean;
   heldItem?: 'kopi' | 'roti' | 'eskrim' | null;
-  activeEmote?: {
-    type: 'love' | 'wave' | 'laugh' | 'dance';
-    icon: string;
-    label: string;
-    startTime: number;
-    expiresAt: number;
-  } | null;
   speechText?: string;
   speechTimer?: number;
   lastSeen: number;
-  connectedAt?: number;
 }
 
-const PRESENCE_FILE_PATH = path.join(__dirname, 'server_presence.json');
-const SERVER_START_TIME = Date.now();
-
-function loadPresenceFromFile(): Map<string, ServerOnlinePlayer> {
-  const map = new Map<string, ServerOnlinePlayer>();
-  try {
-    if (fs.existsSync(PRESENCE_FILE_PATH)) {
-      const raw = fs.readFileSync(PRESENCE_FILE_PATH, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const now = Date.now();
-        // Restore players seen within last 45 seconds as active
-        parsed.forEach((p: ServerOnlinePlayer) => {
-          if (p && p.id && now - p.lastSeen < 45000) {
-            map.set(p.id, p);
-          }
-        });
-      }
-    }
-  } catch (err) {
-    console.warn('[server.ts] Could not read server_presence.json:', err);
-  }
-  return map;
-}
-
-const onlinePlayersMap = loadPresenceFromFile();
+const onlinePlayersMap = new Map<string, ServerOnlinePlayer>();
 const sseClients = new Set<express.Response>();
-let lastPresenceSaveTime = 0;
-
-function savePresenceToFile() {
-  const now = Date.now();
-  if (now - lastPresenceSaveTime < 1500) return; // Throttled to avoid disk thrash
-  lastPresenceSaveTime = now;
-  try {
-    const list = Array.from(onlinePlayersMap.values());
-    fs.writeFileSync(PRESENCE_FILE_PATH, JSON.stringify(list, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('[server.ts] Failed to persist server_presence.json:', err);
-  }
-}
 
 function broadcastPresence(payload: any) {
   const data = `data: ${JSON.stringify(payload)}\n\n`;
@@ -538,7 +492,7 @@ function broadcastPresence(payload: any) {
 }
 
 function purgeInactivePlayers() {
-  const timeoutMs = 40000; // 40 seconds of inactivity before marking offline
+  const timeoutMs = 18000; // 18 seconds of inactivity
   const now = Date.now();
   let changed = false;
   for (const [id, player] of onlinePlayersMap.entries()) {
@@ -548,7 +502,6 @@ function purgeInactivePlayers() {
     }
   }
   if (changed) {
-    savePresenceToFile();
     broadcastPresence({
       type: 'sync',
       onlinePlayers: Array.from(onlinePlayersMap.values()),
@@ -556,7 +509,7 @@ function purgeInactivePlayers() {
   }
 }
 
-// Inactive cleanup & SSE keep-alive ping interval (every 2.5 seconds)
+// Inactive cleanup & SSE keep-alive ping interval (every 3 seconds)
 setInterval(() => {
   purgeInactivePlayers();
   for (const client of sseClients) {
@@ -566,7 +519,7 @@ setInterval(() => {
       sseClients.delete(client);
     }
   }
-}, 2500);
+}, 3000);
 
 // SSE Stream for Instant Real-Time Multi-Device Presence
 app.get('/api/presence/stream', (_req, res) => {
@@ -598,10 +551,7 @@ app.post('/api/presence/heartbeat', (req, res) => {
     return res.status(400).json({ success: false, error: 'Data pemain tidak valid.' });
   }
 
-  const existing = onlinePlayersMap.get(data.id);
   const isTeacherRole = data.role === 'guru' || Boolean(data.isTeacher);
-  const now = Date.now();
-
   const player: ServerOnlinePlayer = {
     id: String(data.id),
     handle: String(data.handle || 'warga').replace(/^@/, ''),
@@ -624,15 +574,12 @@ app.post('/api/presence/heartbeat', (req, res) => {
     sittingSeat: data.sittingSeat,
     isFishing: Boolean(data.isFishing),
     heldItem: data.heldItem || null,
-    activeEmote: data.activeEmote && now < data.activeEmote.expiresAt ? data.activeEmote : null,
     speechText: data.speechText,
     speechTimer: data.speechTimer,
-    lastSeen: now,
-    connectedAt: existing?.connectedAt || now,
+    lastSeen: Date.now(),
   };
 
   onlinePlayersMap.set(data.id, player);
-  savePresenceToFile();
 
   // Broadcast instantly to all other devices listening on SSE
   broadcastPresence({
@@ -648,8 +595,7 @@ app.post('/api/presence/heartbeat', (req, res) => {
     success: true,
     onlinePlayers: others,
     count: others.length + 1,
-    serverTime: now,
-    mode: '24h-realtime-active',
+    serverTime: Date.now(),
   });
 });
 
@@ -661,42 +607,6 @@ app.get('/api/presence/online', (_req, res) => {
     success: true,
     onlinePlayers: Array.from(onlinePlayersMap.values()),
     count: onlinePlayersMap.size,
-    serverUptime: Math.floor((Date.now() - SERVER_START_TIME) / 1000),
-    mode: '24h-realtime-active',
-  });
-});
-
-// Interactive Radar endpoint with detailed positions & activities
-app.get('/api/presence/radar', (_req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  purgeInactivePlayers();
-  const players = Array.from(onlinePlayersMap.values());
-  res.json({
-    success: true,
-    onlineCount: players.length,
-    onlinePlayers: players.map((p) => ({
-      id: p.id,
-      handle: p.handle,
-      name: p.name,
-      role: p.role,
-      roleLabel: p.roleLabel,
-      wx: p.wx,
-      wy: p.wy,
-      isMoving: p.isMoving,
-      isSitting: p.isSitting,
-      isFishing: p.isFishing,
-      heldItem: p.heldItem,
-      activeEmote: p.activeEmote,
-      lastSeenAgoSec: Math.max(0, Math.floor((Date.now() - p.lastSeen) / 1000)),
-    })),
-    serverTime: Date.now(),
-    uptimeSec: Math.floor((Date.now() - SERVER_START_TIME) / 1000),
-    status: '24h-mesh-online',
-    brokers: [
-      { name: 'EMQX Public Broker', protocol: 'WSS', port: 8084, status: 'online' },
-      { name: 'HiveMQ Cloud Broker', protocol: 'WSS', port: 8884, status: 'online' },
-      { name: 'Eclipse Mosquitto', protocol: 'WSS', port: 8081, status: 'online' },
-    ],
   });
 });
 
@@ -716,7 +626,6 @@ app.post('/api/presence/leave', express.text({ type: '*/*' }), (req, res) => {
   }
   if (id && onlinePlayersMap.has(id)) {
     onlinePlayersMap.delete(id);
-    savePresenceToFile();
     broadcastPresence({
       type: 'leave',
       leftId: id,

@@ -2,19 +2,12 @@
  * Real-Time Multi-Device Presence Mesh over Secure WebSockets (MQTT v3.1.1 over WSS)
  * Connects browsers directly across any network (Wi-Fi, 4G/5G), Cloud Run instances,
  * AI Studio Dev/Shared URLs, or GitHub Pages with <50ms latency.
- * Provides 24-Hour continuous uptime with triple-broker redundancy and automatic failover.
  */
 
-export interface BrokerDef {
-  url: string;
-  name: string;
-  region: string;
-}
-
-export const BROKER_DEFS: BrokerDef[] = [
-  { url: 'wss://broker.emqx.io:8084/mqtt', name: 'EMQX Public Cluster', region: 'Global WSS' },
-  { url: 'wss://broker.hivemq.com:8884/mqtt', name: 'HiveMQ Cloud Broker', region: 'Global WSS' },
-  { url: 'wss://test.mosquitto.org:8081/mqtt', name: 'Eclipse Mosquitto', region: 'EU/Global WSS' },
+const BROKER_URLS = [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://test.mosquitto.org:8081/mqtt',
 ];
 
 const PRESENCE_TOPIC = 'kota_refleksi_smkn2_gto_v3/presence';
@@ -44,8 +37,8 @@ function encodeUTF8String(str: string): Uint8Array {
 }
 
 function buildConnectPacket(clientId: string): Uint8Array {
-  // Variable header: Protocol Name "MQTT" (0x00, 0x04, 'M','Q','T','T'), Level 4, Flags 0x02 (Clean Session), KeepAlive 35s
-  const varHeader = new Uint8Array([0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x04, 0x02, 0x00, 0x23]);
+  // Variable header: Protocol Name "MQTT" (0x00, 0x04, 'M','Q','T','T'), Level 4, Flags 0x02 (Clean Session), KeepAlive 45s
+  const varHeader = new Uint8Array([0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x04, 0x02, 0x00, 0x2d]);
   const payload = encodeUTF8String(clientId);
   const remLen = varHeader.length + payload.length;
   const remLenBytes = encodeRemainingLength(remLen);
@@ -153,116 +146,40 @@ export interface PresenceMeshMessage {
   id?: string;
   senderId?: string;
   ts?: number;
-  mid?: string;
-}
-
-export interface BrokerLiveStatus {
-  url: string;
-  name: string;
-  region: string;
-  connected: boolean;
-  latencyMs: number;
-  lastMessageTime: number;
-}
-
-export interface MeshHealthStatus {
-  connectedBrokers: number;
-  totalBrokers: number;
-  isMeshActive: boolean;
-  brokers: BrokerLiveStatus[];
-  lastPingTime: number;
-  uptimeHours24: boolean;
 }
 
 export class RealtimePresenceMesh {
   private sockets: Map<string, WebSocket> = new Map();
-  private brokerStatusMap: Map<string, BrokerLiveStatus> = new Map();
   private pingTimer: number | null = null;
   private reconnectTimers: Map<string, number> = new Map();
   private isDisposed = false;
   private clientIdPrefix: string;
-  private cleanSessionId: string;
   private onMessageCallback: (msg: PresenceMeshMessage) => void;
   private onConnectedCallback: () => void;
-  private onStatusChangeCallback?: (status: MeshHealthStatus) => void;
-  private seenMessageIds: Map<string, number> = new Map();
 
   constructor(
     sessionId: string,
     onMessage: (msg: PresenceMeshMessage) => void,
-    onConnected: () => void,
-    onStatusChange?: (status: MeshHealthStatus) => void
+    onConnected: () => void
   ) {
-    this.cleanSessionId = sessionId.replace(/[^a-zA-Z0-9_]/g, '').slice(-14);
-    this.clientIdPrefix = `kr_${this.cleanSessionId}_${Math.random().toString(36).slice(2, 6)}`;
+    const cleanId = sessionId.replace(/[^a-zA-Z0-9_]/g, '').slice(-14);
+    this.clientIdPrefix = `kr_${cleanId}_${Math.random().toString(36).slice(2, 6)}`;
     this.onMessageCallback = onMessage;
     this.onConnectedCallback = onConnected;
-    this.onStatusChangeCallback = onStatusChange;
 
-    BROKER_DEFS.forEach((b) => {
-      this.brokerStatusMap.set(b.url, {
-        url: b.url,
-        name: b.name,
-        region: b.region,
-        connected: false,
-        latencyMs: 35,
-        lastMessageTime: 0,
-      });
+    BROKER_URLS.forEach((url, index) => {
+      this.connectBroker(url, index);
     });
 
-    BROKER_DEFS.forEach((broker, index) => {
-      this.connectBroker(broker.url, index);
-    });
-
-    // Aggressive ping every 14 seconds to prevent NAT/proxy timeouts across mobile networks
     this.pingTimer = window.setInterval(() => {
       this.sendPingAll();
-      this.pruneSeenMids();
-      this.notifyStatusChange();
-    }, 14000);
-  }
-
-  private pruneSeenMids() {
-    const now = Date.now();
-    for (const [mid, time] of this.seenMessageIds.entries()) {
-      if (now - time > 8000) {
-        this.seenMessageIds.delete(mid);
-      }
-    }
-  }
-
-  private notifyStatusChange() {
-    if (!this.onStatusChangeCallback) return;
-    const brokers = Array.from(this.brokerStatusMap.values());
-    const connectedBrokers = brokers.filter((b) => b.connected).length;
-    this.onStatusChangeCallback({
-      connectedBrokers,
-      totalBrokers: brokers.length,
-      isMeshActive: connectedBrokers > 0,
-      brokers,
-      lastPingTime: Date.now(),
-      uptimeHours24: true,
-    });
-  }
-
-  public getStatus(): MeshHealthStatus {
-    const brokers = Array.from(this.brokerStatusMap.values());
-    const connectedBrokers = brokers.filter((b) => b.connected).length;
-    return {
-      connectedBrokers,
-      totalBrokers: brokers.length,
-      isMeshActive: connectedBrokers > 0,
-      brokers,
-      lastPingTime: Date.now(),
-      uptimeHours24: true,
-    };
+    }, 22000);
   }
 
   private connectBroker(url: string, index: number) {
     if (this.isDisposed || typeof window === 'undefined' || !('WebSocket' in window)) return;
 
     try {
-      const startTime = performance.now();
       const ws = new WebSocket(url, 'mqtt');
       ws.binaryType = 'arraybuffer';
       let isMqttConnected = false;
@@ -287,15 +204,9 @@ export class RealtimePresenceMesh {
           // 0x20 = CONNACK -> Subscribe to room presence topic
           isMqttConnected = true;
           this.sockets.set(url, ws);
-          const st = this.brokerStatusMap.get(url);
-          if (st) {
-            st.connected = true;
-            st.latencyMs = Math.round(performance.now() - startTime);
-          }
           try {
             ws.send(buildSubscribePacket(PRESENCE_TOPIC, 1));
             this.onConnectedCallback();
-            this.notifyStatusChange();
           } catch {
             // ignore
           }
@@ -303,22 +214,10 @@ export class RealtimePresenceMesh {
         }
 
         const payloads = parseIncomingPackets(bytes);
-        const st = this.brokerStatusMap.get(url);
-        if (st) {
-          st.lastMessageTime = Date.now();
-        }
-
         for (const raw of payloads) {
           try {
             const parsed = JSON.parse(raw) as PresenceMeshMessage;
             if (parsed && parsed.type) {
-              // Deduplicate across brokers using unique message ID (mid)
-              if (parsed.mid) {
-                if (this.seenMessageIds.has(parsed.mid)) {
-                  continue; // Already processed from another active broker
-                }
-                this.seenMessageIds.set(parsed.mid, Date.now());
-              }
               this.onMessageCallback(parsed);
             }
           } catch {
@@ -329,19 +228,13 @@ export class RealtimePresenceMesh {
 
       const scheduleReconnect = () => {
         this.sockets.delete(url);
-        const st = this.brokerStatusMap.get(url);
-        if (st) {
-          st.connected = false;
-        }
-        this.notifyStatusChange();
         isMqttConnected = false;
         if (this.isDisposed) return;
         if (!this.reconnectTimers.has(url)) {
-          const delay = 2500 + index * 800 + Math.random() * 500;
           const timer = window.setTimeout(() => {
             this.reconnectTimers.delete(url);
             this.connectBroker(url, index);
-          }, delay);
+          }, 3500 + index * 1000);
           this.reconnectTimers.set(url, timer);
         }
       };
@@ -356,15 +249,12 @@ export class RealtimePresenceMesh {
         scheduleReconnect();
       };
 
-      // Safety fallback if CONNACK not received within 3s
+      // Safety fallback if CONNACK not received within 5s
       window.setTimeout(() => {
         if (!isMqttConnected && ws.readyState === WebSocket.OPEN && !this.isDisposed) {
           try {
             ws.send(buildSubscribePacket(PRESENCE_TOPIC, 2));
             this.sockets.set(url, ws);
-            const statusObj = this.brokerStatusMap.get(url);
-            if (statusObj) statusObj.connected = true;
-            this.notifyStatusChange();
           } catch {}
         }
       }, 3000);
@@ -375,15 +265,7 @@ export class RealtimePresenceMesh {
 
   public publish(msg: PresenceMeshMessage) {
     if (this.isDisposed) return;
-    const mid = `${this.cleanSessionId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    const fullMsg: PresenceMeshMessage = {
-      ...msg,
-      mid,
-      ts: Date.now(),
-    };
-    this.seenMessageIds.set(mid, Date.now());
-
-    const json = JSON.stringify(fullMsg);
+    const json = JSON.stringify({ ...msg, ts: Date.now() });
     const packet = buildPublishPacket(PRESENCE_TOPIC, json);
 
     for (const [url, ws] of this.sockets.entries()) {
@@ -392,9 +274,6 @@ export class RealtimePresenceMesh {
           ws.send(packet);
         } catch {
           this.sockets.delete(url);
-          const st = this.brokerStatusMap.get(url);
-          if (st) st.connected = false;
-          this.notifyStatusChange();
         }
       }
     }
@@ -408,8 +287,6 @@ export class RealtimePresenceMesh {
           ws.send(ping);
         } catch {
           this.sockets.delete(url);
-          const st = this.brokerStatusMap.get(url);
-          if (st) st.connected = false;
         }
       }
     }
@@ -431,6 +308,5 @@ export class RealtimePresenceMesh {
       } catch {}
     }
     this.sockets.clear();
-    this.brokerStatusMap.clear();
   }
 }

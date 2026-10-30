@@ -2,28 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BuildingId, PublicChatMessage } from '../types/index.ts';
 import { sounds } from '../utils/audio.ts';
 import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
-import { RealtimePresenceMesh, MeshHealthStatus, BROKER_DEFS } from '../utils/realtimePresenceMesh.ts';
-import {
-  X,
-  Plus,
-  Minus,
-  MapPin,
-  BookOpen,
-  Newspaper,
-  FileText,
-  Sparkles,
-  CheckCircle2,
-  Radio,
-  Activity,
-  Wifi,
-  Compass,
-  Eye,
-  Hand,
-  Users,
-  ShieldCheck,
-  RefreshCw,
-  Zap,
-} from 'lucide-react';
+import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
+import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2 } from 'lucide-react';
 
 interface ThreeTownCanvasProps {
   onSelectBuilding: (buildingId: BuildingId) => void;
@@ -59,9 +39,6 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'bengkel_latihan', name: 'Lab DKV & Tefa', tagline: 'Tower Kontrol & Kuis', position: [2.8, 0, 2.8], color: 0xf59e0b, icon: '🛠️' },
   { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
 ];
-
-export const BASE_TILE_W = 60;
-export const BASE_TILE_H = 30; // 2:1 isometric ratio
 
 export type EmoteType = 'love' | 'wave' | 'laugh' | 'dance';
 
@@ -876,31 +853,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const playerRef = useRef<AvatarData | null>(null);
   const lastMoveBroadcastTimeRef = useRef<number>(0);
 
-  // Remote online players from other devices (24 Jam Real-Time Presence)
+  // Remote online players from other devices
   const remotePlayersRef = useRef<Map<string, AvatarData>>(new Map());
   const [onlineCount, setOnlineCount] = useState<number>(1);
   const [onlineRemoteList, setOnlineRemoteList] = useState<
-    Array<{
-      id: string;
-      handle: string;
-      name: string;
-      role: 'guru' | 'siswa';
-      roleLabel: string;
-      isMoving: boolean;
-      isSitting: boolean;
-      isFishing: boolean;
-      heldItem?: 'kopi' | 'roti' | 'eskrim' | null;
-      activeEmote?: ActiveEmote | null;
-      speechText?: string;
-      wx: number;
-      wy: number;
-      lastPing: number;
-    }>
+    Array<{ id: string; handle: string; name: string; role: string; isMoving: boolean; isSitting: boolean; wx: number; wy: number }>
   >([]);
   const sendHeartbeatRef = useRef<(() => void) | null>(null);
-  const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
-  const [meshStatus, setMeshStatus] = useState<MeshHealthStatus | null>(null);
-  const cameraTargetOverrideRef = useRef<{ x: number; y: number; expireAt: number } | null>(null);
 
   // Persistent unique device ID per browser tab/device
   const clientDeviceIdRef = useRef<string>('');
@@ -1186,17 +1145,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         id: r.id,
         handle: r.handle,
         name: r.name || r.handle,
-        role: r.role === 'guru' ? ('guru' as const) : ('siswa' as const),
-        roleLabel: r.roleLabel || (r.role === 'guru' ? 'GURU DKV' : 'Siswa DKV'),
+        role: r.role === 'guru' ? 'guru' : 'siswa',
         isMoving: Boolean(r.isMoving),
         isSitting: Boolean(r.isSitting),
-        isFishing: Boolean(r.isFishing),
-        heldItem: r.heldItem || null,
-        activeEmote: r.activeEmote || null,
-        speechText: r.speechText,
         wx: r.wx,
         wy: r.wy,
-        lastPing: r.lastPing || Date.now(),
       }));
       setOnlineCount(list.length + 1);
       setOnlineRemoteList(list);
@@ -1271,8 +1224,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           } else if (Boolean(rem.isMoving)) {
             existing.targetWx = incomingTargetWx;
             existing.targetWy = incomingTargetWy;
-            // Smooth extrapolation: only hard snap if position jumped across large distances (>2.8m)
-            if (distFromActual > 2.8) {
+            if (distFromActual > 1.8) {
               existing.wx = incomingWx;
               existing.wy = incomingWy;
             }
@@ -1281,12 +1233,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             // Remote player stopped at incomingWx, incomingWy
             existing.targetWx = incomingWx;
             existing.targetWy = incomingWy;
-            if (distFromActual > 2.8) {
+            if (distFromActual > 1.8) {
               existing.wx = incomingWx;
               existing.wy = incomingWy;
               existing.isMoving = false;
             } else {
-              existing.isMoving = distFromActual > 0.04;
+              existing.isMoving = distFromActual > 0.05;
             }
           }
 
@@ -1314,9 +1266,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       });
 
-      // Prune only players that have been completely silent across all channels for >45 seconds (24h continuous stability)
+      // Prune only players that have been completely silent across all channels for >18 seconds
       for (const [id, pl] of remotePlayersRef.current.entries()) {
-        if (pl.lastPing && now - pl.lastPing > 45000) {
+        if (pl.lastPing && now - pl.lastPing > 18000) {
           remotePlayersRef.current.delete(id);
         }
       }
@@ -1375,9 +1327,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         // Request all online citizens on other devices to announce themselves immediately
         mesh.publish({ type: 'request_sync', senderId: mySessionId });
         mesh.publish({ type: 'presence_update', player: buildLocalPayload() });
-      },
-      (status) => {
-        if (isMounted) setMeshStatus(status);
       }
     );
 
@@ -1903,7 +1852,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       if (isEmoteMenuOpenRef.current) {
         setIsEmoteMenuOpen(false);
       }
-      cameraTargetOverrideRef.current = null;
 
       // 1. Check Click on Cafe Stall (Toko Roti & Kafe di ujung kota belakang Lab DKV)
       const cafeDist = Math.hypot(wx - cafeWx, wy - cafeWy);
@@ -2155,14 +2103,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         camera.y = (player.wx + player.wy) * currentTileH;
       }
 
-      // Smooth camera follow avatar (or focus on citizen selected in Radar)
-      if (cameraTargetOverrideRef.current && Date.now() < cameraTargetOverrideRef.current.expireAt) {
-        camera.targetX = cameraTargetOverrideRef.current.x;
-        camera.targetY = cameraTargetOverrideRef.current.y;
-      } else {
-        camera.targetX = (player.wx - player.wy) * currentTileW;
-        camera.targetY = (player.wx + player.wy) * currentTileH;
-      }
+      // Smooth camera follow avatar
+      camera.targetX = (player.wx - player.wy) * currentTileW;
+      camera.targetY = (player.wx + player.wy) * currentTileH;
       camera.x += (camera.targetX - camera.x) * (delta * 4.5);
       camera.y += (camera.targetY - camera.y) * (delta * 4.5);
 
@@ -2353,8 +2296,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
         }
 
-        // Live broadcast position while walking every 65ms so other devices see movement in real-time (fluid 60fps)
-        if (currentTime - lastMoveBroadcastTimeRef.current > 65) {
+        // Live broadcast position while walking every 120ms so other devices see movement in real-time
+        if (currentTime - lastMoveBroadcastTimeRef.current > 120) {
           lastMoveBroadcastTimeRef.current = currentTime;
           sendHeartbeatRef.current?.();
         }
@@ -7920,26 +7863,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         <div className="w-full flex flex-wrap items-start justify-between gap-1.5">
           {/* Left: Online Citizens Badge & Quick Teleport Chips */}
           <div className="flex flex-col items-start gap-1 max-w-[62vw] sm:max-w-[380px] pointer-events-auto">
-            <button
-              type="button"
-              onClick={() => {
-                sounds.playClick();
-                setIsRadarModalOpen(true);
-              }}
-              className="bg-[#121e2c]/95 hover:bg-[#192b3d] active:scale-95 border border-emerald-500/50 hover:border-emerald-400 rounded-full px-2.5 sm:px-3 py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-xl flex items-center gap-1.5 transition cursor-pointer"
-              title="Buka Radar Warga Online & Multi-Broker Mesh 24 Jam"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-              <span className="text-emerald-300 font-mono font-extrabold">{onlineCount}</span>
-              <span className="text-slate-100 font-bold">Radar Warga</span>
-              <span className="text-[8.5px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                24 Jam
-              </span>
-            </button>
+            <div className="bg-[#121e2c]/92 backdrop-blur-md border border-emerald-500/45 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-emerald-300 font-mono">{onlineCount}</span>
+              <span className="text-slate-200">Warga Online</span>
+            </div>
 
             {onlineRemoteList.length > 0 && (
               <div className="flex flex-wrap items-center gap-1">
@@ -8548,540 +8476,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 className="py-2 px-5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-md transition cursor-pointer"
               >
                 Tutup & Kembali Jelajah
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================= */}
-      {/* 📡 INTERACTIVE CITIZEN RADAR & MULTI-BROKER MESH MODAL (24 JAM) */}
-      {/* ============================================================= */}
-      {isRadarModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-md animate-fade-in"
-          onClick={() => {
-            sounds.playClick();
-            setIsRadarModalOpen(false);
-          }}
-        >
-          <div
-            className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-gradient-to-b from-[#0e1726] via-[#09111e] to-[#040810] border-2 border-cyan-500/40 shadow-[0_0_60px_rgba(6,182,212,0.25)] text-white overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="relative px-5 py-4 border-b border-cyan-500/20 bg-slate-900/60 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500/30 to-blue-600/30 border border-cyan-400/50 flex items-center justify-center text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
-                  <Radio className="w-5 h-5 animate-pulse text-cyan-300" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 via-sky-300 to-white">
-                      Radar Warga Online 24 Jam & Mesh Server
-                    </h2>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-[10px] font-black text-emerald-300 animate-pulse">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      LIVE 24H
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Sistem koordinasi multi-broker MQTT WSS & Node.js SSE disk-persisten real-time.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  setIsRadarModalOpen(false);
-                }}
-                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 border border-slate-600/60 text-slate-300 hover:text-white flex items-center justify-center transition active:scale-95 cursor-pointer"
-                title="Tutup Radar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 sm:space-y-5 custom-scrollbar">
-              {/* Top Row: Visual Circular Radar Scope + Multi-Broker Mesh Status Matrix */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
-                {/* Visual Circular Radar Scope (5 cols on md) */}
-                <div className="md:col-span-5 rounded-2xl bg-slate-950/70 border border-cyan-500/30 p-4 flex flex-col items-center justify-center relative overflow-hidden shadow-inner">
-                  <div className="w-full flex items-center justify-between text-[11px] font-bold text-cyan-300/80 mb-2">
-                    <span className="flex items-center gap-1.5">
-                      <Compass className="w-3.5 h-3.5 text-cyan-400" />
-                      Jangkauan Scan 50m
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      Posisi: ({playerRef.current?.wx.toFixed(1) ?? '0.0'}, {playerRef.current?.wy.toFixed(1) ?? '0.0'})
-                    </span>
-                  </div>
-
-                  {/* Circular Radar Screen */}
-                  <div className="relative w-56 h-56 rounded-full border-2 border-cyan-400/40 bg-gradient-to-b from-[#021827] via-[#020e1a] to-[#010811] shadow-[0_0_35px_rgba(6,182,212,0.3)_inset] flex items-center justify-center overflow-hidden">
-                    {/* Concentric Range Rings */}
-                    <div className="absolute w-44 h-44 rounded-full border border-cyan-500/25 pointer-events-none" />
-                    <div className="absolute w-32 h-32 rounded-full border border-cyan-500/25 pointer-events-none" />
-                    <div className="absolute w-18 h-18 rounded-full border border-cyan-500/30 pointer-events-none" />
-                    {/* Crosshairs */}
-                    <div className="absolute inset-x-0 top-1/2 h-px bg-cyan-500/30 pointer-events-none" />
-                    <div className="absolute inset-y-0 left-1/2 w-px bg-cyan-500/30 pointer-events-none" />
-
-                    {/* Cardinal Labels */}
-                    <span className="absolute top-1 text-[9px] font-extrabold text-cyan-400 font-mono">U</span>
-                    <span className="absolute bottom-1 text-[9px] font-extrabold text-cyan-400 font-mono">S</span>
-                    <span className="absolute left-1.5 text-[9px] font-extrabold text-cyan-400 font-mono">B</span>
-                    <span className="absolute right-1.5 text-[9px] font-extrabold text-cyan-400 font-mono">T</span>
-
-                    {/* Sweeping Radar Scanner Beam */}
-                    <div
-                      className="absolute inset-0 rounded-full pointer-events-none animate-spin"
-                      style={{
-                        animationDuration: '3.6s',
-                        background: 'conic-gradient(from 0deg, transparent 0deg, transparent 280deg, rgba(6,182,212,0.1) 320deg, rgba(6,182,212,0.5) 360deg)',
-                      }}
-                    />
-
-                    {/* Landmark Blips (Muted Gray Dots) */}
-                    {BUILDINGS_INFO.map((b) => {
-                      const myWx = playerRef.current?.wx ?? 0;
-                      const myWy = playerRef.current?.wy ?? 0;
-                      const relX = ((b.position[0] - myWx) / 8.5) * 85;
-                      const relY = ((b.position[2] - myWy) / 8.5) * 85;
-                      const clampedDist = Math.hypot(relX, relY);
-                      if (clampedDist > 100) return null;
-                      return (
-                        <div
-                          key={b.id}
-                          className="absolute w-2 h-2 rounded-full bg-slate-600/70 border border-slate-400/50 pointer-events-none transition-all"
-                          style={{
-                            transform: `translate(${relX}px, ${relY}px)`,
-                          }}
-                          title={b.name}
-                        />
-                      );
-                    })}
-
-                    {/* Remote Citizen Blips */}
-                    {onlineRemoteList.map((cit) => {
-                      const myWx = playerRef.current?.wx ?? 0;
-                      const myWy = playerRef.current?.wy ?? 0;
-                      const relX = ((cit.wx - myWx) / 8.5) * 85;
-                      const relY = ((cit.wy - myWy) / 8.5) * 85;
-                      const rDist = Math.hypot(relX, relY);
-                      const displayX = rDist > 98 ? (relX / rDist) * 98 : relX;
-                      const displayY = rDist > 98 ? (relY / rDist) * 98 : relY;
-
-                      const isTeacherCit = cit.role === 'guru';
-                      const blipBg = isTeacherCit ? 'bg-amber-400' : 'bg-emerald-400';
-                      const blipBorder = isTeacherCit ? 'border-amber-200' : 'border-emerald-200';
-
-                      return (
-                        <button
-                          key={cit.id}
-                          type="button"
-                          onClick={() => {
-                            sounds.playClick();
-                            const targetX = (cit.wx - cit.wy) * BASE_TILE_W * zoomLevelRef.current;
-                            const targetY = (cit.wx + cit.wy) * BASE_TILE_H * zoomLevelRef.current;
-                            cameraTargetOverrideRef.current = {
-                              x: targetX,
-                              y: targetY,
-                              expireAt: Date.now() + 6000,
-                            };
-                            setIsRadarModalOpen(false);
-                          }}
-                          className={`absolute w-3.5 h-3.5 rounded-full ${blipBg} border-2 ${blipBorder} shadow-[0_0_10px_currentColor] cursor-pointer hover:scale-150 transition-transform z-20 group`}
-                          style={{
-                            transform: `translate(${displayX}px, ${displayY}px)`,
-                          }}
-                          title={`${cit.name} (${cit.roleLabel})`}
-                        >
-                          <span className="absolute -top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-slate-950/90 border border-slate-700 text-[9px] font-bold text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
-                            {cit.name}
-                          </span>
-                        </button>
-                      );
-                    })}
-
-                    {/* Center Player Dot (Cyan Pulsing Dot) */}
-                    <div className="relative z-20 flex items-center justify-center">
-                      <div className="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-white shadow-[0_0_12px_#22d3ee] animate-pulse" />
-                      <div className="absolute w-7 h-7 rounded-full border border-cyan-400/60 animate-ping pointer-events-none" />
-                    </div>
-                  </div>
-
-                  {/* Legend below Radar */}
-                  <div className="mt-3 flex items-center justify-center gap-3 text-[10px] text-slate-300">
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 border border-white" />
-                      Kamu
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 border border-white" />
-                      Guru
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 border border-white" />
-                      Siswa
-                    </span>
-                  </div>
-                </div>
-
-                {/* Multi-Broker Mesh & Server Matrix Card (7 cols on md) */}
-                <div className="md:col-span-7 rounded-2xl bg-slate-950/70 border border-cyan-500/30 p-4 flex flex-col justify-between shadow-inner">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-amber-400" />
-                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
-                          Matriks Koneksi Mesh & Server 24 Jam
-                        </h3>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-md bg-cyan-950/70 border border-cyan-500/40 text-[10px] font-mono text-cyan-300">
-                        {meshStatus?.connectedBrokers ?? 3}/{meshStatus?.totalBrokers ?? 3} Broker Aktif
-                      </span>
-                    </div>
-
-                    {/* 4 Multi-Channel Connectivity Rows */}
-                    <div className="space-y-2">
-                      {/* Node.js Backend Presence Server */}
-                      <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300">
-                            <Activity className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                              Server Presence Lokal (SSE)
-                              <span className="px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 text-[9px] font-bold">Port 3000</span>
-                            </div>
-                            <div className="text-[10px] text-slate-400">
-                              Persistensi Disk (server_presence.json) & Inactivity 40s
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            24H READY
-                          </span>
-                          <div className="text-[9px] font-mono text-slate-500">~12ms</div>
-                        </div>
-                      </div>
-
-                      {/* Broker 1: EMQX Public WSS */}
-                      <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300">
-                            <Wifi className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                              Broker EMQX WSS
-                              <span className="text-[10px] text-slate-400 font-mono">:8084</span>
-                            </div>
-                            <div className="text-[10px] text-slate-400">
-                              Mesh Relay Primer Global (WSS Secured)
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {meshStatus?.brokers.find((b) => b.name.includes('EMQX'))?.connected ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              TERHUBUNG
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400">
-                              STANDBY / MESH
-                            </span>
-                          )}
-                          <div className="text-[9px] font-mono text-slate-500">
-                            {meshStatus?.brokers.find((b) => b.name.includes('EMQX'))?.latencyMs ?? 34}ms
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Broker 2: HiveMQ Public WSS */}
-                      <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
-                            <Wifi className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                              Broker HiveMQ WSS
-                              <span className="text-[10px] text-slate-400 font-mono">:8884</span>
-                            </div>
-                            <div className="text-[10px] text-slate-400">
-                              Mesh Redundansi Sekunder (Zero Loss)
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {meshStatus?.brokers.find((b) => b.name.includes('HiveMQ'))?.connected ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              TERHUBUNG
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400">
-                              STANDBY / MESH
-                            </span>
-                          )}
-                          <div className="text-[9px] font-mono text-slate-500">
-                            {meshStatus?.brokers.find((b) => b.name.includes('HiveMQ'))?.latencyMs ?? 42}ms
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Broker 3: Mosquitto Public WSS */}
-                      <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300">
-                            <Wifi className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                              Broker Mosquitto WSS
-                              <span className="text-[10px] text-slate-400 font-mono">:8081</span>
-                            </div>
-                            <div className="text-[10px] text-slate-400">
-                              Mesh Failover Tersier & Dedup MID
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {meshStatus?.brokers.find((b) => b.name.includes('Mosquitto'))?.connected ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              TERHUBUNG
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400">
-                              STANDBY / MESH
-                            </span>
-                          )}
-                          <div className="text-[9px] font-mono text-slate-500">
-                            {meshStatus?.brokers.find((b) => b.name.includes('Mosquitto'))?.latencyMs ?? 48}ms
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Anti-Slop / Stability Guarantee Bar */}
-                  <div className="mt-3 p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-between text-[11px] text-cyan-200">
-                    <span className="flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                      <span>Dedup Paket Aktif • Dead-reckoning lerp 65ms</span>
-                    </span>
-                    <span className="font-bold text-cyan-300">24 Jam Standby</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Row: Citizen Directory & Interactive Action Cards */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-cyan-400" />
-                    <h3 className="text-sm font-black tracking-wide text-white">
-                      Daftar Warga Terdeteksi ({onlineRemoteList.length})
-                    </h3>
-                  </div>
-                  <span className="text-[11px] text-slate-400">
-                    Klik 'Hampiri', 'Fokus', atau 'Sapa' untuk berinteraksi langsung
-                  </span>
-                </div>
-
-                {onlineRemoteList.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-slate-900/50 border border-dashed border-slate-700/80 text-center space-y-2">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-xl">
-                      📡
-                    </div>
-                    <div className="text-sm font-bold text-slate-200">
-                      Belum Ada Warga Lain Terdeteksi di Sesi Ini
-                    </div>
-                    <p className="text-xs text-slate-400 max-w-md mx-auto">
-                      Sistem Multi-Broker & Server Presence tetap siaga 24 jam. Buka tab baru atau undang teman/guru untuk melihat pergerakan real-time secara instan!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {onlineRemoteList.map((cit) => {
-                      const myWx = playerRef.current?.wx ?? 0;
-                      const myWy = playerRef.current?.wy ?? 0;
-                      const distMeters = Math.max(1, Math.round(Math.hypot(cit.wx - myWx, cit.wy - myWy) * 2));
-                      const isTeacherCit = cit.role === 'guru';
-
-                      // Activity description
-                      let activityText = 'Santai di kota';
-                      let activityIcon = '🚶';
-                      if (cit.activeEmote?.type === 'dance') {
-                        activityText = 'Sedang Berjoget';
-                        activityIcon = '🎵';
-                      } else if (cit.activeEmote?.type === 'love') {
-                        activityText = 'Mengirim Kasih/Suka';
-                        activityIcon = '❤️';
-                      } else if (cit.activeEmote?.type === 'wave') {
-                        activityText = 'Melambaikan Tangan';
-                        activityIcon = '👋';
-                      } else if (cit.activeEmote?.type === 'laugh') {
-                        activityText = 'Tertawa Gembira';
-                        activityIcon = '😂';
-                      } else if (cit.isFishing) {
-                        activityText = 'Sedang Memancing';
-                        activityIcon = '🎣';
-                      } else if (cit.isSitting) {
-                        activityText = 'Duduk Santai';
-                        activityIcon = '🪑';
-                      } else if (cit.heldItem === 'kopi') {
-                        activityText = 'Menikmati Kopi Hangat';
-                        activityIcon = '☕';
-                      } else if (cit.heldItem === 'roti') {
-                        activityText = 'Menikmati Roti';
-                        activityIcon = '🥐';
-                      } else if (cit.heldItem === 'eskrim') {
-                        activityText = 'Menikmati Es Krim';
-                        activityIcon = '🍦';
-                      }
-
-                      return (
-                        <div
-                          key={cit.id}
-                          className="rounded-2xl bg-slate-900/90 border border-slate-700/70 hover:border-cyan-500/50 p-3.5 flex flex-col justify-between gap-3 transition-all hover:bg-slate-850 shadow-md group"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide border ${
-                                  isTeacherCit
-                                    ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
-                                    : 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300'
-                                }`}
-                              >
-                                {cit.roleLabel}
-                              </span>
-                              <span className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-950/60 px-2 py-0.5 rounded-md border border-cyan-500/30">
-                                ~{distMeters} meter
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2.5">
-                              <div
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg border ${
-                                  isTeacherCit
-                                    ? 'bg-amber-950/50 border-amber-500/50 text-amber-300'
-                                    : 'bg-emerald-950/50 border-emerald-500/50 text-emerald-300'
-                                }`}
-                              >
-                                {isTeacherCit ? '👨‍🏫' : '🎓'}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h4 className="text-xs font-bold text-white truncate group-hover:text-cyan-300 transition-colors">
-                                  {cit.name}
-                                </h4>
-                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
-                                  <span>{activityIcon}</span>
-                                  <span className="truncate">{activityText}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Speech bubble if actively talking */}
-                            {cit.speechText && (
-                              <div className="mt-2.5 p-2 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-[11px] text-cyan-100 flex items-start gap-1.5">
-                                <span className="text-cyan-400 shrink-0">💬</span>
-                                <span className="italic line-clamp-2">"{cit.speechText}"</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Quick Interactive Actions */}
-                          <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-800">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                sounds.playClick();
-                                if (playerRef.current) {
-                                  playerRef.current.targetWx = cit.wx;
-                                  playerRef.current.targetWy = cit.wy;
-                                  playerRef.current.isMoving = true;
-                                  setIsSitting(false);
-                                  setIsFishing(false);
-                                  sendHeartbeatRef.current?.();
-                                }
-                                setIsRadarModalOpen(false);
-                              }}
-                              className="py-1.5 px-2 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-[11px] font-bold text-cyan-200 flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer"
-                              title="Avatar kamu akan otomatis berjalan menghampiri warga ini"
-                            >
-                              <Compass className="w-3 h-3" />
-                              <span>Hampiri</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                sounds.playClick();
-                                const targetX = (cit.wx - cit.wy) * BASE_TILE_W * zoomLevelRef.current;
-                                const targetY = (cit.wx + cit.wy) * BASE_TILE_H * zoomLevelRef.current;
-                                cameraTargetOverrideRef.current = {
-                                  x: targetX,
-                                  y: targetY,
-                                  expireAt: Date.now() + 6000,
-                                };
-                                setIsRadarModalOpen(false);
-                              }}
-                              className="py-1.5 px-2 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/40 text-[11px] font-bold text-blue-200 flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer"
-                              title="Arahkan kamera sebentar ke posisi warga ini"
-                            >
-                              <Eye className="w-3 h-3" />
-                              <span>Fokus</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                triggerEmote('wave');
-                                setIsRadarModalOpen(false);
-                              }}
-                              className="py-1.5 px-2 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-[11px] font-bold text-purple-200 flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer"
-                              title="Kirim lambai sapaan ke warga ini"
-                            >
-                              <Hand className="w-3 h-3" />
-                              <span>Sapa</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-5 py-3 border-t border-cyan-500/20 bg-slate-900/60 flex items-center justify-between text-xs text-slate-400 shrink-0">
-              <span className="flex items-center gap-1.5 text-[11px]">
-                <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" style={{ animationDuration: '8s' }} />
-                <span>Pembaruan Real-Time: sinkronisasi 65ms aktif</span>
-              </span>
-
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  setIsRadarModalOpen(false);
-                }}
-                className="py-1.5 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-md transition cursor-pointer"
-              >
-                Tutup Radar
               </button>
             </div>
           </div>
