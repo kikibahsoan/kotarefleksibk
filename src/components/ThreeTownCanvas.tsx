@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BuildingId, PublicChatMessage } from '../types/index.ts';
 import { sounds } from '../utils/audio.ts';
 import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
+import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
 import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2 } from 'lucide-react';
 
 interface ThreeTownCanvasProps {
@@ -378,7 +379,25 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   // Remote online players from other devices
   const remotePlayersRef = useRef<Map<string, AvatarData>>(new Map());
   const [onlineCount, setOnlineCount] = useState<number>(1);
+  const [onlineRemoteList, setOnlineRemoteList] = useState<
+    Array<{ id: string; handle: string; name: string; role: string; isMoving: boolean; isSitting: boolean; wx: number; wy: number }>
+  >([]);
   const sendHeartbeatRef = useRef<(() => void) | null>(null);
+
+  // Persistent unique device ID per browser tab/device
+  const clientDeviceIdRef = useRef<string>('');
+  if (!clientDeviceIdRef.current && typeof window !== 'undefined') {
+    try {
+      let devId = sessionStorage.getItem('kota_device_uuid') || '';
+      if (!devId) {
+        devId = 'dev_' + Math.random().toString(36).substring(2, 8) + '_' + Date.now().toString(36).slice(-4);
+        sessionStorage.setItem('kota_device_uuid', devId);
+      }
+      clientDeviceIdRef.current = devId;
+    } catch {
+      clientDeviceIdRef.current = 'dev_' + Math.random().toString(36).substring(2, 8);
+    }
+  }
 
   // References for render loop
   const onSelectBuildingRef = useRef(onSelectBuilding);
@@ -418,7 +437,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
   // -----------------------------------------------------------
   // REAL-TIME MULTI-DEVICE PRESENCE SYNCHRONIZATION
-  // Instant SSE + Heartbeat + Polling so online citizens from any device are read and their movements are visible
+  // 4-Layer Hybrid Sync:
+  // 1. Global WSS MQTT Presence Mesh (RealtimePresenceMesh) across any device/network/instance
+  // 2. Express Server SSE (/api/presence/stream)
+  // 3. Express Heartbeat (/api/presence/heartbeat)
+  // 4. Local BroadcastChannel
   // -----------------------------------------------------------
   useEffect(() => {
     let isMounted = true;
@@ -426,28 +449,42 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ? new BroadcastChannel('kota_refleksi_presence')
       : null;
 
-    // Unique persistent client device ID per browser tab/device so different devices never clash
-    let clientDeviceId = '';
-    try {
-      clientDeviceId = sessionStorage.getItem('kota_device_uuid') || '';
-      if (!clientDeviceId) {
-        clientDeviceId = 'dev_' + Math.random().toString(36).substring(2, 8) + '_' + Date.now().toString(36).slice(-4);
-        sessionStorage.setItem('kota_device_uuid', clientDeviceId);
-      }
-    } catch (e) {
-      clientDeviceId = 'dev_' + Math.random().toString(36).substring(2, 8);
-    }
+    const clientDeviceId = clientDeviceIdRef.current || 'dev_default';
+    const cleanHandle = studentName
+      .split(' ')
+      .slice(0, 2)
+      .join('_')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '') || (isTeacher ? 'guru_dkv' : 'siswa');
 
-    const mySessionId = `${isTeacher ? 'guru' : 'siswa'}_${studentName.replace(/\s+/g, '_').toLowerCase()}_${clientDeviceId}`;
+    const mySessionId = `${isTeacher ? 'guru' : 'siswa'}_${cleanHandle}_${clientDeviceId}`;
 
-    const handleIncomingOthers = (others: any[], isFullList = false) => {
+    const syncOnlineUiList = () => {
+      if (!isMounted) return;
+      const list = Array.from(remotePlayersRef.current.values()).map((r) => ({
+        id: r.id,
+        handle: r.handle,
+        name: r.name || r.handle,
+        role: r.role === 'guru' ? 'guru' : 'siswa',
+        isMoving: Boolean(r.isMoving),
+        isSitting: Boolean(r.isSitting),
+        wx: r.wx,
+        wy: r.wy,
+      }));
+      setOnlineCount(list.length + 1);
+      setOnlineRemoteList(list);
+    };
+
+    const handleIncomingOthers = (others: any[]) => {
       if (!isMounted || !Array.isArray(others)) return;
-      const activeIds = new Set<string>();
+      const now = Date.now();
 
       others.forEach((rem: any) => {
         if (!rem || !rem.id || rem.id === mySessionId) return;
-        activeIds.add(rem.id);
 
+        const isRemTeacher = rem.role === 'guru' || Boolean(rem.isTeacher);
+        const remRole: 'guru' | 'siswa' = isRemTeacher ? 'guru' : 'siswa';
+        const remGender: 'L' | 'P' = rem.gender === 'P' ? 'P' : 'L';
         const incomingWx = typeof rem.wx === 'number' && !isNaN(rem.wx) ? rem.wx : 1.5;
         const incomingWy = typeof rem.wy === 'number' && !isNaN(rem.wy) ? rem.wy : 1.8;
         const incomingTargetWx = typeof rem.targetWx === 'number' && !isNaN(rem.targetWx) ? rem.targetWx : incomingWx;
@@ -457,19 +494,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (!existing) {
           existing = {
             id: rem.id,
-            role: rem.role || 'siswa',
-            handle: rem.handle || 'warga',
-            name: rem.name || rem.handle,
-            roleLabel: rem.roleLabel || (rem.role === 'guru' ? 'GURU DKV' : 'Warga'),
+            role: remRole,
+            handle: String(rem.handle || 'warga').replace(/^@/, ''),
+            name: rem.name || rem.handle || 'Warga',
+            roleLabel: rem.roleLabel || (isRemTeacher ? 'GURU DKV' : 'Siswa DKV'),
             wx: incomingWx,
             wy: incomingWy,
             targetWx: incomingTargetWx,
             targetWy: incomingTargetWy,
             speed: typeof rem.speed === 'number' && rem.speed > 0 ? rem.speed : 1.35,
-            shirtColor: rem.shirtColor || (rem.gender === 'P' ? '#ec4899' : '#2563eb'),
-            pantsColor: rem.pantsColor || (rem.gender === 'P' ? '#be185d' : '#1e293b'),
-            hairColor: rem.hairColor || '#0f172a',
-            gender: rem.gender || 'L',
+            shirtColor: rem.shirtColor || (isRemTeacher ? (remGender === 'P' ? '#047857' : '#1e3a8a') : (remGender === 'P' ? '#ec4899' : '#2563eb')),
+            pantsColor: rem.pantsColor || (isRemTeacher ? (remGender === 'P' ? '#065f46' : '#1e293b') : (remGender === 'P' ? '#be185d' : '#1e293b')),
+            hairColor: rem.hairColor || (remGender === 'P' ? '#6b3410' : '#0f172a'),
+            gender: remGender,
             isMoving: Boolean(rem.isMoving),
             pauseTimer: 0,
             walkFrame: typeof rem.walkFrame === 'number' ? rem.walkFrame : 0,
@@ -482,92 +519,91 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             speechTimer: rem.speechTimer || (rem.speechText ? 5 : 0),
             isOnlineRemote: true,
             spawnTime: performance.now(),
-            lastPing: Date.now(),
+            lastPing: now,
           };
           remotePlayersRef.current.set(rem.id, existing);
         } else {
-          // If the remote player is actively moving toward targetWx/targetWy, set target to their destination;
-          // if they stopped or are mid-step, guide them smoothly through their reported wx/wy to targetWx/targetWy
-          existing.targetWx = rem.isMoving ? incomingTargetWx : incomingWx;
-          existing.targetWy = rem.isMoving ? incomingTargetWy : incomingWy;
+          existing.role = remRole;
+          existing.handle = String(rem.handle || existing.handle).replace(/^@/, '');
+          existing.name = rem.name || existing.name;
+          existing.roleLabel = rem.roleLabel || (isRemTeacher ? 'GURU DKV' : 'Siswa DKV');
+          existing.gender = remGender;
+          existing.shirtColor = rem.shirtColor || existing.shirtColor;
+          existing.pantsColor = rem.pantsColor || existing.pantsColor;
           existing.speed = typeof rem.speed === 'number' && rem.speed > 0 ? rem.speed : 1.35;
 
           const distFromActual = Math.hypot(existing.wx - incomingWx, existing.wy - incomingWy);
           if (Boolean(rem.isSitting)) {
-            // Snap immediately to bench/swing seat when sitting
             existing.wx = incomingWx;
             existing.wy = incomingWy;
             existing.targetWx = incomingWx;
             existing.targetWy = incomingWy;
-          } else if (distFromActual > 2.2) {
-            // Catch up if drifted more than 2.2 tiles from actual device position
-            existing.wx = incomingWx;
-            existing.wy = incomingWy;
-          } else if (!rem.isMoving && distFromActual > 0.04) {
-            // Walk the remaining sub-tile delta smoothly to exact stopped position
+            existing.isMoving = false;
+          } else if (Boolean(rem.isMoving)) {
+            existing.targetWx = incomingTargetWx;
+            existing.targetWy = incomingTargetWy;
+            if (distFromActual > 1.8) {
+              existing.wx = incomingWx;
+              existing.wy = incomingWy;
+            }
+            existing.isMoving = true;
+          } else {
+            // Remote player stopped at incomingWx, incomingWy
             existing.targetWx = incomingWx;
             existing.targetWy = incomingWy;
+            if (distFromActual > 1.8) {
+              existing.wx = incomingWx;
+              existing.wy = incomingWy;
+              existing.isMoving = false;
+            } else {
+              existing.isMoving = distFromActual > 0.05;
+            }
           }
 
-          existing.isMoving = Boolean(rem.isMoving) || distFromActual > 0.08;
           existing.isSitting = Boolean(rem.isSitting);
           existing.sittingSeat = rem.sittingSeat;
           if (rem.facing) existing.facing = rem.facing;
           existing.isFishing = Boolean(rem.isFishing);
           existing.heldItem = rem.heldItem || null;
-          existing.role = rem.role || existing.role;
-          existing.roleLabel = rem.roleLabel || existing.roleLabel;
-          existing.gender = rem.gender || existing.gender;
-          existing.shirtColor = rem.shirtColor || existing.shirtColor;
-          existing.pantsColor = rem.pantsColor || existing.pantsColor;
           if (rem.speechText) {
             existing.speechText = rem.speechText;
             existing.speechTimer = rem.speechTimer || 5;
           }
-          existing.lastPing = Date.now();
+          existing.lastPing = now;
         }
       });
 
-      // Remove disconnected players when receiving full list from server
-      if (isFullList) {
-        for (const [id] of remotePlayersRef.current.entries()) {
-          if (!activeIds.has(id)) {
-            remotePlayersRef.current.delete(id);
-          }
-        }
-      } else {
-        const now = Date.now();
-        for (const [id, pl] of remotePlayersRef.current.entries()) {
-          if (pl.lastPing && now - pl.lastPing > 12000) {
-            remotePlayersRef.current.delete(id);
-          }
+      // Prune only players that have been completely silent across all channels for >18 seconds
+      for (const [id, pl] of remotePlayersRef.current.entries()) {
+        if (pl.lastPing && now - pl.lastPing > 18000) {
+          remotePlayersRef.current.delete(id);
         }
       }
 
-      setOnlineCount(remotePlayersRef.current.size + 1);
+      syncOnlineUiList();
     };
 
-    const sendHeartbeat = async () => {
-      if (!isMounted || !playerRef.current) return;
+    const buildLocalPayload = () => {
       const p = playerRef.current;
-      const payload = {
+      return {
         id: mySessionId,
-        handle: p.handle,
+        handle: p ? p.handle : cleanHandle,
         name: studentName,
         role: isTeacher ? 'guru' : 'siswa',
-        roleLabel: isTeacher ? 'GURU DKV' : 'Warga',
-        gender: p.gender || (studentGender === 'P' ? 'P' : 'L'),
-        shirtColor: p.shirtColor,
-        pantsColor: p.pantsColor,
-        hairColor: p.hairColor,
-        wx: p.wx,
-        wy: p.wy,
-        targetWx: p.targetWx,
-        targetWy: p.targetWy,
-        speed: p.speed,
-        isMoving: p.isMoving,
-        walkFrame: p.walkFrame,
-        facing: p.facing,
+        isTeacher: Boolean(isTeacher),
+        roleLabel: isTeacher ? 'GURU DKV' : 'Siswa DKV',
+        gender: p?.gender || (studentGender === 'P' ? 'P' : 'L'),
+        shirtColor: p?.shirtColor || (isTeacher ? (studentGender === 'P' ? '#047857' : '#1e3a8a') : (studentGender === 'P' ? '#ec4899' : '#2563eb')),
+        pantsColor: p?.pantsColor || (isTeacher ? (studentGender === 'P' ? '#065f46' : '#1e293b') : (studentGender === 'P' ? '#be185d' : '#1e293b')),
+        hairColor: p?.hairColor || (studentGender === 'P' ? '#6b3410' : '#0f172a'),
+        wx: p ? Number(p.wx.toFixed(3)) : 1.5,
+        wy: p ? Number(p.wy.toFixed(3)) : 1.8,
+        targetWx: p ? Number(p.targetWx.toFixed(3)) : 1.5,
+        targetWy: p ? Number(p.targetWy.toFixed(3)) : 1.8,
+        speed: p ? p.speed : 1.35,
+        isMoving: Boolean(p?.isMoving),
+        walkFrame: p ? Number(p.walkFrame.toFixed(2)) : 0,
+        facing: p?.facing || 'down-left',
         isSitting: Boolean(isSittingRef.current),
         sittingSeat: sittingSeatRef.current || undefined,
         isFishing: Boolean(isFishingRef.current),
@@ -575,15 +611,46 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         speechText: playerSpeechRef.current && Date.now() < playerSpeechRef.current.expiresAt ? playerSpeechRef.current.text : undefined,
         speechTimer: playerSpeechRef.current ? Math.max(0, (playerSpeechRef.current.expiresAt - Date.now()) / 1000) : 0,
       };
+    };
 
-      // 1. BroadcastChannel for local instant reaction across browser tabs
+    // 1. Global WebSocket MQTT Presence Mesh (works across all devices, networks, Cloud Run instances & GitHub Pages)
+    const mesh = new RealtimePresenceMesh(
+      mySessionId,
+      (msg) => {
+        if (!isMounted) return;
+        if (msg.type === 'presence_update' && msg.player && msg.player.id !== mySessionId) {
+          handleIncomingOthers([msg.player]);
+        } else if (msg.type === 'presence_leave' && msg.id) {
+          remotePlayersRef.current.delete(msg.id);
+          syncOnlineUiList();
+        } else if (msg.type === 'request_sync' && msg.senderId !== mySessionId) {
+          // Immediately reply with our current state so the newly connected device sees us in <50ms
+          mesh.publish({ type: 'presence_update', player: buildLocalPayload() });
+        }
+      },
+      () => {
+        if (!isMounted) return;
+        // Request all online citizens on other devices to announce themselves immediately
+        mesh.publish({ type: 'request_sync', senderId: mySessionId });
+        mesh.publish({ type: 'presence_update', player: buildLocalPayload() });
+      }
+    );
+
+    const sendHeartbeat = async () => {
+      if (!isMounted) return;
+      const payload = buildLocalPayload();
+
+      // A. Global WebSocket Mesh broadcast (instant cross-device & cross-network)
+      mesh.publish({ type: 'presence_update', player: payload });
+
+      // B. BroadcastChannel for local instant reaction across browser tabs
       if (presenceChannel) {
         try {
           presenceChannel.postMessage({ type: 'presence_update', player: payload });
         } catch (e) {}
       }
 
-      // 2. Server API for real multi-device online presence
+      // C. Server API for Express SSE & HTTP presence
       try {
         const res = await fetch('/api/presence/heartbeat', {
           method: 'POST',
@@ -591,13 +658,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           body: JSON.stringify(payload),
         });
         if (res.ok && isMounted) {
-          const json = await res.json();
-          if (json.success && Array.isArray(json.onlinePlayers)) {
-            handleIncomingOthers(json.onlinePlayers, true);
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const json = await res.json();
+            if (json.success && Array.isArray(json.onlinePlayers)) {
+              handleIncomingOthers(json.onlinePlayers);
+            }
           }
         }
       } catch (err) {
-        // Offline / network fallback
+        // Offline / static host fallback handled by mesh
       }
     };
 
@@ -618,22 +688,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           try {
             const data = JSON.parse(event.data);
             if ((data.type === 'sync' || data.type === 'init') && Array.isArray(data.onlinePlayers || data.players)) {
-              handleIncomingOthers(data.onlinePlayers || data.players, true);
-            } else if ((data.type === 'player_update' || data.type === 'update')) {
+              handleIncomingOthers(data.onlinePlayers || data.players);
+            } else if (data.type === 'player_update' || data.type === 'update') {
               if (Array.isArray(data.onlinePlayers)) {
-                handleIncomingOthers(data.onlinePlayers, true);
+                handleIncomingOthers(data.onlinePlayers);
               } else if (data.player) {
-                handleIncomingOthers([data.player], false);
+                handleIncomingOthers([data.player]);
               }
             } else if (data.type === 'leave') {
               const leftId = data.leftId || data.id;
               if (leftId) {
                 remotePlayersRef.current.delete(leftId);
-              }
-              if (Array.isArray(data.onlinePlayers)) {
-                handleIncomingOthers(data.onlinePlayers, true);
-              } else {
-                setOnlineCount(remotePlayersRef.current.size + 1);
+                syncOnlineUiList();
               }
             }
           } catch (err) {}
@@ -647,7 +713,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             reconnectTimer = window.setTimeout(() => {
               reconnectTimer = null;
               connectSSE();
-            }, 2500);
+            }, 3000);
           }
         };
       } catch (e) {}
@@ -657,20 +723,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     if (presenceChannel) {
       presenceChannel.onmessage = (event) => {
         if (event.data?.type === 'presence_update' && event.data.player) {
-          handleIncomingOthers([event.data.player], false);
+          handleIncomingOthers([event.data.player]);
         } else if (event.data?.type === 'presence_leave' && event.data.id) {
           remotePlayersRef.current.delete(event.data.id);
-          setOnlineCount(remotePlayersRef.current.size + 1);
+          syncOnlineUiList();
         }
       };
     }
 
-    const interval = setInterval(sendHeartbeat, 750);
-    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 650);
+    // Initial heartbeat after playerRef is ready
+    const initTimer = window.setTimeout(sendHeartbeat, 50);
 
     const onUnload = () => {
       sendHeartbeatRef.current = null;
       try {
+        mesh.publish({ type: 'presence_leave', id: mySessionId });
         if (presenceChannel) {
           presenceChannel.postMessage({ type: 'presence_leave', id: mySessionId });
         }
@@ -684,11 +752,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       isMounted = false;
       sendHeartbeatRef.current = null;
       clearInterval(interval);
+      clearTimeout(initTimer);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (eventSource) eventSource.close();
       if (presenceChannel) presenceChannel.close();
       window.removeEventListener('beforeunload', onUnload);
       onUnload();
+      mesh.dispose();
     };
   }, [isTeacher, studentName, studentGender]);
 
@@ -756,19 +826,44 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     // -----------------------------------------------------------
     // CITIZENS & AVATARS MATCHING SCREENSHOT
     // -----------------------------------------------------------
-    const studentHandle = studentName.split(' ')[0].toLowerCase();
+    const studentHandle = studentName
+      .split(' ')
+      .slice(0, 2)
+      .join('_')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '') || (isTeacher ? 'guru_dkv' : 'siswa');
+
+    // Deterministic non-overlapping plaza spawn offset per device so Guru & Siswa never overlap at (1.5, 1.8)
+    const devSeedStr = `${clientDeviceIdRef.current}_${studentHandle}_${isTeacher ? 'guru' : 'siswa'}`;
+    let seedHash = 0;
+    for (let i = 0; i < devSeedStr.length; i++) {
+      seedHash = (seedHash * 31 + devSeedStr.charCodeAt(i)) % 1000;
+    }
+    const spawnSlot = seedHash % 8;
+    const PLAZA_SPAWN_OFFSETS: Array<[number, number]> = [
+      [1.45, 1.75],
+      [0.95, 1.55],
+      [1.75, 1.35],
+      [0.35, 1.85],
+      [1.15, 2.05],
+      [-0.35, 1.85],
+      [1.85, 0.95],
+      [-0.95, 1.55],
+    ];
+    const [initWx, initWy] = PLAZA_SPAWN_OFFSETS[spawnSlot] || [1.45, 1.75];
 
     // 1. Player (Siswa / Guru)
     const isPlayerTeacher = Boolean(isTeacher);
     const player: AvatarData = {
       id: isPlayerTeacher ? 'guru_player' : 'siswa',
       role: isPlayerTeacher ? 'guru' : 'siswa',
-      handle: studentHandle || (isPlayerTeacher ? 'guru_dkv' : 'andi_pratama'),
+      handle: studentHandle,
+      name: studentName,
       roleLabel: isPlayerTeacher ? 'Guru Pembimbing' : 'Kamu',
-      wx: 1.5,
-      wy: 1.8,
-      targetWx: 1.5,
-      targetWy: 1.8,
+      wx: initWx,
+      wy: initWy,
+      targetWx: initWx,
+      targetWy: initWy,
       speed: 1.35, // Relaxed, gentle and natural walking speed
       shirtColor: isPlayerTeacher
         ? (studentGender === 'P' ? '#047857' : '#1e3a8a')
@@ -784,6 +879,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       facing: 'down-left',
     };
     playerRef.current = player;
+    // Immediately announce our spawn position to all other devices
+    sendHeartbeatRef.current?.();
 
     // -----------------------------------------------------------
     // 7 OFFICIAL TOWN STAFF NPCS (ONLY THESE 7 ARE RANDOM NPCS IN KOTA REFLEKSIA)
@@ -4106,6 +4203,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           }
 
+          // Subtle live online aura ring under remote online Guru & Siswa avatars
+          if (av.isOnlineRemote && !isOnSwing) {
+            ctx.save();
+            const pulseR = (9.5 + Math.sin(elapsed * 4) * 1.2) * z;
+            ctx.strokeStyle = isTeacherAvatar ? 'rgba(245, 158, 11, 0.75)' : 'rgba(16, 185, 129, 0.75)';
+            ctx.lineWidth = 1.4 * z;
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 1, pulseR, pulseR * 0.48, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+
           // Spawning Portal Effect for Remote Online Avatars
           if (av.isOnlineRemote && av.spawnTime && currentTime - av.spawnTime < 3500) {
             const spawnFade = 1 - (currentTime - av.spawnTime) / 3500;
@@ -4574,7 +4683,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (item.isPlayer) {
             labelText = isTeacherAvatar ? `@${av.handle} (Guru)` : `@${av.handle} (Kamu)`;
           } else if (av.isOnlineRemote) {
-            labelText = `@${av.handle} 🟢`;
+            labelText = isTeacherAvatar ? `@${av.handle} (Guru) 🟢` : `@${av.handle} (Siswa) 🟢`;
           } else if (av.role === 'penjaga_kota') {
             labelText = `🛡️ @surya (Penjaga Kota)`;
           } else if (av.role === 'penjaga_lab') {
@@ -4859,7 +4968,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       canvas.removeEventListener('mousemove', onPointerMove);
       playerRef.current = null;
     };
-  }, [studentName, studentGender]);
+  }, [studentName, studentGender, isTeacher]);
 
   // -------------------------------------------------------------
   // KAFE ITEM PURCHASES (Deduct XP Saldo)
@@ -5587,13 +5696,53 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         </div>
       )}
 
-      {/* ONLINE CITIZENS BADGE (Real-Time Device Presence) */}
-      <div className="absolute top-13 sm:top-15 left-2.5 sm:left-4 z-20 pointer-events-none">
-        <div className="bg-[#121e2c]/90 backdrop-blur-md border border-emerald-500/40 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5 sm:gap-2 animate-fade-in-up">
+      {/* ONLINE CITIZENS BADGE & LIVE RADAR (Real-Time Multi-Device Guru & Siswa Presence) */}
+      <div className="absolute top-13 sm:top-15 left-2.5 sm:left-4 z-20 flex flex-col items-start gap-1.5 max-w-[88vw] pointer-events-auto">
+        <div className="bg-[#121e2c]/92 backdrop-blur-md border border-emerald-500/45 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5 sm:gap-2">
           <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span className="text-emerald-300 font-mono">{onlineCount}</span>
-          <span className="text-slate-300">Warga Online</span>
+          <span className="text-slate-200">Warga Online</span>
         </div>
+
+        {onlineRemoteList.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 max-w-[280px] sm:max-w-[380px]">
+            {onlineRemoteList.slice(0, 6).map((cit) => (
+              <button
+                key={cit.id}
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  const rem = remotePlayersRef.current.get(cit.id);
+                  if (rem && playerRef.current) {
+                    if (isSittingRef.current) {
+                      setIsSitting(false);
+                      setSittingSeat(null);
+                    }
+                    playerRef.current.targetWx = Math.max(-6.5, Math.min(6.5, rem.wx + 0.55));
+                    playerRef.current.targetWy = Math.max(-6.5, Math.min(6.5, rem.wy + 0.35));
+                    playerRef.current.isMoving = true;
+                    clickRippleRef.current = { wx: playerRef.current.targetWx, wy: playerRef.current.targetWy, time: performance.now() };
+                    sendHeartbeatRef.current?.();
+                    setCafeToast(`🧭 Menuju lokasi ${cit.role === 'guru' ? 'Guru' : 'Siswa'} @${cit.handle}`);
+                    setTimeout(() => setCafeToast(null), 2500);
+                  }
+                }}
+                className={`px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-bold border shadow-md backdrop-blur-md flex items-center gap-1 transition active:scale-95 cursor-pointer ${
+                  cit.role === 'guru'
+                    ? 'bg-amber-950/90 border-amber-400/60 text-amber-200 hover:bg-amber-900/90'
+                    : 'bg-[#121e2c]/90 border-emerald-400/50 text-emerald-200 hover:bg-slate-800/90'
+                }`}
+                title={`Klik untuk menghampiri ${cit.name} (@${cit.handle})`}
+              >
+                <span>{cit.role === 'guru' ? '👨‍🏫' : '👦'}</span>
+                <span className="truncate max-w-[85px]">@{cit.handle}</span>
+                <span className="text-[8.5px] opacity-85">
+                  {cit.isSitting ? '🪑' : cit.isMoving ? '🚶' : '🟢'}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Zoom & Center Controls */}

@@ -492,7 +492,7 @@ function broadcastPresence(payload: any) {
 }
 
 function purgeInactivePlayers() {
-  const timeoutMs = 12000; // 12 seconds of inactivity
+  const timeoutMs = 18000; // 18 seconds of inactivity
   const now = Date.now();
   let changed = false;
   for (const [id, player] of onlinePlayersMap.entries()) {
@@ -509,19 +509,31 @@ function purgeInactivePlayers() {
   }
 }
 
-// Inactive cleanup interval (check every 3 seconds)
-setInterval(purgeInactivePlayers, 3000);
+// Inactive cleanup & SSE keep-alive ping interval (every 3 seconds)
+setInterval(() => {
+  purgeInactivePlayers();
+  for (const client of sseClients) {
+    try {
+      client.write(`: keepalive ${Date.now()}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}, 3000);
 
 // SSE Stream for Instant Real-Time Multi-Device Presence
 app.get('/api/presence/stream', (_req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.flushHeaders?.();
 
   sseClients.add(res);
 
   // Send initial players immediately on connection
+  purgeInactivePlayers();
   const initial = Array.from(onlinePlayersMap.values());
   res.write(`data: ${JSON.stringify({ type: 'sync', onlinePlayers: initial })}\n\n`);
 
@@ -532,27 +544,29 @@ app.get('/api/presence/stream', (_req, res) => {
 
 // Heartbeat & sync player position/state across all devices
 app.post('/api/presence/heartbeat', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   purgeInactivePlayers();
   const data = req.body;
   if (!data || !data.id) {
     return res.status(400).json({ success: false, error: 'Data pemain tidak valid.' });
   }
 
+  const isTeacherRole = data.role === 'guru' || Boolean(data.isTeacher);
   const player: ServerOnlinePlayer = {
     id: String(data.id),
     handle: String(data.handle || 'warga').replace(/^@/, ''),
     name: String(data.name || data.handle || 'Warga'),
-    role: data.role === 'guru' ? 'guru' : 'siswa',
-    roleLabel: String(data.roleLabel || (data.role === 'guru' ? 'GURU DKV' : 'Warga')),
+    role: isTeacherRole ? 'guru' : 'siswa',
+    roleLabel: String(data.roleLabel || (isTeacherRole ? 'GURU DKV' : 'Siswa DKV')),
     gender: data.gender === 'P' ? 'P' : 'L',
-    shirtColor: String(data.shirtColor || '#2563eb'),
-    pantsColor: String(data.pantsColor || '#1e293b'),
+    shirtColor: String(data.shirtColor || (isTeacherRole ? (data.gender === 'P' ? '#047857' : '#1e3a8a') : '#2563eb')),
+    pantsColor: String(data.pantsColor || (isTeacherRole ? (data.gender === 'P' ? '#065f46' : '#1e293b') : '#1e293b')),
     hairColor: String(data.hairColor || '#0f172a'),
-    wx: typeof data.wx === 'number' ? data.wx : 0,
-    wy: typeof data.wy === 'number' ? data.wy : 0,
-    targetWx: typeof data.targetWx === 'number' ? data.targetWx : (data.wx || 0),
-    targetWy: typeof data.targetWy === 'number' ? data.targetWy : (data.wy || 0),
-    speed: typeof data.speed === 'number' ? data.speed : 1.35,
+    wx: typeof data.wx === 'number' && !isNaN(data.wx) ? data.wx : 1.5,
+    wy: typeof data.wy === 'number' && !isNaN(data.wy) ? data.wy : 1.8,
+    targetWx: typeof data.targetWx === 'number' && !isNaN(data.targetWx) ? data.targetWx : (data.wx || 1.5),
+    targetWy: typeof data.targetWy === 'number' && !isNaN(data.targetWy) ? data.targetWy : (data.wy || 1.8),
+    speed: typeof data.speed === 'number' && data.speed > 0 ? data.speed : 1.35,
     isMoving: Boolean(data.isMoving),
     walkFrame: typeof data.walkFrame === 'number' ? data.walkFrame : 0,
     facing: data.facing || 'down-left',
@@ -587,6 +601,7 @@ app.post('/api/presence/heartbeat', (req, res) => {
 
 // Get list of online players
 app.get('/api/presence/online', (_req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   purgeInactivePlayers();
   res.json({
     success: true,
@@ -597,6 +612,7 @@ app.get('/api/presence/online', (_req, res) => {
 
 // Explicit player disconnect
 app.post('/api/presence/leave', express.text({ type: '*/*' }), (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   let id: string | undefined;
   if (typeof req.body === 'string') {
     try {
