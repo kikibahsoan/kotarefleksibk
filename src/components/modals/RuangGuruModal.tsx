@@ -76,11 +76,12 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // 2. Aksi Lengkap Semua Data (Refleksi, Feedback, Pesan, Obrolan Warga)
+  // 2. Aksi Lengkap Semua Data (Refleksi, Feedback, Pesan, Obrolan Warga, & Jurnal Pohon Beringin)
   var reflections = getReflections(ss);
   var feedbacks = getFeedbacks(ss);
   var messages = getMessages(ss);
   var chats = getPublicChats(ss);
+  var stickyNotes = getStickyNotes(ss);
 
   return ContentService.createTextOutput(JSON.stringify({
     success: true,
@@ -89,6 +90,7 @@ function doGet(e) {
     feedbacks: feedbacks,
     messages: messages,
     chats: chats,
+    stickyNotes: stickyNotes,
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
 }
@@ -110,6 +112,14 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "submit_reflection") {
       saveReflection(ss, data.reflection, data.feedback);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_sticky_note") {
+      saveStickyNote(ss, data.note);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "like_sticky_note") {
+      updateStickyNoteLikes(ss, data.noteId, data.likes, data.likedBy, data.likedByNames);
       return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "send_message") {
@@ -399,6 +409,91 @@ function saveMessageReply(ss, msgId, reply, repliedAt) {
       break;
     }
   }
+}
+
+// -------------------------------------------------------------
+// MANAJEMEN JURNAL HARIAN POHON BERINGIN (STICKY NOTES WARGA)
+// -------------------------------------------------------------
+function getOrCreateStickyNoteSheet(ss) {
+  var sheet = ss.getSheetByName("Jurnal_Pohon_Beringin");
+  if (!sheet) {
+    sheet = ss.insertSheet("Jurnal_Pohon_Beringin");
+    sheet.appendRow([
+      "ID Catatan", "ID Siswa", "Nama Siswa", "Kelas", "Isi Refleksi Harian",
+      "Mood Emoji", "Warna Kertas", "Tanggal", "Timestamp", "Jumlah Suka", "Disukai Oleh (ID)", "Disukai Oleh (Nama)"
+    ]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function saveStickyNote(ss, note) {
+  if (!note || !note.id) return;
+  var sheet = getOrCreateStickyNoteSheet(ss);
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(note.id)) {
+      sheet.getRange(i + 1, 10).setValue(Number(note.likes) || 0);
+      sheet.getRange(i + 1, 11).setValue(JSON.stringify(note.likedBy || []));
+      sheet.getRange(i + 1, 12).setValue(JSON.stringify(note.likedByNames || []));
+      return;
+    }
+  }
+  sheet.appendRow([
+    note.id,
+    note.studentId || "",
+    note.studentName || "Warga",
+    note.className || "X DKV",
+    note.content || "",
+    note.mood || "😊",
+    note.color || "yellow",
+    note.date || "",
+    note.timestamp || Date.now(),
+    Number(note.likes) || 0,
+    JSON.stringify(note.likedBy || []),
+    JSON.stringify(note.likedByNames || [])
+  ]);
+}
+
+function updateStickyNoteLikes(ss, noteId, likes, likedBy, likedByNames) {
+  var sheet = ss.getSheetByName("Jurnal_Pohon_Beringin");
+  if (!sheet) return;
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(noteId)) {
+      sheet.getRange(i + 1, 10).setValue(Number(likes) || 0);
+      sheet.getRange(i + 1, 11).setValue(JSON.stringify(likedBy || []));
+      sheet.getRange(i + 1, 12).setValue(JSON.stringify(likedByNames || []));
+      break;
+    }
+  }
+}
+
+function getStickyNotes(ss) {
+  var sheet = ss.getSheetByName("Jurnal_Pohon_Beringin");
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0] || !r[4]) continue;
+    list.push({
+      id: String(r[0]),
+      studentId: String(r[1]),
+      studentName: String(r[2]),
+      className: String(r[3]),
+      content: String(r[4]),
+      mood: String(r[5] || "😊"),
+      color: String(r[6] || "yellow"),
+      date: String(r[7] || ""),
+      timestamp: Number(r[8]) || Date.now(),
+      likes: Number(r[9]) || 0,
+      likedBy: parseJsonList(r[10]),
+      likedByNames: parseJsonList(r[11])
+    });
+  }
+  return list;
 }`;
 
 export interface RuangGuruModalProps {

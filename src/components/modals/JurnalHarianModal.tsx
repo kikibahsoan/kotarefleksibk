@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Sparkles, Heart, Send, CheckCircle2, Pin, Calendar, User, Search, Filter, MessageSquare, BookOpen } from 'lucide-react';
-import { DailyJournalStickyNote, Student } from '../../types/index.ts';
+import { X, Sparkles, Heart, Send, CheckCircle2, Pin, Calendar, User, Search, Filter, MessageSquare, BookOpen, RefreshCw, Database } from 'lucide-react';
+import { DailyJournalStickyNote, Student, PublicChatMessage, Reflection } from '../../types/index.ts';
 import { sounds } from '../../utils/audio.ts';
+import { StorageService as storage } from '../../utils/storage.ts';
 import confetti from 'canvas-confetti';
 
 interface JurnalHarianModalProps {
@@ -136,6 +137,227 @@ export function mergeStickyNotesList(
   return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
+/**
+ * Menyimpan Sticky Note Pohon Beringin ke Google Spreadsheet melalui Google Apps Script.
+ * Mendukung 3 jalur sekaligus:
+ * 1. Sheet khusus 'Jurnal_Pohon_Beringin' (action: 'save_sticky_note') jika skrip GAS terbaru digunakan
+ * 2. Sheet 'Data_Refleksi_Siswa' / 'Refleksi_Siswa' (action: 'submit_reflection') agar kompatibel 100% dengan skrip GAS v2.0 yang sudah dideploy tanpa perlu update skrip
+ */
+export async function syncStickyNoteToSpreadsheet(note: DailyJournalStickyNote): Promise<void> {
+  try {
+    // 1. Kirim action khusus save_sticky_note untuk tabel Jurnal_Pohon_Beringin
+    storage.syncWithGAS('save_sticky_note', { note });
+
+    // 2. Kirim juga ke submit_reflection dengan penanda [JURNAL_POHON_BERINGIN] agar otomatis tersimpan & terbaca di Spreadsheet v2.0 yang sudah ada!
+    const validColors = ['yellow', 'pink', 'blue', 'green', 'purple'];
+    const safeColor = validColors.includes(note.color) ? note.color : 'yellow';
+
+    const reflectionPayload: Reflection = {
+      id: note.id.startsWith('sticky-') ? note.id : `sticky-${note.id}`,
+      studentId: note.studentId || 'std-anon',
+      studentName: note.studentName || 'Warga Refleksia',
+      studentNumber: safeColor,
+      className: note.className || 'X DKV 2',
+      materiId: 'pohon_beringin',
+      materiTitle: `[JURNAL_POHON_BERINGIN]`,
+      scale: Math.max(1, note.likes || 1),
+      moodEmoji: note.mood || '😊',
+      answers: {
+        understood: note.content,
+        difficult: JSON.stringify(note.likedBy || []),
+        findings: JSON.stringify(note.likedByNames || []),
+        actionPlan: String(note.likes || 0),
+        customAnswers: {
+          color: safeColor,
+          timestamp: String(note.timestamp || Date.now()),
+          date: note.date,
+        },
+      },
+      createdAt: note.date || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+    };
+
+    await storage.syncWithGAS('submit_reflection', {
+      reflection: reflectionPayload,
+      feedback: {
+        id: `fb-${reflectionPayload.id}`,
+        reflectionId: reflectionPayload.id,
+        apresiasi: `Sticky Note Pohon Beringin (${safeColor})`,
+        sudah_dikuasai: [safeColor, String(note.timestamp || Date.now())],
+        perlu_diperkuat: note.likedBy || [],
+        saran: note.likedByNames || [],
+        pertanyaan_pemantik: note.mood || '😊',
+        rencana_belajar: [String(note.likes || 0)],
+        perlu_perhatian_guru: false,
+      },
+    });
+  } catch (err) {
+    console.warn('Gagal menyinkronkan sticky note ke Spreadsheet:', err);
+  }
+}
+
+/**
+ * Menyinkronkan Like Sticky Note ke Google Spreadsheet
+ */
+export async function syncStickyNoteLikeToSpreadsheet(note: DailyJournalStickyNote): Promise<void> {
+  try {
+    storage.syncWithGAS('like_sticky_note', {
+      noteId: note.id,
+      likes: note.likes || 0,
+      likedBy: note.likedBy || [],
+      likedByNames: note.likedByNames || [],
+    });
+    // Juga kirim update baris refleksi agar skrip v2.0 mencatat jumlah like terbaru
+    await syncStickyNoteToSpreadsheet(note);
+  } catch (err) {
+    // safe fallback
+  }
+}
+
+/**
+ * Mengambil seluruh Sticky Note Pohon Beringin dari Google Spreadsheet + Server API + LocalStorage
+ */
+export async function fetchStickyNotesFromAllSources(): Promise<{
+  notes: DailyJournalStickyNote[];
+  fromSpreadsheet: boolean;
+  spreadsheetName?: string;
+}> {
+  let currentNotes = getStoredStickyNotes();
+  let fromSpreadsheet = false;
+  let spreadsheetName = 'Google Spreadsheet';
+
+  // 1. Ambil dari Server API (/api/journals/sticky-notes)
+  try {
+    const res = await fetch('/api/journals/sticky-notes');
+    if (res.ok) {
+      const json = await res.json();
+      const serverList = Array.isArray(json) ? json : (json?.data || []);
+      if (Array.isArray(serverList) && serverList.length > 0) {
+        currentNotes = mergeStickyNotesList(currentNotes, serverList);
+      }
+    }
+  } catch {}
+
+  // 2. Ambil langsung dari Google Spreadsheet (Google Apps Script Web App)
+  const settings = storage.getSettings();
+  if (settings.gasWebAppUrl && settings.gasWebAppUrl.startsWith('http')) {
+    try {
+      const url = new URL(settings.gasWebAppUrl);
+      url.searchParams.set('action', 'get_data');
+      url.searchParams.set('_t', String(Date.now()));
+
+      const gasRes = await fetch(url.toString(), {
+        method: 'GET',
+        redirect: 'follow',
+        cache: 'no-store',
+      });
+
+      if (gasRes.ok) {
+        const resData = await gasRes.json();
+        fromSpreadsheet = true;
+        if (resData.spreadsheet) {
+          spreadsheetName = resData.spreadsheet;
+        }
+
+        const sheetStickyList: DailyJournalStickyNote[] = [];
+
+        // A. Jika skrip GAS mengembalikan array stickyNotes secara langsung
+        if (Array.isArray(resData.stickyNotes)) {
+          resData.stickyNotes.forEach((sn: any) => {
+            if (sn && sn.id && sn.content) {
+              sheetStickyList.push({
+                id: String(sn.id),
+                studentId: String(sn.studentId || 'std-sheet'),
+                studentName: String(sn.studentName || 'Warga Refleksia'),
+                className: String(sn.className || 'X DKV 2'),
+                content: String(sn.content),
+                mood: String(sn.mood || '😊'),
+                color: ['yellow', 'pink', 'blue', 'green', 'purple'].includes(sn.color) ? sn.color : 'yellow',
+                date: String(sn.date || 'Hari ini'),
+                timestamp: Number(sn.timestamp) || Date.now(),
+                likes: Number(sn.likes) || 0,
+                likedBy: Array.isArray(sn.likedBy) ? sn.likedBy : [],
+                likedByNames: Array.isArray(sn.likedByNames) ? sn.likedByNames : [],
+              });
+            }
+          });
+        }
+
+        // B. Ekstrak dari resData.reflections yang bertanda [JURNAL_POHON_BERINGIN] atau id 'sticky-*'
+        if (Array.isArray(resData.reflections)) {
+          resData.reflections.forEach((r: Reflection, idx: number) => {
+            const isSticky =
+              (r.id && String(r.id).startsWith('sticky-')) ||
+              (r.materiTitle && String(r.materiTitle).includes('JURNAL_POHON_BERINGIN')) ||
+              r.materiId === 'pohon_beringin';
+
+            if (isSticky && r.answers?.understood) {
+              const rawColor =
+                (r.answers?.customAnswers && r.answers.customAnswers['color']) ||
+                r.studentNumber ||
+                'yellow';
+              const validColor = (['yellow', 'pink', 'blue', 'green', 'purple'].includes(String(rawColor))
+                ? rawColor
+                : 'yellow') as 'yellow' | 'pink' | 'blue' | 'green' | 'purple';
+
+              let parsedLikedBy: string[] = [];
+              let parsedLikedNames: string[] = [];
+              try {
+                if (r.answers.difficult && r.answers.difficult.startsWith('[')) {
+                  parsedLikedBy = JSON.parse(r.answers.difficult);
+                }
+              } catch {}
+              try {
+                if (r.answers.findings && r.answers.findings.startsWith('[')) {
+                  parsedLikedNames = JSON.parse(r.answers.findings);
+                }
+              } catch {}
+
+              const parsedLikes = Math.max(
+                parsedLikedBy.length,
+                Number(r.answers.actionPlan) || 0,
+                (Number(r.scale) || 1) > 1 ? Number(r.scale) : 0
+              );
+
+              const rawTs =
+                r.answers?.customAnswers && r.answers.customAnswers['timestamp']
+                  ? Number(r.answers.customAnswers['timestamp'])
+                  : Date.now() - idx * 60000;
+
+              sheetStickyList.push({
+                id: String(r.id),
+                studentId: String(r.studentId || 'std-sheet'),
+                studentName: String(r.studentName || 'Warga Refleksia'),
+                className: String(r.className || 'X DKV 2'),
+                content: String(r.answers.understood),
+                mood: String(r.moodEmoji || '😊'),
+                color: validColor,
+                date: String(r.createdAt || 'Hari ini'),
+                timestamp: isNaN(rawTs) ? Date.now() : rawTs,
+                likes: parsedLikes,
+                likedBy: Array.isArray(parsedLikedBy) ? parsedLikedBy : [],
+                likedByNames: Array.isArray(parsedLikedNames) ? parsedLikedNames : [],
+              });
+            }
+          });
+        }
+
+        if (sheetStickyList.length > 0) {
+          currentNotes = mergeStickyNotesList(currentNotes, sheetStickyList);
+        }
+      }
+    } catch (err) {
+      // Safe fallback if offline
+    }
+  }
+
+  saveStoredStickyNotes(currentNotes);
+  return {
+    notes: currentNotes,
+    fromSpreadsheet,
+    spreadsheetName,
+  };
+}
+
 const COLOR_MAP = {
   yellow: {
     bg: 'bg-amber-100 text-amber-950 border-amber-300',
@@ -198,6 +420,9 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
   const [color, setColor] = useState<'yellow' | 'pink' | 'blue' | 'green' | 'purple'>('yellow');
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSyncingSpreadsheet, setIsSyncingSpreadsheet] = useState(false);
+  const [spreadsheetConnected, setSpreadsheetConnected] = useState(true);
+  const [spreadsheetName, setSpreadsheetName] = useState('Database Kota Refleksi');
 
   // Per-citizen liked note IDs stored in localStorage so switching accounts on the same browser works independently
   const [likedNoteIds, setLikedNoteIds] = useState<string[]>(() => {
@@ -216,23 +441,37 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
     }
   });
 
-  // Synchronize sticky notes from localStorage & server across all citizens, tabs & devices
+  const handleManualSyncSpreadsheet = async () => {
+    if (isSyncingSpreadsheet) return;
+    sounds.playClick();
+    setIsSyncingSpreadsheet(true);
+    try {
+      const result = await fetchStickyNotesFromAllSources();
+      setNotes(result.notes);
+      if (result.fromSpreadsheet) {
+        setSpreadsheetConnected(true);
+        if (result.spreadsheetName) setSpreadsheetName(result.spreadsheetName);
+      }
+      window.dispatchEvent(new CustomEvent('kota_refleksi_sticky_notes_updated', { detail: result.notes }));
+    } catch {}
+    setIsSyncingSpreadsheet(false);
+  };
+
+  // Synchronize sticky notes from Google Spreadsheet, Server & localStorage across all citizens, tabs & devices
   useEffect(() => {
     let isMounted = true;
-    const syncNotesFromStorageAndServer = async () => {
+    const syncNotesFromAllSources = async () => {
       const local = getStoredStickyNotes();
       if (isMounted) {
         setNotes(local);
       }
       try {
-        const res = await fetch('/api/journals/sticky-notes');
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && Array.isArray(json.data) && isMounted) {
-            const latestLocal = getStoredStickyNotes();
-            const merged = mergeStickyNotesList(latestLocal, json.data);
-            setNotes(merged);
-            saveStoredStickyNotes(merged);
+        const result = await fetchStickyNotesFromAllSources();
+        if (isMounted) {
+          setNotes(result.notes);
+          if (result.fromSpreadsheet) {
+            setSpreadsheetConnected(true);
+            if (result.spreadsheetName) setSpreadsheetName(result.spreadsheetName);
           }
         }
       } catch (err) {
@@ -240,7 +479,14 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
       }
     };
 
-    syncNotesFromStorageAndServer();
+    syncNotesFromAllSources();
+
+    // Auto-poll Google Spreadsheet every 8 seconds while modal is open so notes from other devices appear live
+    const pollInterval = window.setInterval(() => {
+      if (isMounted) {
+        syncNotesFromAllSources();
+      }
+    }, 8000);
 
     // Listen to localStorage changes from other tabs/windows
     const handleNativeStorage = (e: StorageEvent) => {
@@ -279,7 +525,7 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
             saveStoredStickyNotes(merged);
             setNotes(merged);
           } else {
-            syncNotesFromStorageAndServer();
+            syncNotesFromAllSources();
           }
         }
       };
@@ -287,6 +533,7 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
 
     return () => {
       isMounted = false;
+      window.clearInterval(pollInterval);
       window.removeEventListener('storage', handleNativeStorage);
       window.removeEventListener('kota_refleksi_sticky_notes_updated', handleCustomUpdate);
       if (bc) bc.close();
@@ -367,7 +614,10 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
     // Call callbacks
     if (onNoteAdded) onNoteAdded(newNote);
 
-    // Sync to backend server so other citizens on different devices/browsers can read & like it immediately
+    // 1. Simpan langsung ke Google Spreadsheet supaya bisa dilihat seluruh warga di semua perangkat!
+    syncStickyNoteToSpreadsheet(newNote);
+
+    // 2. Sync to backend server
     try {
       await fetch('/api/journals/sticky-notes', {
         method: 'POST',
@@ -378,7 +628,7 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
       // offline fallback
     }
 
-    // Broadcast update across all tabs & components
+    // 3. Broadcast update across all tabs & components
     try {
       window.dispatchEvent(new CustomEvent('kota_refleksi_sticky_notes_updated', { detail: nextNotes }));
       window.dispatchEvent(new CustomEvent('sticky_note_added', { detail: newNote }));
@@ -433,6 +683,8 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
       localStorage.setItem(STORAGE_KEY_JURNAL_LIKES_BY_USER, JSON.stringify(parsedMap));
     } catch {}
 
+    let updatedSingleNote: DailyJournalStickyNote | null = null;
+
     const nextNotes = notes.map((n) => {
       if (n.id === noteId) {
         const curLikes = n.likes || 0;
@@ -452,18 +704,24 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
           Math.max(0, curLikes + (isAlreadyLiked ? -1 : 1))
         );
 
-        return {
+        updatedSingleNote = {
           ...n,
           likes: updatedLikes,
           likedBy: updatedLikedBy,
           likedByNames: updatedLikedNames,
         };
+        return updatedSingleNote;
       }
       return n;
     });
 
     setNotes(nextNotes);
     saveStoredStickyNotes(nextNotes);
+
+    // Simpan perubahan Like ke Google Spreadsheet agar terbaca warga lain
+    if (updatedSingleNote) {
+      syncStickyNoteLikeToSpreadsheet(updatedSingleNote);
+    }
 
     // Broadcast updated likes to localStorage listeners & other tabs
     try {
@@ -499,26 +757,39 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
               🌳
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                  Belakang Balai Kota
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                  <Database className="w-3 h-3" />
+                  <span>Tersimpan di Google Spreadsheet & LocalStorage</span>
                 </span>
                 <span className="text-[11px] text-amber-300 font-extrabold flex items-center gap-1 font-mono">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" /> +1 XP Tiap Catatan
                 </span>
               </div>
-              <h2 className="text-xl font-black text-white font-['Outfit'] flex items-center gap-2">
+              <h2 className="text-xl font-black text-white font-['Outfit'] flex items-center gap-2 mt-0.5">
                 <span>Jurnal Harian Pohon Beringin</span>
               </h2>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
-            aria-label="Tutup"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleManualSyncSpreadsheet}
+              disabled={isSyncingSpreadsheet}
+              className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="Muat ulang catatan warga dari Google Spreadsheet"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSpreadsheet ? 'animate-spin text-emerald-300' : ''}`} />
+              <span className="hidden sm:inline">{isSyncingSpreadsheet ? 'Sinkronisasi...' : 'Sinkron Spreadsheet'}</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+              aria-label="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Tab switcher: Papan Catatan Warga (Default) vs Tulis Catatan Baru */}

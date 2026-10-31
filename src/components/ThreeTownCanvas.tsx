@@ -10,6 +10,7 @@ import {
   getStoredStickyNotes,
   saveStoredStickyNotes,
   mergeStickyNotesList,
+  fetchStickyNotesFromAllSources,
   STORAGE_KEY_JURNAL_BERINGIN,
 } from './modals/JurnalHarianModal.tsx';
 
@@ -697,27 +698,27 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const stickyNotesRef = useRef<DailyJournalStickyNote[]>(stickyNotes);
   stickyNotesRef.current = stickyNotes;
 
-  // Real-time synchronization of sticky notes on Pohon Beringin from all citizens
+  // Real-time synchronization of sticky notes on Pohon Beringin from Google Spreadsheet, Server & localStorage
   useEffect(() => {
     let isMounted = true;
     const fetchStickyNotes = async () => {
       const local = getStoredStickyNotes();
       if (isMounted) setStickyNotes(local);
       try {
-        const res = await fetch('/api/journals/sticky-notes');
-        if (res.ok) {
-          const json = await res.json();
-          const list = Array.isArray(json) ? json : (json?.data || []);
-          if (isMounted && Array.isArray(list) && list.length > 0) {
-            const merged = mergeStickyNotesList(getStoredStickyNotes(), list);
-            saveStoredStickyNotes(merged);
-            setStickyNotes(merged);
-          }
+        const result = await fetchStickyNotesFromAllSources();
+        if (isMounted && Array.isArray(result.notes) && result.notes.length > 0) {
+          setStickyNotes(result.notes);
         }
       } catch {}
     };
 
     fetchStickyNotes();
+
+    const pollInterval = window.setInterval(() => {
+      if (isMounted) {
+        fetchStickyNotes();
+      }
+    }, 15000);
 
     const handleStickyEvent = (e: Event) => {
       const custom = e as CustomEvent;
@@ -767,6 +768,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     return () => {
       isMounted = false;
+      window.clearInterval(pollInterval);
       window.removeEventListener('sticky_note_added', handleStickyEvent);
       window.removeEventListener('kota_refleksi_sticky_notes_updated', handleStickyEvent);
       window.removeEventListener('storage', handleNativeStorage);
