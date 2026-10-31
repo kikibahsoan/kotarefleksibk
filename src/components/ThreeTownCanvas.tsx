@@ -977,12 +977,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   } | null>(null);
   nearbyActionRef.current = nearbyAction;
 
-  // Fishing state & timer
+  // Fishing state, phase ('casting' | 'waiting' | 'pulling' | null) & timers
   const [isFishing, setIsFishing] = useState(false);
   const isFishingRef = useRef(false);
   isFishingRef.current = isFishing;
+  const [fishingPhase, setFishingPhase] = useState<'casting' | 'waiting' | 'pulling' | null>(null);
+  const fishingPhaseRef = useRef<'casting' | 'waiting' | 'pulling' | null>(null);
+  fishingPhaseRef.current = fishingPhase;
   const fishingTimerRef = useRef<number | null>(null);
   const fishingStartTimeRef = useRef<number>(0);
+  const fishingPullStartTimeRef = useRef<number>(0);
+  const caughtFishRef = useRef<{ name: string; icon: string } | null>(null);
 
   // User Camera Zoom State (+ / -)
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -2331,6 +2336,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         player.isMoving = false;
         player.walkFrame = 0;
         player.facing = 'down-right';
+        player.fishingStartTime = fishingStartTimeRef.current;
       } else if (player.isMoving) {
         const dx = player.targetWx - player.wx;
         const dy = player.targetWy - player.wy;
@@ -7682,45 +7688,59 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
-          // FISHING ANIMATION (Simple Fishing Rod Casting + Bobber & Splash at East Pier)
+          // FISHING ANIMATION (Casting Rod + Bobber Flight & Splash + Interactive Pulling Rod & Leaping Fish)
           if (isFishingNow) {
-            const fishStart = av.fishingStartTime || 0;
+            const fishStart = item.isPlayer
+              ? fishingStartTimeRef.current || av.fishingStartTime || 0
+              : av.fishingStartTime || 0;
             const fishAgeSec = fishStart > 0 ? Math.max(0, (currentTime - fishStart) / 1000) : 1.5;
 
-            // Phase 1 (0.00s - 0.24s): Wind-up backswing behind shoulder
-            // Phase 2 (0.24s - 0.56s): Forward whip cast toward the pond
-            // Phase 3 (0.56s - 0.90s): Line & bobber fly in a parabolic arc into the water + splash
-            // Phase 4 (0.90s+): Settled fishing stance with gentle rod tip & bobber motion
+            const pullStart = item.isPlayer ? fishingPullStartTimeRef.current : 0;
+            const isPullingNow = pullStart > 0 && currentTime >= pullStart;
+            const pullAgeSec = isPullingNow ? Math.max(0, (currentTime - pullStart) / 1000) : 0;
+            const pullProgress = isPullingNow ? Math.min(1, pullAgeSec / 0.85) : 0;
+
+            // Phase 1 (0.00s - 0.32s): Wind-up backswing behind shoulder (Ancang-ancang melempar pancing)
+            // Phase 2 (0.32s - 0.65s): Forward overhead whip cast toward the pond (Melempar pancing)
+            // Phase 3 (0.40s - 1.00s): Line & bobber fly in a high parabolic arc into the water + splash
+            // Phase 4 (1.00s+): Waiting stance with bobber tugging in water
+            // Phase 5 (isPullingNow): Lifting/pulling rod upward (Mengangkat pancing) & fish leaping out of water!
             let rodAngle = -0.68; // settled angle (radians relative to horizontal +X)
-            if (fishAgeSec < 0.24) {
-              const p = fishAgeSec / 0.24;
-              // Swing back from -0.7 to -2.15 rad (tilted backward over head)
-              rodAngle = -0.7 - p * 1.45;
-            } else if (fishAgeSec < 0.56) {
-              const p = (fishAgeSec - 0.24) / 0.32;
-              // Ease-out whip forward from -2.15 to -0.52 rad
+            if (isPullingNow) {
+              // Whip rod sharply upward from -0.68 to -1.92 rad when player clicks "Angkat Pancing!"
+              const easePull = 1 - Math.pow(1 - Math.min(1, pullAgeSec / 0.38), 3);
+              rodAngle = -0.68 - easePull * 1.24 + Math.sin(pullAgeSec * 18) * 0.06;
+            } else if (fishAgeSec < 0.32) {
+              const p = fishAgeSec / 0.32;
+              // Swing back from -0.7 to -2.32 rad (tilted far backward over head)
+              rodAngle = -0.7 - p * 1.62;
+            } else if (fishAgeSec < 0.65) {
+              const p = (fishAgeSec - 0.32) / 0.33;
+              // Ease-out whip forward from -2.32 to -0.44 rad
               const easeOut = 1 - Math.pow(1 - p, 3);
-              rodAngle = -2.15 + easeOut * 1.63;
-            } else if (fishAgeSec < 0.9) {
-              const p = (fishAgeSec - 0.56) / 0.34;
-              // Settle softly from -0.52 to -0.68 rad
-              rodAngle = -0.52 - p * 0.16;
+              rodAngle = -2.32 + easeOut * 1.88;
+            } else if (fishAgeSec < 1.0) {
+              const p = (fishAgeSec - 0.65) / 0.35;
+              // Settle softly from -0.44 to -0.68 rad
+              rodAngle = -0.44 - p * 0.24;
             } else {
-              rodAngle = -0.68 + Math.sin(elapsed * 3.5) * 0.04;
+              // Active tug while waiting for player to lift rod
+              rodAngle = -0.68 + Math.sin(elapsed * 5.5) * 0.065;
             }
 
             const handBaseX = pt.x + 4.5 * z;
             const handBaseY = avY - 8.5 * z;
-            const rodLen = 23 * z;
+            const rodLen = 24 * z;
             const rodMidX = handBaseX + Math.cos(rodAngle) * (rodLen * 0.78);
             const rodMidY = handBaseY + Math.sin(rodAngle) * (rodLen * 0.78);
 
-            // Flexible rod tip bends slightly during cast & water tug
-            const tipBendY =
-              fishAgeSec >= 0.24 && fishAgeSec < 0.56
-                ? -4.5 * z
-                : (4.5 + Math.sin(elapsed * 6) * 1.1) * z;
-            const rodTipX = handBaseX + Math.cos(rodAngle) * rodLen + 5.5 * z;
+            // Flexible rod tip bends during cast, water tug & upward pull
+            const tipBendY = isPullingNow
+              ? (6.5 - pullProgress * 4.5) * z
+              : fishAgeSec >= 0.32 && fishAgeSec < 0.65
+              ? -5.5 * z
+              : (4.5 + Math.sin(elapsed * 7.5) * 1.8) * z;
+            const rodTipX = handBaseX + Math.cos(rodAngle) * rodLen + (isPullingNow ? 2.5 * z : 5.5 * z);
             const rodTipY = handBaseY + Math.sin(rodAngle) * rodLen + tipBendY;
 
             // Casting arm reaching forward/upward with the rod handle
@@ -7729,30 +7749,37 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(pt.x + 3 * z, avY - 11.5 * z);
-            ctx.lineTo(handBaseX + Math.cos(rodAngle) * 3.2 * z, handBaseY + Math.sin(rodAngle) * 3.2 * z);
+            ctx.lineTo(handBaseX + Math.cos(rodAngle) * 3.5 * z, handBaseY + Math.sin(rodAngle) * 3.5 * z);
             ctx.stroke();
 
-            // Motion swoosh arc during the forward whip cast (0.24s - 0.58s)
-            if (fishAgeSec >= 0.22 && fishAgeSec <= 0.62) {
-              const swooshAlpha = 1 - Math.abs(fishAgeSec - 0.42) / 0.22;
-              ctx.strokeStyle = `rgba(224, 242, 254, ${Math.max(0, swooshAlpha * 0.75)})`;
-              ctx.lineWidth = 2.2 * z;
+            // Motion swoosh arc during the forward whip cast (0.28s - 0.72s) or upward pull
+            if (!isPullingNow && fishAgeSec >= 0.28 && fishAgeSec <= 0.72) {
+              const swooshAlpha = 1 - Math.abs(fishAgeSec - 0.5) / 0.24;
+              ctx.strokeStyle = `rgba(186, 230, 253, ${Math.max(0, swooshAlpha * 0.85)})`;
+              ctx.lineWidth = 2.8 * z;
               ctx.beginPath();
-              ctx.arc(handBaseX, handBaseY, rodLen * 0.9, -2.05, rodAngle, false);
+              ctx.arc(handBaseX, handBaseY, rodLen * 0.92, -2.25, rodAngle, false);
+              ctx.stroke();
+            } else if (isPullingNow && pullAgeSec <= 0.45) {
+              const pullSwooshAlpha = 1 - pullAgeSec / 0.45;
+              ctx.strokeStyle = `rgba(253, 224, 71, ${Math.max(0, pullSwooshAlpha * 0.85)})`;
+              ctx.lineWidth = 2.6 * z;
+              ctx.beginPath();
+              ctx.arc(handBaseX, handBaseY, rodLen * 0.88, rodAngle, -0.65, false);
               ctx.stroke();
             }
 
             // Wooden bamboo fishing rod shaft & spinning reel
             ctx.strokeStyle = '#78350f';
-            ctx.lineWidth = 2.1 * z;
+            ctx.lineWidth = 2.2 * z;
             ctx.beginPath();
             ctx.moveTo(handBaseX, handBaseY);
             ctx.lineTo(rodMidX, rodMidY);
             ctx.stroke();
 
             // Flexible fiberglass rod tip
-            ctx.strokeStyle = '#b45309';
-            ctx.lineWidth = 1.2 * z;
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 1.3 * z;
             ctx.beginPath();
             ctx.moveTo(rodMidX, rodMidY);
             ctx.quadraticCurveTo(
@@ -7769,39 +7796,62 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.arc(
               handBaseX + Math.cos(rodAngle) * 4.5 * z,
               handBaseY + Math.sin(rodAngle) * 4.5 * z + 1.2 * z,
-              1.6 * z,
+              1.7 * z,
               0,
               Math.PI * 2
             );
             ctx.fill();
 
-            // Bobber & fishing line trajectory (Parabolic cast flight -> splash -> floating bobber)
+            // Bobber & fishing line trajectory (Parabolic cast flight -> splash -> floating bobber -> upward pull arc)
             const targetBobberX = pt.x + 36 * z;
-            const targetBobberY = avY + (4 + Math.sin(elapsed * 6) * 2.5) * z;
+            const targetBobberY = avY + (4 + Math.sin(elapsed * 8) * 2.8) * z;
 
             let bobberX = targetBobberX;
             let bobberY = targetBobberY;
             let isInWater = true;
 
-            if (fishAgeSec < 0.36) {
+            if (isPullingNow) {
+              // Pulling rod up: bobber & caught fish fly in a high arc out of the pond toward the avatar!
+              isInWater = false;
+              const endX = pt.x + 12 * z;
+              const endY = avY - 16 * z;
+              bobberX = targetBobberX + (endX - targetBobberX) * pullProgress;
+              const pullArcLift = Math.sin(pullProgress * Math.PI) * 24 * z;
+              bobberY = targetBobberY + (endY - targetBobberY) * pullProgress - pullArcLift;
+            } else if (fishAgeSec < 0.42) {
               // During wind-up & early whip, bobber hangs close to rod tip
               isInWater = false;
               bobberX = rodTipX + Math.cos(rodAngle + 0.5) * 4.5 * z;
               bobberY = rodTipY + 5.5 * z;
-            } else if (fishAgeSec < 0.85) {
-              // Parabolic arc flight from rod tip into the pond water
+            } else if (fishAgeSec < 1.0) {
+              // High parabolic arc flight from rod tip into the pond water
               isInWater = false;
-              const flightP = (fishAgeSec - 0.36) / 0.49;
-              const startX = handBaseX + 16 * z;
-              const startY = handBaseY - 18 * z;
+              const flightP = (fishAgeSec - 0.42) / 0.58;
+              const startX = handBaseX + 14 * z;
+              const startY = handBaseY - 20 * z;
               bobberX = startX + (targetBobberX - startX) * flightP;
-              const arcLift = Math.sin(flightP * Math.PI) * 14 * z;
+              const arcLift = Math.sin(flightP * Math.PI) * 18 * z;
               bobberY = startY + (targetBobberY - startY) * flightP - arcLift;
+
+              // Glowing air trail behind flying bobber during cast
+              ctx.strokeStyle = `rgba(186, 230, 253, ${(1 - flightP) * 0.65})`;
+              ctx.lineWidth = 1.4 * z;
+              ctx.setLineDash([2 * z, 2 * z]);
+              ctx.beginPath();
+              ctx.moveTo(startX, startY);
+              ctx.quadraticCurveTo(
+                (startX + bobberX) * 0.5,
+                Math.min(startY, bobberY) - 10 * z,
+                bobberX,
+                bobberY
+              );
+              ctx.stroke();
+              ctx.setLineDash([]);
             }
 
             // Fishing line from rod tip to bobber
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.78)';
-            ctx.lineWidth = 0.85 * z;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.lineWidth = 0.95 * z;
             ctx.beginPath();
             ctx.moveTo(rodTipX, rodTipY);
             if (!isInWater) {
@@ -7819,47 +7869,87 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             // Red & White Fishing Bobber
             ctx.fillStyle = '#ef4444';
             ctx.beginPath();
-            ctx.arc(bobberX, bobberY, 2.6 * z, Math.PI, 0);
+            ctx.arc(bobberX, bobberY, 2.8 * z, Math.PI, 0);
             ctx.fill();
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.arc(bobberX, bobberY, 2.6 * z, 0, Math.PI);
+            ctx.arc(bobberX, bobberY, 2.8 * z, 0, Math.PI);
             ctx.fill();
 
-            // Initial Water Impact Splash Ring & Droplets (0.85s - 1.30s)
-            if (fishAgeSec >= 0.85 && fishAgeSec < 1.3) {
-              const spP = (fishAgeSec - 0.85) / 0.45;
-              ctx.strokeStyle = `rgba(224, 242, 254, ${(1 - spP) * 0.9})`;
-              ctx.lineWidth = 1.4 * z;
+            // Leaping Caught Fish during Pulling Animation (Mengangkat Pancing)
+            if (isPullingNow) {
+              // Water splash burst at the pond surface where fish leaps out
+              if (pullAgeSec < 0.5) {
+                const spP = pullAgeSec / 0.5;
+                ctx.strokeStyle = `rgba(186, 230, 253, ${(1 - spP) * 0.95})`;
+                ctx.lineWidth = 1.6 * z;
+                ctx.beginPath();
+                ctx.ellipse(
+                  targetBobberX,
+                  targetBobberY + 1.5 * z,
+                  (4 + spP * 14) * z,
+                  (2 + spP * 6.5) * z,
+                  0,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.stroke();
+              }
+
+              // Draw Golden-Orange Leaping Fish attached below the bobber
+              const fishX = bobberX;
+              const fishY = bobberY + 4.2 * z;
+              ctx.save();
+              ctx.translate(fishX, fishY);
+              ctx.rotate(-0.45 + pullProgress * 0.9);
+              ctx.fillStyle = '#f97316';
               ctx.beginPath();
-              ctx.ellipse(bobberX, bobberY + 1.5 * z, (3 + spP * 12) * z, (1.5 + spP * 5.5) * z, 0, 0, Math.PI * 2);
+              ctx.ellipse(0, 0, 4.5 * z, 2.3 * z, 0, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = '#fbbf24';
+              ctx.beginPath();
+              ctx.moveTo(3.8 * z, 0);
+              ctx.lineTo(6.8 * z, -2.5 * z);
+              ctx.lineTo(6.8 * z, 2.5 * z);
+              ctx.closePath();
+              ctx.fill();
+              ctx.restore();
+            }
+
+            // Initial Water Impact Splash Ring & Droplets when cast hits water (1.00s - 1.45s)
+            if (!isPullingNow && fishAgeSec >= 1.0 && fishAgeSec < 1.45) {
+              const spP = (fishAgeSec - 1.0) / 0.45;
+              ctx.strokeStyle = `rgba(224, 242, 254, ${(1 - spP) * 0.95})`;
+              ctx.lineWidth = 1.6 * z;
+              ctx.beginPath();
+              ctx.ellipse(bobberX, bobberY + 1.5 * z, (3 + spP * 13) * z, (1.5 + spP * 6) * z, 0, 0, Math.PI * 2);
               ctx.stroke();
 
               // Flying water droplets on splash impact
               ctx.fillStyle = `rgba(186, 230, 253, ${1 - spP})`;
               for (let dp = -1; dp <= 1; dp += 2) {
-                const dx = bobberX + dp * (2.5 + spP * 7) * z;
-                const dy = bobberY - Math.sin(spP * Math.PI) * 6.5 * z;
+                const dx = bobberX + dp * (2.5 + spP * 8) * z;
+                const dy = bobberY - Math.sin(spP * Math.PI) * 7.5 * z;
                 ctx.beginPath();
-                ctx.arc(dx, dy, 1.1 * z, 0, Math.PI * 2);
+                ctx.arc(dx, dy, 1.2 * z, 0, Math.PI * 2);
                 ctx.fill();
               }
             }
 
             // Continuous Pond Ripples & Nibbling Splashes once Bobber is in Water
-            if (isInWater) {
-              const bPhase = (elapsed * 1.5) % 1;
-              ctx.strokeStyle = `rgba(56, 189, 248, ${0.6 * (1 - bPhase)})`;
-              ctx.lineWidth = 0.8 * z;
+            if (isInWater && !isPullingNow) {
+              const bPhase = (elapsed * 1.8) % 1;
+              ctx.strokeStyle = `rgba(56, 189, 248, ${0.7 * (1 - bPhase)})`;
+              ctx.lineWidth = 1.0 * z;
               ctx.beginPath();
-              ctx.ellipse(bobberX, bobberY + 2 * z, (3 + bPhase * 8) * z, (1.5 + bPhase * 4) * z, 0, 0, Math.PI * 2);
+              ctx.ellipse(bobberX, bobberY + 2 * z, (3 + bPhase * 9) * z, (1.5 + bPhase * 4.5) * z, 0, 0, Math.PI * 2);
               ctx.stroke();
 
-              if (Math.sin(elapsed * 6) > 0.6) {
-                ctx.fillStyle = '#38bdf8';
+              if (Math.sin(elapsed * 7) > 0.45) {
+                ctx.fillStyle = '#bae6fd';
                 ctx.beginPath();
-                ctx.arc(bobberX - 2 * z, bobberY - 3 * z, 0.8 * z, 0, Math.PI * 2);
-                ctx.arc(bobberX + 3 * z, bobberY - 4 * z, 1 * z, 0, Math.PI * 2);
+                ctx.arc(bobberX - 2.5 * z, bobberY - 3.5 * z, 1.0 * z, 0, Math.PI * 2);
+                ctx.arc(bobberX + 3.2 * z, bobberY - 4.2 * z, 1.1 * z, 0, Math.PI * 2);
                 ctx.fill();
               }
             }
@@ -8550,26 +8640,60 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const success = onDeductPoints ? onDeductPoints(cost, 'Memancing Ikan Kota') : true;
     if (success) {
       sounds.playClick();
-      fishingStartTimeRef.current = performance.now();
+      const nowPerf = performance.now();
+      fishingStartTimeRef.current = nowPerf;
+      fishingPullStartTimeRef.current = 0;
+      caughtFishRef.current = null;
+      if (playerRef.current) {
+        playerRef.current.fishingStartTime = nowPerf;
+      }
+      setFishingPhase('casting');
       setIsFishing(true);
-      showToast('🎣 Mengayunkan joran & melempar kail ke Kolam Pancing... (-3 XP)', 3500);
+      showToast('🎣 Mengayunkan joran & melempar pancing ke Kolam... (-3 XP)', 3500);
       playerSpeechRef.current = {
-        text: 'Mancing dulu ah, semoga dapat ikan besar! 🎣',
-        expiresAt: Date.now() + 3500,
+        text: 'Hap! Lempar pancing dulu ke tengah kolam! 🎣',
+        expiresAt: Date.now() + 3000,
       };
 
       if (fishingTimerRef.current) clearTimeout(fishingTimerRef.current);
+      // Setelah animasi melempar pancing selesai (~1.0 detik), masuk fase menunggu interaktif
       fishingTimerRef.current = window.setTimeout(() => {
-        setIsFishing(false);
-        sounds.playRewardXp();
-        const randomCatch = FISH_REWARDS[Math.floor(Math.random() * FISH_REWARDS.length)];
-        showToast(`🎉 Hore! Kamu berhasil menangkap ${randomCatch.icon} ${randomCatch.name}!`, 4500);
+        setFishingPhase('waiting');
+        showToast('💦 Umpan bergoyang! Klik tombol "🎣 Angkat Pancing!" untuk menarik ikan!', 6000);
         playerSpeechRef.current = {
-          text: `Dapat ${randomCatch.name}! Hore! 🎣✨`,
-          expiresAt: Date.now() + 5000,
+          text: 'Wah pelampungnya bergoyang! Ayo klik Angkat Pancing! 💦🎣',
+          expiresAt: Date.now() + 4500,
         };
-      }, 3500);
+      }, 1000);
     }
+  };
+
+  const handlePullFishingRod = () => {
+    if (!isFishing || fishingPhase === 'pulling') return;
+    sounds.playClick();
+    if (fishingTimerRef.current) clearTimeout(fishingTimerRef.current);
+
+    const randomCatch = FISH_REWARDS[Math.floor(Math.random() * FISH_REWARDS.length)];
+    caughtFishRef.current = randomCatch;
+    fishingPullStartTimeRef.current = performance.now();
+    setFishingPhase('pulling');
+    showToast('🎣 Menarik joran & mengangkat pancing dari air...', 2000);
+    playerSpeechRef.current = {
+      text: 'Tarikk!! Angkat pancingnya! 🎣💦',
+      expiresAt: Date.now() + 2000,
+    };
+
+    fishingTimerRef.current = window.setTimeout(() => {
+      setIsFishing(false);
+      setFishingPhase(null);
+      fishingPullStartTimeRef.current = 0;
+      sounds.playRewardXp();
+      showToast(`🎉 Hore! Kamu berhasil mengangkat pancing & menangkap ${randomCatch.icon} ${randomCatch.name}!`, 4500);
+      playerSpeechRef.current = {
+        text: `Dapat ${randomCatch.name}! Hore! 🎣✨`,
+        expiresAt: Date.now() + 5000,
+      };
+    }, 850);
   };
 
   // Check if cafeToast is a standalone notification (buying from cafe, standing up, or jumping to citizen)
@@ -9039,30 +9163,51 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 <div className="bg-[#121e2c]/95 backdrop-blur-md border border-sky-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                      🎣
+                      {fishingPhase === 'pulling' ? '🐟' : fishingPhase === 'waiting' ? '💦' : '🎣'}
                     </div>
                     <div className="min-w-0">
                       <div className="text-[10px] font-bold tracking-wider uppercase text-sky-400">
                         Dermaga Air Kota
                       </div>
                       <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                        {isFishing ? 'Sedang Memancing Ikan...' : 'Spot Memancing Warga'}
+                        {!isFishing
+                          ? 'Spot Memancing Warga'
+                          : fishingPhase === 'casting'
+                          ? 'Melempar Pancing ke Kolam...'
+                          : fishingPhase === 'pulling'
+                          ? 'Mengangkat Pancing...'
+                          : 'Umpan Disambar! Angkat Pancing!'}
                       </h4>
                       <p className={`text-[10px] truncate ${cafeToast ? 'text-sky-300 font-semibold' : 'text-slate-300'}`}>
                         {cafeToast || 'Santai memancing & dapatkan ikan unik'}
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={handleStartFishing}
-                    disabled={isFishing}
-                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold border border-sky-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
-                  >
-                    <span>{isFishing ? '⏳ Menunggu...' : '🎣 Mancing'}</span>
-                    <span className="text-[10px] font-mono text-amber-300 bg-sky-950/80 px-1 py-0.5 rounded border border-sky-500/30">
-                      -3 XP
-                    </span>
-                  </button>
+                  {!isFishing ? (
+                    <button
+                      onClick={handleStartFishing}
+                      className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold border border-sky-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <span>🎣 Lempar Pancing</span>
+                      <span className="text-[10px] font-mono text-amber-300 bg-sky-950/80 px-1 py-0.5 rounded border border-sky-500/30">
+                        -3 XP
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handlePullFishingRod}
+                      disabled={fishingPhase === 'pulling'}
+                      className={`py-2 px-3.5 rounded-xl text-white text-xs font-extrabold border shadow-lg transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap ${
+                        fishingPhase === 'pulling'
+                          ? 'bg-amber-600 border-amber-300/60 opacity-90'
+                          : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-400 hover:to-sky-400 border-emerald-300/70 animate-bounce shadow-emerald-500/30'
+                      }`}
+                    >
+                      <span>
+                        {fishingPhase === 'pulling' ? '🐟 Mengangkat...' : '🎣 Angkat Pancing!'}
+                      </span>
+                    </button>
+                  )}
                 </div>
               )}
             </aside>

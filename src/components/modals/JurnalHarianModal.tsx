@@ -74,20 +74,121 @@ export const INITIAL_STICKY_NOTES: DailyJournalStickyNote[] = [
   },
 ];
 
+const INDONESIAN_MONTHS = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
+
+const SHORT_MONTH_MAP: Record<string, string> = {
+  jan: 'Januari',
+  feb: 'Februari',
+  mar: 'Maret',
+  apr: 'April',
+  mei: 'Mei',
+  may: 'Mei',
+  jun: 'Juni',
+  jul: 'Juli',
+  agu: 'Agustus',
+  ags: 'Agustus',
+  aug: 'Agustus',
+  sep: 'September',
+  sept: 'September',
+  okt: 'Oktober',
+  oct: 'Oktober',
+  nov: 'November',
+  des: 'Desember',
+  dec: 'Desember',
+};
+
+/**
+ * Memastikan format tanggal pada bagian bawah Sticky Note Batang Pohon
+ * HANYA menampilkan Tanggal Bulan Tahun (contoh: "31 Oktober 2026") tanpa jam/waktu.
+ */
+export function formatTanggalBulanTahun(rawDate?: string, fallbackTimestamp?: number): string {
+  const formatFromDateObj = (d: Date): string => {
+    const day = d.getDate();
+    const month = INDONESIAN_MONTHS[d.getMonth()] || 'Oktober';
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
+  if (rawDate && typeof rawDate === 'string') {
+    const trimmed = rawDate.trim();
+
+    // 1. Jika sudah berformat "31 Oktober 2026" atau "31 Okt 2026" (tanpa jam)
+    const textDateMatch = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+    if (textDateMatch) {
+      const day = parseInt(textDateMatch[1], 10);
+      const rawMonth = textDateMatch[2].toLowerCase();
+      const year = textDateMatch[3];
+      const fullMonth =
+        INDONESIAN_MONTHS.find((m) => m.toLowerCase() === rawMonth) ||
+        SHORT_MONTH_MAP[rawMonth.slice(0, 3)] ||
+        textDateMatch[2];
+      return `${day} ${fullMonth} ${year}`;
+    }
+
+    // 2. Jika berformat DD/MM/YYYY atau DD-MM-YYYY (sering dari Spreadsheet lokal Indonesia, misal "31/10/2026 14:20:00")
+    const slashMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (slashMatch) {
+      const d = parseInt(slashMatch[1], 10);
+      const m = parseInt(slashMatch[2], 10);
+      const y = parseInt(slashMatch[3], 10);
+      if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
+        return `${d} ${INDONESIAN_MONTHS[m - 1]} ${y}`;
+      }
+    }
+
+    // 3. Jika berformat ISO (YYYY-MM-DD...) dari Google Spreadsheet JSON
+    if (trimmed.toLowerCase() !== 'hari ini') {
+      const parsed = new Date(trimmed);
+      if (!isNaN(parsed.getTime())) {
+        return formatFromDateObj(parsed);
+      }
+    }
+  }
+
+  if (fallbackTimestamp && !isNaN(Number(fallbackTimestamp)) && Number(fallbackTimestamp) > 0) {
+    const d = new Date(Number(fallbackTimestamp));
+    if (!isNaN(d.getTime())) {
+      return formatFromDateObj(d);
+    }
+  }
+
+  return formatFromDateObj(new Date());
+}
+
 export function getStoredStickyNotes(): DailyJournalStickyNote[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_JURNAL_BERINGIN);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.map((n: DailyJournalStickyNote) => ({
+          ...n,
+          date: formatTanggalBulanTahun(n.date, n.timestamp),
+        }));
       }
     }
   } catch (e) {}
+  const normalizedInit = INITIAL_STICKY_NOTES.map((n) => ({
+    ...n,
+    date: formatTanggalBulanTahun(n.date, n.timestamp),
+  }));
   try {
-    localStorage.setItem(STORAGE_KEY_JURNAL_BERINGIN, JSON.stringify(INITIAL_STICKY_NOTES));
+    localStorage.setItem(STORAGE_KEY_JURNAL_BERINGIN, JSON.stringify(normalizedInit));
   } catch (e) {}
-  return INITIAL_STICKY_NOTES;
+  return normalizedInit;
 }
 
 export function saveStoredStickyNotes(notes: DailyJournalStickyNote[]): void {
@@ -103,10 +204,12 @@ export function mergeStickyNotesList(
   const map = new Map<string, DailyJournalStickyNote>();
   const addOrMerge = (n: DailyJournalStickyNote) => {
     if (!n || !n.id) return;
+    const cleanDate = formatTanggalBulanTahun(n.date, n.timestamp);
     const existing = map.get(n.id);
     if (!existing) {
       map.set(n.id, {
         ...n,
+        date: cleanDate,
         likes: typeof n.likes === 'number' ? n.likes : 0,
         likedBy: Array.isArray(n.likedBy) ? n.likedBy : [],
         likedByNames: Array.isArray(n.likedByNames) ? n.likedByNames : [],
@@ -126,6 +229,10 @@ export function mergeStickyNotesList(
       map.set(n.id, {
         ...existing,
         ...n,
+        date: formatTanggalBulanTahun(
+          n.date && n.date !== 'Hari ini' ? n.date : existing.date,
+          n.timestamp || existing.timestamp
+        ),
         likes: maxLikes,
         likedBy: mergedLikedBy,
         likedByNames: mergedLikedNames,
@@ -585,11 +692,7 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
     const studentId = student?.id || `std-${Date.now()}`;
     const className = student?.className || (student?.isTeacher ? 'Guru Pembimbing' : 'X DKV 2');
 
-    const todayStr = new Date().toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    const todayStr = formatTanggalBulanTahun(undefined, Date.now());
 
     const newNote: DailyJournalStickyNote = {
       id: `sticky-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -991,41 +1094,34 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
                           </p>
                         </div>
 
-                        {/* Note Footer: Date, Liked By Names & Heart Likes */}
-                        <div className="mt-3.5 pt-2 border-t border-black/15 space-y-1.5">
-                          {likedNames.length > 0 && (
-                            <div className="text-[10px] text-slate-800/85 font-semibold flex items-center gap-1 truncate">
-                              <Heart className="w-2.5 h-2.5 text-rose-500 fill-rose-500 shrink-0" />
-                              <span className="truncate">
-                                Disukai oleh {likedNames.slice(0, 2).join(', ')}
-                                {likedNames.length > 2 ? ` +${likedNames.length - 2} warga lainnya` : ''}
-                              </span>
-                            </div>
-                          )}
+                        {/* Note Footer Bagian Bawah: Hanya Tanggal Bulan Tahun & Tombol Suka */}
+                        <div className="mt-3.5 pt-2 border-t border-black/15 flex items-center justify-between text-[10.5px]">
+                          <span className="opacity-80 font-semibold flex items-center gap-1 text-slate-900">
+                            <Calendar className="w-3 h-3 opacity-65 shrink-0" />
+                            <span>{formatTanggalBulanTahun(note.date, note.timestamp)}</span>
+                          </span>
 
-                          <div className="flex items-center justify-between text-[10.5px]">
-                            <span className="opacity-75 font-mono flex items-center gap-1">
-                              <Calendar className="w-3 h-3 opacity-60" />
-                              <span>{note.date}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleLike(note.id)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-extrabold transition active:scale-95 cursor-pointer shadow-xs ${
+                              isLiked
+                                ? 'bg-rose-500 text-white shadow-rose-500/30'
+                                : 'bg-black/10 hover:bg-rose-500/20 text-slate-900'
+                            }`}
+                            title={
+                              likedNames.length > 0
+                                ? `Disukai oleh: ${likedNames.join(', ')}`
+                                : isLiked
+                                ? 'Batalkan suka'
+                                : 'Sukai catatan warga ini'
+                            }
+                          >
+                            <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-white animate-bounce' : 'text-rose-600'}`} />
+                            <span className="text-[11px] font-mono">
+                              {note.likes || 0}
                             </span>
-
-                            <button
-                              type="button"
-                              onClick={() => handleToggleLike(note.id)}
-                              className={`flex items-center gap-1.5 px-3 py-1 rounded-full font-extrabold transition active:scale-95 cursor-pointer shadow-xs ${
-                                isLiked
-                                  ? 'bg-rose-500 text-white shadow-rose-500/30'
-                                  : 'bg-black/10 hover:bg-rose-500/20 text-slate-900'
-                              }`}
-                              title={isLiked ? 'Batalkan suka' : 'Sukai catatan warga ini'}
-                            >
-                              <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-white animate-bounce' : 'text-rose-600'}`} />
-                              <span className="text-[11px]">{isLiked ? 'Disukai' : 'Suka'}</span>
-                              <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-full bg-black/15">
-                                {note.likes || 0}
-                              </span>
-                            </button>
-                          </div>
+                          </button>
                         </div>
                       </div>
                     );
@@ -1168,10 +1264,10 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
                     {content.trim() || 'Tuliskan catatan harianmu di formulir sebelah kiri untuk melihat pratinjau di sini...'}
                   </p>
 
-                  <div className="mt-3 pt-2 border-t border-black/15 flex items-center justify-between text-[10px] opacity-75">
-                    <span>Hari ini</span>
-                    <span className="font-bold flex items-center gap-1">
-                      <Heart className="w-3 h-3 text-rose-500 fill-rose-500" /> +1 XP
+                  <div className="mt-3 pt-2 border-t border-black/15 flex items-center justify-between text-[10.5px] opacity-80 font-semibold text-slate-900">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 opacity-65 shrink-0" />
+                      <span>{formatTanggalBulanTahun(undefined, Date.now())}</span>
                     </span>
                   </div>
                 </div>

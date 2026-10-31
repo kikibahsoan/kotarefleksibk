@@ -1031,8 +1031,10 @@ export default function App() {
           feedbacks={feedbacks}
           reflections={reflections}
           student={student}
+          materis={materis}
           onUpdateFeedbackSteps={handleUpdateFeedbackSteps}
           onNavigateBuilding={(id) => handleSelectBuilding(id)}
+          onAddXp={handleAddPoints}
         />
       )}
 

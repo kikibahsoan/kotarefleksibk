@@ -754,6 +754,296 @@ app.post('/api/journals/4f', (req, res) => {
 });
 
 // =========================================================================
+// PODCAST MENARA MENTOR KOTA (AI HOST & RIWAYAT PODCAST WARGA)
+// =========================================================================
+const PODCAST_HISTORY_FILE_PATH = path.join(__dirname, 'server_podcasts.json');
+
+interface ServerPodcastRecord {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  materiId: string;
+  materiTitle: string;
+  sudahDikuasai: string;
+  perluDiperkuat: string;
+  saranKonkretAI: string[];
+  pertanyaanPemantikAI: string;
+  jawabanPemantikSiswa: string;
+  rencanaBelajarSiswa: string[];
+  apresiasiHost: string;
+  transcriptText: string;
+  messages: any[];
+  createdAt: string;
+  timestamp: number;
+}
+
+const INITIAL_SERVER_PODCASTS: ServerPodcastRecord[] = [
+  {
+    id: 'pod-init-01',
+    studentId: 'std-dkv2-01',
+    studentName: 'ABDUL RAZAK SAMAUNA',
+    className: 'X DKV 2',
+    materiId: 'materi-bk-01',
+    materiTitle: 'BAB 1 — MODEL IPO & ARSITEKTUR VON NEUMANN',
+    sudahDikuasai: 'Saya sudah paham alur Input, Process, dan Output, terutama bagaimana pen tablet menjadi input dan RAM menampung layer aktif.',
+    perluDiperkuat: 'Masih perlu memperkuat pemahaman tentang cara kerja Control Unit dan ALU di dalam CPU saat merender grafis.',
+    saranKonkretAI: [
+      'Gunakan analogi dapur studio: Control Unit adalah sutradara yang mengatur antrean, sedangkan ALU adalah juru hitung piksel.',
+      'Coba amati Task Manager saat membuka aplikasi desain untuk melihat beban kerja CPU dan RAM secara langsung.',
+      'Buat sketsa peta konsep hubungan Input -> CPU (CU + ALU) <-> RAM -> Output di buku catatan.'
+    ],
+    pertanyaanPemantikAI: 'Jika suatu hari klien meminta revisi mendadak dengan 50 layer resolusi tinggi sementara kapasitas RAM terbatas, strategi apa yang akan kamu lakukan agar proses komputasi tidak macet?',
+    jawabanPemantikSiswa: 'Saya akan menggabungkan (merge) layer yang sudah final dan menutup aplikasi lain agar ruang meja kerja RAM tetap lega.',
+    rencanaBelajarSiswa: [
+      'Membaca kembali ilustrasi arsitektur Von Neumann di Perpustakaan Kampus selama 15 menit.',
+      'Membuat infografis ringkas tentang perbedaan fungsi RAM dan Storage SSD.',
+      'Mengerjakan latihan soal Model IPO di Bengkel Latihan.'
+    ],
+    apresiasiHost: 'Luar biasa sekali obrolan kita hari ini, Abdul Razak! Kamu berhasil menghubungkan teori arsitektur komputer Von Neumann langsung ke manajemen layer desain grafis.',
+    transcriptText: `[HOST AI MENTOR]: Halo pendengar Radio Refleksia! Selamat datang di Studio Podcast ON AIR Menara Mentor Kota bersama saya Host AI Mentor. Hari ini telah hadir bintang tamu spesial kita, ABDUL RAZAK SAMAUNA dari kelas X DKV 2 yang siap mengupas tuntas materi "BAB 1 — MODEL IPO & ARSITEKTUR VON NEUMANN". Halo Abdul Razak, dari materi ini, bagian mana yang menurutmu sudah paling kamu kuasai?\n\n[ABDUL RAZAK SAMAUNA]: Saya sudah paham alur Input, Process, dan Output, terutama bagaimana pen tablet menjadi input dan RAM menampung layer aktif.\n\n[HOST AI MENTOR]: Keren banget! Analogi RAM sebagai meja kerja layer itu tepat sasaran. Nah, kalau bagian atau area yang menurutmu masih perlu diperkuat apa nih?\n\n[ABDUL RAZAK SAMAUNA]: Masih perlu memperkuat pemahaman tentang cara kerja Control Unit dan ALU di dalam CPU saat merender grafis.\n\n[HOST AI MENTOR]: Jujur dan reflektif sekali! Sebagai Host sekaligus AI Mentor, ini 3 Saran Konkret untukmu:\n1. Gunakan analogi dapur studio: Control Unit adalah sutradara yang mengatur antrean, sedangkan ALU adalah juru hitung piksel.\n2. Coba amati Task Manager saat membuka aplikasi desain untuk melihat beban kerja CPU dan RAM secara langsung.\n3. Buat sketsa peta konsep hubungan Input -> CPU (CU + ALU) <-> RAM -> Output di buku catatan.\n\nSekarang, pertanyaan pemantik spesial buat kamu: "Jika suatu hari klien meminta revisi mendadak dengan 50 layer resolusi tinggi sementara kapasitas RAM terbatas, strategi apa yang akan kamu lakukan agar proses komputasi tidak macet?" Serta apa Rencana Belajar konkretmu selanjutnya?\n\n[ABDUL RAZAK SAMAUNA]: Saya akan menggabungkan (merge) layer yang sudah final dan menutup aplikasi lain agar ruang meja kerja RAM tetap lega. Rencana belajar saya: 1) Membaca kembali ilustrasi arsitektur Von Neumann di Perpustakaan Kampus selama 15 menit. 2) Membuat infografis ringkas tentang perbedaan fungsi RAM dan Storage SSD. 3) Mengerjakan latihan soal Model IPO di Bengkel Latihan.\n\n[HOST AI MENTOR]: Luar biasa sekali obrolan kita hari ini, Abdul Razak! Kamu berhasil menghubungkan teori arsitektur komputer Von Neumann langsung ke manajemen layer desain grafis. Sampai jumpa di episode Podcast Menara Mentor berikutnya!`,
+    messages: [],
+    createdAt: '31 Okt 2026',
+    timestamp: Date.now() - 1000 * 60 * 30,
+  },
+];
+
+function loadServerPodcastsFromFile(): ServerPodcastRecord[] {
+  try {
+    if (fs.existsSync(PODCAST_HISTORY_FILE_PATH)) {
+      const raw = fs.readFileSync(PODCAST_HISTORY_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[server.ts] Could not read server_podcasts.json:', err);
+  }
+  return INITIAL_SERVER_PODCASTS;
+}
+
+let serverPodcasts: ServerPodcastRecord[] = loadServerPodcastsFromFile();
+
+function saveServerPodcastsToFile() {
+  try {
+    fs.writeFileSync(PODCAST_HISTORY_FILE_PATH, JSON.stringify(serverPodcasts, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[server.ts] Failed to persist server_podcasts.json:', err);
+  }
+}
+
+app.get('/api/podcasts/history', (_req, res) => {
+  res.json({
+    success: true,
+    data: serverPodcasts,
+    serverTime: new Date().toISOString(),
+  });
+});
+
+app.post('/api/podcasts/history', (req, res) => {
+  const ep = req.body;
+  if (!ep || !ep.materiTitle) {
+    return res.status(400).json({ success: false, error: 'Data podcast tidak lengkap.' });
+  }
+  const record: ServerPodcastRecord = {
+    id: ep.id ? String(ep.id) : `pod-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    studentId: String(ep.studentId || 'std-anon'),
+    studentName: String(ep.studentName || 'Siswa DKV'),
+    className: String(ep.className || 'X DKV 2'),
+    materiId: String(ep.materiId || 'materi-bk-01'),
+    materiTitle: String(ep.materiTitle),
+    sudahDikuasai: String(ep.sudahDikuasai || ''),
+    perluDiperkuat: String(ep.perluDiperkuat || ''),
+    saranKonkretAI: Array.isArray(ep.saranKonkretAI) ? ep.saranKonkretAI : [],
+    pertanyaanPemantikAI: String(ep.pertanyaanPemantikAI || ''),
+    jawabanPemantikSiswa: String(ep.jawabanPemantikSiswa || ''),
+    rencanaBelajarSiswa: Array.isArray(ep.rencanaBelajarSiswa) ? ep.rencanaBelajarSiswa : [],
+    apresiasiHost: String(ep.apresiasiHost || ''),
+    transcriptText: String(ep.transcriptText || ''),
+    messages: Array.isArray(ep.messages) ? ep.messages : [],
+    createdAt: ep.createdAt || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+    timestamp: typeof ep.timestamp === 'number' ? ep.timestamp : Date.now(),
+  };
+
+  const existingIdx = serverPodcasts.findIndex((p) => p.id === record.id);
+  if (existingIdx >= 0) {
+    serverPodcasts[existingIdx] = record;
+  } else {
+    serverPodcasts.unshift(record);
+  }
+  if (serverPodcasts.length > 100) {
+    serverPodcasts = serverPodcasts.slice(0, 100);
+  }
+  saveServerPodcastsToFile();
+  res.json({ success: true, data: record });
+});
+
+app.post('/api/gemini/podcast-host', async (req, res) => {
+  const {
+    step,
+    studentName,
+    className,
+    materiTitle,
+    materiSummary,
+    sudahDikuasai,
+    perluDiperkuat,
+    jawabanPemantikSiswa,
+    rencanaBelajarSiswa,
+  } = req.body;
+
+  // Step 1: After student shares 'Yang Sudah Kamu Kuasai' -> Host responds warmly and asks 'Area Perlu Diperkuat'
+  if (step === 'after_mastered') {
+    const fallbackReply = `Wah, luar biasa sekali ${studentName}! Pemahamanmu tentang "${sudahDikuasai}" pada materi ${materiTitle} sudah sangat mantap dan aplikatif untuk anak DKV. Nah, sekarang kita geser sedikit nih obrolannya: dari materi ini, bagian atau area mana yang menurutmu masih agak membingungkan dan perlu diperkuat? Ceritakan santai saja!`;
+
+    if (!ai || !apiKey) {
+      return res.json({ success: true, data: { hostReply: fallbackReply } });
+    }
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: `Siswa bernama ${studentName} (${className}) sedang menjadi bintang tamu di Podcast Studio ON AIR Menara Mentor membahas materi "${materiTitle}".
+Ringkasan materi: ${materiSummary || materiTitle}.
+Siswa baru saja menjawab tentang Hal yang Sudah Dikuasai: "${sudahDikuasai}".
+Sebagai Host Podcast AI yang seru, hangat, dan suportif, berikan tanggapan singkat yang mengapresiasi jawaban tersebut (1-2 kalimat), lalu tanyakan dengan santai: "Bagian atau area mana dari materi ini yang menurutmu masih perlu diperkuat atau masih membingungkan?"`,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              hostReply: { type: Type.STRING },
+            },
+            required: ['hostReply'],
+          },
+        },
+      });
+      const parsed = JSON.parse(response.text || '{}');
+      return res.json({ success: true, data: { hostReply: parsed.hostReply || fallbackReply } });
+    } catch {
+      return res.json({ success: true, data: { hostReply: fallbackReply } });
+    }
+  }
+
+  // Step 2: After student shares 'Area Perlu Diperkuat' -> Host gives 3 Concrete Advice (Saran Konkret dari AI) + 1 Pertanyaan Pemantik + asks for Rencana Belajar
+  if (step === 'after_strengthen') {
+    const fallbackAdvice = [
+      `Ulas kembali poin inti "${perluDiperkuat}" pada modul di Perpustakaan sambil membuat catatan visual berwarna.`,
+      `Praktikkan langsung lewat contoh kasus sederhana di studio desain atau diskusikan dengan teman sebangku.`,
+      `Coba uji pemahaman di Bengkel Latihan atau kirim pertanyaan spesifik ke guru lewat Kantor Pos.`,
+    ];
+    const fallbackTrigger = `Kalau konsep "${materiTitle}" ini kamu terapkan saat mengerjakan proyek desain klien di dunia nyata nanti, langkah kreatif apa yang paling ingin kamu coba pertama kali?`;
+    const fallbackHostSpeech = `Terima kasih sudah jujur berbagi, ${studentName}! Wajar banget kalau bagian "${perluDiperkuat}" terasa menantang. Sebagai Host sekaligus Mentor AI, saya punya beberapa saran konkret dan satu pertanyaan pemantik spesial untukmu. Setelah ini, yuk bagikan jawabanmu atas pertanyaan pemantik tersebut sekaligus Rencana Belajarmu ke depan!`;
+
+    if (!ai || !apiKey) {
+      return res.json({
+        success: true,
+        data: {
+          hostIntro: fallbackHostSpeech,
+          saranKonkret: fallbackAdvice,
+          pertanyaanPemantik: fallbackTrigger,
+          suggestedRencana: [
+            `Membaca ulang bagian "${perluDiperkuat}" di modul Perpustakaan Kampus selama 15 menit.`,
+            `Membuat rangkuman mind-map visual agar konsep "${materiTitle}" lebih mudah diingat.`,
+            `Mengerjakan kuis latihan di Bengkel Latihan untuk menguji penguasaan materi.`,
+          ],
+        },
+      });
+    }
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: `Kamu adalah Host Podcast AI sekaligus Mentor Kota di SMK Negeri 2 Gorontalo (Jurusan DKV).
+Bintang tamu siswa: ${studentName} (${className}).
+Materi yang dibahas: "${materiTitle}".
+1. Hal yang sudah dikuasai siswa: "${sudahDikuasai}"
+2. Area yang masih perlu diperkuat menurut siswa: "${perluDiperkuat}"
+
+Tugasmu di segmen podcast ini:
+- Buat "hostIntro": Tanggapan gaya host podcast yang hangat dan memvalidasi usaha siswa (2 kalimat).
+- Buat "saranKonkret": Tepat 3 saran konkret, praktis, dan relevan dengan siswa SMK DKV untuk memperkuat area yang masih sulit tersebut.
+- Buat "pertanyaanPemantik": 1 pertanyaan pemantik reflektif yang menantang rasa ingin tahu siswa terkait penerapan materi di dunia desain/komputasi.
+- Buat "suggestedRencana": 3 ide langkah rencana belajar singkat sebagai referensi siswa.`,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              hostIntro: { type: Type.STRING },
+              saranKonkret: { type: Type.ARRAY, items: { type: Type.STRING } },
+              pertanyaanPemantik: { type: Type.STRING },
+              suggestedRencana: { type: Type.ARRAY, items: { type: Type.STRING } },
+            },
+            required: ['hostIntro', 'saranKonkret', 'pertanyaanPemantik', 'suggestedRencana'],
+          },
+        },
+      });
+      const parsed = JSON.parse(response.text || '{}');
+      return res.json({
+        success: true,
+        data: {
+          hostIntro: parsed.hostIntro || fallbackHostSpeech,
+          saranKonkret: Array.isArray(parsed.saranKonkret) && parsed.saranKonkret.length > 0 ? parsed.saranKonkret : fallbackAdvice,
+          pertanyaanPemantik: parsed.pertanyaanPemantik || fallbackTrigger,
+          suggestedRencana: Array.isArray(parsed.suggestedRencana) && parsed.suggestedRencana.length > 0 ? parsed.suggestedRencana : [
+            `Membaca ulang bagian "${perluDiperkuat}" di modul Perpustakaan Kampus selama 15 menit.`,
+            `Membuat rangkuman mind-map visual agar konsep "${materiTitle}" lebih mudah diingat.`,
+            `Mengerjakan kuis latihan di Bengkel Latihan untuk menguji penguasaan materi.`,
+          ],
+        },
+      });
+    } catch {
+      return res.json({
+        success: true,
+        data: {
+          hostIntro: fallbackHostSpeech,
+          saranKonkret: fallbackAdvice,
+          pertanyaanPemantik: fallbackTrigger,
+          suggestedRencana: [
+            `Membaca ulang bagian "${perluDiperkuat}" di modul Perpustakaan Kampus selama 15 menit.`,
+            `Membuat rangkuman mind-map visual agar konsep "${materiTitle}" lebih mudah diingat.`,
+            `Mengerjakan kuis latihan di Bengkel Latihan untuk menguji penguasaan materi.`,
+          ],
+        },
+      });
+    }
+  }
+
+  // Step 3: After student answers trigger question & submits Rencana Belajar -> Host closes the podcast episode warmly
+  const fallbackClosing = `Luar biasa sekali, ${studentName}! Jawaban dan rencana belajarmu sangat matang. Terima kasih sudah hadir di Studio Podcast ON AIR Menara Mentor Kota hari ini. Rekaman teks transkrip podcast ini sudah disimpan ke Riwayat Podcast dan Google Spreadsheet! Tetap semangat berkarya!`;
+
+  if (!ai || !apiKey) {
+    return res.json({ success: true, data: { hostClosing: fallbackClosing } });
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: `Kamu adalah Host Podcast AI di Menara Mentor Kota.
+Siswa ${studentName} (${className}) baru saja menyelesaikan sesi podcast materi "${materiTitle}".
+Jawaban siswa atas pertanyaan pemantik: "${jawabanPemantikSiswa || '-'}"
+Rencana belajar siswa: "${Array.isArray(rencanaBelajarSiswa) ? rencanaBelajarSiswa.join('; ') : rencanaBelajarSiswa || '-'}"
+Berikan kalimat penutup podcast (closing statement) yang antusias, mengapresiasi komitmen belajar siswa, dan menutup siaran ON AIR dengan hangat (2-3 kalimat).`,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            hostClosing: { type: Type.STRING },
+          },
+          required: ['hostClosing'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    return res.json({ success: true, data: { hostClosing: parsed.hostClosing || fallbackClosing } });
+  } catch {
+    return res.json({ success: true, data: { hostClosing: fallbackClosing } });
+  }
+});
+
+// =========================================================================
 // REAL-TIME PRESENCE & MULTI-DEVICE ONLINE AVATARS SYNC (24 JAM REAL-TIME)
 // =========================================================================
 interface ServerOnlinePlayer {

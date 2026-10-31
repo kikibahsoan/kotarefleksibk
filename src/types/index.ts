@@ -218,3 +218,31 @@ export interface DailyJournalStickyNote {
   likedBy?: string[];      // daftar ID warga yang menyukai
   likedByNames?: string[]; // daftar Nama warga yang menyukai
 }
+
+export interface PodcastTranscriptMessage {
+  role: 'host' | 'student';
+  speakerName: string;
+  text: string;
+  timestamp: string;
+  stage?: 'intro' | 'mastered' | 'strengthen' | 'advice_trigger' | 'action_plan' | 'closing';
+}
+
+export interface PodcastEpisodeRecord {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  materiId: string;
+  materiTitle: string;
+  sudahDikuasai: string;
+  perluDiperkuat: string;
+  saranKonkretAI: string[];
+  pertanyaanPemantikAI: string;
+  jawabanPemantikSiswa: string;
+  rencanaBelajarSiswa: string[];
+  apresiasiHost: string;
+  transcriptText: string;
+  messages: PodcastTranscriptMessage[];
+  createdAt: string;
+  timestamp: number;
+}
