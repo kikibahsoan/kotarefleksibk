@@ -181,9 +181,9 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
                   >
                     <span className="text-2xl shrink-0">🏛️</span>
                     <div className="flex-1">
-                      <div className="font-extrabold">Masuk ke Kota (Sebagai {authenticatedTeacher.isMasterPin ? 'Master' : 'Guru'})</div>
+                      <div className="font-extrabold">Masuk ke Kota (Sebagai {authenticatedTeacher.isMasterPin ? 'Penjelajah Waktu' : 'Guru'})</div>
                       <div className="text-[10px] text-emerald-100/90 font-normal mt-0.5">
-                        Jelajahi kota Refleksia dengan akun {authenticatedTeacher.name} {authenticatedTeacher.isMasterPin ? '(999 XP)' : ''}
+                        Jelajahi kota Refleksia {authenticatedTeacher.isMasterPin ? 'dengan avatar Penjelajah Waktu' : `dengan akun ${authenticatedTeacher.name}`}
                       </div>
                     </div>
                   </button>
@@ -326,7 +326,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
               <form onSubmit={handlePinLogin} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Ketik Master PIN (Akun kikybahsoan • 999 XP)
+                    Ketik Master PIN
                   </label>
                   <div className="relative">
                     <input

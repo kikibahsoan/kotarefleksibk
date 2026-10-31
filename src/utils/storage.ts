@@ -156,6 +156,13 @@ export const StorageService = {
       return null;
     }
     if (student) {
+      const canonical = INITIAL_STUDENTS.find(
+        (s) => s.id === student.id || s.name.trim().toUpperCase() === student.name.trim().toUpperCase()
+      );
+      if (canonical && canonical.gender && student.gender !== canonical.gender) {
+        student.gender = canonical.gender;
+        safeSet(STORAGE_KEYS.CURRENT_USER, student);
+      }
       const migratedKey = `kota_xp_v2_${student.id}`;
       if (!localStorage.getItem(migratedKey)) {
         const initialPoints = student.isTeacher ? 10 : 5;
@@ -253,7 +260,7 @@ export const StorageService = {
 
   getStudents(): Student[] {
     const rawItems = safeGet<Student[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
-    const listMigrated = localStorage.getItem('kota_students_act_v3');
+    const listMigrated = localStorage.getItem('kota_students_act_v4');
     let items = rawItems;
     if (
       !items ||
@@ -264,17 +271,28 @@ export const StorageService = {
       items = INITIAL_STUDENTS;
       safeSet(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
       try {
-        localStorage.setItem('kota_students_act_v3', '1');
+        localStorage.setItem('kota_students_act_v4', '1');
       } catch (e) {}
     }
 
-    // Enrich each student with computed activity stats & accurate points
+    // Enrich each student with computed activity stats, accurate points & canonical gender
     return items.map((s) => {
+      const canonical = INITIAL_STUDENTS.find(
+        (initS) => initS.id === s.id || initS.name.trim().toUpperCase() === s.name.trim().toUpperCase()
+      );
+      const upperName = s.name.trim().toUpperCase();
+      let resolvedGender = canonical?.gender || s.gender || 'L';
+      if (upperName.includes('REVAN PUTRA KARAMA') || upperName.includes('AQZA SETIAWAN YUNUS')) {
+        resolvedGender = 'L';
+      } else if (upperName.includes('AIRA MUSTAPA')) {
+        resolvedGender = 'P';
+      }
       const stats = this.getStudentActivityStats(s);
       const base = getBaselineActivity(s.id, s.className, s.studentNumber);
       const currentPts = s.points !== undefined && s.points > 5 ? s.points : base.points;
       return {
         ...s,
+        gender: resolvedGender,
         points: currentPts,
         activityStats: stats,
         totalActivities: stats.total,

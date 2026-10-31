@@ -901,7 +901,7 @@ export const INITIAL_STUDENTS: Student[] = [
     className: 'X DKV 3 (Desain Komunikasi Visual)',
     studentNumber: '03',
     password: '1231231233',
-    gender: 'L',
+    gender: 'P',
     points: 5,
     badges: ['reflektor_pertama'],
     lastLogin: '2026-10-22',

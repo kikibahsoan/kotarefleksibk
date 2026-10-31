@@ -869,7 +869,13 @@ export default function App() {
             <div className="bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 flex items-center gap-1 sm:gap-1.5 shadow-xl min-w-0 shrink">
               {/* Circular Avatar with gold border */}
               <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[10px] sm:text-[11px] shadow-sm shrink-0">
-                {student.isTeacher ? (student.gender === 'P' ? '👩‍🏫' : '👨‍🏫') : student.gender === 'P' ? '👧' : '👦'}
+                {student.name.toLowerCase().includes('kikybahsoan') || student.name.toLowerCase().includes('kikybahoan')
+                  ? '⏳'
+                  : student.isTeacher
+                  ? (student.gender === 'P' ? '👩‍🏫' : '👨‍🏫')
+                  : student.gender === 'P'
+                  ? '🧕'
+                  : '👦'}
               </div>
 
               {/* Username Handle (Responsively Truncated so it never overlaps) */}

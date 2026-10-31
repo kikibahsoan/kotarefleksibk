@@ -275,6 +275,70 @@ function hashString(str: string): number {
   return hash;
 }
 
+const DISTINCT_AVATAR_PALETTE: Array<{
+  shirt: string;
+  pants: string;
+  hijab: string;
+  hijabEdge: string;
+}> = [
+  { shirt: '#2563eb', pants: '#1e293b', hijab: '#1d4ed8', hijabEdge: '#93c5fd' }, // 0: Royal Blue
+  { shirt: '#e11d48', pants: '#334155', hijab: '#be185d', hijabEdge: '#fda4af' }, // 1: Rose Crimson
+  { shirt: '#059669', pants: '#064e3b', hijab: '#047857', hijabEdge: '#6ee7b7' }, // 2: Emerald Green
+  { shirt: '#7c3aed', pants: '#2e1065', hijab: '#6d28d9', hijabEdge: '#c4b5fd' }, // 3: Royal Violet
+  { shirt: '#d97706', pants: '#451a03', hijab: '#b45309', hijabEdge: '#fde68a' }, // 4: Warm Amber
+  { shirt: '#0891b2', pants: '#164e63', hijab: '#0e7490', hijabEdge: '#67e8f9' }, // 5: Cyan Ocean
+  { shirt: '#db2777', pants: '#500724', hijab: '#9d174d', hijabEdge: '#f9a8d4' }, // 6: Berry Pink
+  { shirt: '#4f46e5', pants: '#1e1b4b', hijab: '#4338ca', hijabEdge: '#a5b4fc' }, // 7: Deep Indigo
+  { shirt: '#ea580c', pants: '#431407', hijab: '#c2410c', hijabEdge: '#fdba74' }, // 8: Sunset Coral
+  { shirt: '#16a34a', pants: '#14532d', hijab: '#15803d', hijabEdge: '#86efac' }, // 9: Leaf Green
+  { shirt: '#9333ea', pants: '#3b0764', hijab: '#7e22ce', hijabEdge: '#d8b4fe' }, // 10: Amethyst Purple
+  { shirt: '#0284c7', pants: '#0c4a6e', hijab: '#0369a1', hijabEdge: '#7dd3fc' }, // 11: Sky Cerulean
+  { shirt: '#dc2626', pants: '#450a0a', hijab: '#b91c1c', hijabEdge: '#fca5a5' }, // 12: Bright Scarlet
+  { shirt: '#0d9488', pants: '#134e4a', hijab: '#0f766e', hijabEdge: '#5eead4' }, // 13: Tropical Teal
+  { shirt: '#c026d3', pants: '#4a044e', hijab: '#a21caf', hijabEdge: '#f0abfc' }, // 14: Fuchsia Magenta
+  { shirt: '#65a30d', pants: '#1a2e05', hijab: '#4d7c0f', hijabEdge: '#bef264' }, // 15: Fresh Lime
+  { shirt: '#f97316', pants: '#431407', hijab: '#ea580c', hijabEdge: '#fed7aa' }, // 16: Tangerine
+  { shirt: '#3b82f6', pants: '#172554', hijab: '#2563eb', hijabEdge: '#bfdbfe' }, // 17: Cobalt Blue
+  { shirt: '#10b981', pants: '#064e3b', hijab: '#059669', hijabEdge: '#a7f3d0' }, // 18: Mint Jade
+  { shirt: '#ec4899', pants: '#500724', hijab: '#db2777', hijabEdge: '#fbcfe8' }, // 19: Sakura Pink
+  { shirt: '#6366f1', pants: '#1e1b4b', hijab: '#4f46e5', hijabEdge: '#c7d2fe' }, // 20: Periwinkle
+  { shirt: '#ca8a04', pants: '#422006', hijab: '#a16207', hijabEdge: '#fef08a' }, // 21: Goldenrod
+  { shirt: '#06b6d4', pants: '#083344', hijab: '#0891b2', hijabEdge: '#a5f3fc' }, // 22: Turquoise
+  { shirt: '#be123c', pants: '#4c0519', hijab: '#9f1239', hijabEdge: '#fecdd3' }, // 23: Ruby Wine
+  { shirt: '#15803d', pants: '#052e16', hijab: '#166534', hijabEdge: '#bbf7d0' }, // 24: Forest Pine
+  { shirt: '#8b5cf6', pants: '#2e1065', hijab: '#7c3aed', hijabEdge: '#ddd6fe' }, // 25: Lavender Violet
+  { shirt: '#0369a1', pants: '#082f49', hijab: '#075985', hijabEdge: '#bae6fd' }, // 26: Marine Blue
+  { shirt: '#b45309', pants: '#271103', hijab: '#92400e', hijabEdge: '#fde68a' }, // 27: Cinnamon Bronze
+];
+
+function isTimeTravelerAccount(idOrName?: string | null, handle?: string | null): boolean {
+  const combined = `${idOrName || ''} ${handle || ''}`.toLowerCase();
+  return combined.includes('kikybahsoan') || combined.includes('kikybahoan');
+}
+
+function getDistinctAvatarOutfit(seedKey: string): {
+  shirt: string;
+  pants: string;
+  hijab: string;
+  hijabEdge: string;
+} {
+  const clean = (seedKey || 'siswa').trim().toLowerCase();
+  if (isTimeTravelerAccount(clean, clean)) {
+    return {
+      shirt: '#0f172a',
+      pants: '#1e1b4b',
+      hijab: '#0891b2',
+      hijabEdge: '#38bdf8',
+    };
+  }
+  const numMatch = clean.match(/(\d+)$/);
+  const baseHash = Math.abs(hashString(clean));
+  const idx = numMatch
+    ? (parseInt(numMatch[1], 10) * 3 + baseHash) % DISTINCT_AVATAR_PALETTE.length
+    : baseHash % DISTINCT_AVATAR_PALETTE.length;
+  return DISTINCT_AVATAR_PALETTE[idx];
+}
+
 export type BenchId =
   | 'fountain_1'
   | 'fountain_1_a'
@@ -1322,6 +1386,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         const incomingTargetWx = typeof rem.targetWx === 'number' && !isNaN(rem.targetWx) ? rem.targetWx : incomingWx;
         const incomingTargetWy = typeof rem.targetWy === 'number' && !isNaN(rem.targetWy) ? rem.targetWy : incomingWy;
 
+        const remOutfit = getDistinctAvatarOutfit(`${rem.id || ''}_${rem.name || rem.handle || ''}`);
         let existing = remotePlayersRef.current.get(rem.id);
         if (!existing) {
           existing = {
@@ -1335,9 +1400,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             targetWx: incomingTargetWx,
             targetWy: incomingTargetWy,
             speed: typeof rem.speed === 'number' && rem.speed > 0 ? rem.speed : 0.88,
-            shirtColor: rem.shirtColor || (isRemTeacher ? (remGender === 'P' ? '#047857' : '#1e3a8a') : (remGender === 'P' ? '#ec4899' : '#2563eb')),
-            pantsColor: rem.pantsColor || (isRemTeacher ? (remGender === 'P' ? '#065f46' : '#1e293b') : (remGender === 'P' ? '#be185d' : '#1e293b')),
-            hairColor: rem.hairColor || (remGender === 'P' ? '#6b3410' : '#0f172a'),
+            shirtColor: rem.shirtColor || remOutfit.shirt,
+            pantsColor: rem.pantsColor || remOutfit.pants,
+            hairColor: rem.hairColor || (remGender === 'P' ? remOutfit.hijab : '#0f172a'),
             gender: remGender,
             isMoving: Boolean(rem.isMoving),
             pauseTimer: 0,
@@ -1362,8 +1427,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           existing.name = rem.name || existing.name;
           existing.roleLabel = rem.roleLabel || (isRemTeacher ? 'GURU DKV' : 'Siswa DKV');
           existing.gender = remGender;
-          existing.shirtColor = rem.shirtColor || existing.shirtColor;
-          existing.pantsColor = rem.pantsColor || existing.pantsColor;
+          existing.shirtColor = rem.shirtColor || remOutfit.shirt;
+          existing.pantsColor = rem.pantsColor || remOutfit.pants;
           existing.speed = typeof rem.speed === 'number' && rem.speed > 0 ? rem.speed : 1.35;
 
           const distFromActual = Math.hypot(existing.wx - incomingWx, existing.wy - incomingWy);
@@ -1430,6 +1495,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     const buildLocalPayload = () => {
       const p = playerRef.current;
+      const myOutfit = getDistinctAvatarOutfit(`${studentId || ''}_${studentName}`);
       return {
         id: mySessionId,
         handle: p ? p.handle : cleanHandle,
@@ -1438,9 +1504,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         isTeacher: Boolean(isTeacher),
         roleLabel: isTeacher ? 'GURU DKV' : 'Siswa DKV',
         gender: p?.gender || (studentGender === 'P' ? 'P' : 'L'),
-        shirtColor: p?.shirtColor || (isTeacher ? (studentGender === 'P' ? '#047857' : '#1e3a8a') : (studentGender === 'P' ? '#ec4899' : '#2563eb')),
-        pantsColor: p?.pantsColor || (isTeacher ? (studentGender === 'P' ? '#065f46' : '#1e293b') : (studentGender === 'P' ? '#be185d' : '#1e293b')),
-        hairColor: p?.hairColor || (studentGender === 'P' ? '#6b3410' : '#0f172a'),
+        shirtColor: p?.shirtColor || myOutfit.shirt,
+        pantsColor: p?.pantsColor || myOutfit.pants,
+        hairColor: p?.hairColor || (studentGender === 'P' ? myOutfit.hijab : '#0f172a'),
         wx: p ? Number(p.wx.toFixed(3)) : 0.0,
         wy: p ? Number(p.wy.toFixed(3)) : 6.38,
         targetWx: p ? Number(p.targetWx.toFixed(3)) : 0.0,
@@ -1701,6 +1767,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     // 1. Player (Siswa / Guru) spawning right at the Welcome Gapura at the edge of the map
     const isPlayerTeacher = Boolean(isTeacher);
+    const playerOutfit = getDistinctAvatarOutfit(`${studentId || ''}_${studentName}`);
     const player: AvatarData = {
       id: isPlayerTeacher ? 'guru_player' : 'siswa',
       role: isPlayerTeacher ? 'guru' : 'siswa',
@@ -1712,13 +1779,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       targetWx: initWx,
       targetWy: initWy,
       speed: 0.88, // Calmer, slower, relaxed and steady walking speed
-      shirtColor: isPlayerTeacher
-        ? (studentGender === 'P' ? '#047857' : '#1e3a8a')
-        : (studentGender === 'P' ? '#ec4899' : '#2563eb'),
-      pantsColor: isPlayerTeacher
-        ? (studentGender === 'P' ? '#065f46' : '#1e293b')
-        : (studentGender === 'P' ? '#be185d' : '#1e293b'),
-      hairColor: studentGender === 'P' ? '#6b3410' : '#0f172a',
+      shirtColor: playerOutfit.shirt,
+      pantsColor: playerOutfit.pants,
+      hairColor: studentGender === 'P' ? playerOutfit.hijab : '#0f172a',
       gender: studentGender === 'P' ? 'P' : 'L',
       isMoving: false,
       pauseTimer: 0,
@@ -7004,30 +7067,144 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             avY = twoPersonBenchLock.screenY;
           }
 
+          const isKikyTimeTraveler = Boolean(
+            (item.isPlayer && isTimeTravelerAccount(studentName, studentId)) ||
+              isTimeTravelerAccount(av.name, av.handle)
+          );
+          const avatarDistinctOutfit = getDistinctAvatarOutfit(
+            item.isPlayer ? `${studentId || ''}_${studentName}` : `${av.id || ''}_${av.name || av.handle || ''}`
+          );
+          const resolvedShirtColor =
+            av.shirtColor && av.shirtColor !== '#ec4899' && av.shirtColor !== '#2563eb'
+              ? av.shirtColor
+              : avatarDistinctOutfit.shirt;
+          const resolvedPantsColor =
+            av.pantsColor && av.pantsColor !== '#be185d' && av.pantsColor !== '#1e293b'
+              ? av.pantsColor
+              : avatarDistinctOutfit.pants;
+          const resolvedHijabColor = avatarDistinctOutfit.hijab;
+          const resolvedHijabEdge = avatarDistinctOutfit.hijabEdge;
+
+          // 0. SPECIAL CHRONO PORTAL RING UNDER TIME TRAVELER (kikybahsoan)
+          if (isKikyTimeTraveler && !isOnSwing) {
+            ctx.save();
+            const chronoAngle = elapsed * 2.4;
+            const ringRx = 11.5 * z;
+            const ringRy = 5.4 * z;
+
+            // Soft cyan-gold temporal glow under feet
+            const timeGlow = ctx.createRadialGradient(pt.x, pt.y + 1, 1 * z, pt.x, pt.y + 1, 14 * z);
+            timeGlow.addColorStop(0, 'rgba(34, 211, 238, 0.42)');
+            timeGlow.addColorStop(0.55, 'rgba(250, 204, 21, 0.22)');
+            timeGlow.addColorStop(1, 'rgba(34, 211, 238, 0)');
+            ctx.fillStyle = timeGlow;
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 1, 14 * z, 6.8 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Outer golden clockwork ring
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+            ctx.lineWidth = 1.3 * z;
+            ctx.setLineDash([3 * z, 2 * z]);
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 1, ringRx, ringRy, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Inner neon-cyan temporal ring
+            ctx.strokeStyle = 'rgba(34, 211, 238, 0.9)';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y + 1, ringRx * 0.72, ringRy * 0.72, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Rotating clock hands inside ground portal
+            ctx.strokeStyle = '#fde047';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y + 1);
+            ctx.lineTo(
+              pt.x + Math.cos(chronoAngle) * ringRx * 0.65,
+              pt.y + 1 + Math.sin(chronoAngle) * ringRy * 0.65
+            );
+            ctx.moveTo(pt.x, pt.y + 1);
+            ctx.lineTo(
+              pt.x + Math.cos(-chronoAngle * 0.5) * ringRx * 0.45,
+              pt.y + 1 + Math.sin(-chronoAngle * 0.5) * ringRy * 0.45
+            );
+            ctx.stroke();
+
+            // 3 Orbiting temporal chrono sparks rising around Time Traveler
+            for (let sp = 0; sp < 3; sp++) {
+              const spAng = elapsed * 3 + sp * ((Math.PI * 2) / 3);
+              const sx = pt.x + Math.cos(spAng) * 9.5 * z;
+              const sy = avY - (6 + ((elapsed * 10 + sp * 6) % 18)) * z;
+              ctx.fillStyle = sp % 2 === 0 ? '#22d3ee' : '#fde047';
+              ctx.beginPath();
+              ctx.arc(sx, sy, 1.3 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.restore();
+          }
+
           // 1. LEGS & PANTS / SKIRT
           if (isSittingNow) {
             // SITTING ANIMATION: Legs folded forward resting comfortably over the bench/swing surface
             const swayVal = swingMetrics ? swingMetrics.sway : 0;
-            // When swinging forward (kemuka, sway > 0), calves kick forward/outward; when swinging backward (kebelakang, sway < 0), calves tuck back
             const calfKickX = isOnSwing ? swayVal * 2.2 * z : 0;
             const calfKickY = isOnSwing ? -Math.max(0, swayVal) * 1.6 * z : 0;
 
-            ctx.fillStyle = isTeacherAvatar
+            ctx.fillStyle = isKikyTimeTraveler
+              ? '#0f172a'
+              : isTeacherAvatar
               ? (isFemale ? '#065f46' : '#1e293b')
-              : (isFemale ? (av.pantsColor || '#be185d') : av.pantsColor);
+              : resolvedPantsColor;
 
             // Horizontal thighs resting flat on bench/swing plank
             ctx.fillRect(pt.x - 4 * z, avY - 4 * z, 3.8 * z, 3.2 * z);
             ctx.fillRect(pt.x + 0.5 * z, avY - 4 * z, 3.8 * z, 3.2 * z);
 
-            // Vertical calves hanging downward from bench/swing (pumping forward & backward on swing)
+            // Vertical calves hanging downward from bench/swing
             ctx.fillRect(pt.x - 4 * z + calfKickX, avY - 1 * z + calfKickY, 3.2 * z, 4.2 * z);
             ctx.fillRect(pt.x + 1 * z + calfKickX, avY - 1 * z + calfKickY, 3.2 * z, 4.2 * z);
 
             // Shoes resting on ground / swinging in air
-            ctx.fillStyle = isFemale ? (isTeacherAvatar ? '#064e3b' : '#e11d48') : '#0f172a';
+            ctx.fillStyle = isKikyTimeTraveler
+              ? '#22d3ee'
+              : isFemale
+              ? (isTeacherAvatar ? '#064e3b' : '#be185d')
+              : '#0f172a';
             ctx.fillRect(pt.x - 4.5 * z + calfKickX, avY + 3.2 * z + calfKickY, 4 * z, 2.2 * z);
             ctx.fillRect(pt.x + 0.8 * z + calfKickX, avY + 3.2 * z + calfKickY, 4 * z, 2.2 * z);
+          } else if (isKikyTimeTraveler) {
+            // KIKYBAHSOAN (PENJELAJAH WAKTU): Flowing Cosmic Trench Coat Tails & Futuristic Chrono Gravity Boots
+            const coatFlare = Math.sin(elapsed * 4.5) * 1.1 * z;
+            ctx.fillStyle = '#1e1b4b';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5.5 * z, avY - 7 * z);
+            ctx.lineTo(pt.x + 5.5 * z, avY - 7 * z);
+            ctx.lineTo(pt.x + 7.4 * z + coatFlare, avY + 0.2 * z);
+            ctx.lineTo(pt.x + 1.8 * z, avY - 1.5 * z);
+            ctx.lineTo(pt.x - 1.8 * z, avY - 1.5 * z);
+            ctx.lineTo(pt.x - 7.4 * z - coatFlare, avY + 0.2 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+
+            // Dark temporal trousers
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 3.6 * z, avY - 5 * z + legSwing, 3.1 * z, 6 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY - 5 * z - legSwing, 3.1 * z, 6 * z);
+
+            // Chrono Gravity Boots with glowing cyan hover soles
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(pt.x - 4.2 * z, avY + 0.8 * z + legSwing, 3.8 * z, 2.4 * z);
+            ctx.fillRect(pt.x + 0.4 * z, avY + 0.8 * z - legSwing, 3.8 * z, 2.4 * z);
+            ctx.fillStyle = '#22d3ee';
+            ctx.fillRect(pt.x - 4.2 * z, avY + 2.6 * z + legSwing, 3.8 * z, 0.9 * z);
+            ctx.fillRect(pt.x + 0.4 * z, avY + 2.6 * z - legSwing, 3.8 * z, 0.9 * z);
           } else if (av.role === 'penjaga_literasi') {
             // PATRA (Ibu Muslim di Sudut Literasi): Long modest Muslimah Gamis skirt & soft shoes
             ctx.fillStyle = '#115e59';
@@ -7067,41 +7244,31 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing, 3.6 * z, 2.4 * z);
               ctx.fillRect(pt.x + 0.6 * z, avY + 1 * z - legSwing, 3.6 * z, 2.4 * z);
             } else {
-              // Female Student: Legs in socks & pleated skirt
-              ctx.fillStyle = '#fed7aa';
-              ctx.fillRect(pt.x - 3.5 * z, avY - 4 * z + legSwing, 2.5 * z, 5 * z);
-              ctx.fillRect(pt.x + 1 * z, avY - 4 * z - legSwing, 2.5 * z, 5 * z);
-
-              // White ankle socks
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(pt.x - 3.5 * z, avY - 0.5 * z + legSwing, 2.5 * z, 2 * z);
-              ctx.fillRect(pt.x + 1 * z, avY - 0.5 * z - legSwing, 2.5 * z, 2 * z);
-
-              // Pleated skirt
-              ctx.fillStyle = av.pantsColor || '#be185d';
+              // Female Hijabi Student: Modest long pleated skirt (rok panjang rapi) & white socks/shoes
+              ctx.fillStyle = resolvedPantsColor;
               ctx.beginPath();
-              ctx.moveTo(pt.x - 5.5 * z, avY - 7 * z);
-              ctx.lineTo(pt.x + 5.5 * z, avY - 7 * z);
-              ctx.lineTo(pt.x + 7.5 * z, avY - 2 * z);
-              ctx.lineTo(pt.x - 7.5 * z, avY - 2 * z);
+              ctx.moveTo(pt.x - 5.2 * z, avY - 7 * z);
+              ctx.lineTo(pt.x + 5.2 * z, avY - 7 * z);
+              ctx.lineTo(pt.x + 6.6 * z, avY + 0.8 * z);
+              ctx.lineTo(pt.x - 6.6 * z, avY + 0.8 * z);
               ctx.closePath();
               ctx.fill();
-              ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-              ctx.lineWidth = 0.8 * z;
-              for (let pl = -4; pl <= 4; pl += 2.6) {
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+              ctx.lineWidth = 0.7 * z;
+              for (let pl = -3.6; pl <= 3.6; pl += 2.4) {
                 ctx.beginPath();
-                ctx.moveTo(pt.x + pl * z, avY - 7 * z);
-                ctx.lineTo(pt.x + pl * 1.3 * z, avY - 2 * z);
+                ctx.moveTo(pt.x + pl * z, avY - 6.8 * z);
+                ctx.lineTo(pt.x + pl * 1.15 * z, avY + 0.6 * z);
                 ctx.stroke();
               }
               // Shoes
-              ctx.fillStyle = '#e11d48';
-              ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing, 3.5 * z, 2.5 * z);
-              ctx.fillRect(pt.x + 0.5 * z, avY + 1 * z - legSwing, 3.5 * z, 2.5 * z);
+              ctx.fillStyle = '#1e293b';
+              ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing * 0.4, 3.5 * z, 2.4 * z);
+              ctx.fillRect(pt.x + 0.5 * z, avY + 1 * z - legSwing * 0.4, 3.5 * z, 2.4 * z);
             }
           } else {
-            // Male Pants (including Wali Kota Sony's crisp white/slate dress pants & Satpam Surya's dark brown trousers)
-            ctx.fillStyle = isTeacherAvatar ? '#1e293b' : av.pantsColor;
+            // Male Pants
+            ctx.fillStyle = isTeacherAvatar ? '#1e293b' : resolvedPantsColor;
             ctx.fillRect(pt.x - 3.5 * z, avY - 5 * z + legSwing, 3 * z, 6 * z);
             ctx.fillRect(pt.x + 0.5 * z, avY - 5 * z - legSwing, 3 * z, 6 * z);
             // Shoes
@@ -7111,10 +7278,62 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           // 2. SHIRT / TORSO
-          if (isTeacherAvatar) {
+          if (isKikyTimeTraveler) {
+            // KIKYBAHSOAN (PENJELAJAH WAKTU): High-Collar Cosmic Trench Coat, Chrono Bandolier & Glowing Arcane Hourglass Core
+            // High popped time-traveler collar behind neck
+            ctx.fillStyle = '#1e1b4b';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 6.2 * z, avY - 13.5 * z);
+            ctx.lineTo(pt.x - 7.4 * z, avY - 18.2 * z);
+            ctx.lineTo(pt.x + 7.4 * z, avY - 18.2 * z);
+            ctx.lineTo(pt.x + 6.2 * z, avY - 13.5 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#22d3ee';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+
+            // Main Chrono Coat Torso
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.8 * z, avY - 14.2 * z, 11.6 * z, 8.8 * z, 2.2 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+
+            // Golden-Brass Epaulettes on shoulders
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(pt.x - 5.8 * z, avY - 14.5 * z, 2.8 * z, 1.3 * z);
+            ctx.fillRect(pt.x + 3.0 * z, avY - 14.5 * z, 2.8 * z, 1.3 * z);
+
+            // Diagonal Leather & Brass Chrono Bandolier Strap across chest
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 1.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 4.8 * z, avY - 13.8 * z);
+            ctx.lineTo(pt.x + 4.8 * z, avY - 6.2 * z);
+            ctx.stroke();
+
+            // Chrono Waist Belt with Golden Time Buckle
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(pt.x - 5.6 * z, avY - 6.8 * z, 11.2 * z, 1.6 * z);
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(pt.x - 1.4 * z, avY - 7.0 * z, 2.8 * z, 2.0 * z);
+
+            // Pulsing Cyan-Gold Temporal Reactor / Pocket Watch Core in center of chest
+            const corePulse = 0.75 + Math.sin(elapsed * 6) * 0.25;
+            ctx.fillStyle = `rgba(34, 211, 238, ${corePulse})`;
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 10.5 * z, 2.1 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#fde047';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+          } else if (isTeacherAvatar) {
             if (isFemale) {
-              // Female Teacher: Formal emerald blazer with golden brooch
-              ctx.fillStyle = '#047857';
+              // Female Teacher: Formal blazer in distinct color with golden brooch
+              ctx.fillStyle = resolvedShirtColor;
               ctx.beginPath();
               ctx.roundRect(pt.x - 5.5 * z, avY - 14 * z, 11 * z, 8.5 * z, 2.2 * z);
               ctx.fill();
@@ -7124,8 +7343,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.arc(pt.x - 2 * z, avY - 11.5 * z, 1.2 * z, 0, Math.PI * 2);
               ctx.fill();
             } else {
-              // Male Teacher: Formal navy blazer with golden amber tie
-              ctx.fillStyle = '#1e3a8a';
+              // Male Teacher: Formal blazer in distinct color with golden amber tie
+              ctx.fillStyle = resolvedShirtColor;
               ctx.beginPath();
               ctx.roundRect(pt.x - 5.5 * z, avY - 14 * z, 11 * z, 8.5 * z, 2.2 * z);
               ctx.fill();
@@ -7260,21 +7479,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.closePath();
             ctx.fill();
           } else {
-            // Student Torso
-            ctx.fillStyle = av.shirtColor;
+            // Student Torso with distinct unique shirt color per student
+            ctx.fillStyle = resolvedShirtColor;
             ctx.beginPath();
             ctx.roundRect(pt.x - 5 * z, avY - 14 * z, 10 * z, 8.5 * z, 2.2 * z);
             ctx.fill();
 
             if (isFemale) {
-              // Cute Peter Pan collar
-              ctx.fillStyle = '#ffffff';
+              // Modest tunic accent trim at waist for hijabi female student
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+              ctx.lineWidth = 0.8 * z;
               ctx.beginPath();
-              ctx.arc(pt.x - 2 * z, avY - 13.5 * z, 1.8 * z, 0, Math.PI);
-              ctx.arc(pt.x + 2 * z, avY - 13.5 * z, 1.8 * z, 0, Math.PI);
-              ctx.fill();
-              ctx.fillStyle = '#f43f5e';
-              ctx.fillRect(pt.x - 1 * z, avY - 13 * z, 2 * z, 2.5 * z);
+              ctx.moveTo(pt.x - 4.6 * z, avY - 6.2 * z);
+              ctx.lineTo(pt.x + 4.6 * z, avY - 6.2 * z);
+              ctx.stroke();
             } else {
               // Male open polo collar line
               ctx.strokeStyle = '#ffffff';
@@ -7294,9 +7512,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 (isSittingNow && (sittingSeat === 'literacy' || sittingSeat?.startsWith('literacy_'))))
           );
 
+          const sleeveColor = isKikyTimeTraveler
+            ? '#0f172a'
+            : isTeacherAvatar
+            ? resolvedShirtColor
+            : resolvedShirtColor;
+
           if (isReadingNow) {
             // ARMS HOLDING OPEN BOOK / COMIC
-            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.fillStyle = sleeveColor;
             // Left arm reaching forward to hold book
             ctx.beginPath();
             ctx.moveTo(pt.x - 5.5 * z, avY - 12 * z);
@@ -7354,7 +7578,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const rightHandY = swingMetrics.anchorY + (swingMetrics.seatY - swingMetrics.anchorY) * handChainT;
 
             // Sleeves reaching from shoulders to the chains
-            ctx.strokeStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.strokeStyle = sleeveColor;
             ctx.lineWidth = 2.4 * z;
             ctx.beginPath();
             ctx.moveTo(pt.x - 4.8 * z, avY - 12.5 * z);
@@ -7381,7 +7605,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           } else if (isSittingNow) {
             // Resting arms on lap / knees
-            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.fillStyle = sleeveColor;
             ctx.fillRect(pt.x - 6.5 * z, avY - 13 * z, 2.2 * z, 6.5 * z);
             ctx.fillRect(pt.x + 4.5 * z, avY - 13 * z, 2.2 * z, 6.5 * z);
             // Hands on knees
@@ -7480,7 +7704,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const leftPointX = Math.cos(beat) * 2.5 * z;
             const rightPointX = -Math.cos(beat) * 2.5 * z;
 
-            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.fillStyle = sleeveColor;
             ctx.fillRect(pt.x - 7.2 * z + leftPointX, avY - 14 * z + leftArmY, 2.2 * z, 6.5 * z);
             ctx.fillRect(pt.x + 5.0 * z + rightPointX, avY - 14 * z + rightArmY, 2.2 * z, 6.5 * z);
             // Hands
@@ -7492,7 +7716,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           } else if (isWavingNow) {
             // WAVING ARM: Right hand held high and waving side-to-side
             const waveCycle = Math.sin(elapsed * 10) * 3.6 * z;
-            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.fillStyle = sleeveColor;
             // Left arm relaxed
             ctx.fillRect(pt.x - 7.2 * z, avY - 13 * z, 2.2 * z, 7 * z);
             // Right arm raised high
@@ -7505,9 +7729,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           } else {
             const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0;
-            ctx.fillStyle = isTeacherAvatar ? (isFemale ? '#047857' : '#1e3a8a') : av.shirtColor;
+            ctx.fillStyle = sleeveColor;
             ctx.fillRect(pt.x - 7.2 * z, avY - 13 * z - armSwing, 2.2 * z, 7 * z);
             ctx.fillRect(pt.x + 5 * z, avY - 13 * z + armSwing, 2.2 * z, 7 * z);
+            if (isKikyTimeTraveler) {
+              // Glowing Cyan Chrono Gauntlet / Time-Turner Wristband on left & right cuffs
+              ctx.fillStyle = '#22d3ee';
+              ctx.fillRect(pt.x - 7.2 * z, avY - 7.2 * z - armSwing, 2.2 * z, 1.3 * z);
+              ctx.fillStyle = '#facc15';
+              ctx.fillRect(pt.x + 5 * z, avY - 7.2 * z + armSwing, 2.2 * z, 1.3 * z);
+            }
             // Hands
             ctx.fillStyle = '#fed7aa';
             ctx.fillRect(pt.x - 7.2 * z, avY - 6 * z - armSwing, 2.2 * z, 2.2 * z);
@@ -7529,11 +7760,63 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           }
 
-          // 5. HAIR, HIJAB, HATS & GLASSES (Distinguished Teacher, Custom NPCs & Student)
-          if ((isTeacherAvatar && isFemale) || av.role === 'penjaga_literasi') {
+          // 5. HAIR, HIJAB, HATS & GLASSES (Time Traveler kikybahsoan, Distinguished Teacher, Custom NPCs & Hijabi Female Students)
+          if (isKikyTimeTraveler) {
+            // KIKYBAHSOAN (PENJELAJAH WAKTU): Tousled Temporal Hair with Silver-Cyan Streaks + Steampunk-Futuristic Glowing Chrono Goggles & Floating Mini Hourglass
+            // Dark cosmic hair with silver-cyan time streak
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 21.2 * z, 5.6 * z, Math.PI, 0);
+            ctx.fill();
+            ctx.fillRect(pt.x - 4.8 * z, avY - 22.4 * z, 4.2 * z, 2.6 * z);
+            // Silver-cyan temporal hair streak
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 1.5 * z, avY - 23.2 * z);
+            ctx.lineTo(pt.x + 2.2 * z, avY - 20.2 * z);
+            ctx.lineTo(pt.x + 0.5 * z, avY - 19.8 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Leather head strap for Time-Traveler Goggles
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 1.6 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5.2 * z, avY - 18.4 * z);
+            ctx.lineTo(pt.x + 5.2 * z, avY - 18.4 * z);
+            ctx.stroke();
+
+            // Dual Brass & Neon-Cyan Time-Traveler Goggles over eyes
+            ctx.fillStyle = '#22d3ee';
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.2 * z, avY - 18.3 * z, 2.1 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 2.2 * z, avY - 18.3 * z, 2.1 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.15 * z;
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.2 * z, avY - 18.3 * z, 2.1 * z, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(pt.x + 2.2 * z, avY - 18.3 * z, 2.1 * z, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Specular gleam on chrono goggle lenses
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 3.0 * z, avY - 19.2 * z, 0.9 * z, 0.9 * z);
+            ctx.fillRect(pt.x + 1.4 * z, avY - 19.2 * z, 0.9 * z, 0.9 * z);
+
+            // Floating Golden Hourglass / Temporal Crown Halo above head
+            const floatBob = Math.sin(elapsed * 5) * 1.4 * z;
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 26.5 * z + floatBob * 0.4, 5.2 * z, 1.5 * z, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          } else if ((isTeacherAvatar && isFemale) || av.role === 'penjaga_literasi') {
             // Female Teacher or PATRA (Ibu Muslim di Sudut Literasi): Flowing Syar'i Hijab covering chest with Golden Brooch
-            const hijabMain = av.role === 'penjaga_literasi' ? '#0d9488' : '#059669';
-            const hijabEdge = av.role === 'penjaga_literasi' ? '#99f6e4' : '#34d399';
+            const hijabMain = av.role === 'penjaga_literasi' ? '#0d9488' : resolvedHijabColor;
+            const hijabEdge = av.role === 'penjaga_literasi' ? '#99f6e4' : resolvedHijabEdge;
             ctx.fillStyle = hijabMain;
             ctx.beginPath();
             ctx.arc(pt.x, avY - 19.5 * z, 6.4 * z, 0, Math.PI * 2);
@@ -7675,20 +7958,50 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x + 1 * z, avY - 18.5 * z);
             ctx.stroke();
           } else if (isFemale) {
-            // Female Student: Round crown & bangs with side locks & hair ribbons
-            ctx.fillStyle = av.hairColor || '#6b3410';
+            // Female Student (Siswa Perempuan Berhijab): Modest & neat student Hijab coordinated with outfit color
+            ctx.fillStyle = resolvedHijabColor;
             ctx.beginPath();
-            ctx.arc(pt.x, avY - 21 * z, 5.8 * z, Math.PI, 0);
+            ctx.arc(pt.x, avY - 19.4 * z, 6.2 * z, 0, Math.PI * 2);
             ctx.fill();
+
+            // Neat hijab shoulder & chest drape (kerudung menutup dada dengan rapi)
             ctx.beginPath();
-            ctx.roundRect(pt.x - 7 * z, avY - 20 * z, 2.4 * z, 10 * z, 1.2 * z);
-            ctx.roundRect(pt.x + 4.6 * z, avY - 20 * z, 2.4 * z, 10 * z, 1.2 * z);
+            ctx.moveTo(pt.x - 6.3 * z, avY - 17.5 * z);
+            ctx.lineTo(pt.x + 6.3 * z, avY - 17.5 * z);
+            ctx.lineTo(pt.x + 7.2 * z, avY - 10.2 * z);
+            ctx.quadraticCurveTo(pt.x, avY - 8.0 * z, pt.x - 7.2 * z, avY - 10.2 * z);
+            ctx.closePath();
             ctx.fill();
-            // Hair ribbons
-            ctx.fillStyle = '#f43f5e';
+
+            // Soft hijab edge border trim
+            ctx.strokeStyle = resolvedHijabEdge;
+            ctx.lineWidth = 0.7 * z;
+            ctx.stroke();
+
+            // Cute pastel brooch pin on hijab drape
+            ctx.fillStyle = '#fde047';
             ctx.beginPath();
-            ctx.arc(pt.x - 6 * z, avY - 21 * z, 1.8 * z, 0, Math.PI * 2);
-            ctx.arc(pt.x + 6 * z, avY - 21 * z, 1.8 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 2.3 * z, avY - 11.8 * z, 1.0 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Inner face opening
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 18 * z, 3.8 * z, 4.1 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Soft white inner underscarf (ciput) line at forehead
+            ctx.strokeStyle = '#f8fafc';
+            ctx.lineWidth = 0.75 * z;
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 18.2 * z, 3.8 * z, Math.PI * 1.18, Math.PI * 1.82);
+            ctx.stroke();
+
+            // Rosy blushing cheeks
+            ctx.fillStyle = 'rgba(244, 63, 94, 0.38)';
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.4 * z, avY - 17.5 * z, 1.0 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 2.4 * z, avY - 17.5 * z, 1.0 * z, 0, Math.PI * 2);
             ctx.fill();
           } else {
             // Male Student: Clean crop with side part
@@ -8018,11 +8331,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
-          // 6. TRANSPARENT USERNAME TAG PILL (Teachers show ONLY their name differentiated by golden-amber color; citizens have subtle transparent tags)
-          const tagPosY = avY - 28 * z;
+          // 6. TRANSPARENT USERNAME TAG PILL
+          const tagPosY = avY - (isKikyTimeTraveler ? 30 : 28) * z;
           let labelText = `@${av.handle}`;
-          if (isTeacherAvatar) {
-            // Guru: hanya nama saja dan dibedakan dengan warnanya
+          if (isKikyTimeTraveler) {
+            labelText = `⏳ @${av.handle}`;
+          } else if (isTeacherAvatar) {
             labelText = `@${av.handle}`;
           } else if (item.isPlayer) {
             labelText = `@${av.handle}`;
@@ -8042,20 +8356,27 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             labelText = `@sony`;
           }
 
-          ctx.font = `${isTeacherAvatar ? 'bold' : '600'} ${Math.round((isTeacherAvatar ? 8.5 : 7.8) * z)}px sans-serif`;
+          ctx.font = `${isTeacherAvatar || isKikyTimeTraveler ? 'bold' : '600'} ${Math.round((isTeacherAvatar || isKikyTimeTraveler ? 8.5 : 7.8) * z)}px sans-serif`;
           const tM = ctx.measureText(labelText);
           const tW = tM.width + 9 * z;
           const tH = 13.5 * z;
 
           // Lightweight Transparent Pill Background so it never clutters the city view
-          ctx.fillStyle = isTeacherAvatar
+          ctx.fillStyle = isKikyTimeTraveler
+            ? 'rgba(15, 23, 42, 0.78)'
+            : isTeacherAvatar
             ? 'rgba(120, 53, 15, 0.45)'
             : 'rgba(15, 23, 42, 0.28)';
           ctx.beginPath();
           ctx.roundRect(pt.x - tW / 2, tagPosY - tH / 2, tW, tH, 6.5 * z);
           ctx.fill();
 
-          if (isTeacherAvatar) {
+          if (isKikyTimeTraveler) {
+            ctx.strokeStyle = 'rgba(34, 211, 238, 0.9)';
+            ctx.lineWidth = 1.3 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#67e8f9';
+          } else if (isTeacherAvatar) {
             ctx.strokeStyle = 'rgba(251, 191, 36, 0.75)';
             ctx.lineWidth = 1.2 * z;
             ctx.stroke();
