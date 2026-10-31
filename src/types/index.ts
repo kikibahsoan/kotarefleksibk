@@ -23,6 +23,16 @@ export interface PublicChatMessage {
   isTeacher?: boolean;
 }
 
+export interface StudentActivityBreakdown {
+  logins: number;
+  missions: number;
+  reflections: number;
+  chats: number;
+  quizzes: number;
+  messages: number;
+  total: number;
+}
+
 export interface Student {
   id: string;
   name: string;
@@ -36,6 +46,11 @@ export interface Student {
   streakDays: number;
   isTeacher?: boolean;
   subject?: string;
+  loginCount?: number;
+  completedMissionsCount?: number;
+  quizCount?: number;
+  activityStats?: Partial<StudentActivityBreakdown>;
+  totalActivities?: number;
 }
 
 export interface Materi {

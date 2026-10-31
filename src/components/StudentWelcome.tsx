@@ -103,6 +103,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
       badges: target.badges && target.badges.length > 0 ? target.badges : ['reflektor_pertama'],
     };
 
+    StorageService.recordStudentActivity(target.id, 'login', 1);
     StorageService.saveOrUpdateStudent(loggedStudent);
     StorageService.setCurrentStudent(loggedStudent);
     onLoginStudent(loggedStudent);

@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BuildingId, PublicChatMessage } from '../types/index.ts';
+import { BuildingId, PublicChatMessage, Student } from '../types/index.ts';
 import { sounds } from '../utils/audio.ts';
 import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
 import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
-import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText } from 'lucide-react';
+import { TownRulesModal } from './modals/TownRulesModal.tsx';
 
 interface ThreeTownCanvasProps {
   onSelectBuilding: (buildingId: BuildingId) => void;
@@ -17,7 +18,17 @@ interface ThreeTownCanvasProps {
   timePeriod?: TimePeriod;
   latestMessage?: PublicChatMessage | null;
   studentPoints?: number;
+  latestXpGain?: { amount: number; reason?: string; timestamp: number } | null;
   onDeductPoints?: (amount: number, reason: string) => boolean;
+  onOpenTownRules?: () => void;
+}
+
+export interface XpFloatItem {
+  id: string;
+  amount: number;
+  reason?: string;
+  startTime: number;
+  duration: number;
 }
 
 export interface BuildingInfo {
@@ -33,12 +44,15 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'balai_kota', name: 'Balai Kota', tagline: 'Kubah Emas & Misi', position: [0, 0, -4.2], color: 0x3b82f6, icon: '🏛️' },
   { id: 'menara_mentor', name: 'Studio ON AIR', tagline: 'Studio Podcast, ON AIR & AI', position: [4.2, 0, 0], color: 0x8b5cf6, icon: '🎙️' },
   { id: 'perpustakaan', name: 'Perpustakaan Kampus', tagline: 'Gedung Biru & Materi', position: [-4.2, 0, 0], color: 0x10b981, icon: '📚' },
-  { id: 'pasar_prestasi', name: 'Toko Poin', tagline: 'Lencana & Hadiah', position: [-2.8, 0, 2.8], color: 0x06b6d4, icon: '🎪' },
+  { id: 'pasar_prestasi', name: 'Pasar Prestasi', tagline: 'Leaderboard & Dewan Guru', position: [-2.8, 0, 2.8], color: 0xf59e0b, icon: '🏆' },
   { id: 'kantor_pos', name: 'Kantor Pos Kilat', tagline: 'Kirim Pesan ke Guru', position: [2.8, 0, -2.8], color: 0xef4444, icon: '📮' },
   { id: 'taman_refleksi', name: 'Pusat Refleksi', tagline: 'Tulis Jurnal Refleksi (+3 Poin)', position: [-2.8, 0, -2.8], color: 0xd97706, icon: '🌍' },
   { id: 'bengkel_latihan', name: 'Lab DKV & Tefa', tagline: 'Tower Kontrol & Kuis', position: [2.8, 0, 2.8], color: 0xf59e0b, icon: '🛠️' },
   { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
 ];
+
+// Papan Peraturan & Panduan Aktivitas di Dekat Gapura Awal Masuk [wx: 1.45, wy: 5.95]
+export const TOWN_RULES_BOARD_COORDS = { wx: 1.45, wy: 5.95 };
 
 export type EmoteType = 'love' | 'wave' | 'laugh' | 'dance';
 
@@ -621,13 +635,52 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   timePeriod,
   latestMessage,
   studentPoints = 100,
+  latestXpGain,
   onDeductPoints,
+  onOpenTownRules,
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Floating Pop-Up XP Gain Queue (+3 XP, +5 XP floating above avatar)
+  const xpFloatsRef = useRef<XpFloatItem[]>([]);
+  const prevPointsRef = useRef<number>(studentPoints);
+
+  const addXpFloat = (amount: number, reason?: string) => {
+    if (amount <= 0) return;
+    const now = performance.now();
+    // Avoid exact duplicate within 250ms
+    const recent = xpFloatsRef.current.find((item) => now - item.startTime < 250 && item.amount === amount);
+    if (recent) {
+      if (reason && !recent.reason) recent.reason = reason;
+      return;
+    }
+    xpFloatsRef.current.push({
+      id: Math.random().toString(),
+      amount,
+      reason,
+      startTime: now,
+      duration: 2700,
+    });
+    sounds.playRewardXp();
+  };
+
+  useEffect(() => {
+    if (studentPoints > prevPointsRef.current) {
+      const diff = studentPoints - prevPointsRef.current;
+      addXpFloat(diff);
+    }
+    prevPointsRef.current = studentPoints;
+  }, [studentPoints]);
+
+  useEffect(() => {
+    if (!latestXpGain || latestXpGain.amount <= 0) return;
+    addXpFloat(latestXpGain.amount, latestXpGain.reason);
+  }, [latestXpGain]);
+
   const [hoveredBuilding, setHoveredBuilding] = useState<BuildingInfo | null>(null);
   const [isCafeMenuOpen, setIsCafeMenuOpen] = useState(false);
+  const [isTownRulesModalOpen, setIsTownRulesModalOpen] = useState(false);
   const [cafeToast, setCafeToast] = useState<string | null>(null);
   const cafeToastTimerRef = useRef<number | null>(null);
   const [cafeScreenPos, setCafeScreenPos] = useState<{ x: number; y: number; visible: boolean }>({
@@ -815,15 +868,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [isLiteracyModalOpen, setIsLiteracyModalOpen] = useState(false);
   const [activeLiteracyDoc, setActiveLiteracyDoc] = useState<'komik' | 'majalah' | 'koran' | null>(null);
 
-  // Nearby interaction (tree watering, fishing spot, literacy corner, or bench)
+  // Nearby interaction (tree watering, fishing spot, literacy corner, bench, or town rules board)
   const [nearbyAction, setNearbyAction] = useState<{
-    type: 'tree' | 'fishing' | 'literacy' | 'bench';
+    type: 'tree' | 'fishing' | 'literacy' | 'bench' | 'town_rules';
     treeIndex?: number;
     benchId?: BenchId;
     benchName?: string;
   } | null>(null);
   const nearbyActionRef = useRef<{
-    type: 'tree' | 'fishing' | 'literacy' | 'bench';
+    type: 'tree' | 'fishing' | 'literacy' | 'bench' | 'town_rules';
     treeIndex?: number;
     benchId?: BenchId;
     benchName?: string;
@@ -1182,7 +1235,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             wy: incomingWy,
             targetWx: incomingTargetWx,
             targetWy: incomingTargetWy,
-            speed: typeof rem.speed === 'number' && rem.speed > 0 ? rem.speed : 1.35,
+            speed: typeof rem.speed === 'number' && rem.speed > 0 ? rem.speed : 0.88,
             shirtColor: rem.shirtColor || (isRemTeacher ? (remGender === 'P' ? '#047857' : '#1e3a8a') : (remGender === 'P' ? '#ec4899' : '#2563eb')),
             pantsColor: rem.pantsColor || (isRemTeacher ? (remGender === 'P' ? '#065f46' : '#1e293b') : (remGender === 'P' ? '#be185d' : '#1e293b')),
             hairColor: rem.hairColor || (remGender === 'P' ? '#6b3410' : '#0f172a'),
@@ -1559,7 +1612,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       wy: initWy,
       targetWx: initWx,
       targetWy: initWy,
-      speed: 1.35, // Relaxed, gentle and natural walking speed
+      speed: 0.88, // Calmer, slower, relaxed and steady walking speed
       shirtColor: isPlayerTeacher
         ? (studentGender === 'P' ? '#047857' : '#1e3a8a')
         : (studentGender === 'P' ? '#ec4899' : '#2563eb'),
@@ -1878,6 +1931,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
+      // 1b. Check Click on Papan Peraturan Kota di Dekat Gapura Masuk [1.45, 5.95] or Welcome Gate [0, 6.15]
+      const rulesDist = Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy);
+      const gateDist = Math.hypot(wx - 0, wy - 6.15);
+      if (rulesDist < 1.35 || gateDist < 1.45) {
+        sounds.playClick();
+        if (isSittingRef.current) {
+          setIsSitting(false);
+          setSittingSeat(null);
+        }
+        pendingSeatRef.current = null;
+        player.targetWx = 1.25;
+        player.targetWy = 5.95;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+        pendingBuildingId = null;
+        lastTouchedIdRef.current = null;
+        setPendingConfirmation(null);
+        setIsCafeMenuOpen(false);
+        sounds.playOpenModal();
+        if (onOpenTownRules) {
+          onOpenTownRules();
+        } else {
+          setIsTownRulesModalOpen(true);
+        }
+        return;
+      }
+
       // 2. Check Click on Kolam Pemancingan Timur [4.6, -2.2]
       const fishSpotDist = Math.hypot(wx - 4.6, wy - (-2.2));
       if (fishSpotDist < 2.2) {
@@ -2042,6 +2122,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         Math.hypot(wx - (-4.3), wy - 1.8) < 2.0 ||
         Math.hypot(wx - (-3.7), wy - 1.8) < 1.05 ||
         Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 1.35 ||
+        Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy) < 1.35 ||
+        Math.hypot(wx - 0, wy - 6.15) < 1.45 ||
         ALL_TWO_PERSON_BENCHES.some((g) => Math.hypot(wx - g.wx, wy - g.wy) < 1.05) ||
         SWING_STRUCTURES.some((s) => Math.hypot(wx - s.wx, wy - s.wy) < 1.15);
 
@@ -2152,7 +2234,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (!isSolidCollision(nextWx, nextWy, 0.16)) {
             player.wx = nextWx;
             player.wy = nextWy;
-            player.walkFrame += delta * (4.2 + (easeSpeed / player.speed) * 1.8);
+            player.walkFrame += delta * (2.8 + (easeSpeed / player.speed) * 1.5);
           } else {
             const fDist = Math.hypot(nextWx, nextWy);
             if (fDist < 1.12 && fDist > 0.001) {
@@ -2172,7 +2254,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 player.wx = (player.wx / newR) * 1.10;
                 player.wy = (player.wy / newR) * 1.10;
               }
-              player.walkFrame += delta * 5.2;
+              player.walkFrame += delta * 3.4;
             } else {
               // Wall sliding: try X movement only
               const canMoveX = !isSolidCollision(nextWx, player.wy, 0.16);
@@ -2181,10 +2263,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
               if (canMoveX) {
                 player.wx = nextWx;
-                player.walkFrame += delta * 5.2;
+                player.walkFrame += delta * 3.4;
               } else if (canMoveY) {
                 player.wy = nextWy;
-                player.walkFrame += delta * 5.2;
+                player.walkFrame += delta * 3.4;
               } else if (pendingSeatRef.current && dist < 0.55) {
                 // Close enough to target seat when blocked -> complete sitting
                 const ps = pendingSeatRef.current;
@@ -2359,6 +2441,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       } else if (nearBench) {
         if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== nearBench.id) {
           setNearbyAction({ type: 'bench', benchId: nearBench.id, benchName: nearBench.name });
+        }
+      } else if (Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.35 || Math.hypot(player.wx - 0, player.wy - 6.15) < 1.45) {
+        if (nearbyActionRef.current?.type !== 'town_rules') {
+          setNearbyAction({ type: 'town_rules' });
         }
       } else if (litDist < 1.05) {
         if (nearbyActionRef.current?.type !== 'literacy') {
@@ -2878,7 +2964,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'bench'; wx: number; wy: number; depth: number; id: BenchId; twoPersonGroup?: TwoPersonBenchGroup }
         | { type: 'swings_structure'; struct: SwingStructureDef; wx: number; wy: number; depth: number }
         | { type: 'campfire_spot'; wx: number; wy: number; depth: number }
-        | { type: 'welcome_gate'; wx: number; wy: number; depth: number };
+        | { type: 'welcome_gate'; wx: number; wy: number; depth: number }
+        | { type: 'town_rules_board'; wx: number; wy: number; depth: number };
 
       const drawItems: DrawItem[] = [];
 
@@ -2979,6 +3066,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         wx: WELCOME_GATE_COORDS.wx,
         wy: WELCOME_GATE_COORDS.wy,
         depth: WELCOME_GATE_COORDS.wx + WELCOME_GATE_COORDS.wy + 0.65,
+      });
+
+      // 8. Papan Peraturan & Panduan Aktivitas di Dekat Gapura Masuk [1.45, 5.95]
+      drawItems.push({
+        type: 'town_rules_board',
+        wx: TOWN_RULES_BOARD_COORDS.wx,
+        wy: TOWN_RULES_BOARD_COORDS.wy,
+        depth: TOWN_RULES_BOARD_COORDS.wx + TOWN_RULES_BOARD_COORDS.wy + 0.45,
       });
 
       drawItems.sort((a, b) => a.depth - b.depth);
@@ -3602,6 +3697,163 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(titleText, bannerCenterX, bannerCenterY);
+        } else if (item.type === 'town_rules_board') {
+          // PAPAN PERATURAN KOTA & PANDUAN AKTIVITAS DI DEKAT GAPURA UTAMA [wx: 1.45, wy: 5.95]
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          ctx.save();
+
+          // 1. Soft Ground Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 2 * z, 14 * z, 6 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 2. Twin Sturdy Teak Timber Posts
+          const postH = 36 * z;
+          const postW = 3.6 * z;
+          const leftPostX = pt.x - 10 * z;
+          const rightPostX = pt.x + 10 * z;
+
+          [leftPostX, rightPostX].forEach((px) => {
+            // Post Footing Stone
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(px - 3.2 * z, pt.y - 3 * z, 6.4 * z, 4 * z);
+            // Wooden Post
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(px - postW / 2, pt.y - postH, postW, postH - 2 * z);
+            ctx.fillStyle = '#92400e';
+            ctx.fillRect(px - postW / 2 + 0.8 * z, pt.y - postH, postW * 0.45, postH - 2 * z);
+          });
+
+          // 3. Wooden Crossbars connecting posts
+          ctx.fillStyle = '#451a03';
+          ctx.fillRect(leftPostX - 1 * z, pt.y - 12 * z, (rightPostX - leftPostX) + 2 * z, 3 * z);
+          ctx.fillRect(leftPostX - 1 * z, pt.y - postH + 6 * z, (rightPostX - leftPostX) + 2 * z, 3 * z);
+
+          // 4. Main Notice Board Frame & Bulletin Surface
+          const bW = 32 * z;
+          const bH = 24 * z;
+          const bY = pt.y - postH + 8 * z;
+
+          // Frame drop shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - bW / 2 + 1.5 * z, bY + 1.5 * z, bW, bH, 4 * z);
+          ctx.fill();
+
+          // Heavy Teak Frame
+          ctx.fillStyle = '#451a03';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - bW / 2, bY, bW, bH, 4 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#b45309';
+          ctx.lineWidth = 1.2 * z;
+          ctx.stroke();
+
+          // Parchment Bulletin Board Face
+          const innerW = bW - 4.5 * z;
+          const innerH = bH - 4.5 * z;
+          const innerX = pt.x - innerW / 2;
+          const innerY = bY + 2.25 * z;
+          ctx.fillStyle = '#fef3c7';
+          ctx.fillRect(innerX, innerY, innerW, innerH);
+
+          // Pinned Notices
+          // Left Notice: 📜 Peraturan Kota
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(innerX + 1.5 * z, innerY + 1.5 * z, innerW * 0.46, innerH - 3 * z);
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 0.6 * z;
+          ctx.strokeRect(innerX + 1.5 * z, innerY + 1.5 * z, innerW * 0.46, innerH - 3 * z);
+
+          // Miniature text lines
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(innerX + 2.5 * z, innerY + 3.5 * z, innerW * 0.36, 1.2 * z);
+          ctx.fillStyle = '#64748b';
+          for (let li = 0; li < 4; li++) {
+            ctx.fillRect(innerX + 2.5 * z, innerY + 6.5 * z + li * 2.2 * z, innerW * (0.38 - (li % 2) * 0.08), 0.9 * z);
+          }
+          // Red pushpin
+          ctx.fillStyle = '#dc2626';
+          ctx.beginPath();
+          ctx.arc(innerX + 1.5 * z + innerW * 0.23, innerY + 2.2 * z, 1.1 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Right Notice: 🎒 Panduan Siswa & Guru
+          ctx.fillStyle = '#f0fdf4';
+          ctx.fillRect(innerX + innerW * 0.52, innerY + 1.5 * z, innerW * 0.44, innerH - 3 * z);
+          ctx.strokeStyle = '#a7f3d0';
+          ctx.lineWidth = 0.6 * z;
+          ctx.strokeRect(innerX + innerW * 0.52, innerY + 1.5 * z, innerW * 0.44, innerH - 3 * z);
+
+          ctx.fillStyle = '#065f46';
+          ctx.fillRect(innerX + innerW * 0.55, innerY + 3.5 * z, innerW * 0.35, 1.2 * z);
+          ctx.fillStyle = '#10b981';
+          for (let li = 0; li < 4; li++) {
+            ctx.fillRect(innerX + innerW * 0.55, innerY + 6.5 * z + li * 2.2 * z, innerW * (0.35 - (li % 2) * 0.06), 0.9 * z);
+          }
+          // Brass pushpin
+          ctx.fillStyle = '#eab308';
+          ctx.beginPath();
+          ctx.arc(innerX + innerW * 0.52 + innerW * 0.22, innerY + 2.2 * z, 1.1 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 5. Gabled Roof Canopy at Apex
+          const roofW = bW + 8 * z;
+          const roofApexY = bY - 8 * z;
+          ctx.fillStyle = '#78350f';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - roofW / 2, bY + 1 * z);
+          ctx.lineTo(pt.x, roofApexY);
+          ctx.lineTo(pt.x + roofW / 2, bY + 1 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 1.4 * z;
+          ctx.stroke();
+
+          // Golden finial on roof peak
+          ctx.fillStyle = '#facc15';
+          ctx.beginPath();
+          ctx.arc(pt.x, roofApexY - 1 * z, 2.2 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 6. Overhead glowing lantern
+          const lX = pt.x;
+          const lY = roofApexY + 4 * z;
+          const bGlow = ctx.createRadialGradient(lX, lY, 1 * z, lX, lY, 14 * z);
+          bGlow.addColorStop(0, 'rgba(254, 240, 138, 0.85)');
+          bGlow.addColorStop(0.5, 'rgba(245, 158, 11, 0.35)');
+          bGlow.addColorStop(1, 'rgba(245, 158, 11, 0)');
+          ctx.fillStyle = bGlow;
+          ctx.beginPath();
+          ctx.arc(lX, lY, 14 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 7. Floating Hover Badge: "📋 Papan Peraturan Kota"
+          const hoverBounce = Math.sin(elapsed * 4) * 2.2 * z;
+          const badgeY = roofApexY - 15 * z + hoverBounce;
+          const bText = '📋 Papan Peraturan Kota';
+          ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+          const tW = ctx.measureText(bText).width + 12 * z;
+          const tH = 16 * z;
+
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - tW / 2, badgeY - tH / 2, tW, tH, 8 * z);
+          ctx.fill();
+
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 1.1 * z;
+          ctx.stroke();
+
+          ctx.fillStyle = '#a7f3d0';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(bText, pt.x, badgeY);
+
+          ctx.restore();
         } else if (item.type === 'literacy_corner') {
           // SUDUT LITERASI WARGA (Minimalist Modern Reading Pavilion, Recessed Bookshelf & Teak Reading Deck)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
@@ -7445,6 +7697,131 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               }
             }
           }
+
+          // 9. ANIMASI FLOATING POP-UP XP GAIN MELAYANG DI ATAS AVATAR (+3 XP, +5 XP, DLL)
+          if (item.isPlayer && xpFloatsRef.current.length > 0) {
+            const now = performance.now();
+            xpFloatsRef.current = xpFloatsRef.current.filter((xp) => now - xp.startTime < xp.duration);
+
+            xpFloatsRef.current.forEach((xpItem, idx) => {
+              const elapsedXp = now - xpItem.startTime;
+              const progress = Math.min(1.0, elapsedXp / xpItem.duration);
+
+              // Smooth bouncy pop-in at start (first 320ms)
+              const enterT = Math.min(1.0, elapsedXp / 320);
+              const springScale = enterT < 1.0 ? 0.35 + 0.85 * Math.sin(enterT * Math.PI * 0.55) : 1.0;
+
+              // Float upward smoothly from tagPosY
+              const floatDistance = (18 + Math.pow(progress, 0.72) * 46) * z + (idx * 16 * z);
+              const xpY = tagPosY - (speech ? 28 * z : 14 * z) - floatDistance;
+              const xpX = pt.x;
+
+              // Fade out gently in the last 30% of lifetime
+              const alpha = progress > 0.7 ? Math.max(0, (1.0 - progress) / 0.3) : 1.0;
+
+              ctx.save();
+              ctx.globalAlpha = alpha;
+              ctx.translate(xpX, xpY);
+              ctx.scale(springScale, springScale);
+
+              // A. Radial Golden Shimmer Glow
+              const halo = ctx.createRadialGradient(0, 0, 2 * z, 0, 0, 26 * z);
+              halo.addColorStop(0, 'rgba(254, 240, 138, 0.85)');
+              halo.addColorStop(0.4, 'rgba(245, 158, 11, 0.5)');
+              halo.addColorStop(1, 'rgba(217, 119, 6, 0)');
+              ctx.fillStyle = halo;
+              ctx.beginPath();
+              ctx.arc(0, 0, 26 * z, 0, Math.PI * 2);
+              ctx.fill();
+
+              // B. Orbiting Sparkle Stars & Gleams
+              const numSparkles = 5;
+              for (let si = 0; si < numSparkles; si++) {
+                const spAngle = si * ((Math.PI * 2) / numSparkles) + elapsedXp * 0.0035;
+                const spDist = (18 + Math.sin(elapsedXp * 0.009 + si * 1.3) * 5) * z;
+                const spX = Math.cos(spAngle) * spDist;
+                const spY = Math.sin(spAngle) * spDist;
+                const spAlpha = alpha * (0.6 + 0.4 * Math.sin(elapsedXp * 0.012 + si));
+
+                ctx.save();
+                ctx.globalAlpha = spAlpha;
+                ctx.font = `${Math.round(9 * z)}px sans-serif`;
+                ctx.fillText(si % 2 === 0 ? '✨' : '⭐', spX, spY);
+                ctx.restore();
+              }
+
+              // C. XP Pill Badge with Deep Gold Gradient & Glowing Border
+              const textStr = `+${xpItem.amount} XP`;
+              ctx.font = `900 ${Math.round(12.5 * z)}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+              const textMetrics = ctx.measureText(textStr);
+              const pillW = Math.max(52 * z, textMetrics.width + 24 * z);
+              const pillH = 22 * z;
+
+              // Shadow
+              ctx.shadowColor = 'rgba(245, 158, 11, 0.75)';
+              ctx.shadowBlur = 10 * z;
+              ctx.shadowOffsetY = 2 * z;
+
+              // Gradient Capsule
+              const pillGrad = ctx.createLinearGradient(-pillW / 2, -pillH / 2, pillW / 2, pillH / 2);
+              pillGrad.addColorStop(0, '#f59e0b');
+              pillGrad.addColorStop(0.5, '#ea580c');
+              pillGrad.addColorStop(1, '#c2410c');
+              ctx.fillStyle = pillGrad;
+              ctx.beginPath();
+              ctx.roundRect(-pillW / 2, -pillH / 2, pillW, pillH, 11 * z);
+              ctx.fill();
+
+              // Sharp Gold/Yellow Rim
+              ctx.shadowColor = 'transparent';
+              ctx.strokeStyle = '#fef08a';
+              ctx.lineWidth = 1.8 * z;
+              ctx.stroke();
+
+              // Glossy Upper Highlight Reflection
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+              ctx.beginPath();
+              ctx.roundRect(-pillW / 2 + 1.5 * z, -pillH / 2 + 1.5 * z, pillW - 3 * z, pillH / 2 - 1.5 * z, [9 * z, 9 * z, 0, 0]);
+              ctx.fill();
+
+              // Text: Coin Icon + "+X XP"
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+
+              // Text Outline
+              ctx.lineWidth = 3.0 * z;
+              ctx.strokeStyle = '#431407';
+              ctx.strokeText(`🪙 ${textStr}`, 0, 0.5 * z);
+
+              // Text Fill
+              ctx.fillStyle = '#ffffff';
+              ctx.fillText(`🪙 ${textStr}`, 0, 0.5 * z);
+
+              // D. Reason Capsule (if exists)
+              if (xpItem.reason && z >= 0.8) {
+                const subStr = xpItem.reason.length > 22 ? xpItem.reason.slice(0, 20) + '...' : xpItem.reason;
+                ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+                const subMetrics = ctx.measureText(subStr);
+                const subW = subMetrics.width + 11 * z;
+                const subH = 13.5 * z;
+                const subY = pillH / 2 + 7.5 * z;
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+                ctx.beginPath();
+                ctx.roundRect(-subW / 2, subY - subH / 2, subW, subH, 4 * z);
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+                ctx.lineWidth = 0.9 * z;
+                ctx.stroke();
+
+                ctx.fillStyle = '#fef08a';
+                ctx.fillText(subStr, 0, subY);
+              }
+
+              ctx.restore();
+            });
+          }
         } else if (item.type === 'lamp') {
           // STREET LAMP POST (Cast Iron Classical Lamppost with Warm Glowing Lantern)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
@@ -8109,6 +8486,38 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     </span>
                   </button>
                 </div>
+              ) : nearbyAction.type === 'town_rules' ? (
+                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/60 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/25 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                      📋
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
+                        Gapura Masuk Kota SMKN 2
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                        Papan Peraturan & Panduan Aktivitas
+                      </h4>
+                      <p className="text-[10px] truncate text-amber-200/80">
+                        Tata tertib kota, panduan aktivitas Siswa & peran Guru/Pengawas
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      sounds.playOpenModal();
+                      if (onOpenTownRules) {
+                        onOpenTownRules();
+                      } else {
+                        setIsTownRulesModalOpen(true);
+                      }
+                    }}
+                    className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-500 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/50 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <span>📋 Baca</span>
+                  </button>
+                </div>
               ) : nearbyAction.type === 'literacy' ? (
                 <div className="bg-[#121e2c]/95 backdrop-blur-md border border-cyan-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -8480,6 +8889,30 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             </div>
           </div>
         </div>
+      )}
+
+      {/* TOWN RULES & ACTIVITIES GUIDE MODAL (Gapura Awal Masuk) */}
+      {isTownRulesModalOpen && (
+        <TownRulesModal
+          onClose={() => setIsTownRulesModalOpen(false)}
+          student={
+            studentId
+              ? ({
+                  id: studentId,
+                  name: studentName,
+                  gender: studentGender,
+                  isTeacher,
+                  points: studentPoints,
+                  className: isTeacher ? 'Guru DKV' : 'Siswa DKV',
+                  studentNumber: studentId,
+                  password: '',
+                  badges: [],
+                  lastLogin: '',
+                  streakDays: 1,
+                } as Student)
+              : null
+          }
+        />
       )}
 
       {/* ============================================================= */}

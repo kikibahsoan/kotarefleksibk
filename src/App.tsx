@@ -101,6 +101,10 @@ export default function App() {
   const [missionToast, setMissionToast] = useState<string | null>(null);
   const missionToastTimerRef = useRef<number | null>(null);
 
+  // Interactive floating pop-up for XP gain feedback
+  const [latestXpGain, setLatestXpGain] = useState<{ amount: number; reason?: string; timestamp: number } | null>(null);
+  const xpGainTimerRef = useRef<number | null>(null);
+
   const [activeBuilding, setActiveBuilding] = useState<BuildingId | null>(null);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [isTeacherPinModalOpen, setIsTeacherPinModalOpen] = useState(false);
@@ -260,6 +264,16 @@ export default function App() {
       } catch (e) {
         // Safe fallback
       }
+
+      // Trigger interactive floating XP pop-up
+      setLatestXpGain({ amount, reason: _reason, timestamp: Date.now() });
+      if (xpGainTimerRef.current) {
+        window.clearTimeout(xpGainTimerRef.current);
+      }
+      xpGainTimerRef.current = window.setTimeout(() => {
+        setLatestXpGain(null);
+        xpGainTimerRef.current = null;
+      }, 2800);
     },
     [reflections, messages]
   );
@@ -284,6 +298,7 @@ export default function App() {
 
       sounds.playRewardXp();
       handleAddPoints(3, foundMission.title);
+      StorageService.recordStudentActivity(current.id, 'mission', 1);
 
       if (missionToastTimerRef.current) {
         window.clearTimeout(missionToastTimerRef.current);
@@ -368,6 +383,9 @@ export default function App() {
     // Automatically complete chat mission (+3 XP) if assigned
     completeMissionIfActive('m_chat');
 
+    // Record world chat activity
+    StorageService.recordStudentActivity(current.id, 'chat', 1);
+
     // Persist and send to chat server asynchronously without blocking UI or triggering full data reloads
     StorageService.addPublicChatMessage(newMsg).catch(() => {});
   };
@@ -432,6 +450,9 @@ export default function App() {
     completedMissionIdsRef.current = [];
     setCompletedMissionIds([]);
     saveCompletedMissionIds(studentWithLoginXp.id, []);
+
+    // Record login town activity
+    StorageService.recordStudentActivity(studentWithLoginXp.id, 'login', 1);
   };
 
   // Handle Logout
@@ -461,6 +482,7 @@ export default function App() {
     // Complete reflection mission (+3 XP automatic) or update badges
     const current = studentRef.current;
     if (current) {
+      StorageService.recordStudentActivity(current.id, 'reflection', 1);
       const hasReflectionMission =
         assignedMissionsRef.current.some((m) => m.id === 'm_refleksi') &&
         !completedMissionIdsRef.current.includes('m_refleksi');
@@ -509,6 +531,7 @@ export default function App() {
   const handleAnswerCorrect = (pointsEarned: number) => {
     const current = studentRef.current;
     if (!current) return;
+    StorageService.recordStudentActivity(current.id, 'quiz', 1);
     const newPoints = current.points + pointsEarned;
     const myReflections = reflections.filter((r) => r.studentId === current.id);
     const myMessages = messages.filter((m) => m.studentId === current.id);
@@ -555,6 +578,7 @@ export default function App() {
     const updatedMessages = [newMsg, ...messages];
     setMessages(updatedMessages);
     StorageService.addMessage(newMsg);
+    StorageService.recordStudentActivity(current.id, 'message', 1);
 
     // Sync to Google Apps Script
     StorageService.syncWithGAS('send_message', { message: newMsg });
@@ -804,8 +828,24 @@ export default function App() {
         timePeriod={timePeriod}
         latestMessage={latestChat}
         studentPoints={student.points}
+        latestXpGain={latestXpGain}
         onDeductPoints={handleDeductPoints}
       />
+
+      {/* INTERACTIVE FLOATING POP-UP BADGE (+XP Feedback) */}
+      {latestXpGain && (
+        <div className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-[100] pointer-events-none animate-bounce flex flex-col items-center">
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white font-black text-xs sm:text-sm px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-2xl shadow-[0_10px_35px_rgba(245,158,11,0.6)] border-2 border-amber-300 flex items-center gap-2">
+            <span className="text-lg sm:text-xl">🪙</span>
+            <span className="tracking-wide">+{latestXpGain.amount} XP</span>
+            {latestXpGain.reason && (
+              <span className="text-[10px] sm:text-xs text-amber-100 font-semibold bg-black/30 px-2 py-0.5 rounded-lg border border-amber-300/30">
+                {latestXpGain.reason}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* TOP HEADER OVERLAY (Clean & Perfectly Responsive on Mobile) */}
       {/* TOP HEADER OVERLAY (Clean & Perfectly Responsive on Mobile, Never Overlaps) */}
@@ -1017,6 +1057,9 @@ export default function App() {
           onClose={() => setActiveBuilding(null)}
           student={student}
           reflections={reflections}
+          students={StorageService.getStudents()}
+          publicChats={publicChats}
+          messages={messages}
         />
       )}
 

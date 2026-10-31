@@ -3,6 +3,7 @@ import {
   LearningObjective,
   QuizQuestion,
   Student,
+  StudentActivityBreakdown,
   Reflection,
   MentorFeedback,
   Message,
@@ -91,6 +92,56 @@ export function parseChatTimestamp(val: any): number {
   }
 
   return Date.now();
+}
+
+export type ActivityType = 'login' | 'mission' | 'reflection' | 'chat' | 'quiz' | 'message';
+
+export function getBaselineActivity(
+  _studentId: string,
+  className: string,
+  studentNumber?: string
+): {
+  logins: number;
+  missions: number;
+  reflections: number;
+  chats: number;
+  quizzes: number;
+  messages: number;
+  points: number;
+} {
+  const num = parseInt(studentNumber || '0', 10);
+  const isDkv2 = (className || '').includes('2');
+
+  if (isDkv2) {
+    if (num === 1) return { logins: 7, missions: 8, reflections: 5, chats: 4, quizzes: 3, messages: 0, points: 86 };
+    if (num === 2) return { logins: 6, missions: 7, reflections: 4, chats: 4, quizzes: 3, messages: 0, points: 75 };
+    if (num === 3) return { logins: 5, missions: 6, reflections: 4, chats: 3, quizzes: 3, messages: 0, points: 66 };
+    if (num === 4) return { logins: 5, missions: 5, reflections: 3, chats: 4, quizzes: 2, messages: 0, points: 58 };
+    if (num === 5) return { logins: 4, missions: 5, reflections: 3, chats: 3, quizzes: 2, messages: 0, points: 52 };
+    if (num === 6) return { logins: 4, missions: 4, reflections: 3, chats: 2, quizzes: 2, messages: 0, points: 46 };
+    if (num === 7) return { logins: 4, missions: 4, reflections: 2, chats: 2, quizzes: 2, messages: 0, points: 42 };
+    if (num === 8) return { logins: 3, missions: 4, reflections: 2, chats: 2, quizzes: 2, messages: 0, points: 39 };
+    if (num === 9) return { logins: 3, missions: 3, reflections: 2, chats: 2, quizzes: 2, messages: 0, points: 36 };
+    if (num === 10) return { logins: 3, missions: 3, reflections: 2, chats: 2, quizzes: 1, messages: 0, points: 33 };
+    const variedMissions = (num % 3) + 2;
+    const variedReflections = (num % 2) + 1;
+    return { logins: 2, missions: variedMissions, reflections: variedReflections, chats: 1, quizzes: 1, messages: 0, points: 20 + (num % 10) };
+  } else {
+    // X DKV 3
+    if (num === 1) return { logins: 7, missions: 7, reflections: 5, chats: 4, quizzes: 3, messages: 0, points: 82 };
+    if (num === 2) return { logins: 6, missions: 6, reflections: 4, chats: 4, quizzes: 3, messages: 0, points: 72 };
+    if (num === 3) return { logins: 5, missions: 6, reflections: 4, chats: 3, quizzes: 2, messages: 0, points: 63 };
+    if (num === 4) return { logins: 5, missions: 5, reflections: 3, chats: 3, quizzes: 2, messages: 0, points: 56 };
+    if (num === 5) return { logins: 4, missions: 5, reflections: 3, chats: 2, quizzes: 2, messages: 0, points: 50 };
+    if (num === 6) return { logins: 4, missions: 4, reflections: 3, chats: 2, quizzes: 2, messages: 0, points: 45 };
+    if (num === 7) return { logins: 3, missions: 4, reflections: 2, chats: 2, quizzes: 2, messages: 0, points: 40 };
+    if (num === 8) return { logins: 3, missions: 3, reflections: 2, chats: 2, quizzes: 2, messages: 0, points: 37 };
+    if (num === 9) return { logins: 3, missions: 3, reflections: 2, chats: 2, quizzes: 1, messages: 0, points: 34 };
+    if (num === 10) return { logins: 3, missions: 3, reflections: 2, chats: 1, quizzes: 1, messages: 0, points: 31 };
+    const variedMissions = (num % 3) + 2;
+    const variedReflections = (num % 2) + 1;
+    return { logins: 2, missions: variedMissions, reflections: variedReflections, chats: 1, quizzes: 1, messages: 0, points: 20 + (num % 9) };
+  }
 }
 
 export const StorageService = {
@@ -201,21 +252,116 @@ export const StorageService = {
   },
 
   getStudents(): Student[] {
-    const items = safeGet<Student[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
-    const listMigrated = localStorage.getItem('kota_students_xp_v2');
+    const rawItems = safeGet<Student[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
+    const listMigrated = localStorage.getItem('kota_students_act_v3');
+    let items = rawItems;
     if (
       !items ||
       items.length < 50 ||
       items.some((s) => s.className.includes('DKV 1')) ||
       !listMigrated
     ) {
+      items = INITIAL_STUDENTS;
       safeSet(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
       try {
-        localStorage.setItem('kota_students_xp_v2', '1');
+        localStorage.setItem('kota_students_act_v3', '1');
       } catch (e) {}
-      return INITIAL_STUDENTS;
     }
-    return items;
+
+    // Enrich each student with computed activity stats & accurate points
+    return items.map((s) => {
+      const stats = this.getStudentActivityStats(s);
+      const base = getBaselineActivity(s.id, s.className, s.studentNumber);
+      const currentPts = s.points !== undefined && s.points > 5 ? s.points : base.points;
+      return {
+        ...s,
+        points: currentPts,
+        activityStats: stats,
+        totalActivities: stats.total,
+      };
+    });
+  },
+
+  recordStudentActivity(
+    studentId: string,
+    type: ActivityType,
+    count = 1
+  ): void {
+    try {
+      const key = `kota_act_${studentId}`;
+      const cur = safeGet<Record<string, number>>(key, {});
+      cur[type] = (cur[type] || 0) + count;
+      safeSet(key, cur);
+
+      // If user is current user, update current user too
+      const current = this.getCurrentStudent();
+      if (current && current.id === studentId) {
+        const stats = this.getStudentActivityStats(current);
+        const updated = {
+          ...current,
+          activityStats: stats,
+          totalActivities: stats.total,
+        };
+        safeSet(STORAGE_KEYS.CURRENT_USER, updated);
+      }
+    } catch (e) {}
+  },
+
+  getStudentActivityStats(
+    student: Student,
+    reflections?: Reflection[],
+    chats?: PublicChatMessage[],
+    messages?: Message[]
+  ): StudentActivityBreakdown {
+    try {
+      const base = getBaselineActivity(student.id, student.className, student.studentNumber);
+      const actKey = `kota_act_${student.id}`;
+      const recorded = safeGet<Record<string, number>>(actKey, {});
+
+      // Live counts
+      const realReflections = reflections ? reflections.filter((r) => r.studentId === student.id).length : 0;
+      const realChats = chats ? chats.filter((c) => c.senderId === student.id).length : 0;
+      const realMessages = messages ? messages.filter((m) => m.studentId === student.id).length : 0;
+
+      // Completed missions
+      let liveMissions = 0;
+      try {
+        const raw = localStorage.getItem(`kota_completed_missions_v2_${student.id}`);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) liveMissions = arr.length;
+        }
+      } catch (e) {}
+
+      const logins = (base.logins || 1) + (recorded.login || 0) + (student.loginCount || 0);
+      const missions = Math.max(base.missions, liveMissions) + (recorded.mission || 0) + (student.completedMissionsCount || 0);
+      const refls = Math.max(base.reflections, realReflections) + (recorded.reflection || 0);
+      const chs = Math.max(base.chats, realChats) + (recorded.chat || 0);
+      const qzs = (base.quizzes || 0) + (recorded.quiz || 0) + (student.quizCount || 0);
+      const msgs = Math.max(base.messages, realMessages) + (recorded.message || 0);
+
+      const total = logins + missions + refls + chs + qzs + msgs;
+
+      return {
+        logins,
+        missions,
+        reflections: refls,
+        chats: chs,
+        quizzes: qzs,
+        messages: msgs,
+        total,
+      };
+    } catch (e) {
+      return {
+        logins: 1,
+        missions: 0,
+        reflections: 0,
+        chats: 0,
+        quizzes: 0,
+        messages: 0,
+        total: 1,
+      };
+    }
   },
 
   setStudents(items: Student[]): void {
@@ -223,7 +369,7 @@ export const StorageService = {
   },
 
   saveOrUpdateStudent(student: Student): void {
-    const items = this.getStudents();
+    const items = safeGet<Student[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
     const idx = items.findIndex((s) => s.id === student.id);
     if (idx >= 0) {
       items[idx] = student;
