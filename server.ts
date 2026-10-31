@@ -448,6 +448,262 @@ app.post('/api/chat/report', (req, res) => {
 });
 
 // =========================================================================
+// JURNAL HARIAN POHON BERINGIN & JURNAL 4F SYNC ACROSS CITIZENS
+// =========================================================================
+
+interface ServerStickyNote {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className?: string;
+  content: string;
+  mood: string;
+  color: 'yellow' | 'pink' | 'blue' | 'green' | 'purple';
+  date: string;
+  timestamp: number;
+  likes?: number;
+}
+
+interface ServerJurnal4F {
+  id: string;
+  title: string;
+  subject: string;
+  facts: string;
+  feelings: string;
+  findings: string;
+  future: string;
+  date: string;
+  xpEarned?: number;
+  studentId?: string;
+  studentName?: string;
+  className?: string;
+}
+
+const STICKY_NOTES_FILE_PATH = path.join(__dirname, 'server_sticky_notes.json');
+const JURNAL_4F_FILE_PATH = path.join(__dirname, 'server_4f_journals.json');
+
+const INITIAL_SERVER_STICKY_NOTES: ServerStickyNote[] = [
+  {
+    id: 'note-init-01',
+    studentId: 'std-dkv2-01',
+    studentName: 'ABDUL RAZAK SAMAUNA',
+    className: 'X DKV 2',
+    content: 'Hari ini paham konsep IPO Von Neumann, ternyata alur kerja layer desain mirip pemrosesan RAM!',
+    mood: '💡',
+    color: 'yellow',
+    date: '31 Okt 2026',
+    timestamp: Date.now() - 1000 * 60 * 45,
+    likes: 5,
+  },
+  {
+    id: 'note-init-02',
+    studentId: 'teacher-naziefah',
+    studentName: 'NAZIEFAH S.Pd',
+    className: 'Guru Pembimbing',
+    content: 'Semangat terus anak-anak DKV! Jangan lupa selalu istirahat cukup & jaga ketelitian berkarya.',
+    mood: '🌿',
+    color: 'pink',
+    date: '31 Okt 2026',
+    timestamp: Date.now() - 1000 * 60 * 120,
+    likes: 12,
+  },
+  {
+    id: 'note-init-03',
+    studentId: 'std-dkv3-05',
+    studentName: 'FADHIL ARKAN',
+    className: 'X DKV 3',
+    content: 'Berhasil selesaikan 5 soal di Bengkel Latihan. Semoga besok bisa raih lencana reflektor lagi!',
+    mood: '🚀',
+    color: 'blue',
+    date: '30 Okt 2026',
+    timestamp: Date.now() - 1000 * 60 * 60 * 18,
+    likes: 4,
+  },
+  {
+    id: 'note-init-04',
+    studentId: 'std-dkv2-12',
+    studentName: 'NURUL AISYAH',
+    className: 'X DKV 2',
+    content: 'Tadi santai di ayunan relaksasi sambil baca modul tipografi. Suasana kotanya adem banget.',
+    mood: '🎨',
+    color: 'green',
+    date: '30 Okt 2026',
+    timestamp: Date.now() - 1000 * 60 * 60 * 24,
+    likes: 7,
+  },
+];
+
+const INITIAL_SERVER_4F: ServerJurnal4F[] = [
+  {
+    id: 'j4f-init-01',
+    title: 'Model IPO & Von Neumann',
+    subject: 'Informatika (Berpikir Komputasional)',
+    facts: 'Mempelajari cara kerja Input - Process - Output pada arsitektur komputer Von Neumann dan hubungannya dengan workflow rendering karya desain.',
+    feelings: 'Merasa kagum saat menyadari instruksi pen tablet adalah input dan layer aktif di Photoshop ditampung sementara oleh RAM.',
+    findings: 'Pentingnya kapasitas RAM dan manajemen layer agar aplikasi desain tidak lagging atau crash saat proses rendering.',
+    future: 'Akan selalu menyimpan file secara berkala (Ctrl+S) dan membersihkan scratch disk laptop sebelum memulai project besar.',
+    date: '31 Okt 2026',
+    xpEarned: 2,
+    studentId: 'std-dkv2-01',
+    studentName: 'ABDUL RAZAK SAMAUNA',
+    className: 'X DKV 2',
+  },
+  {
+    id: 'j4f-init-02',
+    title: 'Manajemen Sistem Operasi & Antrean FIFO',
+    subject: 'Informatika (Berpikir Komputasional)',
+    facts: 'Mempelajari algoritma penjadwalan First In First Out (FIFO) dan Shortest Job First (SJF) dalam sistem operasi.',
+    feelings: 'Tertantang memahami bagaimana CPU membagi waktu proses kerja rendering dan antrean cetak printer.',
+    findings: 'Algoritma SJF lebih efisien mencegah deadlock saat banyak tugas desain kecil mengantre bersamaan.',
+    future: 'Menerapkan prioritas pengerjaan tugas singkat terlebih dahulu agar antrean revisi klien tidak menumpuk.',
+    date: '30 Okt 2026',
+    xpEarned: 2,
+    studentId: 'std-dkv3-02',
+    studentName: 'AQILA NAILA SALSABILA',
+    className: 'X DKV 3',
+  },
+];
+
+function loadServerStickyNotesFromFile(): ServerStickyNote[] {
+  try {
+    if (fs.existsSync(STICKY_NOTES_FILE_PATH)) {
+      const raw = fs.readFileSync(STICKY_NOTES_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[server.ts] Could not read server_sticky_notes.json:', err);
+  }
+  return INITIAL_SERVER_STICKY_NOTES;
+}
+
+let serverStickyNotes: ServerStickyNote[] = loadServerStickyNotesFromFile();
+
+function saveServerStickyNotesToFile() {
+  try {
+    fs.writeFileSync(STICKY_NOTES_FILE_PATH, JSON.stringify(serverStickyNotes, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[server.ts] Failed to persist server_sticky_notes.json:', err);
+  }
+}
+
+function loadServer4FFromFile(): ServerJurnal4F[] {
+  try {
+    if (fs.existsSync(JURNAL_4F_FILE_PATH)) {
+      const raw = fs.readFileSync(JURNAL_4F_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[server.ts] Could not read server_4f_journals.json:', err);
+  }
+  return INITIAL_SERVER_4F;
+}
+
+let server4FJournals: ServerJurnal4F[] = loadServer4FFromFile();
+
+function saveServer4FToFile() {
+  try {
+    fs.writeFileSync(JURNAL_4F_FILE_PATH, JSON.stringify(server4FJournals, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[server.ts] Failed to persist server_4f_journals.json:', err);
+  }
+}
+
+// Sticky Notes Endpoints
+app.get('/api/journals/sticky-notes', (_req, res) => {
+  res.json({
+    success: true,
+    data: serverStickyNotes,
+    serverTime: new Date().toISOString(),
+  });
+});
+
+app.post('/api/journals/sticky-notes', (req, res) => {
+  const { studentId, studentName, className, content, mood, color, date } = req.body;
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    return res.status(400).json({ success: false, error: 'Isi catatan tidak boleh kosong.' });
+  }
+
+  const newNote: ServerStickyNote = {
+    id: `sticky-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    studentId: String(studentId || 'std-anon'),
+    studentName: String(studentName || 'Warga Refleksia'),
+    className: String(className || 'X DKV 2'),
+    content: content.trim().slice(0, 200),
+    mood: String(mood || '😊'),
+    color: ['yellow', 'pink', 'blue', 'green', 'purple'].includes(color) ? color : 'yellow',
+    date: date || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+    timestamp: Date.now(),
+    likes: 0,
+  };
+
+  serverStickyNotes.unshift(newNote);
+  if (serverStickyNotes.length > 100) {
+    serverStickyNotes = serverStickyNotes.slice(0, 100);
+  }
+  saveServerStickyNotesToFile();
+
+  res.json({ success: true, data: newNote });
+});
+
+app.post('/api/journals/sticky-notes/like', (req, res) => {
+  const { noteId, increment } = req.body;
+  const delta = increment === false ? -1 : 1;
+  serverStickyNotes = serverStickyNotes.map((n) => {
+    if (n.id === noteId) {
+      return { ...n, likes: Math.max(0, (n.likes || 0) + delta) };
+    }
+    return n;
+  });
+  saveServerStickyNotesToFile();
+  res.json({ success: true });
+});
+
+// Jurnal 4F Endpoints
+app.get('/api/journals/4f', (_req, res) => {
+  res.json({
+    success: true,
+    data: server4FJournals,
+    serverTime: new Date().toISOString(),
+  });
+});
+
+app.post('/api/journals/4f', (req, res) => {
+  const { title, subject, facts, feelings, findings, future, studentId, studentName, className, date, xpEarned } = req.body;
+  if (!title || !facts) {
+    return res.status(400).json({ success: false, error: 'Judul dan fakta tidak boleh kosong.' });
+  }
+
+  const newJurnal: ServerJurnal4F = {
+    id: `j4f-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    title: String(title).trim(),
+    subject: String(subject || 'Informatika'),
+    facts: String(facts).trim(),
+    feelings: String(feelings || 'Tertantang dan bersemangat.').trim(),
+    findings: String(findings || 'Menemukan wawasan baru.').trim(),
+    future: String(future || 'Akan terus berlatih.').trim(),
+    date: date || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+    xpEarned: Number(xpEarned || 2),
+    studentId: String(studentId || 'std-anon'),
+    studentName: String(studentName || 'Warga Refleksia'),
+    className: String(className || 'X DKV'),
+  };
+
+  server4FJournals.unshift(newJurnal);
+  if (server4FJournals.length > 100) {
+    server4FJournals = server4FJournals.slice(0, 100);
+  }
+  saveServer4FToFile();
+
+  res.json({ success: true, data: newJurnal });
+});
+
+// =========================================================================
 // REAL-TIME PRESENCE & MULTI-DEVICE ONLINE AVATARS SYNC (24 JAM REAL-TIME)
 // =========================================================================
 interface ServerOnlinePlayer {

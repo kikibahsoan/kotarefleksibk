@@ -1006,6 +1006,7 @@ export default function App() {
           onNavigateBuilding={(id) => handleSelectBuilding(id)}
           onSelectMateriForReflection={(mId) => setPreselectedMateriForReflection(mId)}
           onAddXp={handleAddPoints}
+          student={student}
         />
       )}
 

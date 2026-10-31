@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { X, BookOpen, Send, Sparkles, CheckCircle2, History, FileText, ArrowRight, Video, ChevronLeft, HelpCircle, Layers } from 'lucide-react';
-import { Materi, ReflectionEntry } from '../../types/index.ts';
+import React, { useState, useEffect } from 'react';
+import { X, BookOpen, Send, Sparkles, CheckCircle2, History, FileText, ArrowRight, Video, ChevronLeft, HelpCircle, Layers, Users, User, Search, Filter } from 'lucide-react';
+import { Materi, ReflectionEntry, Student } from '../../types/index.ts';
 import { INITIAL_MATERI } from '../../data/initialData.ts';
 import { sounds } from '../../utils/audio.ts';
 
@@ -12,6 +12,7 @@ interface PerpustakaanModalProps {
   onAddXp?: (amount: number, reason: string) => void;
   reflections?: ReflectionEntry[];
   onSaveReflection?: (entry: ReflectionEntry) => void;
+  student?: Student | null;
 }
 
 const BOOK_SHELF_THEMES = [
@@ -97,6 +98,65 @@ const BOOK_SHELF_THEMES = [
   },
 ];
 
+const INITIAL_4F_SEEDS: ReflectionEntry[] = [
+  {
+    id: 'j4f-seed-1',
+    studentId: 'guru-1',
+    studentName: 'NAZIEFAH',
+    className: 'Guru DKV',
+    title: 'Model IPO & Arsitektur Von Neumann',
+    subject: 'Informatika',
+    facts: 'Mendampingi kelas membedah alur Input-Proses-Output pada perancangan poster digital dan pipeline rendering grafis.',
+    feelings: 'Bangga melihat siswa langsung paham fungsi RAM sebagai meja kerja sementara bagi software desain.',
+    findings: 'Analogi meja kerja nyata sangat mempercepat pemahaman arsitektur komputer bagi siswa SMK DKV.',
+    future: 'Akan menyiapkan studi kasus perbandingan rendering CPU vs GPU di lab komputer.',
+    date: '31 Okt 2026',
+    xpEarned: 2,
+  },
+  {
+    id: 'j4f-seed-2',
+    studentId: 'std-2',
+    studentName: 'Siti Rahma',
+    className: 'X DKV 2',
+    title: 'Algoritma Penjadwalan Antrean Render',
+    subject: 'Informatika',
+    facts: 'Mempelajari perbedaan FIFO dan Shortest Job First (SJF) saat mengelola antrean cetak poster di lab.',
+    feelings: 'Awalnya bingung dengan konsep starvation pada SJF, tapi setelah simulasi jadi sangat paham.',
+    findings: 'Sistem operasi bekerja persis seperti asisten manajer yang adil dalam membagi waktu prosesor.',
+    future: 'Menerapkan prioritas pengerjaan tugas dari deadline terpendek seperti prinsip SJF.',
+    date: '31 Okt 2026',
+    xpEarned: 2,
+  },
+  {
+    id: 'j4f-seed-3',
+    studentId: 'std-1',
+    studentName: 'Raditya Pratama',
+    className: 'X DKV 2',
+    title: 'Struktur Data Stack pada Tombol Undo',
+    subject: 'Informatika',
+    facts: 'Bereksperimen dengan fungsi Undo (Ctrl+Z) di Photoshop dan menyadari itu adalah implementasi Stack (LIFO).',
+    feelings: 'Sangat kagum! Ternyata fitur yang sering saya pakai sehari-hari adalah algoritma komputasi nyata.',
+    findings: 'Aksi terakhir yang kita lakukan adalah aksi pertama yang dibatalkan oleh Stack memory.',
+    future: 'Akan lebih teliti merancang hierarki layer agar tidak boros memori stack.',
+    date: '30 Okt 2026',
+    xpEarned: 2,
+  },
+  {
+    id: 'j4f-seed-4',
+    studentId: 'std-13',
+    studentName: 'Dewa Bagus',
+    className: 'X DKV 3',
+    title: 'Kecepatan Binary Search vs Linear Search',
+    subject: 'Informatika',
+    facts: 'Menguji pencarian 1.000 file foto klien dengan binary search yang hanya perlu maksimal 10 langkah.',
+    feelings: 'Terkesima karena efisiensi binary search jauh lebih cepat daripada mencari acak satu per satu.',
+    findings: 'Syarat wajib binary search adalah file harus dinamai secara teratur (Sorting) terlebih dahulu.',
+    future: 'Mulai hari ini saya akan merapikan folder aset proyek dengan penomoran tanggal baku.',
+    date: '30 Okt 2026',
+    xpEarned: 2,
+  },
+];
+
 export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
   onClose,
   materis = [],
@@ -105,6 +165,7 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
   onAddXp,
   reflections = [],
   onSaveReflection,
+  student,
 }) => {
   // Always ensure the 5 main books have full detailed text content
   const fiveShelfBooks: Materi[] = INITIAL_MATERI.slice(0, 5).map((initBook, idx) => {
@@ -124,14 +185,85 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
   const [findings, setFindings] = useState('');
   const [future, setFuture] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const [filterClass, setFilterClass] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [authorFilter, setAuthorFilter] = useState<'all' | 'mine'>('all');
+
   const [localArchives, setLocalArchives] = useState<ReflectionEntry[]>(() => {
     try {
       const saved = localStorage.getItem('kota_refleksi_jurnal4f');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_4F_SEEDS;
   });
+
+  // Fetch shared 4F journals from server and listen for real-time broadcasts
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSharedJournals = async () => {
+      try {
+        const res = await fetch('/api/journals/4f');
+        if (res.ok) {
+          const json = await res.json();
+          const list = Array.isArray(json) ? json : (json?.data || []);
+          if (isMounted && Array.isArray(list) && list.length > 0) {
+            setLocalArchives(list);
+            try {
+              localStorage.setItem('kota_refleksi_jurnal4f', JSON.stringify(list));
+            } catch {}
+          }
+        }
+      } catch (err) {
+        console.warn('Gagal memuat jurnal 4F dari server:', err);
+      }
+    };
+
+    fetchSharedJournals();
+
+    const handleCustomJournal = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail) {
+        setLocalArchives((prev) => {
+          const exists = prev.some((j) => j.id === custom.detail.id);
+          if (exists) return prev;
+          const next = [custom.detail, ...prev];
+          try {
+            localStorage.setItem('kota_refleksi_jurnal4f', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener('journal_4f_added', handleCustomJournal);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('kota_refleksi_channel');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'JOURNAL_4F_ADDED' && event.data.entry) {
+          setLocalArchives((prev) => {
+            const exists = prev.some((j) => j.id === event.data.entry.id);
+            if (exists) return prev;
+            const next = [event.data.entry, ...prev];
+            try {
+              localStorage.setItem('kota_refleksi_jurnal4f', JSON.stringify(next));
+            } catch {}
+            return next;
+          });
+        }
+      };
+    } catch {}
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('journal_4f_added', handleCustomJournal);
+      if (channel) channel.close();
+    };
+  }, []);
 
   const combinedReflections = reflections.length > 0 ? reflections : localArchives;
 
@@ -145,18 +277,21 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
       ? BOOK_SHELF_THEMES[selectedBookIndex % BOOK_SHELF_THEMES.length]
       : BOOK_SHELF_THEMES[0];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !facts.trim()) return;
 
     const newEntry: ReflectionEntry = {
-      id: `ref-${Date.now()}`,
-      title,
-      subject,
-      facts,
-      feelings: feelings || 'Merasa tertantang namun puas setelah berhasil.',
-      findings: findings || 'Memahami pentingnya ketelitian dalam pemecahan masalah.',
-      future: future || 'Akan mendokumentasikan setiap solusi untuk referensi berikutnya.',
+      id: `ref-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      studentId: student?.id || 'std-anon',
+      studentName: student?.name || 'Warga Refleksia',
+      className: student?.className || (student?.isTeacher ? 'Guru DKV' : 'X DKV 2'),
+      title: title.trim(),
+      subject: subject.trim() || 'Informatika',
+      facts: facts.trim(),
+      feelings: feelings.trim() || 'Merasa tertantang namun puas setelah berhasil.',
+      findings: findings.trim() || 'Memahami pentingnya ketelitian dalam pemecahan masalah.',
+      future: future.trim() || 'Akan mendokumentasikan setiap solusi untuk referensi berikutnya.',
       date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
       xpEarned: 2,
     };
@@ -166,6 +301,25 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
     try {
       localStorage.setItem('kota_refleksi_jurnal4f', JSON.stringify(nextArchives));
     } catch {}
+
+    // Send to backend so all other citizens on any device/session can read it
+    try {
+      await fetch('/api/journals/4f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newEntry),
+      });
+    } catch (err) {
+      console.warn('Gagal simpan ke endpoint server 4F:', err);
+    }
+
+    // Broadcast real-time to other tabs
+    try {
+      const channel = new BroadcastChannel('kota_refleksi_channel');
+      channel.postMessage({ type: 'JOURNAL_4F_ADDED', entry: newEntry });
+      channel.close();
+    } catch {}
+    window.dispatchEvent(new CustomEvent('journal_4f_added', { detail: newEntry }));
 
     if (onSaveReflection) onSaveReflection(newEntry);
     if (onAddXp) onAddXp(2, 'Menyelesaikan Jurnal 4F di Perpustakaan');
@@ -180,7 +334,7 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
       setFindings('');
       setFuture('');
       setActiveTab('archive');
-    }, 1500);
+    }, 1200);
   };
 
   return (
@@ -602,34 +756,224 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
           </form>
         )}
 
-        {/* Tab Content: Archive */}
+        {/* Tab Content: Archive (Semua Jurnal Warga) */}
         {activeTab === 'archive' && (
-          <div className="mt-5 space-y-3">
-            {combinedReflections.length === 0 ? (
-              <div className="text-center py-10 text-slate-400 text-xs">
-                Belum ada arsip jurnal 4F yang tersimpan. Mulai tulis jurnal baru sekarang!
-              </div>
-            ) : (
-              combinedReflections.map((r) => (
-                <div key={r.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
-                        {r.subject}
-                      </span>
-                      <h4 className="text-sm font-bold text-white mt-1">{r.title}</h4>
-                    </div>
-                    <span className="text-[10px] text-slate-400">{r.date}</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-300 pt-1">
-                    <p><strong className="text-purple-300">Facts:</strong> {r.facts}</p>
-                    <p><strong className="text-blue-300">Feelings:</strong> {r.feelings}</p>
-                    <p><strong className="text-emerald-300">Findings:</strong> {r.findings}</p>
-                    <p><strong className="text-amber-300">Future:</strong> {r.future}</p>
-                  </div>
+          <div className="mt-5 space-y-4">
+            {/* Filter and Search Bar */}
+            <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/60 border border-white/10 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playClick();
+                      setAuthorFilter('all');
+                    }}
+                    className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+                      authorFilter === 'all'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" /> Semua Warga ({combinedReflections.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playClick();
+                      setAuthorFilter('mine');
+                    }}
+                    className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+                      authorFilter === 'mine'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5" /> Jurnal Saya (
+                    {
+                      combinedReflections.filter(
+                        (r) =>
+                          (student?.id && r.studentId === student.id) ||
+                          (student?.name && r.studentName?.toLowerCase() === student.name.toLowerCase())
+                      ).length
+                    }
+                    )
+                  </button>
                 </div>
-              ))
-            )}
+
+                {/* Class selector */}
+                <div className="flex items-center gap-1 overflow-x-auto text-xs">
+                  {['all', 'X DKV 2', 'X DKV 3', 'Guru DKV'].map((cls) => (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        setFilterClass(cls);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg font-medium transition text-[11px] whitespace-nowrap ${
+                        filterClass === cls
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-bold'
+                          : 'bg-white/5 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {cls === 'all' ? 'Semua Kelas' : cls}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Search input */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari topik, nama siswa, atau kata kunci refleksi 4F..."
+                  className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-900/80 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                />
+              </div>
+            </div>
+
+            {/* List of Reflections */}
+            {(() => {
+              const filtered = combinedReflections.filter((r) => {
+                // Author filter
+                if (authorFilter === 'mine') {
+                  const isMine =
+                    (student?.id && r.studentId === student.id) ||
+                    (student?.name && r.studentName?.toLowerCase() === student.name.toLowerCase());
+                  if (!isMine) return false;
+                }
+                // Class filter
+                if (filterClass !== 'all') {
+                  if (filterClass === 'Guru DKV') {
+                    if (r.className !== 'Guru DKV' && r.className !== 'Guru & Pengawas') return false;
+                  } else if (r.className !== filterClass) {
+                    return false;
+                  }
+                }
+                // Search query
+                if (searchQuery.trim()) {
+                  const q = searchQuery.toLowerCase();
+                  const match =
+                    (r.title && r.title.toLowerCase().includes(q)) ||
+                    (r.subject && r.subject.toLowerCase().includes(q)) ||
+                    (r.studentName && r.studentName.toLowerCase().includes(q)) ||
+                    (r.facts && r.facts.toLowerCase().includes(q)) ||
+                    (r.feelings && r.feelings.toLowerCase().includes(q)) ||
+                    (r.findings && r.findings.toLowerCase().includes(q)) ||
+                    (r.future && r.future.toLowerCase().includes(q));
+                  if (!match) return false;
+                }
+                return true;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="text-center py-12 px-4 rounded-2xl bg-white/5 border border-white/10 text-slate-400 text-xs space-y-2">
+                    <p className="font-semibold text-slate-300">Tidak ada jurnal refleksi yang cocok dengan filter.</p>
+                    <p className="text-[11px] text-slate-500">
+                      Semua warga dapat saling membaca jurnal di sini. Coba ubah kata kunci atau tulis jurnal barumu!
+                    </p>
+                  </div>
+                );
+              }
+
+              return filtered.map((r) => {
+                const isCurrentStudent =
+                  (student?.id && r.studentId === student.id) ||
+                  (student?.name && r.studentName?.toLowerCase() === student.name.toLowerCase());
+
+                return (
+                  <div
+                    key={r.id}
+                    className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                      isCurrentStudent
+                        ? 'bg-purple-950/30 border-purple-500/40 shadow-lg shadow-purple-950/20'
+                        : 'bg-white/5 border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    {/* Header info */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Author Tag */}
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-white/15 text-xs text-white font-bold">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>{r.studentName || 'Warga Refleksia'}</span>
+                          {isCurrentStudent && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500 text-white font-extrabold">
+                              Kamu
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Class Tag */}
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                          {r.className || 'X DKV'}
+                        </span>
+
+                        {/* Subject Tag */}
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
+                          {r.subject}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                        <span>{r.date}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 font-bold text-[10px]">
+                          +2 XP
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Topic Title */}
+                    <div>
+                      <h4 className="text-sm font-extrabold text-white flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                        {r.title}
+                      </h4>
+                    </div>
+
+                    {/* 4F Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {/* Facts */}
+                      <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-purple-300 mb-1 flex items-center gap-1">
+                          <span>🔍 1. Facts (Peristiwa)</span>
+                        </div>
+                        <p className="text-slate-200 leading-relaxed text-[11px]">{r.facts}</p>
+                      </div>
+
+                      {/* Feelings */}
+                      <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-blue-300 mb-1 flex items-center gap-1">
+                          <span>💖 2. Feelings (Perasaan)</span>
+                        </div>
+                        <p className="text-slate-200 leading-relaxed text-[11px]">{r.feelings}</p>
+                      </div>
+
+                      {/* Findings */}
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-emerald-300 mb-1 flex items-center gap-1">
+                          <span>💡 3. Findings (Pembelajaran)</span>
+                        </div>
+                        <p className="text-slate-200 leading-relaxed text-[11px]">{r.findings}</p>
+                      </div>
+
+                      {/* Future */}
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-amber-300 mb-1 flex items-center gap-1">
+                          <span>🚀 4. Future (Rencana Aksi)</span>
+                        </div>
+                        <p className="text-slate-200 leading-relaxed text-[11px]">{r.future}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
       </div>

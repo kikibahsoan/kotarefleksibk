@@ -114,6 +114,9 @@ export interface ReflectionEntry {
   future: string;
   date: string;
   xpEarned: number;
+  studentId?: string;
+  studentName?: string;
+  className?: string;
 }
 
 export interface MentorFeedback {

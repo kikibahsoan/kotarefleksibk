@@ -690,6 +690,55 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [stickyNotes, setStickyNotes] = useState<DailyJournalStickyNote[]>(() => getStoredStickyNotes());
   const stickyNotesRef = useRef<DailyJournalStickyNote[]>(stickyNotes);
   stickyNotesRef.current = stickyNotes;
+
+  // Real-time synchronization of sticky notes on Pohon Beringin from all citizens
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStickyNotes = async () => {
+      try {
+        const res = await fetch('/api/journals/sticky-notes');
+        if (res.ok) {
+          const json = await res.json();
+          const list = Array.isArray(json) ? json : (json?.data || []);
+          if (isMounted && Array.isArray(list) && list.length > 0) {
+            setStickyNotes(list);
+          }
+        }
+      } catch {}
+    };
+
+    fetchStickyNotes();
+
+    const handleStickyEvent = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail) {
+        setStickyNotes((prev) => {
+          const exists = prev.some((n) => n.id === custom.detail.id);
+          return exists ? prev : [custom.detail, ...prev];
+        });
+      }
+    };
+    window.addEventListener('sticky_note_added', handleStickyEvent);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('kota_refleksi_channel');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'STICKY_NOTE_ADDED' && event.data.note) {
+          setStickyNotes((prev) => {
+            const exists = prev.some((n) => n.id === event.data.note.id);
+            return exists ? prev : [event.data.note, ...prev];
+          });
+        }
+      };
+    } catch {}
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('sticky_note_added', handleStickyEvent);
+      if (channel) channel.close();
+    };
+  }, []);
   const [cafeToast, setCafeToast] = useState<string | null>(null);
   const cafeToastTimerRef = useRef<number | null>(null);
   const [cafeScreenPos, setCafeScreenPos] = useState<{ x: number; y: number; visible: boolean }>({
