@@ -2040,19 +2040,25 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           setSittingSeat(null);
         }
         pendingSeatRef.current = null;
+        const playerNearRules =
+          Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 ||
+          Math.hypot(player.wx - 0, player.wy - 6.15) < 1.65;
         player.targetWx = 1.25;
         player.targetWy = 5.95;
-        player.isMoving = true;
+        player.isMoving = !playerNearRules;
         clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
-        sounds.playOpenModal();
-        if (onOpenTownRules) {
-          onOpenTownRules();
-        } else {
-          setIsTownRulesModalOpen(true);
+        if (playerNearRules) {
+          setNearbyAction({ type: 'town_rules' });
+          sounds.playOpenModal();
+          if (onOpenTownRules) {
+            onOpenTownRules();
+          } else {
+            setIsTownRulesModalOpen(true);
+          }
         }
         return;
       }
@@ -2066,16 +2072,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           setSittingSeat(null);
         }
         pendingSeatRef.current = null;
+        const playerNearBeringin =
+          Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.75;
         player.targetWx = 0;
         player.targetWy = -5.2;
-        player.isMoving = true;
+        player.isMoving = !playerNearBeringin;
         clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
-        sounds.playOpenModal();
-        setIsJurnalModalOpen(true);
+        if (playerNearBeringin) {
+          setNearbyAction({ type: 'beringin' });
+          sounds.playOpenModal();
+          setIsJurnalModalOpen(true);
+        }
         return;
       }
 
@@ -2243,6 +2254,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         Math.hypot(wx - (-4.3), wy - 1.8) < 2.0 ||
         Math.hypot(wx - (-3.7), wy - 1.8) < 1.05 ||
         Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 1.35 ||
+        Math.hypot(wx - BERINGIN_TREE_COORDS.wx, wy - BERINGIN_TREE_COORDS.wy) < 1.65 ||
         Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy) < 1.35 ||
         Math.hypot(wx - 0, wy - 6.15) < 1.45 ||
         ALL_TWO_PERSON_BENCHES.some((g) => Math.hypot(wx - g.wx, wy - g.wy) < 1.05) ||
@@ -2421,19 +2433,34 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           // Proximity touch check: show confirmation popup at top WITHOUT interrupting player movement (skip while walking to a seat)
           if (!pendingSeatRef.current) {
+            const isNearBeringinSpot =
+              Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.75;
+            const isNearRulesSpot =
+              Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 ||
+              Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55;
+
             let touchedBuilding: BuildingInfo | null = null;
-            for (const b of BUILDINGS_INFO) {
-              const [bx, , by] = b.position;
-              const bDist = Math.hypot(player.wx - bx, player.wy - by);
-              const threshold = b.id === 'monumen_warga' ? 1.4 : 1.7;
-              if (bDist < threshold) {
-                touchedBuilding = b;
-                break;
+            if (!isNearBeringinSpot && !isNearRulesSpot) {
+              for (const b of BUILDINGS_INFO) {
+                const [bx, , by] = b.position;
+                // Avoid triggering Balai Kota when walking behind it toward Pohon Beringin
+                if (b.id === 'balai_kota' && player.wy < -4.65) continue;
+                const bDist = Math.hypot(player.wx - bx, player.wy - by);
+                const threshold = b.id === 'monumen_warga' ? 1.4 : 1.7;
+                if (bDist < threshold) {
+                  touchedBuilding = b;
+                  break;
+                }
               }
             }
 
             const cafeDist = Math.hypot(player.wx - cafeWx, player.wy - cafeWy);
-            if (cafeDist < 1.6) {
+            if (isNearBeringinSpot || isNearRulesSpot) {
+              if (lastTouchedIdRef.current) {
+                lastTouchedIdRef.current = null;
+                setPendingConfirmation(null);
+              }
+            } else if (cafeDist < 1.6) {
               if (lastTouchedIdRef.current !== 'cafe') {
                 lastTouchedIdRef.current = 'cafe';
                 sounds.playClick();
@@ -2468,7 +2495,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 const prevB = BUILDINGS_INFO.find((b) => b.id === prevId);
                 if (prevB) {
                   const d = Math.hypot(player.wx - prevB.position[0], player.wy - prevB.position[2]);
-                  if (d > 2.1) away = true;
+                  if (d > 2.1 || (prevB.id === 'balai_kota' && player.wy < -4.65)) away = true;
                 }
               }
               if (away) {
@@ -2564,12 +2591,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== nearBench.id) {
           setNearbyAction({ type: 'bench', benchId: nearBench.id, benchName: nearBench.name });
         }
-      } else if (Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.35 || Math.hypot(player.wx - 0, player.wy - 6.15) < 1.45) {
+      } else if (Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 || Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55) {
+        if (lastTouchedIdRef.current) {
+          lastTouchedIdRef.current = null;
+          setPendingConfirmation(null);
+        }
         if (nearbyActionRef.current?.type !== 'town_rules') {
+          sounds.playClick();
           setNearbyAction({ type: 'town_rules' });
         }
-      } else if (Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.6) {
+      } else if (Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.75) {
+        if (lastTouchedIdRef.current) {
+          lastTouchedIdRef.current = null;
+          setPendingConfirmation(null);
+        }
         if (nearbyActionRef.current?.type !== 'beringin') {
+          sounds.playClick();
           setNearbyAction({ type: 'beringin' });
         }
       } else if (litDist < 1.05) {
@@ -3760,16 +3797,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           });
 
           // Grand Banner Signboard at the Crown of the Gapura:
-          // "SELAMAT DATANG DI REFLEKSIA CITY"
-          const bannerCenterX = centerBase.x;
-          const bannerCenterY = (leftTopY + rightTopY) / 2 - 10 * z;
+          // "SELAMAT DATANG DI REFLEKSIA CITY" — angled to follow the exact isometric slope of the Gapura!
+          const bannerCenterX = (leftTopX + rightTopX) / 2;
+          const bannerCenterY = (leftTopY + rightTopY) / 2 - 11 * z;
+          const gateDx = rightTopX - leftTopX;
+          const gateDy = rightTopY - leftTopY;
+          const gateSlope = gateDx !== 0 ? gateDy / gateDx : 0.5;
 
-          // Traditional/Modern Crown Roof Peak above the Signboard
+          ctx.save();
+          ctx.translate(bannerCenterX, bannerCenterY);
+          ctx.transform(1, gateSlope, 0, 1, 0, 0);
+
+          // Supporting golden struts connecting crossbeam to angled signboard
+          ctx.fillStyle = '#b45309';
+          ctx.fillRect(-52 * z, 6 * z, 4 * z, 10 * z);
+          ctx.fillRect(48 * z, 6 * z, 4 * z, 10 * z);
+
+          // Traditional/Modern Crown Roof Peak above the Signboard (following Gapura angle)
           ctx.fillStyle = '#b45309';
           ctx.beginPath();
-          ctx.moveTo(bannerCenterX - 96 * z, bannerCenterY - 8 * z);
-          ctx.lineTo(bannerCenterX, bannerCenterY - 24 * z);
-          ctx.lineTo(bannerCenterX + 96 * z, bannerCenterY - 8 * z);
+          ctx.moveTo(-92 * z, -8 * z);
+          ctx.lineTo(0, -24 * z);
+          ctx.lineTo(92 * z, -8 * z);
           ctx.closePath();
           ctx.fill();
           ctx.strokeStyle = '#fde047';
@@ -3779,35 +3828,41 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Golden Spire Finial at Apex of Gapura
           ctx.fillStyle = '#fde047';
           ctx.beginPath();
-          ctx.arc(bannerCenterX, bannerCenterY - 26 * z, 3.2 * z, 0, Math.PI * 2);
+          ctx.arc(0, -26 * z, 3.2 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Wide Illuminated Signboard Plaque
+          // Wide Illuminated Signboard Plaque aligned with Gapura angle
           const titleText = '🏛️ SELAMAT DATANG DI REFLEKSIA CITY ✨';
-          ctx.font = `900 ${Math.round(9.2 * z)}px sans-serif`;
+          ctx.font = `900 ${Math.round(8.8 * z)}px sans-serif`;
           const tm = ctx.measureText(titleText);
-          const boardW = Math.max(176 * z, tm.width + 24 * z);
+          const boardW = Math.max(168 * z, tm.width + 22 * z);
           const boardH = 22 * z;
 
-          // Outer golden frame shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+          // 3D Isometric Extrusion / Back Depth of the Signboard
+          ctx.fillStyle = '#451a03';
           ctx.beginPath();
-          ctx.roundRect(bannerCenterX - boardW / 2 + 2 * z, bannerCenterY - boardH / 2 + 2 * z, boardW, boardH, 7 * z);
+          ctx.roundRect(-boardW / 2 + 2.5 * z, -boardH / 2 - 2 * z, boardW, boardH, 6 * z);
           ctx.fill();
 
-          // Deep royal navy & emerald gradient plaque background
+          // Outer golden frame drop shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+          ctx.beginPath();
+          ctx.roundRect(-boardW / 2 + 2 * z, -boardH / 2 + 2.5 * z, boardW, boardH, 6 * z);
+          ctx.fill();
+
+          // Deep royal navy & indigo gradient plaque background
           const boardGrad = ctx.createLinearGradient(
-            bannerCenterX - boardW / 2,
-            bannerCenterY - boardH / 2,
-            bannerCenterX + boardW / 2,
-            bannerCenterY + boardH / 2
+            -boardW / 2,
+            -boardH / 2,
+            boardW / 2,
+            boardH / 2
           );
           boardGrad.addColorStop(0, '#0f172a');
           boardGrad.addColorStop(0.5, '#1e3a8a');
           boardGrad.addColorStop(1, '#0f172a');
           ctx.fillStyle = boardGrad;
           ctx.beginPath();
-          ctx.roundRect(bannerCenterX - boardW / 2, bannerCenterY - boardH / 2, boardW, boardH, 7 * z);
+          ctx.roundRect(-boardW / 2, -boardH / 2, boardW, boardH, 6 * z);
           ctx.fill();
 
           // Double gold border
@@ -3815,23 +3870,25 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineWidth = 2.0 * z;
           ctx.stroke();
 
-          ctx.strokeStyle = 'rgba(254, 240, 138, 0.5)';
+          ctx.strokeStyle = 'rgba(254, 240, 138, 0.55)';
           ctx.lineWidth = 0.8 * z;
           ctx.beginPath();
           ctx.roundRect(
-            bannerCenterX - boardW / 2 + 2.5 * z,
-            bannerCenterY - boardH / 2 + 2.5 * z,
+            -boardW / 2 + 2.5 * z,
+            -boardH / 2 + 2.5 * z,
             boardW - 5 * z,
             boardH - 5 * z,
-            5 * z
+            4.5 * z
           );
           ctx.stroke();
 
-          // Crisp Glowing Gold & White Welcome Text
+          // Crisp Glowing Gold & White Welcome Text following Gapura angle
           ctx.fillStyle = '#fef08a';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(titleText, bannerCenterX, bannerCenterY);
+          ctx.fillText(titleText, 0, 0.5 * z);
+
+          ctx.restore();
         } else if (item.type === 'town_rules_board') {
           // PAPAN PERATURAN KOTA & PANDUAN AKTIVITAS DI DEKAT GAPURA UTAMA [wx: 1.45, wy: 5.95]
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
@@ -3966,27 +4023,30 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(lX, lY, 14 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // 7. Floating Hover Badge: "📋 Papan Peraturan Kota"
-          const hoverBounce = Math.sin(elapsed * 4) * 2.2 * z;
-          const badgeY = roofApexY - 15 * z + hoverBounce;
-          const bText = '📋 Papan Peraturan Kota';
-          ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
-          const tW = ctx.measureText(bText).width + 12 * z;
-          const tH = 16 * z;
+          // 7. Floating Hover Badge: "📋 Papan Peraturan Kota" (appears when avatar approaches the board)
+          const distToRulesBoard = Math.hypot(player.wx - item.wx, player.wy - item.wy);
+          if (distToRulesBoard < 2.35) {
+            const hoverBounce = Math.sin(elapsed * 4) * 2.2 * z;
+            const badgeY = roofApexY - 15 * z + hoverBounce;
+            const bText = '📋 Papan Peraturan Kota';
+            ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+            const tW = ctx.measureText(bText).width + 12 * z;
+            const tH = 16 * z;
 
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-          ctx.beginPath();
-          ctx.roundRect(pt.x - tW / 2, badgeY - tH / 2, tW, tH, 8 * z);
-          ctx.fill();
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - tW / 2, badgeY - tH / 2, tW, tH, 8 * z);
+            ctx.fill();
 
-          ctx.strokeStyle = '#10b981';
-          ctx.lineWidth = 1.1 * z;
-          ctx.stroke();
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1.1 * z;
+            ctx.stroke();
 
-          ctx.fillStyle = '#a7f3d0';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(bText, pt.x, badgeY);
+            ctx.fillStyle = '#a7f3d0';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(bText, pt.x, badgeY);
+          }
 
           ctx.restore();
         } else if (item.type === 'beringin_tree') {
@@ -4186,40 +4246,43 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
 
-          // 8. Floating Hover Tag: "🌳 Pohon Beringin • Jurnal Harian"
-          const treeHoverBounce = Math.sin(elapsed * 3.5) * 2 * z;
-          const tagY = pt.y - 120 * z + treeHoverBounce;
-          const tagTitle = '🌳 Pohon Beringin Jurnal Harian';
-          const subText = `${noteCount} Catatan Tempel • +1 XP`;
+          // 8. Floating Hover Tag: "🌳 Pohon Beringin Jurnal Harian" — muncul saat avatar mendekati Pohon Beringin
+          const distToBeringin = Math.hypot(player.wx - item.wx, player.wy - item.wy);
+          if (distToBeringin < 2.35) {
+            const treeHoverBounce = Math.sin(elapsed * 3.5) * 2 * z;
+            const tagY = pt.y - 120 * z + treeHoverBounce;
+            const tagTitle = '🌳 Pohon Beringin Jurnal Harian';
+            const subText = `${noteCount} Catatan Tempel • +1 XP`;
 
-          ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
-          const titleWidth = ctx.measureText(tagTitle).width;
-          ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
-          const subWidth = ctx.measureText(subText).width;
-          const bannerW = Math.max(titleWidth, subWidth) + 16 * z;
-          const bannerH = 26 * z;
+            ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+            const titleWidth = ctx.measureText(tagTitle).width;
+            ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
+            const subWidth = ctx.measureText(subText).width;
+            const bannerW = Math.max(titleWidth, subWidth) + 16 * z;
+            const bannerH = 26 * z;
 
-          // Banner capsule background
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-          ctx.beginPath();
-          ctx.roundRect(pt.x - bannerW / 2, tagY - bannerH / 2, bannerW, bannerH, 10 * z);
-          ctx.fill();
+            // Banner capsule background
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - bannerW / 2, tagY - bannerH / 2, bannerW, bannerH, 10 * z);
+            ctx.fill();
 
-          ctx.strokeStyle = '#10b981';
-          ctx.lineWidth = 1.2 * z;
-          ctx.stroke();
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
 
-          // Title
-          ctx.fillStyle = '#a7f3d0';
-          ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(tagTitle, pt.x, tagY - 4 * z);
+            // Title
+            ctx.fillStyle = '#a7f3d0';
+            ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(tagTitle, pt.x, tagY - 4 * z);
 
-          // Subtitle / XP badge
-          ctx.fillStyle = '#fde047';
-          ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
-          ctx.fillText(subText, pt.x, tagY + 6 * z);
+            // Subtitle / XP badge
+            ctx.fillStyle = '#fde047';
+            ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
+            ctx.fillText(subText, pt.x, tagY + 6 * z);
+          }
 
           ctx.restore();
         } else if (item.type === 'literacy_corner') {

@@ -839,7 +839,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                   <Radio className="w-3 h-3" /> ON AIR PODCAST
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
-                  <Database className="w-3 h-3" /> Tersimpan ke Teks Spreadsheet
+                  <Database className="w-3 h-3" /> Terekam di Spreadsheet v2.6
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-black font-display leading-tight mt-0.5">

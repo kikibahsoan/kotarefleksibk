@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Student, Reflection, PublicChatMessage, Message, StudentActivityBreakdown } from '../../types/index.ts';
 import { TEACHER_ACCOUNTS } from '../../data/teacherAccounts.ts';
 import { INITIAL_BADGES } from '../../data/initialData.ts';
@@ -23,6 +23,8 @@ import {
   Zap,
   Activity,
   CheckCircle2,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 
 interface PasarPrestasiModalProps {
@@ -102,12 +104,31 @@ export const PasarPrestasiModal: React.FC<PasarPrestasiModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'teachers' | 'supervisors' | 'my_stats'>('leaderboard');
   const [classFilter, setClassFilter] = useState<'all' | 'X DKV 2' | 'X DKV 3'>('all');
+  const [syncCounter, setSyncCounter] = useState(0);
+  const [isSyncingSheet, setIsSyncingSheet] = useState(false);
+
+  const handleSyncPasarPrestasi = async () => {
+    setIsSyncingSheet(true);
+    try {
+      await StorageService.syncPasarPrestasiToSpreadsheet(student);
+      await StorageService.fetchPasarPrestasiFromGAS();
+      setSyncCounter((c) => c + 1);
+    } finally {
+      setIsSyncingSheet(false);
+    }
+  };
+
+  useEffect(() => {
+    handleSyncPasarPrestasi();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Retrieve all students
   const allStudents = useMemo(() => {
-    const list = propStudents && propStudents.length > 0 ? propStudents : StorageService.getStudents();
-    return list.filter((s) => !s.isTeacher);
-  }, [propStudents]);
+    const list = StorageService.getStudents();
+    const source = list && list.length > 0 ? list : propStudents || [];
+    return source.filter((s) => !s.isTeacher);
+  }, [propStudents, syncCounter]);
 
   // Compute stats and rank students by Total Activities in Town!
   const filteredStudents = useMemo(() => {
@@ -137,7 +158,7 @@ export const PasarPrestasiModal: React.FC<PasarPrestasiModalProps> = ({
     });
 
     return list;
-  }, [allStudents, classFilter, reflections, publicChats, messages]);
+  }, [allStudents, classFilter, reflections, publicChats, messages, syncCounter]);
 
   // Top 5 Students based on Total Activities
   const top5Students = useMemo(() => {
@@ -181,27 +202,46 @@ export const PasarPrestasiModal: React.FC<PasarPrestasiModalProps> = ({
               🏆
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg sm:text-xl font-extrabold font-display leading-tight">Pasar Prestasi</h2>
                 <span className="text-[10px] uppercase font-black tracking-wider bg-black/25 text-amber-200 px-2 py-0.5 rounded-full border border-amber-300/30">
                   Refleksia City
                 </span>
+                <span className="text-[10px] font-bold bg-emerald-950/60 text-emerald-200 px-2 py-0.5 rounded-full border border-emerald-400/40 flex items-center gap-1">
+                  <Database className="w-3 h-3 text-emerald-300" />
+                  <span>Terekam di Spreadsheet v2.6</span>
+                </span>
               </div>
-              <p className="text-xs text-amber-100 font-medium">
+              <p className="text-xs text-amber-100 font-medium mt-0.5">
                 Papan Peringkat (Top 5 Siswa Teraktif), Dewan Guru Pembimbing & Pengawas Sekolah
               </p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              sounds.playClick();
-              onClose();
-            }}
-            aria-label="Tutup Pasar Prestasi"
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition cursor-pointer"
-          >
-            <X className="w-5 h-5 text-white" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playClick();
+                handleSyncPasarPrestasi();
+              }}
+              disabled={isSyncingSheet}
+              className="px-3 py-1.5 rounded-xl bg-black/25 hover:bg-black/40 border border-white/25 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="Sinkronkan Peringkat & Aktivitas Pasar Prestasi ke Google Spreadsheet v2.6"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheet ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isSyncingSheet ? 'Menyinkronkan...' : 'Sinkron v2.6'}</span>
+            </button>
+            <button
+              onClick={() => {
+                sounds.playClick();
+                onClose();
+              }}
+              aria-label="Tutup Pasar Prestasi"
+              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition cursor-pointer"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation Tabs */}

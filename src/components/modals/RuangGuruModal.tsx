@@ -36,7 +36,7 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
  * =========================================================================
  * SKRIP GOOGLE APPS SCRIPT - KOTA REFLEKSI SMK NEGERI 2 GORONTALO
  * =========================================================================
- * Versi: 2.5 (Dukungan Real-Time Obrolan Warga 24 Jam & Refleksi 4F)
+ * Versi: 2.6 (Dukungan Studio ON AIR Podcast, Pasar Prestasi, Jurnal Pohon Beringin, Obrolan Warga & Refleksi 4F)
  * 
  * Panduan Pemasangan:
  * 1. Buka Google Spreadsheet ini.
@@ -46,7 +46,7 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
  * 5. Klik 'Terapkan' (Deploy) > 'Penerapan baru' (New deployment).
  * 6. Pilih jenis: 'Aplikasi Web' (Web app).
  * 7. Isi Konfigurasi:
- *    - Deskripsi: Kota Refleksi Web App v2.5
+ *    - Deskripsi: Kota Refleksi Web App v2.6
  *    - Jalankan sebagai (Execute as): Saya (Me)
  *    - Siapa yang memiliki akses (Who has access): Siapa saja (Anyone)
  * 8. Klik 'Terapkan' (Deploy) lalu berikan izin akses Google (Izinkan/Allow).
@@ -76,21 +76,26 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // 2. Aksi Lengkap Semua Data (Refleksi, Feedback, Pesan, Obrolan Warga, & Jurnal Pohon Beringin)
+  // 2. Aksi Lengkap Semua Data v2.6 (Refleksi, Feedback, Pesan, Obrolan Warga, Jurnal Pohon Beringin, Studio ON AIR Podcast, & Pasar Prestasi)
   var reflections = getReflections(ss);
   var feedbacks = getFeedbacks(ss);
   var messages = getMessages(ss);
   var chats = getPublicChats(ss);
   var stickyNotes = getStickyNotes(ss);
+  var podcasts = getPodcasts(ss);
+  var pasarPrestasi = getPasarPrestasi(ss);
 
   return ContentService.createTextOutput(JSON.stringify({
     success: true,
+    version: "2.6",
     spreadsheet: ss.getName(),
     reflections: reflections,
     feedbacks: feedbacks,
     messages: messages,
     chats: chats,
     stickyNotes: stickyNotes,
+    podcasts: podcasts,
+    pasarPrestasi: pasarPrestasi,
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
 }
@@ -120,6 +125,14 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "like_sticky_note") {
       updateStickyNoteLikes(ss, data.noteId, data.likes, data.likedBy, data.likedByNames);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_podcast_episode") {
+      savePodcastEpisode(ss, data.episode);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_pasar_prestasi") {
+      savePasarPrestasi(ss, data.student, data.top5);
       return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "send_message") {
@@ -491,6 +504,200 @@ function getStickyNotes(ss) {
       likes: Number(r[9]) || 0,
       likedBy: parseJsonList(r[10]),
       likedByNames: parseJsonList(r[11])
+    });
+  }
+  return list;
+}
+
+// -------------------------------------------------------------
+// MANAJEMEN STUDIO ON AIR PODCAST (MENARA MENTOR KOTA - v2.6)
+// -------------------------------------------------------------
+function getOrCreatePodcastSheet(ss) {
+  var sheet = ss.getSheetByName("Studio_On_Air_Podcast");
+  if (!sheet) {
+    sheet = ss.insertSheet("Studio_On_Air_Podcast");
+    sheet.appendRow([
+      "ID Episode", "ID Siswa", "Nama Siswa", "Kelas", "ID Materi", "Judul Materi",
+      "Hal Sudah Dikuasai", "Area Perlu Diperkuat", "Saran Konkret AI",
+      "Pertanyaan Pemantik AI", "Jawaban Pemantik Siswa", "Rencana Belajar Siswa",
+      "Apresiasi Host AI", "Transkrip Lengkap Podcast (Teks)", "Tanggal", "Timestamp"
+    ]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function savePodcastEpisode(ss, ep) {
+  if (!ep || !ep.id) return;
+  var sheet = getOrCreatePodcastSheet(ss);
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(ep.id)) {
+      return;
+    }
+  }
+  sheet.appendRow([
+    ep.id,
+    ep.studentId || "",
+    ep.studentName || "Siswa DKV",
+    ep.className || "X DKV",
+    ep.materiId || "",
+    ep.materiTitle || "",
+    ep.sudahDikuasai || "",
+    ep.perluDiperkuat || "",
+    JSON.stringify(ep.saranKonkretAI || []),
+    ep.pertanyaanPemantikAI || "",
+    ep.jawabanPemantikSiswa || "",
+    JSON.stringify(ep.rencanaBelajarSiswa || []),
+    ep.apresiasiHost || "",
+    ep.transcriptText || "",
+    ep.createdAt || new Date().toLocaleDateString("id-ID"),
+    ep.timestamp || Date.now()
+  ]);
+}
+
+function getPodcasts(ss) {
+  var sheet = ss.getSheetByName("Studio_On_Air_Podcast");
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0] || !r[5]) continue;
+    list.push({
+      id: String(r[0]),
+      studentId: String(r[1]),
+      studentName: String(r[2]),
+      className: String(r[3]),
+      materiId: String(r[4]),
+      materiTitle: String(r[5]),
+      sudahDikuasai: String(r[6] || ""),
+      perluDiperkuat: String(r[7] || ""),
+      saranKonkretAI: parseJsonList(r[8]),
+      pertanyaanPemantikAI: String(r[9] || ""),
+      jawabanPemantikSiswa: String(r[10] || ""),
+      rencanaBelajarSiswa: parseJsonList(r[11]),
+      apresiasiHost: String(r[12] || ""),
+      transcriptText: String(r[13] || ""),
+      createdAt: String(r[14] || ""),
+      timestamp: Number(r[15]) || Date.now()
+    });
+  }
+  return list;
+}
+
+// -------------------------------------------------------------
+// MANAJEMEN PASAR PRESTASI & PERINGKAT AKTIVITAS WARGA (v2.6)
+// -------------------------------------------------------------
+function getOrCreatePasarPrestasiSheet(ss) {
+  var sheet = ss.getSheetByName("Pasar_Prestasi_Siswa");
+  if (!sheet) {
+    sheet = ss.insertSheet("Pasar_Prestasi_Siswa");
+    sheet.appendRow([
+      "ID Siswa", "Nama Siswa", "Kelas", "Total Aktivitas Kota",
+      "Jumlah Login", "Misi Selesai", "Refleksi Terkirim", "Obrolan Warga",
+      "Kuis Bengkel", "Pesan Guru", "Saldo XP", "Status / Peringkat", "Waktu Sinkron"
+    ]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function upsertPasarPrestasiRow(sheet, item) {
+  if (!item || !item.id) return;
+  var stats = item.activityStats || {};
+  var totalAct = Number(item.totalActivities || stats.total || 0);
+  var logins = Number(stats.logins || 1);
+  var missions = Number(stats.missions || 0);
+  var reflections = Number(stats.reflections || 0);
+  var chats = Number(stats.chats || 0);
+  var quizzes = Number(stats.quizzes || 0);
+  var messages = Number(stats.messages || 0);
+  var points = Number(item.points || 0);
+  var rankLabel = item.rankLabel || "Warga Aktif";
+  var nowStr = new Date().toLocaleString("id-ID");
+
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(item.id)) {
+      sheet.getRange(i + 1, 2, 1, 12).setValues([[
+        item.name || "Siswa DKV",
+        item.className || "X DKV",
+        Math.max(Number(rows[i][3]) || 0, totalAct),
+        Math.max(Number(rows[i][4]) || 0, logins),
+        Math.max(Number(rows[i][5]) || 0, missions),
+        Math.max(Number(rows[i][6]) || 0, reflections),
+        Math.max(Number(rows[i][7]) || 0, chats),
+        Math.max(Number(rows[i][8]) || 0, quizzes),
+        Math.max(Number(rows[i][9]) || 0, messages),
+        Math.max(Number(rows[i][10]) || 0, points),
+        rankLabel,
+        nowStr
+      ]]);
+      return;
+    }
+  }
+
+  sheet.appendRow([
+    item.id,
+    item.name || "Siswa DKV",
+    item.className || "X DKV",
+    totalAct,
+    logins,
+    missions,
+    reflections,
+    chats,
+    quizzes,
+    messages,
+    points,
+    rankLabel,
+    nowStr
+  ]);
+}
+
+function savePasarPrestasi(ss, student, top5List) {
+  var sheet = getOrCreatePasarPrestasiSheet(ss);
+  if (student && student.id) {
+    upsertPasarPrestasiRow(sheet, student);
+  }
+  if (Array.isArray(top5List)) {
+    for (var k = 0; k < top5List.length; k++) {
+      var st = top5List[k];
+      if (st && st.id) {
+        st.rankLabel = "Top #" + (k + 1) + " Pasar Prestasi";
+        upsertPasarPrestasiRow(sheet, st);
+      }
+    }
+  }
+}
+
+function getPasarPrestasi(ss) {
+  var sheet = ss.getSheetByName("Pasar_Prestasi_Siswa");
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0]) continue;
+    list.push({
+      id: String(r[0]),
+      name: String(r[1]),
+      className: String(r[2]),
+      totalActivities: Number(r[3]) || 0,
+      activityStats: {
+        logins: Number(r[4]) || 1,
+        missions: Number(r[5]) || 0,
+        reflections: Number(r[6]) || 0,
+        chats: Number(r[7]) || 0,
+        quizzes: Number(r[8]) || 0,
+        messages: Number(r[9]) || 0,
+        total: Number(r[3]) || 0
+      },
+      points: Number(r[10]) || 0,
+      rankLabel: String(r[11] || ""),
+      updatedAt: String(r[12] || "")
     });
   }
   return list;
@@ -1140,9 +1347,9 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
                     <Code2 className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-extrabold text-white">Kode Skrip Google Apps Script (v2.5)</h4>
+                    <h4 className="text-sm font-extrabold text-white">Kode Skrip Google Apps Script (v2.6)</h4>
                     <p className="text-[11px] text-slate-300">
-                      Skrip resmi untuk Google Spreadsheet agar mendukung obrolan realtime dan refleksi
+                      Skrip resmi untuk Google Spreadsheet agar mendukung Studio ON AIR Podcast, Pasar Prestasi, Jurnal Pohon Beringin, Obrolan Warga & Refleksi 4F
                     </p>
                   </div>
                 </div>

@@ -303,6 +303,12 @@ export const StorageService = {
           totalActivities: stats.total,
         };
         safeSet(STORAGE_KEYS.CURRENT_USER, updated);
+        this.syncPasarPrestasiToSpreadsheet(updated);
+      } else {
+        const matched = this.getStudents().find((s) => s.id === studentId);
+        if (matched) {
+          this.syncPasarPrestasiToSpreadsheet(matched);
+        }
       }
     } catch (e) {}
   },
@@ -333,12 +339,30 @@ export const StorageService = {
         }
       } catch (e) {}
 
-      const logins = (base.logins || 1) + (recorded.login || 0) + (student.loginCount || 0);
-      const missions = Math.max(base.missions, liveMissions) + (recorded.mission || 0) + (student.completedMissionsCount || 0);
-      const refls = Math.max(base.reflections, realReflections) + (recorded.reflection || 0);
-      const chs = Math.max(base.chats, realChats) + (recorded.chat || 0);
-      const qzs = (base.quizzes || 0) + (recorded.quiz || 0) + (student.quizCount || 0);
-      const msgs = Math.max(base.messages, realMessages) + (recorded.message || 0);
+      const logins = Math.max(
+        (base.logins || 1) + (recorded.login || 0) + (student.loginCount || 0),
+        recorded.sheet_logins || 0
+      );
+      const missions = Math.max(
+        Math.max(base.missions, liveMissions) + (recorded.mission || 0) + (student.completedMissionsCount || 0),
+        recorded.sheet_missions || 0
+      );
+      const refls = Math.max(
+        Math.max(base.reflections, realReflections) + (recorded.reflection || 0),
+        recorded.sheet_reflections || 0
+      );
+      const chs = Math.max(
+        Math.max(base.chats, realChats) + (recorded.chat || 0),
+        recorded.sheet_chats || 0
+      );
+      const qzs = Math.max(
+        (base.quizzes || 0) + (recorded.quiz || 0) + (student.quizCount || 0),
+        recorded.sheet_quizzes || 0
+      );
+      const msgs = Math.max(
+        Math.max(base.messages, realMessages) + (recorded.message || 0),
+        recorded.sheet_messages || 0
+      );
 
       const total = logins + missions + refls + chs + qzs + msgs;
 
@@ -381,6 +405,200 @@ export const StorageService = {
     const current = this.getCurrentStudent();
     if (current && current.id === student.id) {
       this.setCurrentStudent(student);
+    }
+    if (!student.isTeacher) {
+      this.syncPasarPrestasiToSpreadsheet(student);
+    }
+  },
+
+  /**
+   * Menyimpan & menyinkronkan data Pasar Prestasi (Aktivitas Kota, Saldo XP & Top 5 Siswa) ke Google Spreadsheet v2.6
+   */
+  async syncPasarPrestasiToSpreadsheet(student?: Student | null): Promise<void> {
+    try {
+      const allStudents = this.getStudents().filter((s) => !s.isTeacher);
+      const reflections = this.getReflections();
+      const chats = this.getPublicChatMessages();
+      const messages = this.getMessages();
+
+      const enrichedList = allStudents.map((s) => {
+        const stats = this.getStudentActivityStats(s, reflections, chats, messages);
+        return {
+          ...s,
+          activityStats: stats,
+          totalActivities: stats.total,
+        };
+      });
+
+      enrichedList.sort((a, b) => {
+        const actDiff = (b.totalActivities || 0) - (a.totalActivities || 0);
+        if (actDiff !== 0) return actDiff;
+        return (b.points || 0) - (a.points || 0);
+      });
+
+      const top5 = enrichedList.slice(0, 5);
+      const targetStudent = student
+        ? enrichedList.find((s) => s.id === student.id) || {
+            ...student,
+            activityStats: this.getStudentActivityStats(student, reflections, chats, messages),
+            totalActivities: this.getStudentActivityStats(student, reflections, chats, messages).total,
+          }
+        : null;
+
+      // 1. Kirim ke Sheet khusus 'Pasar_Prestasi_Siswa' pada Google Apps Script v2.6
+      await this.syncWithGAS('save_pasar_prestasi', {
+        student: targetStudent,
+        top5,
+      });
+
+      // 2. Kirim juga ringkasan ke submit_reflection bertanda [PASAR_PRESTASI] agar kompatibel dengan semua versi Spreadsheet
+      if (targetStudent && !targetStudent.isTeacher) {
+        const stStats = targetStudent.activityStats || this.getStudentActivityStats(targetStudent);
+        const rankIdx = enrichedList.findIndex((s) => s.id === targetStudent.id);
+        const rankText = rankIdx >= 0 ? `Peringkat #${rankIdx + 1}` : 'Warga Aktif';
+
+        const reflectionPayload: Reflection = {
+          id: `prestasi-${targetStudent.id}`,
+          studentId: targetStudent.id,
+          studentName: targetStudent.name,
+          studentNumber: 'PASAR_PRESTASI',
+          className: targetStudent.className || 'X DKV 2',
+          materiId: 'pasar_prestasi',
+          materiTitle: `[PASAR_PRESTASI] ${rankText} • ${stStats.total} Aktivitas • ${targetStudent.points || 0} XP`,
+          scale: 5,
+          moodEmoji: '🏆',
+          answers: {
+            understood: `Total Aktivitas: ${stStats.total} (Login: ${stStats.logins}, Misi: ${stStats.missions}, Refleksi: ${stStats.reflections}, Obrolan: ${stStats.chats}, Kuis: ${stStats.quizzes}, Pesan: ${stStats.messages})`,
+            difficult: `Saldo XP: ${targetStudent.points || 0} XP | ${rankText}`,
+            findings: JSON.stringify(stStats),
+            actionPlan: JSON.stringify(
+              top5.map((t, i) => `#${i + 1} ${t.name} (${t.className}) - ${t.totalActivities} Aktivitas / ${t.points} XP`)
+            ),
+            customAnswers: {
+              totalActivities: String(stStats.total),
+              points: String(targetStudent.points || 0),
+              rank: rankText,
+              statsJson: JSON.stringify(stStats),
+            },
+          },
+          createdAt: new Date().toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          }),
+        };
+
+        await this.syncWithGAS('submit_reflection', {
+          reflection: reflectionPayload,
+        });
+      }
+    } catch (e) {
+      // silent fallback
+    }
+  },
+
+  /**
+   * Menarik data Pasar Prestasi dari Google Spreadsheet v2.6 dan memperbarui statistik aktivitas siswa lokal
+   */
+  async fetchPasarPrestasiFromGAS(): Promise<{
+    success: boolean;
+    spreadsheetName?: string;
+    version?: string;
+    updatedCount: number;
+  }> {
+    const settings = this.getSettings();
+    if (!settings.gasWebAppUrl || !settings.gasWebAppUrl.startsWith('http')) {
+      return { success: false, updatedCount: 0 };
+    }
+
+    try {
+      const url = new URL(settings.gasWebAppUrl);
+      url.searchParams.set('action', 'get_data');
+      url.searchParams.set('_t', String(Date.now()));
+
+      const res = await fetch(url.toString(), {
+        method: 'GET',
+        redirect: 'follow',
+        cache: 'no-store',
+      });
+      if (!res.ok) return { success: false, updatedCount: 0 };
+
+      const resData = await res.json();
+      let updatedCount = 0;
+      const students = safeGet<Student[]>(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
+
+      const applyRemoteStats = (
+        studentId: string,
+        studentName: string,
+        stats: Partial<StudentActivityBreakdown>,
+        points?: number
+      ) => {
+        const target = students.find(
+          (s) =>
+            s.id === studentId ||
+            (studentName && s.name.toLowerCase() === studentName.toLowerCase())
+        );
+        if (!target) return;
+
+        const actKey = `kota_act_${target.id}`;
+        const cur = safeGet<Record<string, number>>(actKey, {});
+        if (stats.logins) cur.sheet_logins = Math.max(cur.sheet_logins || 0, Number(stats.logins));
+        if (stats.missions) cur.sheet_missions = Math.max(cur.sheet_missions || 0, Number(stats.missions));
+        if (stats.reflections) cur.sheet_reflections = Math.max(cur.sheet_reflections || 0, Number(stats.reflections));
+        if (stats.chats) cur.sheet_chats = Math.max(cur.sheet_chats || 0, Number(stats.chats));
+        if (stats.quizzes) cur.sheet_quizzes = Math.max(cur.sheet_quizzes || 0, Number(stats.quizzes));
+        if (stats.messages) cur.sheet_messages = Math.max(cur.sheet_messages || 0, Number(stats.messages));
+        safeSet(actKey, cur);
+
+        if (typeof points === 'number' && points > (target.points || 0)) {
+          target.points = points;
+        }
+        updatedCount++;
+      };
+
+      // A. Dari array pasarPrestasi (Skrip GAS v2.6 Sheet 'Pasar_Prestasi_Siswa')
+      if (Array.isArray(resData.pasarPrestasi)) {
+        resData.pasarPrestasi.forEach((row: any) => {
+          if (row && (row.id || row.name)) {
+            applyRemoteStats(
+              String(row.id || ''),
+              String(row.name || ''),
+              row.activityStats || {},
+              Number(row.points) || undefined
+            );
+          }
+        });
+      }
+
+      // B. Dari refleksi bertanda [PASAR_PRESTASI]
+      if (Array.isArray(resData.reflections)) {
+        resData.reflections.forEach((r: Reflection) => {
+          const isPrestasi =
+            (r.id && String(r.id).startsWith('prestasi-')) ||
+            (r.materiTitle && String(r.materiTitle).includes('[PASAR_PRESTASI]')) ||
+            r.studentNumber === 'PASAR_PRESTASI';
+          if (isPrestasi && r.answers?.findings) {
+            try {
+              const parsedStats = JSON.parse(r.answers.findings);
+              const pts = Number(r.answers?.customAnswers?.['points']) || undefined;
+              applyRemoteStats(r.studentId, r.studentName, parsedStats, pts);
+            } catch {}
+          }
+        });
+      }
+
+      if (updatedCount > 0) {
+        safeSet(STORAGE_KEYS.STUDENTS, students);
+      }
+
+      return {
+        success: true,
+        spreadsheetName: resData.spreadsheet || 'Google Spreadsheet',
+        version: resData.version || '2.6',
+        updatedCount,
+      };
+    } catch {
+      return { success: false, updatedCount: 0 };
     }
   },
 
