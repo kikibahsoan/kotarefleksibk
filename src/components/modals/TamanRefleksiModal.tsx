@@ -497,7 +497,7 @@ export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
               ) : (
                 <>
                   <Send className="w-5 h-5" />
-                  <span>Kirim Refleksi & Dapatkan Umpan Balik AI (+3 Poin)</span>
+                  <span>Kirim Refleksi & Dapatkan Umpan Balik AI (+1 Poin)</span>
                 </>
               )}
             </button>

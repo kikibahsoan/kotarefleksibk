@@ -158,7 +158,7 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
       findings: findings || 'Memahami pentingnya ketelitian dalam pemecahan masalah.',
       future: future || 'Akan mendokumentasikan setiap solusi untuk referensi berikutnya.',
       date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-      xpEarned: 30,
+      xpEarned: 2,
     };
 
     const nextArchives = [newEntry, ...localArchives];
@@ -168,7 +168,7 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
     } catch {}
 
     if (onSaveReflection) onSaveReflection(newEntry);
-    if (onAddXp) onAddXp(30, 'Menyelesaikan Jurnal 4F di Perpustakaan');
+    if (onAddXp) onAddXp(2, 'Menyelesaikan Jurnal 4F di Perpustakaan');
     sounds.playRewardXp();
     setIsSuccess(true);
 
@@ -500,7 +500,7 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
                       }}
                       className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/30 transition flex items-center gap-2 cursor-pointer active:scale-95"
                     >
-                      <span>🌍 Tulis Refleksi Materi Ini di Pusat Refleksi (+3 Poin)</span>
+                      <span>🌍 Tulis Refleksi Materi Ini di Pusat Refleksi (+1 Poin)</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -518,7 +518,7 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
                 <CheckCircle2 className="w-6 h-6 shrink-0" />
                 <div>
                   <h4 className="font-bold text-sm">Jurnal Berhasil Disimpan!</h4>
-                  <p className="text-xs text-emerald-200">Kamu mendapatkan reward +30 XP ke status Refleksia City.</p>
+                  <p className="text-xs text-emerald-200">Kamu mendapatkan reward +2 XP ke status Refleksia City.</p>
                 </div>
               </div>
             )}
@@ -596,7 +596,7 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
                 type="submit"
                 className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-600/30 flex items-center gap-2 transition-all active:scale-95"
               >
-                <Send className="w-4 h-4" /> Simpan Jurnal Refleksi (+30 XP)
+                <Send className="w-4 h-4" /> Simpan Jurnal Refleksi (+2 XP)
               </button>
             </div>
           </form>

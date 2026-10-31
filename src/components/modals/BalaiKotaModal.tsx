@@ -16,8 +16,8 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
   {
     id: 'm_refleksi',
     title: 'Kirim Refleksi di Pusat Refleksi',
-    desc: 'Tulis dan kirim refleksi pembelajaran di Pusat Refleksi (+3 XP)',
-    xp: 3,
+    desc: 'Tulis dan kirim refleksi pembelajaran di Pusat Refleksi (+1 XP)',
+    xp: 1,
     targetId: 'taman_refleksi',
     icon: '🌍',
   },
@@ -25,7 +25,7 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
     id: 'm_bengkel',
     title: 'Tuntaskan 5 Soal Berjenjang di Bengkel Latihan',
     desc: 'Jawab soal kuis berjenjang (5 detik/soal) di Bengkel Latihan',
-    xp: 3,
+    xp: 1,
     targetId: 'bengkel_latihan',
     icon: '🛠️',
   },
@@ -33,7 +33,7 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
     id: 'm_perpustakaan',
     title: 'Pelajari Modul di Perpustakaan',
     desc: 'Buka dan baca materi ajar Berpikir Komputasional di Perpustakaan Kampus',
-    xp: 3,
+    xp: 1,
     targetId: 'perpustakaan',
     icon: '📚',
   },
@@ -41,7 +41,7 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
     id: 'm_chat',
     title: 'Sapa Warga di Obrolan Kota',
     desc: 'Kirim pesan sapaan atau insight belajar ke obrolan langsung warga kota',
-    xp: 3,
+    xp: 1,
     targetId: 'monumen_warga',
     icon: '💬',
   },
@@ -49,7 +49,7 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
     id: 'm_pos',
     title: 'Kirim Pesan Konsultasi di Kantor Pos',
     desc: 'Kirim surat pertanyaan atau progres belajar ke Guru via Kantor Pos Kilat',
-    xp: 3,
+    xp: 1,
     targetId: 'kantor_pos',
     icon: '📮',
   },
@@ -57,7 +57,7 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
     id: 'm_mentor',
     title: 'Simak Evaluasi di Studio ON AIR',
     desc: 'Kunjungi Studio ON AIR (Menara Mentor) untuk menyimak umpan balik AI Mentor',
-    xp: 3,
+    xp: 1,
     targetId: 'menara_mentor',
     icon: '🎙️',
   },
@@ -65,7 +65,7 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
     id: 'm_papan',
     title: 'Baca Pengumuman di Papan Informasi',
     desc: 'Buka Papan Informasi Refleksia untuk mempelajari buletin & tips metakognisi',
-    xp: 3,
+    xp: 1,
     targetId: 'monumen_warga',
     icon: '📋',
   },
@@ -73,7 +73,7 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
     id: 'm_pasar',
     title: 'Cek Progres Lencana di Toko Poin',
     desc: 'Kunjungi Pasar Prestasi (Toko Poin) untuk mengecek koleksi lencana warga',
-    xp: 3,
+    xp: 1,
     targetId: 'pasar_prestasi',
     icon: '🎪',
   },
@@ -186,7 +186,7 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
             </div>
             <h4 className="text-lg font-bold text-white mt-0.5">{studentName}</h4>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Setiap misi bernilai <strong className="text-amber-300">+3 XP</strong>. Tidak ada klaim instan — tuntaskan langsung aktivitas misinya di kota dan XP otomatis masuk ke saldomu!
+              Setiap misi bernilai <strong className="text-amber-300">+1 XP</strong>. Tidak ada klaim instan — tuntaskan langsung aktivitas misinya di kota dan XP otomatis masuk ke saldomu!
             </p>
           </div>
           <div className="flex items-center gap-3 bg-black/40 px-4 py-2.5 rounded-2xl border border-amber-400/40 shrink-0 shadow-inner">
@@ -206,7 +206,7 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
             </h3>
             <div className="flex items-center gap-2">
               <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold flex items-center gap-1">
-                <Shuffle className="w-3 h-3" /> Misi Random • +3 XP / Misi
+                <Shuffle className="w-3 h-3" /> Misi Random • +1 XP / Misi
               </span>
               <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
                 {completedCount}/{assignedMissions.length} Tuntas
@@ -239,7 +239,7 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
                         <h5 className="text-sm font-bold text-white">{mission.title}</h5>
                         {isCompleted && (
                           <span className="text-[10px] font-semibold text-emerald-300 flex items-center gap-1 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/30">
-                            <CheckCircle2 className="w-3 h-3" /> Tuntas (+3 XP Masuk Otomatis)
+                            <CheckCircle2 className="w-3 h-3" /> Tuntas (+1 XP Masuk Otomatis)
                           </span>
                         )}
                       </div>

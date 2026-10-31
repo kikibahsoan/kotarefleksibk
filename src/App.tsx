@@ -278,7 +278,7 @@ export default function App() {
     [reflections, messages]
   );
 
-  // Automatically complete a randomized mission and award +3 XP (no manual claim button)
+  // Automatically complete a randomized mission and award +1 XP (no manual claim button)
   const completeMissionIfActive = useCallback(
     (missionId: string) => {
       const current = studentRef.current;
@@ -297,13 +297,14 @@ export default function App() {
       saveCompletedMissionIds(current.id, nextCompleted);
 
       sounds.playRewardXp();
-      handleAddPoints(3, foundMission.title);
+      const awardedXp = foundMission.xp || 1;
+      handleAddPoints(awardedXp, foundMission.title);
       StorageService.recordStudentActivity(current.id, 'mission', 1);
 
       if (missionToastTimerRef.current) {
         window.clearTimeout(missionToastTimerRef.current);
       }
-      setMissionToast(`🎯 Misi Tuntas: "${foundMission.title}" (+3 XP otomatis masuk ke saldo!)`);
+      setMissionToast(`🎯 Misi Tuntas: "${foundMission.title}" (+${awardedXp} XP otomatis masuk ke saldo!)`);
       missionToastTimerRef.current = window.setTimeout(() => {
         setMissionToast(null);
         missionToastTimerRef.current = null;
@@ -380,7 +381,7 @@ export default function App() {
     setLatestChat(newMsg);
     playChimeSound();
 
-    // Automatically complete chat mission (+3 XP) if assigned
+    // Automatically complete chat mission (+1 XP) if assigned
     completeMissionIfActive('m_chat');
 
     // Record world chat activity
@@ -479,7 +480,7 @@ export default function App() {
       feedback: newFeedback,
     });
 
-    // Complete reflection mission (+3 XP automatic) or update badges
+    // Complete reflection mission (+1 XP automatic) or update badges
     const current = studentRef.current;
     if (current) {
       StorageService.recordStudentActivity(current.id, 'reflection', 1);
@@ -491,11 +492,11 @@ export default function App() {
         completeMissionIfActive('m_refleksi');
       } else {
         sounds.playRewardXp();
-        handleAddPoints(3, 'Kirim Refleksi di Pusat Refleksi');
+        handleAddPoints(1, 'Kirim Refleksi di Pusat Refleksi');
         if (missionToastTimerRef.current) {
           window.clearTimeout(missionToastTimerRef.current);
         }
-        setMissionToast('🌍 Refleksi terkirim di Pusat Refleksi! (+3 Poin otomatis masuk ke saldo!)');
+        setMissionToast('🌍 Refleksi terkirim di Pusat Refleksi! (+1 Poin otomatis masuk ke saldo!)');
         missionToastTimerRef.current = window.setTimeout(() => {
           setMissionToast(null);
           missionToastTimerRef.current = null;
@@ -583,7 +584,7 @@ export default function App() {
     // Sync to Google Apps Script
     StorageService.syncWithGAS('send_message', { message: newMsg });
 
-    // Complete Kantor Pos mission (+3 XP automatic) if assigned
+    // Complete Kantor Pos mission (+1 XP automatic) if assigned
     const hasPosMission =
       assignedMissionsRef.current.some((m) => m.id === 'm_pos') &&
       !completedMissionIdsRef.current.includes('m_pos');
@@ -830,6 +831,7 @@ export default function App() {
         studentPoints={student.points}
         latestXpGain={latestXpGain}
         onDeductPoints={handleDeductPoints}
+        onAddXp={handleAddPoints}
       />
 
       {/* INTERACTIVE FLOATING POP-UP BADGE (+XP Feedback) */}

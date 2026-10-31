@@ -72,9 +72,15 @@ export const TownRulesModal: React.FC<TownRulesModalProps> = ({ onClose, student
   const studentActivities = [
     {
       title: 'Menulis Refleksi di Taman Refleksi',
-      desc: 'Pilih skala pemahaman (1-5), tuangkan rangkuman materi, hal menarik, dan kesulitan belajarmu. Dapatkan +3 XP setiap mengirimkan refleksi!',
+      desc: 'Pilih skala pemahaman (1-5), tuangkan rangkuman materi, hal menarik, dan kesulitan belajarmu. Dapatkan +1 XP setiap mengirimkan refleksi!',
       icon: '🌿',
-      badge: '+3 XP',
+      badge: '+1 XP',
+    },
+    {
+      title: 'Jurnal Harian di Pohon Beringin',
+      desc: 'Tulis refleksi singkat harianmu dan tempelkan sticky note di Pohon Beringin belakang Balai Kota (+1 XP).',
+      icon: '🌳',
+      badge: '+1 XP',
     },
     {
       title: 'Belajar Mandiri di Perpustakaan',
@@ -84,9 +90,9 @@ export const TownRulesModal: React.FC<TownRulesModalProps> = ({ onClose, student
     },
     {
       title: 'Menuntaskan 5 Misi Harian',
-      desc: 'Kerjakan misi acak setiap hari seperti menyiram tanaman, memancing, membaca literasi, dan berdiskusi untuk mempercepat kenaikan level.',
+      desc: 'Kerjakan misi acak setiap hari di Balai Kota untuk mempercepat kenaikan level dan koleksi lencana warga.',
       icon: '🎯',
-      badge: '15 XP Total',
+      badge: '5 XP Total',
     },
     {
       title: 'Memantau Peringkat di Pasar Prestasi',

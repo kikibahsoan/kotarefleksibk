@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BuildingId, PublicChatMessage, Student } from '../types/index.ts';
+import { BuildingId, PublicChatMessage, Student, DailyJournalStickyNote } from '../types/index.ts';
 import { sounds } from '../utils/audio.ts';
 import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
 import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
-import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText } from 'lucide-react';
+import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin } from 'lucide-react';
 import { TownRulesModal } from './modals/TownRulesModal.tsx';
+import { JurnalHarianModal, getStoredStickyNotes } from './modals/JurnalHarianModal.tsx';
 
 interface ThreeTownCanvasProps {
   onSelectBuilding: (buildingId: BuildingId) => void;
@@ -21,6 +22,7 @@ interface ThreeTownCanvasProps {
   latestXpGain?: { amount: number; reason?: string; timestamp: number } | null;
   onDeductPoints?: (amount: number, reason: string) => boolean;
   onOpenTownRules?: () => void;
+  onAddXp?: (amount: number, reason: string) => void;
 }
 
 export interface XpFloatItem {
@@ -53,6 +55,9 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
 
 // Papan Peraturan & Panduan Aktivitas di Dekat Gapura Awal Masuk [wx: 1.45, wy: 5.95]
 export const TOWN_RULES_BOARD_COORDS = { wx: 1.45, wy: 5.95 };
+
+// Pohon Beringin Jurnal Harian di Belakang Balai Kota [wx: 0, wy: -5.8]
+export const BERINGIN_TREE_COORDS = { wx: 0, wy: -5.8 };
 
 export type EmoteType = 'love' | 'wave' | 'laugh' | 'dance';
 
@@ -111,8 +116,7 @@ interface Cloud {
 }
 
 export const TREES_LIST: [number, number][] = [
-  // Outer perimeter for 15x15 island (North edge)
-  [0, -6.6],
+  // Outer perimeter for 15x15 island (North edge - center is reserved for Pohon Beringin at [0, -5.8])
   [-2.2, -6.4],
   [2.2, -6.4],
   [-4.4, -6.0],
@@ -638,6 +642,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   latestXpGain,
   onDeductPoints,
   onOpenTownRules,
+  onAddXp,
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -681,6 +686,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [hoveredBuilding, setHoveredBuilding] = useState<BuildingInfo | null>(null);
   const [isCafeMenuOpen, setIsCafeMenuOpen] = useState(false);
   const [isTownRulesModalOpen, setIsTownRulesModalOpen] = useState(false);
+  const [isJurnalModalOpen, setIsJurnalModalOpen] = useState(false);
+  const [stickyNotes, setStickyNotes] = useState<DailyJournalStickyNote[]>(() => getStoredStickyNotes());
+  const stickyNotesRef = useRef<DailyJournalStickyNote[]>(stickyNotes);
+  stickyNotesRef.current = stickyNotes;
   const [cafeToast, setCafeToast] = useState<string | null>(null);
   const cafeToastTimerRef = useRef<number | null>(null);
   const [cafeScreenPos, setCafeScreenPos] = useState<{ x: number; y: number; visible: boolean }>({
@@ -868,15 +877,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [isLiteracyModalOpen, setIsLiteracyModalOpen] = useState(false);
   const [activeLiteracyDoc, setActiveLiteracyDoc] = useState<'komik' | 'majalah' | 'koran' | null>(null);
 
-  // Nearby interaction (tree watering, fishing spot, literacy corner, bench, or town rules board)
+  // Nearby interaction (tree watering, fishing spot, literacy corner, bench, town rules board, or beringin tree journal)
   const [nearbyAction, setNearbyAction] = useState<{
-    type: 'tree' | 'fishing' | 'literacy' | 'bench' | 'town_rules';
+    type: 'tree' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
     treeIndex?: number;
     benchId?: BenchId;
     benchName?: string;
   } | null>(null);
   const nearbyActionRef = useRef<{
-    type: 'tree' | 'fishing' | 'literacy' | 'bench' | 'town_rules';
+    type: 'tree' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
     treeIndex?: number;
     benchId?: BenchId;
     benchName?: string;
@@ -1958,6 +1967,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
+      // 1c. Check Click on Pohon Beringin Jurnal Harian di Belakang Balai Kota [0, -5.8]
+      const beringinDist = Math.hypot(wx - BERINGIN_TREE_COORDS.wx, wy - BERINGIN_TREE_COORDS.wy);
+      if (beringinDist < 1.6) {
+        sounds.playClick();
+        if (isSittingRef.current) {
+          setIsSitting(false);
+          setSittingSeat(null);
+        }
+        pendingSeatRef.current = null;
+        player.targetWx = 0;
+        player.targetWy = -5.2;
+        player.isMoving = true;
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+        pendingBuildingId = null;
+        lastTouchedIdRef.current = null;
+        setPendingConfirmation(null);
+        setIsCafeMenuOpen(false);
+        sounds.playOpenModal();
+        setIsJurnalModalOpen(true);
+        return;
+      }
+
       // 2. Check Click on Kolam Pemancingan Timur [4.6, -2.2]
       const fishSpotDist = Math.hypot(wx - 4.6, wy - (-2.2));
       if (fishSpotDist < 2.2) {
@@ -2445,6 +2476,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       } else if (Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.35 || Math.hypot(player.wx - 0, player.wy - 6.15) < 1.45) {
         if (nearbyActionRef.current?.type !== 'town_rules') {
           setNearbyAction({ type: 'town_rules' });
+        }
+      } else if (Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.6) {
+        if (nearbyActionRef.current?.type !== 'beringin') {
+          setNearbyAction({ type: 'beringin' });
         }
       } else if (litDist < 1.05) {
         if (nearbyActionRef.current?.type !== 'literacy') {
@@ -2965,7 +3000,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'swings_structure'; struct: SwingStructureDef; wx: number; wy: number; depth: number }
         | { type: 'campfire_spot'; wx: number; wy: number; depth: number }
         | { type: 'welcome_gate'; wx: number; wy: number; depth: number }
-        | { type: 'town_rules_board'; wx: number; wy: number; depth: number };
+        | { type: 'town_rules_board'; wx: number; wy: number; depth: number }
+        | { type: 'beringin_tree'; wx: number; wy: number; depth: number };
 
       const drawItems: DrawItem[] = [];
 
@@ -3074,6 +3110,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         wx: TOWN_RULES_BOARD_COORDS.wx,
         wy: TOWN_RULES_BOARD_COORDS.wy,
         depth: TOWN_RULES_BOARD_COORDS.wx + TOWN_RULES_BOARD_COORDS.wy + 0.45,
+      });
+
+      // 9. Pohon Beringin Jurnal Harian di Belakang Balai Kota [0, -5.8]
+      drawItems.push({
+        type: 'beringin_tree',
+        wx: BERINGIN_TREE_COORDS.wx,
+        wy: BERINGIN_TREE_COORDS.wy,
+        depth: BERINGIN_TREE_COORDS.wx + BERINGIN_TREE_COORDS.wy - 0.05,
       });
 
       drawItems.sort((a, b) => a.depth - b.depth);
@@ -3852,6 +3896,239 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(bText, pt.x, badgeY);
+
+          ctx.restore();
+        } else if (item.type === 'beringin_tree') {
+          // =========================================================
+          // POHON BERINGIN JURNAL HARIAN DI BELAKANG BALAI KOTA [wx: 0, wy: -5.8]
+          // =========================================================
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          ctx.save();
+
+          // 1. Soft Grand Ground Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x + 2, pt.y + 4 * z, 44 * z, 20 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 2. Circular Stone / Wooden Garden Retaining Border around Tree Base
+          ctx.fillStyle = isNight ? '#1e293b' : '#334155';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 2 * z, 32 * z, 15 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 1.2 * z;
+          ctx.stroke();
+
+          // Inner rich dark soil ring
+          ctx.fillStyle = isNight ? '#180f08' : '#2e190d';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 1 * z, 27 * z, 12 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 3. Sprawling Gnarled Banyan Roots & Broad Trunk
+          const trunkH = 58 * z;
+          const trunkBaseW = 28 * z;
+          const trunkTopW = 16 * z;
+
+          // Main Trunk Body
+          ctx.fillStyle = isNight ? '#2b1406' : '#54260a';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - trunkBaseW / 2, pt.y + 1 * z);
+          // Left flared root
+          ctx.quadraticCurveTo(pt.x - 18 * z, pt.y - 12 * z, pt.x - trunkTopW / 2, pt.y - trunkH);
+          ctx.lineTo(pt.x + trunkTopW / 2, pt.y - trunkH);
+          // Right flared root
+          ctx.quadraticCurveTo(pt.x + 18 * z, pt.y - 12 * z, pt.x + trunkBaseW / 2, pt.y + 1 * z);
+          ctx.closePath();
+          ctx.fill();
+
+          // Bark highlights & shadow ridges
+          ctx.fillStyle = isNight ? '#1c0c03' : '#3d1a05';
+          ctx.fillRect(pt.x + 1 * z, pt.y - trunkH, 4 * z, trunkH);
+          ctx.fillStyle = isNight ? '#422006' : '#78350f';
+          ctx.fillRect(pt.x - 5 * z, pt.y - trunkH + 4 * z, 2.5 * z, trunkH - 6 * z);
+
+          // 4. Aerial Hanging Roots (Sulur Beringin)
+          const aerialRoots = [
+            { xOff: -16, topY: -44, botY: -1, width: 2 },
+            { xOff: -10, topY: -50, botY: 1, width: 1.8 },
+            { xOff: 10, topY: -48, botY: 1, width: 2 },
+            { xOff: 16, topY: -42, botY: -1, width: 1.8 },
+          ];
+          aerialRoots.forEach((ar) => {
+            const rx = pt.x + ar.xOff * z;
+            const sway = Math.sin(elapsed * 2 + ar.xOff) * 1.2 * z;
+            ctx.strokeStyle = isNight ? '#381a07' : '#6b320d';
+            ctx.lineWidth = ar.width * z;
+            ctx.beginPath();
+            ctx.moveTo(rx, pt.y + ar.topY * z);
+            ctx.quadraticCurveTo(rx + sway, pt.y + (ar.topY + ar.botY) * 0.5 * z, rx, pt.y + ar.botY * z);
+            ctx.stroke();
+          });
+
+          // 5. Massive Layered Canopy Foliage
+          // Layer A: Deep Base Canopy Lobes (Outer Dark Green)
+          ctx.fillStyle = isNight ? '#022c22' : '#064e3b';
+          ctx.beginPath();
+          ctx.arc(pt.x - 24 * z, pt.y - 68 * z, 26 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x + 24 * z, pt.y - 68 * z, 26 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x, pt.y - 82 * z, 32 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Layer B: Mid Lush Jade Canopy
+          ctx.fillStyle = isNight ? '#065f46' : '#047857';
+          ctx.beginPath();
+          ctx.arc(pt.x - 16 * z, pt.y - 74 * z, 24 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x + 16 * z, pt.y - 74 * z, 24 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x, pt.y - 92 * z, 28 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Layer C: Upper Mint / Spring Highlights
+          ctx.fillStyle = isNight ? '#047857' : '#10b981';
+          ctx.beginPath();
+          ctx.arc(pt.x - 10 * z, pt.y - 82 * z, 18 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x + 10 * z, pt.y - 82 * z, 18 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x, pt.y - 98 * z, 20 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Layer D: Top Soft Sunlight Canopy Glow
+          ctx.fillStyle = isNight ? '#059669' : '#34d399';
+          ctx.beginPath();
+          ctx.arc(pt.x - 4 * z, pt.y - 102 * z, 12 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 6. Hanging Warm Glowing Paper Lanterns
+          const lanterns = [
+            { lx: pt.x - 22 * z, ly: pt.y - 52 * z },
+            { lx: pt.x + 22 * z, ly: pt.y - 50 * z },
+          ];
+          lanterns.forEach((lan) => {
+            // Cord
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 0.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(lan.lx, lan.ly - 8 * z);
+            ctx.lineTo(lan.lx, lan.ly);
+            ctx.stroke();
+
+            // Glow
+            const lGrad = ctx.createRadialGradient(lan.lx, lan.ly, 1 * z, lan.lx, lan.ly, 10 * z);
+            lGrad.addColorStop(0, 'rgba(254, 240, 138, 0.9)');
+            lGrad.addColorStop(0.4, 'rgba(245, 158, 11, 0.4)');
+            lGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+            ctx.fillStyle = lGrad;
+            ctx.beginPath();
+            ctx.arc(lan.lx, lan.ly, 10 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Lantern body
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(lan.lx - 2.5 * z, lan.ly - 3.5 * z, 5 * z, 7 * z);
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 0.8 * z;
+            ctx.strokeRect(lan.lx - 2.5 * z, lan.ly - 3.5 * z, 5 * z, 7 * z);
+          });
+
+          // 7. REALTIME STICKY NOTES ON THE BERINGIN TRUNK!
+          const notesToRender = stickyNotesRef.current || [];
+          const noteCount = notesToRender.length;
+
+          // Slot coordinates on the beringin trunk for sticky notes
+          const noteSlots = [
+            { dx: -7, dy: -32, angle: -0.15, defaultColor: '#fef08a' }, // top left
+            { dx: 4, dy: -36, angle: 0.12, defaultColor: '#fbcfe8' },  // top right
+            { dx: -8, dy: -20, angle: 0.08, defaultColor: '#bae6fd' },  // mid left
+            { dx: 3, dy: -22, angle: -0.10, defaultColor: '#a7f3d0' },  // mid right
+            { dx: -4, dy: -10, angle: -0.05, defaultColor: '#e9d5ff' }, // lower left
+            { dx: 6, dy: -12, angle: 0.15, defaultColor: '#fed7aa' },   // lower right
+            { dx: -12, dy: -26, angle: -0.20, defaultColor: '#fef08a' }, // side branch left
+            { dx: 11, dy: -28, angle: 0.18, defaultColor: '#fbcfe8' },  // side branch right
+          ];
+
+          const visibleCount = Math.min(noteSlots.length, Math.max(3, noteCount));
+          for (let ni = 0; ni < visibleCount; ni++) {
+            const slot = noteSlots[ni];
+            const actualNote = notesToRender[ni];
+            const nx = pt.x + slot.dx * z;
+            const ny = pt.y + slot.dy * z;
+            const nW = 7.5 * z;
+            const nH = 7.5 * z;
+            const flutter = Math.sin(elapsed * 3 + ni * 1.5) * 0.04;
+            const totalAngle = slot.angle + flutter;
+
+            ctx.save();
+            ctx.translate(nx, ny);
+            ctx.rotate(totalAngle);
+
+            // Drop shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.fillRect(-nW / 2 + 0.8 * z, -nH / 2 + 0.8 * z, nW, nH);
+
+            // Note paper background
+            let noteBg = slot.defaultColor;
+            if (actualNote) {
+              if (actualNote.color === 'pink') noteBg = '#fbcfe8';
+              else if (actualNote.color === 'blue') noteBg = '#bae6fd';
+              else if (actualNote.color === 'green') noteBg = '#a7f3d0';
+              else if (actualNote.color === 'purple') noteBg = '#e9d5ff';
+              else noteBg = '#fef08a';
+            }
+            ctx.fillStyle = noteBg;
+            ctx.fillRect(-nW / 2, -nH / 2, nW, nH);
+            ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+            ctx.lineWidth = 0.5 * z;
+            ctx.strokeRect(-nW / 2, -nH / 2, nW, nH);
+
+            // Red pushpin
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(0, -nH / 2 + 1.2 * z, 0.9 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2 tiny pencil lines
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fillRect(-nW / 2 + 1.2 * z, -nH / 2 + 3.2 * z, nW - 2.4 * z, 0.6 * z);
+            ctx.fillRect(-nW / 2 + 1.2 * z, -nH / 2 + 4.8 * z, nW - 3.8 * z, 0.6 * z);
+
+            ctx.restore();
+          }
+
+          // 8. Floating Hover Tag: "🌳 Pohon Beringin • Jurnal Harian"
+          const treeHoverBounce = Math.sin(elapsed * 3.5) * 2 * z;
+          const tagY = pt.y - 120 * z + treeHoverBounce;
+          const tagTitle = '🌳 Pohon Beringin Jurnal Harian';
+          const subText = `${noteCount} Catatan Tempel • +1 XP`;
+
+          ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+          const titleWidth = ctx.measureText(tagTitle).width;
+          ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
+          const subWidth = ctx.measureText(subText).width;
+          const bannerW = Math.max(titleWidth, subWidth) + 16 * z;
+          const bannerH = 26 * z;
+
+          // Banner capsule background
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - bannerW / 2, tagY - bannerH / 2, bannerW, bannerH, 10 * z);
+          ctx.fill();
+
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 1.2 * z;
+          ctx.stroke();
+
+          // Title
+          ctx.fillStyle = '#a7f3d0';
+          ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(tagTitle, pt.x, tagY - 4 * z);
+
+          // Subtitle / XP badge
+          ctx.fillStyle = '#fde047';
+          ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
+          ctx.fillText(subText, pt.x, tagY + 6 * z);
 
           ctx.restore();
         } else if (item.type === 'literacy_corner') {
@@ -8518,6 +8795,36 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     <span>📋 Baca</span>
                   </button>
                 </div>
+              ) : nearbyAction.type === 'beringin' ? (
+                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-emerald-400/60 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                      🌳
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-400 flex items-center gap-1.5">
+                        <span>Pohon Beringin • Belakang Balai Kota</span>
+                        <span className="text-amber-300 font-mono font-black">+1 XP</span>
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                        Jurnal Harian Refleksi Singkat
+                      </h4>
+                      <p className="text-[10px] truncate text-emerald-200/80">
+                        {stickyNotes.length} sticky note tertempel di pohon • Tulis refleksimu hari ini
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      sounds.playOpenModal();
+                      setIsJurnalModalOpen(true);
+                    }}
+                    className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold border border-emerald-400/50 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <Pin className="w-3.5 h-3.5" />
+                    <span>Tulis Jurnal</span>
+                  </button>
+                </div>
               ) : nearbyAction.type === 'literacy' ? (
                 <div className="bg-[#121e2c]/95 backdrop-blur-md border border-cyan-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -8912,6 +9219,34 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 } as Student)
               : null
           }
+        />
+      )}
+
+      {/* JURNAL HARIAN POHON BERINGIN MODAL (Belakang Balai Kota) */}
+      {isJurnalModalOpen && (
+        <JurnalHarianModal
+          onClose={() => setIsJurnalModalOpen(false)}
+          student={
+            studentId
+              ? ({
+                  id: studentId,
+                  name: studentName,
+                  gender: studentGender,
+                  isTeacher,
+                  points: studentPoints,
+                  className: isTeacher ? 'Guru DKV' : 'X DKV 2',
+                  studentNumber: studentId,
+                  password: '',
+                  badges: [],
+                  lastLogin: '',
+                  streakDays: 1,
+                } as Student)
+              : null
+          }
+          onAddXp={onAddXp}
+          onNoteAdded={(newNote) => {
+            setStickyNotes((prev) => [newNote, ...prev]);
+          }}
         />
       )}
 

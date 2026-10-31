@@ -200,3 +200,16 @@ export interface TeacherAccount {
   gender: 'L' | 'P';
   subjects: string[];
 }
+
+export interface DailyJournalStickyNote {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className?: string;
+  content: string; // Catatan refleksi singkat harian
+  mood: string;    // e.g. '😊', '💡', '🚀', '🎨', '🌿', '🎯'
+  color: 'yellow' | 'pink' | 'blue' | 'green' | 'purple';
+  date: string;    // format tanggal Indonesia
+  timestamp: number;
+  likes?: number;
+}
