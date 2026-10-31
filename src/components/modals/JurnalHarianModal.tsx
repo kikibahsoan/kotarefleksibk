@@ -12,6 +12,7 @@ interface JurnalHarianModalProps {
 }
 
 export const STORAGE_KEY_JURNAL_BERINGIN = 'kota_jurnal_harian_beringin';
+export const STORAGE_KEY_JURNAL_LIKES_BY_USER = 'kota_jurnal_likes_by_user';
 
 export const INITIAL_STICKY_NOTES: DailyJournalStickyNote[] = [
   {
@@ -25,6 +26,8 @@ export const INITIAL_STICKY_NOTES: DailyJournalStickyNote[] = [
     date: '31 Okt 2026',
     timestamp: Date.now() - 1000 * 60 * 45,
     likes: 5,
+    likedBy: ['std-dkv2-02', 'std-dkv2-03', 'teacher-naziefah'],
+    likedByNames: ['Siti Rahma', 'Budi Santoso', 'NAZIEFAH S.Pd'],
   },
   {
     id: 'note-init-02',
@@ -37,6 +40,8 @@ export const INITIAL_STICKY_NOTES: DailyJournalStickyNote[] = [
     date: '31 Okt 2026',
     timestamp: Date.now() - 1000 * 60 * 120,
     likes: 12,
+    likedBy: ['std-dkv2-01', 'std-dkv3-05', 'std-dkv2-12'],
+    likedByNames: ['ABDUL RAZAK SAMAUNA', 'FADHIL ARKAN', 'NURUL AISYAH'],
   },
   {
     id: 'note-init-03',
@@ -49,6 +54,8 @@ export const INITIAL_STICKY_NOTES: DailyJournalStickyNote[] = [
     date: '30 Okt 2026',
     timestamp: Date.now() - 1000 * 60 * 60 * 18,
     likes: 4,
+    likedBy: ['std-dkv2-01', 'teacher-naziefah'],
+    likedByNames: ['ABDUL RAZAK SAMAUNA', 'NAZIEFAH S.Pd'],
   },
   {
     id: 'note-init-04',
@@ -61,6 +68,8 @@ export const INITIAL_STICKY_NOTES: DailyJournalStickyNote[] = [
     date: '30 Okt 2026',
     timestamp: Date.now() - 1000 * 60 * 60 * 24,
     likes: 7,
+    likedBy: ['std-dkv2-01', 'std-dkv3-05'],
+    likedByNames: ['ABDUL RAZAK SAMAUNA', 'FADHIL ARKAN'],
   },
 ];
 
@@ -84,6 +93,47 @@ export function saveStoredStickyNotes(notes: DailyJournalStickyNote[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_JURNAL_BERINGIN, JSON.stringify(notes));
   } catch (e) {}
+}
+
+export function mergeStickyNotesList(
+  listA: DailyJournalStickyNote[],
+  listB: DailyJournalStickyNote[]
+): DailyJournalStickyNote[] {
+  const map = new Map<string, DailyJournalStickyNote>();
+  const addOrMerge = (n: DailyJournalStickyNote) => {
+    if (!n || !n.id) return;
+    const existing = map.get(n.id);
+    if (!existing) {
+      map.set(n.id, {
+        ...n,
+        likes: typeof n.likes === 'number' ? n.likes : 0,
+        likedBy: Array.isArray(n.likedBy) ? n.likedBy : [],
+        likedByNames: Array.isArray(n.likedByNames) ? n.likedByNames : [],
+      });
+    } else {
+      const mergedLikedBy = Array.from(
+        new Set([...(existing.likedBy || []), ...(n.likedBy || [])])
+      );
+      const mergedLikedNames = Array.from(
+        new Set([...(existing.likedByNames || []), ...(n.likedByNames || [])])
+      );
+      const maxLikes = Math.max(
+        existing.likes || 0,
+        n.likes || 0,
+        mergedLikedBy.length
+      );
+      map.set(n.id, {
+        ...existing,
+        ...n,
+        likes: maxLikes,
+        likedBy: mergedLikedBy,
+        likedByNames: mergedLikedNames,
+      });
+    }
+  };
+  listA.forEach(addOrMerge);
+  listB.forEach(addOrMerge);
+  return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
 const COLOR_MAP = {
@@ -134,6 +184,9 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
   onAddXp,
   onNoteAdded,
 }) => {
+  const currentCitizenId = student?.id || 'warga-lokal';
+  const currentCitizenName = student?.name || 'Warga Refleksia';
+
   const [notes, setNotes] = useState<DailyJournalStickyNote[]>(() => getStoredStickyNotes());
   // Default to board so citizen immediately reads all other citizens' journals!
   const [activeTab, setActiveTab] = useState<'board' | 'write'>('board');
@@ -146,67 +199,96 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Per-citizen liked note IDs stored in localStorage so switching accounts on the same browser works independently
   const [likedNoteIds, setLikedNoteIds] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('kota_jurnal_likes');
-      return saved ? JSON.parse(saved) : [];
+      const byUserRaw = localStorage.getItem(STORAGE_KEY_JURNAL_LIKES_BY_USER);
+      if (byUserRaw) {
+        const parsedMap = JSON.parse(byUserRaw);
+        if (parsedMap && Array.isArray(parsedMap[currentCitizenId])) {
+          return parsedMap[currentCitizenId];
+        }
+      }
+      const savedLegacy = localStorage.getItem('kota_jurnal_likes');
+      return savedLegacy ? JSON.parse(savedLegacy) : [];
     } catch {
       return [];
     }
   });
 
-  // Synchronize sticky notes from server across all devices & students
+  // Synchronize sticky notes from localStorage & server across all citizens, tabs & devices
   useEffect(() => {
     let isMounted = true;
-    const fetchSharedNotes = async () => {
+    const syncNotesFromStorageAndServer = async () => {
+      const local = getStoredStickyNotes();
+      if (isMounted) {
+        setNotes(local);
+      }
       try {
         const res = await fetch('/api/journals/sticky-notes');
         if (res.ok) {
           const json = await res.json();
           if (json.success && Array.isArray(json.data) && isMounted) {
-            const map = new Map<string, DailyJournalStickyNote>();
-            // Add server notes first
-            json.data.forEach((n: DailyJournalStickyNote) => {
-              if (n && n.id) map.set(n.id, n);
-            });
-            // Merge local storage notes
-            const local = getStoredStickyNotes();
-            local.forEach((n) => {
-              if (!map.has(n.id)) map.set(n.id, n);
-            });
-            const merged = Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            const latestLocal = getStoredStickyNotes();
+            const merged = mergeStickyNotesList(latestLocal, json.data);
             setNotes(merged);
             saveStoredStickyNotes(merged);
           }
         }
       } catch (err) {
-        // Safe offline fallback
+        // Offline / localStorage-only mode works seamlessly
       }
     };
 
-    fetchSharedNotes();
+    syncNotesFromStorageAndServer();
 
-    // Listen to local BroadcastChannel and window events
-    const handleStorageUpdate = (e: any) => {
+    // Listen to localStorage changes from other tabs/windows
+    const handleNativeStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY_JURNAL_BERINGIN && e.newValue && isMounted) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) setNotes(parsed);
+        } catch {}
+      }
+    };
+
+    // Listen to custom window events within the same tab
+    const handleCustomUpdate = (e: any) => {
       if (e?.detail && Array.isArray(e.detail) && isMounted) {
         setNotes(e.detail);
+      } else if (isMounted) {
+        setNotes(getStoredStickyNotes());
       }
     };
-    window.addEventListener('kota_refleksi_sticky_notes_updated', handleStorageUpdate);
+
+    window.addEventListener('storage', handleNativeStorage);
+    window.addEventListener('kota_refleksi_sticky_notes_updated', handleCustomUpdate);
 
     let bc: BroadcastChannel | null = null;
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       bc = new BroadcastChannel('kota_refleksi_channel');
       bc.onmessage = (event) => {
-        if (event.data?.type === 'sticky_note_added' || event.data?.type === 'sticky_notes_updated') {
-          fetchSharedNotes();
+        if (
+          event.data?.type === 'sticky_note_added' ||
+          event.data?.type === 'STICKY_NOTE_ADDED' ||
+          event.data?.type === 'sticky_notes_updated' ||
+          event.data?.type === 'sticky_note_liked'
+        ) {
+          if (Array.isArray(event.data?.notes) && isMounted) {
+            const merged = mergeStickyNotesList(getStoredStickyNotes(), event.data.notes);
+            saveStoredStickyNotes(merged);
+            setNotes(merged);
+          } else {
+            syncNotesFromStorageAndServer();
+          }
         }
       };
     }
 
     return () => {
       isMounted = false;
-      window.removeEventListener('kota_refleksi_sticky_notes_updated', handleStorageUpdate);
+      window.removeEventListener('storage', handleNativeStorage);
+      window.removeEventListener('kota_refleksi_sticky_notes_updated', handleCustomUpdate);
       if (bc) bc.close();
     };
   }, []);
@@ -216,7 +298,10 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
     return notes.filter((n) => {
       // 1. Class / Mine filter
       if (filterClass === 'mine') {
-        if (student?.id && n.studentId !== student.id) return false;
+        const isMine =
+          (student?.id && n.studentId === student.id) ||
+          (student?.name && n.studentName.toLowerCase() === student.name.toLowerCase());
+        if (!isMine) return false;
       } else if (filterClass === 'dkv2') {
         if (!n.className?.includes('DKV 2') && !n.className?.includes('2')) return false;
       } else if (filterClass === 'dkv3') {
@@ -236,9 +321,13 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
 
       return true;
     });
-  }, [notes, filterClass, searchQuery, student?.id]);
+  }, [notes, filterClass, searchQuery, student?.id, student?.name]);
 
-  const myNotesCount = notes.filter((n) => student?.id && n.studentId === student.id).length;
+  const myNotesCount = notes.filter(
+    (n) =>
+      (student?.id && n.studentId === student.id) ||
+      (student?.name && n.studentName.toLowerCase() === student.name.toLowerCase())
+  ).length;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -266,16 +355,19 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
       date: todayStr,
       timestamp: Date.now(),
       likes: 0,
+      likedBy: [],
+      likedByNames: [],
     };
 
-    const nextNotes = [newNote, ...notes];
+    const currentLocal = getStoredStickyNotes();
+    const nextNotes = [newNote, ...currentLocal.filter((n) => n.id !== newNote.id)];
     setNotes(nextNotes);
     saveStoredStickyNotes(nextNotes);
 
     // Call callbacks
     if (onNoteAdded) onNoteAdded(newNote);
 
-    // Sync to backend server so other citizens on different devices/browsers can read it immediately
+    // Sync to backend server so other citizens on different devices/browsers can read & like it immediately
     try {
       await fetch('/api/journals/sticky-notes', {
         method: 'POST',
@@ -286,12 +378,13 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
       // offline fallback
     }
 
-    // Broadcast update across tabs
+    // Broadcast update across all tabs & components
     try {
       window.dispatchEvent(new CustomEvent('kota_refleksi_sticky_notes_updated', { detail: nextNotes }));
+      window.dispatchEvent(new CustomEvent('sticky_note_added', { detail: newNote }));
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         const bc = new BroadcastChannel('kota_refleksi_channel');
-        bc.postMessage({ type: 'sticky_note_added', data: newNote });
+        bc.postMessage({ type: 'STICKY_NOTE_ADDED', note: newNote, notes: nextNotes });
         bc.close();
       }
     } catch (e) {}
@@ -318,27 +411,52 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
       setIsSuccess(false);
       setContent('');
       setActiveTab('board');
-    }, 1200);
+    }, 1000);
   };
 
   const handleToggleLike = async (noteId: string) => {
     sounds.playClick();
-    const isAlreadyLiked = likedNoteIds.includes(noteId);
+    const targetNote = notes.find((n) => n.id === noteId);
+    const alreadyInNoteLikedBy = Boolean(targetNote?.likedBy?.includes(currentCitizenId));
+    const isAlreadyLiked = likedNoteIds.includes(noteId) || alreadyInNoteLikedBy;
+
     const nextLiked = isAlreadyLiked
       ? likedNoteIds.filter((id) => id !== noteId)
-      : [...likedNoteIds, noteId];
+      : Array.from(new Set([...likedNoteIds, noteId]));
 
     setLikedNoteIds(nextLiked);
     try {
       localStorage.setItem('kota_jurnal_likes', JSON.stringify(nextLiked));
+      const rawMap = localStorage.getItem(STORAGE_KEY_JURNAL_LIKES_BY_USER);
+      const parsedMap = rawMap ? JSON.parse(rawMap) : {};
+      parsedMap[currentCitizenId] = nextLiked;
+      localStorage.setItem(STORAGE_KEY_JURNAL_LIKES_BY_USER, JSON.stringify(parsedMap));
     } catch {}
 
     const nextNotes = notes.map((n) => {
       if (n.id === noteId) {
         const curLikes = n.likes || 0;
+        const prevLikedBy = Array.isArray(n.likedBy) ? n.likedBy : [];
+        const prevLikedNames = Array.isArray(n.likedByNames) ? n.likedByNames : [];
+
+        const updatedLikedBy = isAlreadyLiked
+          ? prevLikedBy.filter((id) => id !== currentCitizenId)
+          : Array.from(new Set([...prevLikedBy, currentCitizenId]));
+
+        const updatedLikedNames = isAlreadyLiked
+          ? prevLikedNames.filter((nm) => nm !== currentCitizenName)
+          : Array.from(new Set([...prevLikedNames, currentCitizenName]));
+
+        const updatedLikes = Math.max(
+          updatedLikedBy.length,
+          Math.max(0, curLikes + (isAlreadyLiked ? -1 : 1))
+        );
+
         return {
           ...n,
-          likes: Math.max(0, curLikes + (isAlreadyLiked ? -1 : 1)),
+          likes: updatedLikes,
+          likedBy: updatedLikedBy,
+          likedByNames: updatedLikedNames,
         };
       }
       return n;
@@ -347,11 +465,26 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
     setNotes(nextNotes);
     saveStoredStickyNotes(nextNotes);
 
+    // Broadcast updated likes to localStorage listeners & other tabs
+    try {
+      window.dispatchEvent(new CustomEvent('kota_refleksi_sticky_notes_updated', { detail: nextNotes }));
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('kota_refleksi_channel');
+        bc.postMessage({ type: 'sticky_note_liked', noteId, notes: nextNotes });
+        bc.close();
+      }
+    } catch {}
+
     try {
       fetch('/api/journals/sticky-notes/like', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ noteId, increment: !isAlreadyLiked }),
+        body: JSON.stringify({
+          noteId,
+          increment: !isAlreadyLiked,
+          studentId: currentCitizenId,
+          studentName: currentCitizenName,
+        }),
       }).catch(() => {});
     } catch (e) {}
   };
@@ -538,10 +671,15 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
                   {filteredNotes.map((note, idx) => {
                     const cObj = COLOR_MAP[note.color] || COLOR_MAP.yellow;
-                    const isLiked = likedNoteIds.includes(note.id);
-                    const isMyOwn = student?.id && note.studentId === student.id;
+                    const isLiked =
+                      likedNoteIds.includes(note.id) ||
+                      Boolean(note.likedBy?.includes(currentCitizenId));
+                    const isMyOwn =
+                      (student?.id && note.studentId === student.id) ||
+                      (student?.name && note.studentName.toLowerCase() === student.name.toLowerCase());
                     const rotations = ['rotate-[-1.2deg]', 'rotate-[1.2deg]', 'rotate-[-0.8deg]', 'rotate-[1.5deg]', 'rotate-[-1.5deg]'];
                     const rot = rotations[idx % rotations.length];
+                    const likedNames = Array.isArray(note.likedByNames) ? note.likedByNames : [];
 
                     return (
                       <div
@@ -582,24 +720,41 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
                           </p>
                         </div>
 
-                        {/* Note Footer: Date & Heart Likes */}
-                        <div className="mt-3.5 pt-2 border-t border-black/15 flex items-center justify-between text-[10.5px]">
-                          <span className="opacity-75 font-mono flex items-center gap-1">
-                            <Calendar className="w-3 h-3 opacity-60" />
-                            <span>{note.date}</span>
-                          </span>
+                        {/* Note Footer: Date, Liked By Names & Heart Likes */}
+                        <div className="mt-3.5 pt-2 border-t border-black/15 space-y-1.5">
+                          {likedNames.length > 0 && (
+                            <div className="text-[10px] text-slate-800/85 font-semibold flex items-center gap-1 truncate">
+                              <Heart className="w-2.5 h-2.5 text-rose-500 fill-rose-500 shrink-0" />
+                              <span className="truncate">
+                                Disukai oleh {likedNames.slice(0, 2).join(', ')}
+                                {likedNames.length > 2 ? ` +${likedNames.length - 2} warga lainnya` : ''}
+                              </span>
+                            </div>
+                          )}
 
-                          <button
-                            type="button"
-                            onClick={() => handleToggleLike(note.id)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition active:scale-95 cursor-pointer shadow-xs ${
-                              isLiked ? 'bg-rose-500 text-white' : 'bg-black/10 hover:bg-black/20 text-slate-900'
-                            }`}
-                            title="Beri tanda suka pada catatan ini"
-                          >
-                            <Heart className={`w-3 h-3 ${isLiked ? 'fill-white' : ''}`} />
-                            <span className="text-[11px] font-mono">{note.likes || 0}</span>
-                          </button>
+                          <div className="flex items-center justify-between text-[10.5px]">
+                            <span className="opacity-75 font-mono flex items-center gap-1">
+                              <Calendar className="w-3 h-3 opacity-60" />
+                              <span>{note.date}</span>
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleLike(note.id)}
+                              className={`flex items-center gap-1.5 px-3 py-1 rounded-full font-extrabold transition active:scale-95 cursor-pointer shadow-xs ${
+                                isLiked
+                                  ? 'bg-rose-500 text-white shadow-rose-500/30'
+                                  : 'bg-black/10 hover:bg-rose-500/20 text-slate-900'
+                              }`}
+                              title={isLiked ? 'Batalkan suka' : 'Sukai catatan warga ini'}
+                            >
+                              <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-white animate-bounce' : 'text-rose-600'}`} />
+                              <span className="text-[11px]">{isLiked ? 'Disukai' : 'Suka'}</span>
+                              <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-full bg-black/15">
+                                {note.likes || 0}
+                              </span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

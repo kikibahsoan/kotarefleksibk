@@ -215,4 +215,6 @@ export interface DailyJournalStickyNote {
   date: string;    // format tanggal Indonesia
   timestamp: number;
   likes?: number;
+  likedBy?: string[];      // daftar ID warga yang menyukai
+  likedByNames?: string[]; // daftar Nama warga yang menyukai
 }

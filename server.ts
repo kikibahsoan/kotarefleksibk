@@ -462,6 +462,8 @@ interface ServerStickyNote {
   date: string;
   timestamp: number;
   likes?: number;
+  likedBy?: string[];
+  likedByNames?: string[];
 }
 
 interface ServerJurnal4F {
@@ -494,6 +496,8 @@ const INITIAL_SERVER_STICKY_NOTES: ServerStickyNote[] = [
     date: '31 Okt 2026',
     timestamp: Date.now() - 1000 * 60 * 45,
     likes: 5,
+    likedBy: ['std-dkv2-02', 'std-dkv2-03', 'teacher-naziefah'],
+    likedByNames: ['Siti Rahma', 'Budi Santoso', 'NAZIEFAH S.Pd'],
   },
   {
     id: 'note-init-02',
@@ -506,6 +510,8 @@ const INITIAL_SERVER_STICKY_NOTES: ServerStickyNote[] = [
     date: '31 Okt 2026',
     timestamp: Date.now() - 1000 * 60 * 120,
     likes: 12,
+    likedBy: ['std-dkv2-01', 'std-dkv3-05', 'std-dkv2-12'],
+    likedByNames: ['ABDUL RAZAK SAMAUNA', 'FADHIL ARKAN', 'NURUL AISYAH'],
   },
   {
     id: 'note-init-03',
@@ -518,6 +524,8 @@ const INITIAL_SERVER_STICKY_NOTES: ServerStickyNote[] = [
     date: '30 Okt 2026',
     timestamp: Date.now() - 1000 * 60 * 60 * 18,
     likes: 4,
+    likedBy: ['std-dkv2-01', 'teacher-naziefah'],
+    likedByNames: ['ABDUL RAZAK SAMAUNA', 'NAZIEFAH S.Pd'],
   },
   {
     id: 'note-init-04',
@@ -530,6 +538,8 @@ const INITIAL_SERVER_STICKY_NOTES: ServerStickyNote[] = [
     date: '30 Okt 2026',
     timestamp: Date.now() - 1000 * 60 * 60 * 24,
     likes: 7,
+    likedBy: ['std-dkv2-01', 'std-dkv3-05'],
+    likedByNames: ['ABDUL RAZAK SAMAUNA', 'FADHIL ARKAN'],
   },
 ];
 
@@ -624,13 +634,16 @@ app.get('/api/journals/sticky-notes', (_req, res) => {
 });
 
 app.post('/api/journals/sticky-notes', (req, res) => {
-  const { studentId, studentName, className, content, mood, color, date } = req.body;
+  const { id, studentId, studentName, className, content, mood, color, date, timestamp } = req.body;
   if (!content || typeof content !== 'string' || !content.trim()) {
     return res.status(400).json({ success: false, error: 'Isi catatan tidak boleh kosong.' });
   }
 
+  const noteId = id ? String(id) : `sticky-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const existingIdx = serverStickyNotes.findIndex((n) => n.id === noteId);
+
   const newNote: ServerStickyNote = {
-    id: `sticky-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: noteId,
     studentId: String(studentId || 'std-anon'),
     studentName: String(studentName || 'Warga Refleksia'),
     className: String(className || 'X DKV 2'),
@@ -638,11 +651,17 @@ app.post('/api/journals/sticky-notes', (req, res) => {
     mood: String(mood || '😊'),
     color: ['yellow', 'pink', 'blue', 'green', 'purple'].includes(color) ? color : 'yellow',
     date: date || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-    timestamp: Date.now(),
+    timestamp: typeof timestamp === 'number' ? timestamp : Date.now(),
     likes: 0,
+    likedBy: [],
+    likedByNames: [],
   };
 
-  serverStickyNotes.unshift(newNote);
+  if (existingIdx >= 0) {
+    serverStickyNotes[existingIdx] = { ...serverStickyNotes[existingIdx], ...newNote };
+  } else {
+    serverStickyNotes.unshift(newNote);
+  }
   if (serverStickyNotes.length > 100) {
     serverStickyNotes = serverStickyNotes.slice(0, 100);
   }
@@ -652,16 +671,47 @@ app.post('/api/journals/sticky-notes', (req, res) => {
 });
 
 app.post('/api/journals/sticky-notes/like', (req, res) => {
-  const { noteId, increment } = req.body;
+  const { noteId, increment, studentId, studentName } = req.body;
   const delta = increment === false ? -1 : 1;
+  let updatedNote: ServerStickyNote | null = null;
+
   serverStickyNotes = serverStickyNotes.map((n) => {
     if (n.id === noteId) {
-      return { ...n, likes: Math.max(0, (n.likes || 0) + delta) };
+      const prevLikedBy = Array.isArray(n.likedBy) ? n.likedBy : [];
+      const prevLikedNames = Array.isArray(n.likedByNames) ? n.likedByNames : [];
+      let nextLikedBy = [...prevLikedBy];
+      let nextLikedNames = [...prevLikedNames];
+
+      if (studentId) {
+        if (increment === false) {
+          const idx = nextLikedBy.indexOf(studentId);
+          if (idx >= 0) {
+            nextLikedBy.splice(idx, 1);
+            if (studentName) {
+              nextLikedNames = nextLikedNames.filter((nm) => nm !== studentName);
+            }
+          }
+        } else if (!nextLikedBy.includes(studentId)) {
+          nextLikedBy.push(studentId);
+          if (studentName && !nextLikedNames.includes(studentName)) {
+            nextLikedNames.push(studentName);
+          }
+        }
+      }
+
+      const nextLikes = Math.max(nextLikedBy.length, Math.max(0, (n.likes || 0) + delta));
+      updatedNote = {
+        ...n,
+        likes: nextLikes,
+        likedBy: nextLikedBy,
+        likedByNames: nextLikedNames,
+      };
+      return updatedNote;
     }
     return n;
   });
   saveServerStickyNotesToFile();
-  res.json({ success: true });
+  res.json({ success: true, data: updatedNote });
 });
 
 // Jurnal 4F Endpoints

@@ -5,7 +5,13 @@ import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
 import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
 import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin } from 'lucide-react';
 import { TownRulesModal } from './modals/TownRulesModal.tsx';
-import { JurnalHarianModal, getStoredStickyNotes } from './modals/JurnalHarianModal.tsx';
+import {
+  JurnalHarianModal,
+  getStoredStickyNotes,
+  saveStoredStickyNotes,
+  mergeStickyNotesList,
+  STORAGE_KEY_JURNAL_BERINGIN,
+} from './modals/JurnalHarianModal.tsx';
 
 interface ThreeTownCanvasProps {
   onSelectBuilding: (buildingId: BuildingId) => void;
@@ -695,13 +701,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   useEffect(() => {
     let isMounted = true;
     const fetchStickyNotes = async () => {
+      const local = getStoredStickyNotes();
+      if (isMounted) setStickyNotes(local);
       try {
         const res = await fetch('/api/journals/sticky-notes');
         if (res.ok) {
           const json = await res.json();
           const list = Array.isArray(json) ? json : (json?.data || []);
           if (isMounted && Array.isArray(list) && list.length > 0) {
-            setStickyNotes(list);
+            const merged = mergeStickyNotesList(getStoredStickyNotes(), list);
+            saveStoredStickyNotes(merged);
+            setStickyNotes(merged);
           }
         }
       } catch {}
@@ -712,22 +722,44 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const handleStickyEvent = (e: Event) => {
       const custom = e as CustomEvent;
       if (custom.detail) {
-        setStickyNotes((prev) => {
-          const exists = prev.some((n) => n.id === custom.detail.id);
-          return exists ? prev : [custom.detail, ...prev];
-        });
+        if (Array.isArray(custom.detail)) {
+          setStickyNotes(custom.detail);
+        } else {
+          setStickyNotes((prev) => {
+            const exists = prev.some((n) => n.id === custom.detail.id);
+            return exists ? prev : [custom.detail, ...prev];
+          });
+        }
       }
     };
+
+    const handleNativeStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY_JURNAL_BERINGIN && e.newValue && isMounted) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) setStickyNotes(parsed);
+        } catch {}
+      }
+    };
+
     window.addEventListener('sticky_note_added', handleStickyEvent);
+    window.addEventListener('kota_refleksi_sticky_notes_updated', handleStickyEvent);
+    window.addEventListener('storage', handleNativeStorage);
 
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel('kota_refleksi_channel');
       channel.onmessage = (event) => {
-        if (event.data?.type === 'STICKY_NOTE_ADDED' && event.data.note) {
+        if (Array.isArray(event.data?.notes) && isMounted) {
+          const merged = mergeStickyNotesList(getStoredStickyNotes(), event.data.notes);
+          saveStoredStickyNotes(merged);
+          setStickyNotes(merged);
+        } else if (event.data?.type === 'STICKY_NOTE_ADDED' && event.data.note) {
           setStickyNotes((prev) => {
             const exists = prev.some((n) => n.id === event.data.note.id);
-            return exists ? prev : [event.data.note, ...prev];
+            const next = exists ? prev : [event.data.note, ...prev];
+            saveStoredStickyNotes(next);
+            return next;
           });
         }
       };
@@ -736,6 +768,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     return () => {
       isMounted = false;
       window.removeEventListener('sticky_note_added', handleStickyEvent);
+      window.removeEventListener('kota_refleksi_sticky_notes_updated', handleStickyEvent);
+      window.removeEventListener('storage', handleNativeStorage);
       if (channel) channel.close();
     };
   }, []);
