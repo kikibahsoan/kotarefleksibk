@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BuildingId, PublicChatMessage, Student, DailyJournalStickyNote } from '../types/index.ts';
 import { sounds } from '../utils/audio.ts';
 import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
+import { WeatherType, getWeatherTypeWita } from '../utils/weather.ts';
 import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
 import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin } from 'lucide-react';
 import { TownRulesModal } from './modals/TownRulesModal.tsx';
@@ -24,6 +25,8 @@ interface ThreeTownCanvasProps {
   isTeacher?: boolean;
   timeOfDay?: 'day' | 'night' | 'auto';
   timePeriod?: TimePeriod;
+  weatherType?: WeatherType;
+  weatherTempCelsius?: number;
   latestMessage?: PublicChatMessage | null;
   studentPoints?: number;
   latestXpGain?: { amount: number; reason?: string; timestamp: number } | null;
@@ -120,6 +123,32 @@ interface Cloud {
   w: number;
   h: number;
   speed: number;
+}
+
+interface RaindropParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  length: number;
+}
+
+interface SnowflakeParticle {
+  x: number;
+  y: number;
+  radius: number;
+  vy: number;
+  swayAmp: number;
+  swaySpeed: number;
+  phase: number;
+  alpha: number;
+}
+
+interface RainRipple {
+  x: number;
+  y: number;
+  radius: number;
+  alpha: number;
 }
 
 interface MinimalistBird {
@@ -758,6 +787,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   isTeacher = false,
   timeOfDay = 'night',
   timePeriod,
+  weatherType,
+  weatherTempCelsius,
   latestMessage,
   studentPoints = 100,
   latestXpGain,
@@ -1215,6 +1246,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   timeOfDayRef.current = timeOfDay;
   const timePeriodRef = useRef<TimePeriod>(timePeriod || getTimePeriodWita());
   timePeriodRef.current = timePeriod || getTimePeriodWita();
+  const weatherTypeRef = useRef<WeatherType>(weatherType || getWeatherTypeWita());
+  weatherTypeRef.current = weatherType || getWeatherTypeWita();
   const studentPointsRef = useRef(studentPoints);
   studentPointsRef.current = studentPoints;
   const onDeductPointsRef = useRef(onDeductPoints);
@@ -2117,7 +2150,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const cafeWy = 4.55;
 
     // -----------------------------------------------------------
-    // SKY & WEATHER ELEMENTS MATCHING SCREENSHOT
+    // SKY & WEATHER ELEMENTS (4 Cuaca: Normal, Berawan, Hujan Ringan, Salju)
     // -----------------------------------------------------------
     // Puffy horizontal flat cumulus clouds in daytime
     const clouds: Cloud[] = [
@@ -2125,6 +2158,43 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       { x: width * 0.58, y: 60, w: 90, h: 28, speed: 10 },
       { x: width * 0.85, y: 130, w: 140, h: 42, speed: 7 },
     ];
+
+    // Extra layered cumulus clouds for Berawan (15.00 - 17.00 WITA)
+    const extraOvercastClouds: Cloud[] = [
+      { x: width * 0.05, y: 35, w: 155, h: 46, speed: 6 },
+      { x: width * 0.38, y: 78, w: 135, h: 40, speed: 7.5 },
+      { x: width * 0.65, y: 42, w: 170, h: 50, speed: 5.5 },
+      { x: width * 0.88, y: 88, w: 125, h: 36, speed: 8 },
+    ];
+
+    // Gentle raindrops for Hujan Ringan (10.00-12.00 & 21.00-22.30 WITA)
+    const raindrops: RaindropParticle[] = Array.from({ length: 75 }, () => ({
+      x: Math.random() * (width + 80) - 40,
+      y: Math.random() * (height + 60) - 30,
+      vx: -18 + Math.random() * 5,
+      vy: 340 + Math.random() * 110,
+      length: 12 + Math.random() * 7,
+    }));
+
+    const rainRipples: RainRipple[] = Array.from({ length: 12 }, () => ({
+      x: 0,
+      y: 0,
+      radius: 0,
+      alpha: 0,
+    }));
+    let rippleHeadIdx = 0;
+
+    // Gentle floating snowflakes for Salju (00.00 - 02.30 WITA)
+    const snowflakes: SnowflakeParticle[] = Array.from({ length: 65 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      radius: 1.2 + Math.random() * 2.2,
+      vy: 32 + Math.random() * 28,
+      swayAmp: 18 + Math.random() * 16,
+      swaySpeed: 1.2 + Math.random() * 1.6,
+      phase: Math.random() * Math.PI * 2,
+      alpha: 0.5 + Math.random() * 0.45,
+    }));
 
     // Constellation / Diagonal star trails in nighttime matching screenshot
     const stars: Star[] = Array.from({ length: 60 }, (_, i) => ({
@@ -9366,6 +9436,87 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             drawMinimalistBirdShape(airPt.x, airPt.y, b.wingSpan * z, flap, bankTilt, 0.65);
           }
         });
+      }
+
+      // ---------------------------------------------------------
+      // 7. DYNAMIC 4 WEATHER PARTICLES & OVERLAYS
+      // (Berawan: 15.00-17.00 | Hujan Ringan: 10.00-12.00 & 21.00-22.30 | Salju: 00.00-02.30 | Normal)
+      // ---------------------------------------------------------
+      {
+        const activeWeather = weatherTypeRef.current || 'normal';
+
+        if (activeWeather === 'hujan_ringan') {
+          // Soft atmospheric drizzle tint
+          ctx.fillStyle = isNight ? 'rgba(15, 23, 42, 0.22)' : 'rgba(30, 41, 59, 0.12)';
+          ctx.fillRect(0, 0, width, height);
+
+          // Translucent slanted raindrops
+          ctx.strokeStyle = isNight ? 'rgba(186, 230, 253, 0.52)' : 'rgba(125, 211, 252, 0.62)';
+          ctx.lineWidth = 1.05;
+          ctx.beginPath();
+          for (const drop of raindrops) {
+            drop.x += drop.vx * delta;
+            drop.y += drop.vy * delta;
+            if (drop.y > height + 25) {
+              drop.y = -20;
+              drop.x = Math.random() * (width + 60) - 30;
+              if (Math.random() < 0.25) {
+                const rip = rainRipples[rippleHeadIdx % rainRipples.length];
+                rip.x = drop.x;
+                rip.y = height * (0.35 + Math.random() * 0.6);
+                rip.radius = 2;
+                rip.alpha = 0.55;
+                rippleHeadIdx++;
+              }
+            }
+            if (drop.x < -40) drop.x = width + 30;
+
+            ctx.moveTo(drop.x, drop.y);
+            ctx.lineTo(drop.x + drop.vx * 0.045, drop.y + drop.length);
+          }
+          ctx.stroke();
+
+          // Delicate water splash ripples on the ground
+          for (const rip of rainRipples) {
+            if (rip.alpha > 0.02) {
+              rip.radius += delta * 15;
+              rip.alpha -= delta * 1.5;
+              ctx.strokeStyle = `rgba(186, 230, 253, ${Math.max(0, rip.alpha * 0.45)})`;
+              ctx.lineWidth = 0.9;
+              ctx.beginPath();
+              ctx.ellipse(rip.x, rip.y, rip.radius, rip.radius * 0.45, 0, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+          }
+        } else if (activeWeather === 'salju') {
+          // Soft frosted cool midnight tint
+          ctx.fillStyle = 'rgba(199, 210, 254, 0.07)';
+          ctx.fillRect(0, 0, width, height);
+
+          // Gentle fluttering snowflakes
+          for (const flake of snowflakes) {
+            flake.y += flake.vy * delta;
+            flake.x += Math.sin(elapsed * flake.swaySpeed + flake.phase) * (flake.swayAmp * delta);
+            if (flake.y > height + 10) {
+              flake.y = -10;
+              flake.x = Math.random() * width;
+            }
+            ctx.fillStyle = `rgba(255, 255, 255, ${flake.alpha})`;
+            ctx.beginPath();
+            ctx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (activeWeather === 'berawan') {
+          // Drifting soft cumulus cloud wisps across upper screen
+          for (const oc of extraOvercastClouds) {
+            oc.x += oc.speed * delta;
+            if (oc.x > width + 180) oc.x = -180;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+            ctx.beginPath();
+            ctx.roundRect(oc.x, oc.y, oc.w, oc.h, oc.h / 2);
+            ctx.fill();
+          }
+        }
       }
     };
 

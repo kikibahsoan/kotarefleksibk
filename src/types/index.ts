@@ -246,3 +246,12 @@ export interface PodcastEpisodeRecord {
   createdAt: string;
   timestamp: number;
 }
+
+export type WeatherType = 'cerah' | 'berawan' | 'hujan' | 'salju';
+
+export interface WeatherConfig {
+  type: WeatherType;
+  label: string;
+  icon: string;
+  description: string;
+}

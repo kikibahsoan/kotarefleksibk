@@ -39,6 +39,8 @@ import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
 import { LofiAudioControl } from './components/LofiAudioControl.tsx';
 import { getTimePeriodWita, TimePeriod } from './utils/lofiAudio.ts';
+import { WeatherType, getWeatherTypeWita, getWeatherMeta, fetchGorontaloLiveWeather } from './utils/weather.ts';
+import { WeatherGorontaloModal } from './components/modals/WeatherGorontaloModal.tsx';
 import { sounds } from './utils/audio.ts';
 import { PublicChatMessage } from './types/index.ts';
 import {
@@ -114,6 +116,15 @@ export default function App() {
   const [preselectedMateriForReflection, setPreselectedMateriForReflection] = useState<string | undefined>(undefined);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>(() => getTimePeriodWita());
 
+  // 4 Tipe Cuaca WITA & Suhu Realtime Gorontalo
+  const [weatherType, setWeatherType] = useState<WeatherType>(() => getWeatherTypeWita());
+  const [liveGorontaloTemp, setLiveGorontaloTemp] = useState<number | undefined>(undefined);
+  const [liveGorontaloHumidity, setLiveGorontaloHumidity] = useState<number | undefined>(undefined);
+  const [weatherOverride, setWeatherOverride] = useState<WeatherType | 'auto'>('auto');
+  const [isWeatherModalOpen, setIsWeatherModalOpen] = useState(false);
+  const weatherOverrideRef = useRef(weatherOverride);
+  weatherOverrideRef.current = weatherOverride;
+
   // Live WITA Clock (Waktu Indonesia Tengah - Asia/Makassar)
   const [currentTimeWita, setCurrentTimeWita] = useState(() => {
     const now = new Date();
@@ -129,6 +140,10 @@ export default function App() {
     const timer = setInterval(() => {
       const now = new Date();
       setTimePeriod(getTimePeriodWita(now));
+      const autoWeather = getWeatherTypeWita(now);
+      if (weatherOverrideRef.current === 'auto') {
+        setWeatherType(autoWeather);
+      }
       setCurrentTimeWita(
         new Intl.DateTimeFormat('id-ID', {
           timeZone: 'Asia/Makassar',
@@ -140,6 +155,32 @@ export default function App() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch real-time temperature & humidity for Gorontalo
+  useEffect(() => {
+    let isCancelled = false;
+    const syncGorontaloWeather = async () => {
+      try {
+        const live = await fetchGorontaloLiveWeather();
+        if (live && !isCancelled) {
+          setLiveGorontaloTemp(live.tempCelsius);
+          setLiveGorontaloHumidity(live.humidity);
+        }
+      } catch {}
+    };
+
+    syncGorontaloWeather();
+    const interval = setInterval(syncGorontaloWeather, 5 * 60 * 1000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const currentWeatherInfo = useMemo(
+    () => getWeatherMeta(weatherType, liveGorontaloTemp, liveGorontaloHumidity),
+    [weatherType, liveGorontaloTemp, liveGorontaloHumidity]
+  );
 
   // Live World Chat State matching screenshot
   const [publicChats, setPublicChats] = useState<PublicChatMessage[]>(() =>
@@ -827,6 +868,8 @@ export default function App() {
         studentGender={student.gender}
         isTeacher={student.isTeacher}
         timePeriod={timePeriod}
+        weatherType={weatherType}
+        weatherTempCelsius={currentWeatherInfo.tempCelsius}
         latestMessage={latestChat}
         studentPoints={student.points}
         latestXpGain={latestXpGain}
@@ -925,16 +968,28 @@ export default function App() {
               )}
             </div>
 
-            {/* Class Badge Pill (Hidden on narrowest screens < 370px to preserve space) */}
-            <div
-              className="hidden min-[370px]:flex bg-[#121e2c]/68 backdrop-blur-md border border-slate-600/50 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 shadow-lg text-[10px] sm:text-xs font-bold text-emerald-400 shrink-0"
-              title={student.isTeacher ? 'DKV SMKN 2 Gorontalo' : student.className}
+            {/* Realtime Gorontalo Weather & Celsius Pill (Replaces former Class badge) */}
+            <button
+              type="button"
+              onClick={() => setIsWeatherModalOpen(true)}
+              className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-2 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold cursor-pointer transition active:scale-95 shrink-0 ${
+                weatherType === 'hujan_ringan'
+                  ? 'border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
+                  : weatherType === 'salju'
+                  ? 'border-indigo-300/50 text-indigo-200 hover:bg-indigo-950/40'
+                  : weatherType === 'berawan'
+                  ? 'border-sky-400/50 text-sky-200 hover:bg-sky-950/40'
+                  : 'border-amber-400/50 text-amber-300 hover:bg-amber-950/40'
+              }`}
+              title={`Cuaca Gorontalo Realtime: ${currentWeatherInfo.name} (${currentWeatherInfo.tempCelsius}°C) • Klik untuk melihat jadwal 4 cuaca & detail`}
+              aria-label="Cuaca Realtime Gorontalo"
             >
-              <GraduationCap className="w-3 h-3 text-emerald-400 shrink-0" />
-              <span className="truncate max-w-[48px] sm:max-w-none">
-                {student.isTeacher ? 'DKV' : (student.className.includes('DKV 2') ? 'X DKV 2' : student.className.includes('DKV 3') ? 'X DKV 3' : 'XII RPL 1')}
+              <span className="text-xs sm:text-sm leading-none drop-shadow-sm">{currentWeatherInfo.icon}</span>
+              <span className="font-mono font-extrabold text-white">{currentWeatherInfo.tempCelsius}°C</span>
+              <span className="hidden sm:inline font-sans text-[10.5px] opacity-90 truncate max-w-[70px] md:max-w-none">
+                {currentWeatherInfo.name}
               </span>
-            </div>
+            </button>
 
             {/* Chart / Quick Navigation */}
             <button
@@ -1164,6 +1219,25 @@ export default function App() {
           onDeleteReflection={handleDeleteReflection}
           onClearAllReflections={handleClearAllReflections}
           onSyncReflectionsAndMessages={handleSyncReflectionsAndMessages}
+        />
+      )}
+
+      {/* GORONTALO REAL-TIME WEATHER MODAL */}
+      {isWeatherModalOpen && (
+        <WeatherGorontaloModal
+          onClose={() => setIsWeatherModalOpen(false)}
+          currentWeather={currentWeatherInfo}
+          activeWeatherType={weatherType}
+          weatherOverride={weatherOverride}
+          onSetWeatherOverride={(type) => {
+            setWeatherOverride(type);
+            if (type === 'auto') {
+              setWeatherType(getWeatherTypeWita());
+            } else {
+              setWeatherType(type);
+            }
+          }}
+          currentTimeWita={currentTimeWita}
         />
       )}
     </div>

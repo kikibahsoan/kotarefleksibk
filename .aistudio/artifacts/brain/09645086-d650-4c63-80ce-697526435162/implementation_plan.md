@@ -119,3 +119,16 @@ Peningkatan fitur interaktif dan visual pada Kota Refleksia SMK Negeri 2 Goronta
    - Verifikasi endpoint `/api/presence/heartbeat` dan pembersihan offline di `server.ts`.
    - Pastikan setiap avatar remote memiliki lencana nama `@handle 🟢`, status gerak `walkFrame`, dan terhapus saat offline.
    - Uji kompilasi dengan `compile_applet` dan `lint_applet`.
+
+---
+
+## 5. Fitur Cuaca Dinamis Refleksia City (Cerah, Berawan, Hujan Ringan, Salju)
+- **4 Tipe Cuaca**:
+  1. `cerah`: Langit hangat bergradasi cerah, sinar matahari, awan tipis melayang.
+  2. `berawan`: Langit teduh keabu-abuan, awan lembut berarak tebal meredupkan pencahayaan kota.
+  3. `hujan`: Langit kelabu kebiruan sejuk, rumput dan trotoar berpenampilan basah, rintik hujan transparan berkecepatan dinamis (`rainDrops`) serta riak air melingkar (`rainRipples`) di tanah.
+  4. `salju`: Langit lavender-slate pucat, rumput dan jalanan berbalut lapisan salju putih halus, partikel keping salju melayang meliuk lembut (`snowFlakes`).
+- **Sistem Otomatis & Manual**:
+  - Cuaca berganti secara acak otomatis setiap ~95 detik dengan notifikasi pop-up elegan.
+  - Terdapat tombol pil cuaca interaktif di header atas (`bg-[#121e2c]/68 backdrop-blur-md`) dengan menu dropdown untuk memilih cuaca secara langsung atau menyalakan/mematikan pergantian otomatis (`Otomatis: ON/OFF`).
+
