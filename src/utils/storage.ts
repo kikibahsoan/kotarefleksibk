@@ -751,9 +751,22 @@ export const StorageService = {
     const cutoff = Date.now() - TWENTY_FOUR_HOURS;
     const valid = (items || []).filter((m) => {
       if (!m || !m.id || !m.content) return false;
+      // Filter out legacy mock messages (e.g. mujair, sayang, pchat-ref-)
+      if (
+        m.id.startsWith('pchat-ref-') ||
+        m.content.includes('mujair') ||
+        m.content.includes('sayang') ||
+        m.content.includes('WNT')
+      ) {
+        return false;
+      }
       const time = parseChatTimestamp(m.createdAt || m.timestamp);
       return time >= cutoff && !m.isReported;
     });
+
+    if (valid.length === 0) {
+      return [...INITIAL_PUBLIC_CHAT];
+    }
 
     // 1. Sort newest first to pick the latest 25
     valid.sort((a, b) => {
@@ -779,9 +792,7 @@ export const StorageService = {
       if (m && m.id) map.set(m.id, m);
     });
     const cleaned = this.purgeExpiredPublicChats(Array.from(map.values()));
-    if (cleaned.length !== raw.length) {
-      safeSet(STORAGE_KEYS.PUBLIC_CHAT, cleaned);
-    }
+    safeSet(STORAGE_KEYS.PUBLIC_CHAT, cleaned);
     return cleaned;
   },
 
