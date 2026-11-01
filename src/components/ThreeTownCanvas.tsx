@@ -122,6 +122,28 @@ interface Cloud {
   speed: number;
 }
 
+interface MinimalistBird {
+  id: number;
+  mode: 'sky' | 'world';
+  // For 'sky' mode (upper horizon gliders)
+  x: number;
+  y: number;
+  vx: number;
+  vyWave: number;
+  // For 'world' mode (high-altitude isometric garden gliders)
+  centerWx: number;
+  centerWy: number;
+  orbitRx: number;
+  orbitRy: number;
+  angle: number;
+  angularSpeed: number;
+  altitude: number;
+  // Shared visual traits
+  wingSpan: number;
+  flapSpeed: number;
+  phase: number;
+}
+
 export const TREES_LIST: [number, number][] = [
   // Outer perimeter for 15x15 island (North edge - center is reserved for Pohon Beringin at [0, -5.8])
   [-2.2, -6.4],
@@ -2126,6 +2148,156 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         blinkSpeed: 1.8 + Math.random() * 2.5,
       };
     });
+
+    // Minimalist tiny flying birds (halus, kecil, tidak menghalangi tampilan bangunan/avatar)
+    const minimalistBirds: MinimalistBird[] = [
+      // 4 Sky-horizon pair gliders (high in the sky backdrop)
+      {
+        id: 0,
+        mode: 'sky',
+        x: width * 0.15,
+        y: 52,
+        vx: 18,
+        vyWave: 3.5,
+        centerWx: 0,
+        centerWy: 0,
+        orbitRx: 0,
+        orbitRy: 0,
+        angle: 0,
+        angularSpeed: 0,
+        altitude: 0,
+        wingSpan: 3.6,
+        flapSpeed: 6.2,
+        phase: 0.2,
+      },
+      {
+        id: 1,
+        mode: 'sky',
+        x: width * 0.15 - 14,
+        y: 58,
+        vx: 18,
+        vyWave: 3.5,
+        centerWx: 0,
+        centerWy: 0,
+        orbitRx: 0,
+        orbitRy: 0,
+        angle: 0,
+        angularSpeed: 0,
+        altitude: 0,
+        wingSpan: 3.1,
+        flapSpeed: 6.5,
+        phase: 1.1,
+      },
+      {
+        id: 2,
+        mode: 'sky',
+        x: width * 0.68,
+        y: 84,
+        vx: 14,
+        vyWave: 2.8,
+        centerWx: 0,
+        centerWy: 0,
+        orbitRx: 0,
+        orbitRy: 0,
+        angle: 0,
+        angularSpeed: 0,
+        altitude: 0,
+        wingSpan: 3.4,
+        flapSpeed: 5.8,
+        phase: 2.4,
+      },
+      {
+        id: 3,
+        mode: 'sky',
+        x: width * 0.68 - 12,
+        y: 90,
+        vx: 14,
+        vyWave: 2.8,
+        centerWx: 0,
+        centerWy: 0,
+        orbitRx: 0,
+        orbitRy: 0,
+        angle: 0,
+        angularSpeed: 0,
+        altitude: 0,
+        wingSpan: 2.9,
+        flapSpeed: 6.1,
+        phase: 3.2,
+      },
+      // 4 High-altitude world-space park gliders (soaring gently above outer trees & pond)
+      {
+        id: 4,
+        mode: 'world',
+        x: 0,
+        y: 0,
+        vx: 0,
+        vyWave: 0,
+        centerWx: 0.0,
+        centerWy: -5.4, // High above Pohon Beringin & North Park
+        orbitRx: 2.2,
+        orbitRy: 1.1,
+        angle: 0.4,
+        angularSpeed: 0.32,
+        altitude: 118,
+        wingSpan: 3.4,
+        flapSpeed: 5.6,
+        phase: 0.5,
+      },
+      {
+        id: 5,
+        mode: 'world',
+        x: 0,
+        y: 0,
+        vx: 0,
+        vyWave: 0,
+        centerWx: 0.0,
+        centerWy: -5.4, // Companion bird near North Park
+        orbitRx: 2.35,
+        orbitRy: 1.18,
+        angle: 0.22,
+        angularSpeed: 0.32,
+        altitude: 114,
+        wingSpan: 2.9,
+        flapSpeed: 6.0,
+        phase: 1.4,
+      },
+      {
+        id: 6,
+        mode: 'world',
+        x: 0,
+        y: 0,
+        vx: 0,
+        vyWave: 0,
+        centerWx: 4.5,
+        centerWy: -2.2, // High above East Koi Pond
+        orbitRx: 1.8,
+        orbitRy: 1.2,
+        angle: 2.1,
+        angularSpeed: -0.28,
+        altitude: 96,
+        wingSpan: 3.2,
+        flapSpeed: 5.9,
+        phase: 2.0,
+      },
+      {
+        id: 7,
+        mode: 'world',
+        x: 0,
+        y: 0,
+        vx: 0,
+        vyWave: 0,
+        centerWx: -4.2,
+        centerWy: 1.8, // High above West Sudut Literasi grove
+        orbitRx: 1.9,
+        orbitRy: 1.25,
+        angle: 4.2,
+        angularSpeed: 0.3,
+        altitude: 98,
+        wingSpan: 3.1,
+        flapSpeed: 5.7,
+        phase: 3.8,
+      },
+    ];
 
     let pendingBuildingId: BuildingId | null = null;
     let hoveredBuildingRef: BuildingInfo | null = null;
@@ -4301,23 +4473,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(lX, lY, 14 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // 7. Floating Hover Badge: "📋 Papan Peraturan Kota" (appears when avatar approaches the board)
+          // 7. Floating Hover Badge: "📋 Papan Peraturan Kota" (compact & semi-transparent)
           const distToRulesBoard = Math.hypot(player.wx - item.wx, player.wy - item.wy);
           if (distToRulesBoard < 2.35) {
-            const hoverBounce = Math.sin(elapsed * 4) * 2.2 * z;
-            const badgeY = roofApexY - 15 * z + hoverBounce;
+            const hoverBounce = Math.sin(elapsed * 4) * 1.8 * z;
+            const badgeY = roofApexY - 13 * z + hoverBounce;
             const bText = '📋 Papan Peraturan Kota';
-            ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
-            const tW = ctx.measureText(bText).width + 12 * z;
-            const tH = 16 * z;
+            ctx.font = `bold ${Math.round(7.4 * z)}px sans-serif`;
+            const tW = ctx.measureText(bText).width + 9 * z;
+            const tH = 13.5 * z;
 
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.62)';
             ctx.beginPath();
-            ctx.roundRect(pt.x - tW / 2, badgeY - tH / 2, tW, tH, 8 * z);
+            ctx.roundRect(pt.x - tW / 2, badgeY - tH / 2, tW, tH, 6.5 * z);
             ctx.fill();
 
-            ctx.strokeStyle = '#10b981';
-            ctx.lineWidth = 1.1 * z;
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.7)';
+            ctx.lineWidth = 0.9 * z;
             ctx.stroke();
 
             ctx.fillStyle = '#a7f3d0';
@@ -4524,42 +4696,42 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
 
-          // 8. Floating Hover Tag: "🌳 Pohon Beringin Jurnal Harian" — muncul saat avatar mendekati Pohon Beringin
+          // 8. Floating Hover Tag: "🌳 Pohon Beringin Jurnal Harian" — muncul saat avatar mendekati Pohon Beringin (kecil & agak transparan)
           const distToBeringin = Math.hypot(player.wx - item.wx, player.wy - item.wy);
           if (distToBeringin < 2.35) {
-            const treeHoverBounce = Math.sin(elapsed * 3.5) * 2 * z;
-            const tagY = pt.y - 120 * z + treeHoverBounce;
+            const treeHoverBounce = Math.sin(elapsed * 3.5) * 1.6 * z;
+            const tagY = pt.y - 116 * z + treeHoverBounce;
             const tagTitle = '🌳 Pohon Beringin Jurnal Harian';
-            const subText = `${noteCount} Catatan Tempel • +1 XP`;
+            const subText = `${noteCount} Catatan • +1 XP`;
 
-            ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+            ctx.font = `bold ${Math.round(7.4 * z)}px sans-serif`;
             const titleWidth = ctx.measureText(tagTitle).width;
-            ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
+            ctx.font = `bold ${Math.round(6.6 * z)}px sans-serif`;
             const subWidth = ctx.measureText(subText).width;
-            const bannerW = Math.max(titleWidth, subWidth) + 16 * z;
-            const bannerH = 26 * z;
+            const bannerW = Math.max(titleWidth, subWidth) + 12 * z;
+            const bannerH = 21 * z;
 
-            // Banner capsule background
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+            // Banner capsule background (smaller & slightly transparent)
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.62)';
             ctx.beginPath();
-            ctx.roundRect(pt.x - bannerW / 2, tagY - bannerH / 2, bannerW, bannerH, 10 * z);
+            ctx.roundRect(pt.x - bannerW / 2, tagY - bannerH / 2, bannerW, bannerH, 8 * z);
             ctx.fill();
 
-            ctx.strokeStyle = '#10b981';
-            ctx.lineWidth = 1.2 * z;
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.72)';
+            ctx.lineWidth = 0.95 * z;
             ctx.stroke();
 
             // Title
             ctx.fillStyle = '#a7f3d0';
-            ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+            ctx.font = `bold ${Math.round(7.4 * z)}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(tagTitle, pt.x, tagY - 4 * z);
+            ctx.fillText(tagTitle, pt.x, tagY - 3.2 * z);
 
             // Subtitle / XP badge
             ctx.fillStyle = '#fde047';
-            ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
-            ctx.fillText(subText, pt.x, tagY + 6 * z);
+            ctx.font = `bold ${Math.round(6.6 * z)}px sans-serif`;
+            ctx.fillText(subText, pt.x, tagY + 4.8 * z);
           }
 
           ctx.restore();
@@ -4806,22 +4978,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(lampX, lampY + 2 * z, 1.8 * z, 0, Math.PI);
           ctx.fill();
 
-          // Floating Pill Badge: 📖 Sudut Literasi ONLY when player approaches
+          // Floating Pill Badge: 📖 Sudut Literasi ONLY when player approaches (compact & semi-transparent)
           const distToLiteracy = Math.hypot(player.wx - item.wx, player.wy - item.wy);
           if (distToLiteracy < 2.2) {
-            const litTagY = pt.y - 54 * z;
+            const litTagY = pt.y - 52 * z;
             const litLabel = '📖 Sudut Literasi';
-            ctx.font = `bold ${Math.round(8.8 * z)}px sans-serif`;
+            ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
             const litM = ctx.measureText(litLabel);
-            const litW = litM.width + 14 * z;
-            const litH = 18 * z;
+            const litW = litM.width + 10 * z;
+            const litH = 14 * z;
 
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
             ctx.beginPath();
-            ctx.roundRect(pt.x - litW / 2, litTagY - litH / 2, litW, litH, 9 * z);
+            ctx.roundRect(pt.x - litW / 2, litTagY - litH / 2, litW, litH, 7 * z);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
-            ctx.lineWidth = 1.2 * z;
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.68)';
+            ctx.lineWidth = 0.95 * z;
             ctx.stroke();
 
             ctx.fillStyle = '#bae6fd';
@@ -5065,22 +5237,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           }
 
-          // 3. FLOATING BADGE: 🎣 Kolam Pemancingan ONLY when player approaches
+          // 3. FLOATING BADGE: 🎣 Kolam Pemancingan ONLY when player approaches (compact & semi-transparent)
           const distToFishing = Math.hypot(player.wx - item.wx, player.wy - item.wy);
           if (distToFishing < 2.3) {
-            const dockTagY = pt.y - 46 * z;
+            const dockTagY = pt.y - 44 * z;
             const dockLabel = '🎣 Kolam Pemancingan';
-            ctx.font = `bold ${Math.round(8.8 * z)}px sans-serif`;
+            ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
             const dM = ctx.measureText(dockLabel);
-            const dW = dM.width + 14 * z;
-            const dH = 18 * z;
+            const dW = dM.width + 10 * z;
+            const dH = 14 * z;
 
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
             ctx.beginPath();
-            ctx.roundRect(pt.x - dW / 2, dockTagY - dH / 2, dW, dH, 9 * z);
+            ctx.roundRect(pt.x - dW / 2, dockTagY - dH / 2, dW, dH, 7 * z);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
-            ctx.lineWidth = 1.2 * z;
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.68)';
+            ctx.lineWidth = 0.95 * z;
             ctx.stroke();
 
             ctx.fillStyle = '#bae6fd';
@@ -6988,22 +7160,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
 
-          // Floating Building Label ONLY when touched, hovered or active
+          // Floating Building Label ONLY when touched, hovered or active (compact & semi-transparent)
           const shouldShowLabel = isHovered || activeBuilding === b.id || lastTouchedIdRef.current === b.id;
           if (shouldShowLabel) {
-            const tagY = pt.y - (b.id === 'balai_kota' ? 88 : b.id === 'menara_mentor' ? 64 : b.id === 'taman_refleksi' ? 62 : 54) * z;
+            const tagY = pt.y - (b.id === 'balai_kota' ? 86 : b.id === 'menara_mentor' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
             const labelText = `${b.icon} ${b.name}`;
-            ctx.font = `bold ${Math.round(10 * z)}px sans-serif`;
+            ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
             const tMetrics = ctx.measureText(labelText);
-            const tagW = tMetrics.width + 16 * z;
-            const tagH = 20 * z;
+            const tagW = tMetrics.width + 11 * z;
+            const tagH = 15.5 * z;
 
-            ctx.fillStyle = '#0f172a';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.62)';
             ctx.beginPath();
-            ctx.roundRect(pt.x - tagW / 2, tagY - tagH / 2, tagW, tagH, 10 * z);
+            ctx.roundRect(pt.x - tagW / 2, tagY - tagH / 2, tagW, tagH, 7.5 * z);
             ctx.fill();
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.72)';
+            ctx.lineWidth = 1.1 * z;
             ctx.stroke();
 
             ctx.fillStyle = '#ffffff';
@@ -7092,22 +7264,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           }
 
-          // Floating Pill Badge above Toko Roti awning ONLY when touched/opened
+          // Floating Pill Badge above Toko Roti awning ONLY when touched/opened (compact & semi-transparent)
           const isCafeTouched = lastTouchedIdRef.current === 'cafe' || isCafeMenuOpen;
           if (isCafeTouched) {
-            const trBadgeY = pt.y - 38 * z;
+            const trBadgeY = pt.y - 36 * z;
             ctx.save();
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.62)';
             const trLabel = '🥐 Toko Roti & Kafe';
-            ctx.font = `bold ${Math.round(9.5 * z)}px sans-serif`;
+            ctx.font = `bold ${Math.round(8.0 * z)}px sans-serif`;
             const trMetrics = ctx.measureText(trLabel);
-            const trW = trMetrics.width + 16 * z;
-            const trH = 19 * z;
+            const trW = trMetrics.width + 11 * z;
+            const trH = 15 * z;
             ctx.beginPath();
-            ctx.roundRect(pt.x - trW / 2, trBadgeY - trH / 2, trW, trH, 9.5 * z);
+            ctx.roundRect(pt.x - trW / 2, trBadgeY - trH / 2, trW, trH, 7.5 * z);
             ctx.fill();
-            ctx.strokeStyle = '#f59e0b';
-            ctx.lineWidth = 1.2 * z;
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.72)';
+            ctx.lineWidth = 1.0 * z;
             ctx.stroke();
             ctx.fillStyle = '#fef3c7';
             ctx.textAlign = 'center';
@@ -9119,6 +9291,82 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fill();
         });
       }
+
+      // ---------------------------------------------------------
+      // 6. MINIMALIST TINY FLYING BIRDS (Burung-burung kecil minimalis yang terbang, tidak mengganggu tampilan)
+      // ---------------------------------------------------------
+      {
+        const z = zoomLevelRef.current;
+        const birdStrokeColor =
+          currentPeriod === 'malam'
+            ? 'rgba(148, 163, 184, 0.35)'
+            : currentPeriod === 'sore'
+            ? 'rgba(69, 26, 3, 0.52)'
+            : currentPeriod === 'subuh'
+            ? 'rgba(226, 232, 240, 0.45)'
+            : 'rgba(30, 41, 59, 0.48)';
+
+        const drawMinimalistBirdShape = (
+          bx: number,
+          by: number,
+          span: number,
+          flapPhase: number,
+          tiltRad: number,
+          alphaMult: number = 1
+        ) => {
+          const wingY = Math.sin(flapPhase) * (span * 0.58);
+          const wingMidY = -Math.abs(Math.cos(flapPhase)) * (span * 0.32) + wingY * 0.35;
+
+          ctx.save();
+          ctx.translate(bx, by);
+          ctx.rotate(tiltRad);
+          ctx.globalAlpha = alphaMult;
+          ctx.strokeStyle = birdStrokeColor;
+          ctx.lineWidth = Math.max(0.85, 1.05 * (span / 3.4));
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          // Minimalist 2-wing gull silhouette (clean curved 'm'/'v' strokes)
+          ctx.beginPath();
+          ctx.moveTo(-span, wingY);
+          ctx.quadraticCurveTo(-span * 0.48, wingMidY - span * 0.28, 0, 0);
+          ctx.quadraticCurveTo(span * 0.48, wingMidY - span * 0.28, span, wingY);
+          ctx.stroke();
+          ctx.restore();
+        };
+
+        minimalistBirds.forEach((b) => {
+          // At deep night, only a couple of high sky birds glide faintly
+          if (currentPeriod === 'malam' && b.id > 3) return;
+
+          const flap = elapsed * b.flapSpeed + b.phase;
+
+          if (b.mode === 'sky') {
+            b.x += b.vx * delta;
+            if (b.x > width + 40) {
+              b.x = -40;
+            }
+            const curY = b.y + Math.sin(elapsed * 1.4 + b.phase) * b.vyWave;
+            drawMinimalistBirdShape(b.x, curY, b.wingSpan, flap, 0.06, 0.72);
+          } else {
+            b.angle += b.angularSpeed * delta;
+            const wx = b.centerWx + Math.cos(b.angle) * b.orbitRx;
+            const wy = b.centerWy + Math.sin(b.angle) * b.orbitRy;
+            const altBob = b.altitude + Math.sin(elapsed * 1.8 + b.phase) * 3.5;
+
+            const airPt = toScreen(wx, wy, altBob, camera.x, camera.y);
+            // Compute screen-space velocity tangent for subtle natural bank tilt
+            const nextAngle = b.angle + (b.angularSpeed >= 0 ? 0.05 : -0.05);
+            const nextWx = b.centerWx + Math.cos(nextAngle) * b.orbitRx;
+            const nextWy = b.centerWy + Math.sin(nextAngle) * b.orbitRy;
+            const nextPt = toScreen(nextWx, nextWy, altBob, camera.x, camera.y);
+            const dxScreen = nextPt.x - airPt.x;
+            const bankTilt = Math.max(-0.18, Math.min(0.18, (dxScreen >= 0 ? 1 : -1) * 0.08));
+
+            drawMinimalistBirdShape(airPt.x, airPt.y, b.wingSpan * z, flap, bankTilt, 0.65);
+          }
+        });
+      }
     };
 
     animId = requestAnimationFrame(render);
@@ -9500,19 +9748,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           {/* Left: Online Citizens Badge, Dry Leaf Counter & Quick Teleport Chips */}
           <div className="flex flex-col items-start gap-1 max-w-[68vw] sm:max-w-[430px] pointer-events-auto">
             <div className="flex flex-wrap items-center gap-1.5">
-              <div className="bg-[#121e2c]/92 backdrop-blur-md border border-emerald-500/45 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5">
+              <div className="bg-[#121e2c]/68 backdrop-blur-md border border-emerald-500/45 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span className="text-emerald-300 font-mono">{onlineCount}</span>
-                <span className="text-slate-200">Warga Online</span>
+                <span className="text-slate-100">Warga Online</span>
               </div>
 
               <div
-                className="bg-[#121e2c]/92 backdrop-blur-md border border-amber-500/45 rounded-full px-2.5 py-0.5 sm:py-1 text-amber-200 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1"
+                className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-500/45 rounded-full px-2.5 py-0.5 sm:py-1 text-amber-200 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1"
                 title="10 Daun Kering tersebar di kota • Pungut setiap 5 daun kering untuk mendapatkan +1 XP"
               >
                 <span>🍂</span>
                 <span className="font-mono text-amber-300">{pickedDryLeavesCount}/5</span>
-                <span className="hidden sm:inline text-slate-300">
+                <span className="hidden sm:inline text-slate-200">
                   Daun ({dryLeaves.filter((l) => l.pickedAt === null).length}/{TOTAL_SCATTERED_DRY_LEAVES} di Peta)
                 </span>
                 <span className="text-[9px] text-emerald-300 font-mono">(+1 XP)</span>
@@ -9547,8 +9795,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     }}
                     className={`px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-bold border shadow-md backdrop-blur-md flex items-center gap-1 transition active:scale-95 cursor-pointer ${
                       cit.role === 'guru'
-                        ? 'bg-amber-950/90 border-amber-400/60 text-amber-200 hover:bg-amber-900/90'
-                        : 'bg-[#121e2c]/90 border-emerald-400/50 text-emerald-200 hover:bg-slate-800/90'
+                        ? 'bg-amber-950/68 border-amber-400/60 text-amber-200 hover:bg-amber-900/80'
+                        : 'bg-[#121e2c]/68 border-emerald-400/50 text-emerald-200 hover:bg-slate-800/80'
                     }`}
                     title={`Klik untuk menghampiri ${cit.name} (@${cit.handle})`}
                   >
@@ -9565,7 +9813,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           {/* Right: Held Item Badge with Live Auto-Disappear Countdown (90s Kopi, 60s Roti, 30s Eskrim) */}
           {heldItem && (
-            <div className="pointer-events-auto bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-full px-2.5 sm:px-3 py-1 flex items-center gap-1.5 text-xs font-bold text-amber-200 shadow-xl animate-fade-in-down ml-auto shrink-0">
+            <div className="pointer-events-auto bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/50 rounded-full px-2.5 sm:px-3 py-1 flex items-center gap-1.5 text-xs font-bold text-amber-200 shadow-lg animate-fade-in-down ml-auto shrink-0">
               <span className="text-sm sm:text-base">
                 {heldItem === 'kopi' ? '☕' : heldItem === 'roti' ? '🥐' : '🍦'}
               </span>
@@ -9580,7 +9828,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   sounds.playClick();
                   equipHeldItem(null);
                 }}
-                className="w-4 h-4 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-[10px] cursor-pointer"
+                className="w-4 h-4 rounded-full bg-slate-800/75 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] cursor-pointer"
                 title="Habiskan / Simpan"
               >
                 ✕
@@ -9589,109 +9837,109 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           )}
         </div>
 
-        {/* ROW 2: SINGLE MUTUALLY-EXCLUSIVE POPUP SLOT (Never overlaps on Mobile HP or Laptop) */}
+        {/* ROW 2: SINGLE MUTUALLY-EXCLUSIVE POPUP SLOT (Smaller & Slightly Transparent so it never blocks the map) */}
         <div className="w-full flex justify-center">
           {isCafeMenuOpen ? (
-            /* 1. MENU TOKO ROTI & KAFE */
+            /* 1. MENU TOKO ROTI & KAFE (Compact & Semi-Transparent) */
             <aside
               aria-label="Menu Toko Roti & Kafe"
-              className="w-full max-w-md pointer-events-auto animate-fade-in-down"
+              className="w-full max-w-[310px] sm:max-w-[340px] pointer-events-auto animate-fade-in-down"
               onPointerDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-[#121e2c]/95 backdrop-blur-md text-white px-3.5 py-3 rounded-2xl border border-amber-400/50 shadow-[0_12px_36px_rgba(0,0,0,0.8)] flex flex-col items-center gap-2.5">
-                <div className="w-full flex items-center justify-between border-b border-slate-700/70 pb-1.5">
-                  <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+              <div className="bg-[#121e2c]/72 backdrop-blur-md text-white px-2.5 py-2 rounded-xl border border-amber-400/40 shadow-lg flex flex-col items-center gap-1.5">
+                <div className="w-full flex items-center justify-between border-b border-slate-700/50 pb-1">
+                  <div className="text-[11px] font-bold text-slate-200 flex items-center gap-1 whitespace-nowrap">
                     <span>☕</span>
                     <span className="font-extrabold text-white">Toko Roti & Kafe Warga</span>
-                    <span className="text-slate-500">•</span>
-                    <span className="text-amber-400 font-mono text-[11px]">🪙 {studentPoints} XP</span>
+                    <span className="text-slate-400">•</span>
+                    <span className="text-amber-300 font-mono text-[10px]">🪙 {studentPoints} XP</span>
                   </div>
                   <button
                     onClick={() => setIsCafeMenuOpen(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                    className="p-0.5 rounded-md text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
                     title="Tutup Menu Kafe"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
 
                 {cafeToast && (
-                  <div className="w-full text-center text-[11px] font-bold text-amber-300 bg-amber-950/60 border border-amber-500/40 rounded-xl px-2.5 py-1">
+                  <div className="w-full text-center text-[10px] font-bold text-amber-200 bg-amber-950/50 border border-amber-500/35 rounded-lg px-2 py-0.5">
                     {cafeToast}
                   </div>
                 )}
 
-                <div className="grid grid-cols-3 gap-2 w-full">
+                <div className="grid grid-cols-3 gap-1.5 w-full">
                   <button
                     onClick={handleBuyCoffee}
-                    className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-2.5 py-2 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                    className="bg-[#245e54]/80 hover:bg-[#2d7569]/90 active:scale-95 text-white px-2 py-1.5 rounded-lg text-[10.5px] font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
                   >
-                    <span className="text-lg">☕</span>
-                    <span className="text-[11px] mt-0.5">Kopi (-2 XP)</span>
-                    <span className="text-[9.5px] text-emerald-200/90 font-normal">Tahan 90 detik</span>
+                    <span className="text-sm">☕</span>
+                    <span className="text-[10px] mt-0.5">Kopi (-2 XP)</span>
+                    <span className="text-[8.5px] text-emerald-200/90 font-normal">90 detik</span>
                   </button>
                   <button
                     onClick={handleBuyBread}
-                    className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-2.5 py-2 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                    className="bg-[#245e54]/80 hover:bg-[#2d7569]/90 active:scale-95 text-white px-2 py-1.5 rounded-lg text-[10.5px] font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
                   >
-                    <span className="text-lg">🍞</span>
-                    <span className="text-[11px] mt-0.5">Roti (-1 XP)</span>
-                    <span className="text-[9.5px] text-emerald-200/90 font-normal">Tahan 60 detik</span>
+                    <span className="text-sm">🍞</span>
+                    <span className="text-[10px] mt-0.5">Roti (-1 XP)</span>
+                    <span className="text-[8.5px] text-emerald-200/90 font-normal">60 detik</span>
                   </button>
                   <button
                     onClick={handleBuyIceCream}
-                    className="bg-[#245e54] hover:bg-[#2d7569] active:scale-95 text-white px-2.5 py-2 rounded-xl text-xs font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
+                    className="bg-[#245e54]/80 hover:bg-[#2d7569]/90 active:scale-95 text-white px-2 py-1.5 rounded-lg text-[10.5px] font-bold flex flex-col items-center leading-tight transition cursor-pointer border border-emerald-400/30 shadow-sm"
                   >
-                    <span className="text-lg">🍦</span>
-                    <span className="text-[11px] mt-0.5">Eskrim (-1 XP)</span>
-                    <span className="text-[9.5px] text-emerald-200/90 font-normal">Tahan 30 detik</span>
+                    <span className="text-sm">🍦</span>
+                    <span className="text-[10px] mt-0.5">Eskrim (-1 XP)</span>
+                    <span className="text-[8.5px] text-emerald-200/90 font-normal">30 detik</span>
                   </button>
                 </div>
               </div>
             </aside>
           ) : isStandaloneToast && cafeToast ? (
-            /* 2. STANDALONE TOAST (Pembelian Kopi/Roti/Eskrim, Berdiri, atau Navigasi Warga) */
+            /* 2. STANDALONE TOAST (Compact & Semi-Transparent) */
             <div
               role="status"
-              className="pointer-events-auto bg-[#121e2c]/95 backdrop-blur-md text-emerald-300 font-bold text-xs sm:text-sm px-4 py-2 rounded-2xl border border-emerald-500/45 shadow-2xl animate-fade-in-down flex items-center gap-2 max-w-md text-center"
+              className="pointer-events-auto bg-[#121e2c]/70 backdrop-blur-md text-emerald-200 font-bold text-[11px] sm:text-xs px-3 py-1.5 rounded-xl border border-emerald-500/40 shadow-lg animate-fade-in-down flex items-center gap-1.5 max-w-[310px] sm:max-w-[340px] text-center"
             >
               <span>✨</span>
               <span>{cafeToast}</span>
               <button
                 onClick={() => showToast(null, 0)}
-                className="ml-1 text-slate-400 hover:text-white text-xs cursor-pointer"
+                className="ml-1 text-slate-300 hover:text-white text-[10px] cursor-pointer"
                 title="Tutup"
               >
                 ✕
               </button>
             </div>
           ) : pendingConfirmation ? (
-            /* 3. POP-UP KONFIRMASI MASUK BANGUNAN / KAFE */
+            /* 3. POP-UP KONFIRMASI MASUK BANGUNAN / KAFE (Perkecil & Transparan Sedikit) */
             <aside
               aria-label="Konfirmasi Masuk Bangunan"
-              className="w-full max-w-md pointer-events-auto animate-fade-in-down"
+              className="w-full max-w-[295px] sm:max-w-[330px] pointer-events-auto animate-fade-in-down"
             >
-              <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-2.5 sm:p-3.5 shadow-[0_12px_36px_rgba(0,0,0,0.8)] flex items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-sky-500/20 via-slate-800 to-amber-500/20 border border-amber-400/40 flex items-center justify-center text-lg sm:text-xl shrink-0 shadow-sm">
+              <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/40 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-lg bg-gradient-to-tr from-sky-500/20 via-slate-800/70 to-amber-500/20 border border-amber-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
                     {pendingConfirmation.icon}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1">
+                    <div className="text-[8.5px] font-bold tracking-wider uppercase text-amber-300/95 flex items-center gap-1 leading-none">
                       <span>📍 Dekat Bangunan</span>
                     </div>
-                    <h4 className="text-xs sm:text-sm font-extrabold text-white truncate leading-tight">
+                    <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
                       {pendingConfirmation.name}
                     </h4>
-                    <p className="text-[10px] sm:text-[11px] text-slate-300 truncate">
+                    <p className="text-[9.5px] text-slate-200/90 truncate leading-tight">
                       {pendingConfirmation.tagline}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => {
                       sounds.playOpenModal();
@@ -9703,7 +9951,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                         onSelectBuildingRef.current(target.id as BuildingId);
                       }
                     }}
-                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 border border-emerald-400/40 transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] sm:text-[11px] font-bold shadow-sm border border-emerald-400/40 transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
                   >
                     <span>🚪 Masuk</span>
                   </button>
@@ -9712,110 +9960,110 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       sounds.playClick();
                       setPendingConfirmation(null);
                     }}
-                    className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition cursor-pointer"
+                    className="w-6 h-6 rounded-md bg-slate-800/65 hover:bg-slate-700/80 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
                     title="Abaikan"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
               </div>
             </aside>
           ) : nearbyAction ? (
-            /* 4. POP-UP AKSI KONTEKSTUAL (POHON, LITERASI, DUDUK/AYUNAN, MEMANCING) DENGAN STATUS INLINE TANPA MENIMPA */
+            /* 4. POP-UP AKSI KONTEKSTUAL (Perkecil & Transparan Sedikit) */
             <aside
               aria-label="Aksi Lingkungan Kota"
-              className="w-full max-w-md pointer-events-auto animate-fade-in-down"
+              className="w-full max-w-[295px] sm:max-w-[340px] pointer-events-auto animate-fade-in-down"
             >
               {nearbyAction.type === 'dry_leaf' ? (
-                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/55 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
                       🍂
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
-                        10 Daun Kering Tersebar • Terkumpul {pickedDryLeavesCount}/5
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-amber-300 leading-none">
+                        10 Daun Kering • Terkumpul {pickedDryLeavesCount}/5
                       </div>
-                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                        Pungut Daun Kering Gugur ({pickedDryLeavesCount}/5)
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
+                        Pungut Daun Kering ({pickedDryLeavesCount}/5)
                       </h4>
-                      <p className="text-[10px] truncate text-slate-300">
-                        {cafeToast || 'Kumpulkan 5 dari 10 daun kering yang tersebar agar kota tetap bersih (+1 XP)'}
+                      <p className="text-[9.5px] truncate text-slate-200/90 leading-tight">
+                        {cafeToast || 'Kumpulkan 5 dari 10 daun kering (+1 XP)'}
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => handlePickDryLeaf(nearbyAction.leafId ?? 0)}
-                    className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/50 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
                   >
-                    <span>🍂 Pungut Daun</span>
-                    <span className="text-[10px] font-mono text-emerald-200 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-400/30">
-                      5 Daun = +1 XP
+                    <span>🍂 Pungut</span>
+                    <span className="text-[9px] font-mono text-emerald-200 bg-amber-950/75 px-1 py-0.5 rounded border border-amber-400/30">
+                      +1 XP
                     </span>
                   </button>
                 </div>
               ) : nearbyAction.type === 'tree' ? (
-                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-emerald-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-emerald-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
                       {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples ? '🍎' : '🌳'}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-400">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-emerald-300 leading-none">
                         {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
-                          ? 'Pohon Telah Disiram & Berbuah Apel • Siap Dipetik!'
-                          : `Pohon Rindang Kota • Disiram ${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3`}
+                          ? 'Pohon Berbuah Apel • Siap Dipetik!'
+                          : `Pohon Kota • Disiram ${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3`}
                       </div>
-                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
                         {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
                           ? 'Petik Buah Apel Merah (+2 XP)'
                           : `Siram Pohon (${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3)`}
                       </h4>
-                      <p className={`text-[10px] truncate ${cafeToast ? 'text-emerald-300 font-semibold' : 'text-slate-300'}`}>
+                      <p className={`text-[9.5px] truncate leading-tight ${cafeToast ? 'text-emerald-200 font-semibold' : 'text-slate-200/90'}`}>
                         {cafeToast ||
                           (treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
-                            ? 'Pohon sudah disiram & mengeluarkan buah apel segar (+2 XP)'
-                            : 'Pohon belum berbuah • Siram pohon 3 kali agar mengeluarkan buah apel (+2 XP)')}
+                            ? 'Buah apel segar siap dipetik (+2 XP)'
+                            : 'Siram pohon 3x agar berbuah apel (+2 XP)')}
                       </p>
                     </div>
                   </div>
                   {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples ? (
                     <button
                       onClick={() => handleHarvestTreeApple(nearbyAction.treeIndex || 0)}
-                      className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold border border-rose-400/50 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-rose-600/90 to-red-600/90 hover:from-rose-500 hover:to-red-500 text-white text-[10.5px] font-bold border border-rose-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
                     >
-                      <span>🍎 Petik Apel</span>
-                      <span className="text-[10px] font-mono text-amber-200 bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-400/30">
+                      <span>🍎 Petik</span>
+                      <span className="text-[9px] font-mono text-amber-200 bg-rose-950/75 px-1 py-0.5 rounded border border-rose-400/30">
                         +2 XP
                       </span>
                     </button>
                   ) : (
                     <button
                       onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
-                      className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold border border-emerald-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] font-bold border border-emerald-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
                     >
                       <span>💧 Siram ({Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)</span>
-                      <span className="text-[10px] font-mono text-amber-300 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-500/30">
+                      <span className="text-[9px] font-mono text-amber-300 bg-emerald-950/75 px-1 py-0.5 rounded border border-emerald-500/30">
                         -1 XP
                       </span>
                     </button>
                   )}
                 </div>
               ) : nearbyAction.type === 'town_rules' ? (
-                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/60 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/25 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
                       📋
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-amber-300 leading-none">
                         Gapura Masuk Kota SMKN 2
                       </div>
-                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                        Papan Peraturan & Panduan Aktivitas
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
+                        Papan Peraturan & Panduan
                       </h4>
-                      <p className="text-[10px] truncate text-amber-200/80">
-                        Tata tertib kota, panduan aktivitas Siswa & peran Guru/Pengawas
+                      <p className="text-[9.5px] truncate text-amber-100/85 leading-tight">
+                        Tata tertib kota & panduan aktivitas warga
                       </p>
                     </div>
                   </div>
@@ -9828,27 +10076,27 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                         setIsTownRulesModalOpen(true);
                       }
                     }}
-                    className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-500 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/50 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
                   >
                     <span>📋 Baca</span>
                   </button>
                 </div>
               ) : nearbyAction.type === 'beringin' ? (
-                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-emerald-400/60 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-emerald-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-emerald-600/80 to-teal-500/80 border border-emerald-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
                       🌳
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-400 flex items-center gap-1.5">
-                        <span>Pohon Beringin • Belakang Balai Kota</span>
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-emerald-300 flex items-center gap-1 leading-none">
+                        <span>Pohon Beringin</span>
                         <span className="text-amber-300 font-mono font-black">+1 XP</span>
                       </div>
-                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                        Jurnal Harian Refleksi Singkat
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
+                        Jurnal Harian Refleksi
                       </h4>
-                      <p className="text-[10px] truncate text-emerald-200/80">
-                        {stickyNotes.length} sticky note tertempel di pohon • Tulis refleksimu hari ini
+                      <p className="text-[9.5px] truncate text-emerald-100/85 leading-tight">
+                        {stickyNotes.length} catatan di pohon • Tulis refleksimu
                       </p>
                     </div>
                   </div>
@@ -9857,26 +10105,26 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       sounds.playOpenModal();
                       setIsJurnalModalOpen(true);
                     }}
-                    className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold border border-emerald-400/50 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] font-bold border border-emerald-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
                   >
-                    <Pin className="w-3.5 h-3.5" />
+                    <Pin className="w-3 h-3" />
                     <span>Tulis Jurnal</span>
                   </button>
                 </div>
               ) : nearbyAction.type === 'literacy' ? (
-                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-cyan-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-cyan-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
                       📖
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold tracking-wider uppercase text-cyan-400">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-cyan-300 leading-none">
                         Sudut Literasi Warga
                       </div>
-                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
                         Baca Buku & Majalah DKV
                       </h4>
-                      <p className={`text-[10px] truncate ${cafeToast ? 'text-cyan-300 font-semibold' : 'text-slate-300'}`}>
+                      <p className={`text-[9.5px] truncate leading-tight ${cafeToast ? 'text-cyan-200 font-semibold' : 'text-slate-200/90'}`}>
                         {cafeToast || 'Komik, Majalah, atau Koran (-1 XP)'}
                       </p>
                     </div>
@@ -9886,18 +10134,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       sounds.playOpenModal();
                       setIsLiteracyModalOpen(true);
                     }}
-                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold border border-cyan-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-cyan-600/90 to-blue-600/90 hover:from-cyan-500 hover:to-blue-500 text-white text-[10.5px] font-bold border border-cyan-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
                   >
                     <span>📖 Baca</span>
-                    <span className="text-[10px] font-mono text-amber-300 bg-cyan-950/80 px-1 py-0.5 rounded border border-cyan-500/30">
+                    <span className="text-[9px] font-mono text-amber-300 bg-cyan-950/75 px-1 py-0.5 rounded border border-cyan-500/30">
                       -1 XP
                     </span>
                   </button>
                 </div>
               ) : nearbyAction.type === 'bench' ? (
-                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
                       {nearbyAction.benchId?.startsWith('swing')
                         ? '🎠'
                         : nearbyAction.benchId?.startsWith('campfire')
@@ -9905,29 +10153,29 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                         : '🪑'}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-amber-300 leading-none">
                         {nearbyAction.benchName || 'Kursi Taman'}
                       </div>
-                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
                         {nearbyAction.benchId?.startsWith('swing')
                           ? isSittingRef.current
                             ? 'Sedang Naik Ayunan'
                             : 'Naik & Berayun (-1 XP)'
                           : nearbyAction.benchId?.startsWith('campfire')
                           ? isSittingRef.current
-                            ? 'Menghangatkan Tubuh di Api Unggun'
-                            : 'Duduk Menghangatkan Tubuh'
+                            ? 'Menghangatkan Tubuh'
+                            : 'Duduk di Api Unggun'
                           : isSittingRef.current
                           ? 'Sedang Duduk Santai'
                           : 'Duduk Santai (Muat 2 Orang)'}
                       </h4>
-                      <p className={`text-[10px] truncate ${cafeToast ? 'text-amber-300 font-semibold' : 'text-slate-300'}`}>
+                      <p className={`text-[9.5px] truncate leading-tight ${cafeToast ? 'text-amber-200 font-semibold' : 'text-slate-200/90'}`}>
                         {cafeToast ||
                           (nearbyAction.benchId?.startsWith('swing')
-                            ? 'Setiap warga yang naik ayunan membayar 1 XP'
+                            ? 'Naik ayunan taman (-1 XP)'
                             : nearbyAction.benchId?.startsWith('campfire')
-                            ? 'Hangatkan tubuh bersama warga di sudut api unggun'
-                            : 'Bangku minimalis air mancur muat untuk 2 orang')}
+                            ? 'Hangatkan tubuh bersama warga'
+                            : 'Bangku taman muat 2 orang')}
                       </p>
                     </div>
                   </div>
@@ -9966,48 +10214,48 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                         }
                       }
                     }}
-                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
                   >
                     <span>
                       {nearbyAction.benchId?.startsWith('swing')
                         ? isSittingRef.current
                           ? '🚶 Turun'
-                          : '🎠 Naik Ayunan'
+                          : '🎠 Ayunan'
                         : nearbyAction.benchId?.startsWith('campfire')
                         ? isSittingRef.current
                           ? '🚶 Berdiri'
-                          : '🔥 Hangatkan'
+                          : '🔥 Duduk'
                         : isSittingRef.current
                         ? '🚶 Berdiri'
                         : '🪑 Duduk'}
                     </span>
                     {nearbyAction.benchId?.startsWith('swing') && !isSittingRef.current && (
-                      <span className="text-[10px] font-mono text-amber-200 bg-amber-950/80 px-1 py-0.5 rounded border border-amber-400/30">
+                      <span className="text-[9px] font-mono text-amber-200 bg-amber-950/75 px-1 py-0.5 rounded border border-amber-400/30">
                         -1 XP
                       </span>
                     )}
                   </button>
                 </div>
               ) : (
-                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-sky-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-sky-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
                       {fishingPhase === 'pulling' ? '🐟' : fishingPhase === 'waiting' ? '💦' : '🎣'}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold tracking-wider uppercase text-sky-400">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-sky-300 leading-none">
                         Dermaga Air Kota
                       </div>
-                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
                         {!isFishing
                           ? 'Spot Memancing Warga'
                           : fishingPhase === 'casting'
-                          ? 'Melempar Pancing ke Kolam...'
+                          ? 'Melempar Pancing...'
                           : fishingPhase === 'pulling'
                           ? 'Mengangkat Pancing...'
-                          : 'Umpan Disambar! Angkat Pancing!'}
+                          : 'Umpan Disambar! Angkat!'}
                       </h4>
-                      <p className={`text-[10px] truncate ${cafeToast ? 'text-sky-300 font-semibold' : 'text-slate-300'}`}>
+                      <p className={`text-[9.5px] truncate leading-tight ${cafeToast ? 'text-sky-200 font-semibold' : 'text-slate-200/90'}`}>
                         {cafeToast || 'Santai memancing & dapatkan ikan unik'}
                       </p>
                     </div>
@@ -10015,10 +10263,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   {!isFishing ? (
                     <button
                       onClick={handleStartFishing}
-                      className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold border border-sky-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-sky-600/90 to-blue-600/90 hover:from-sky-500 hover:to-blue-500 text-white text-[10.5px] font-bold border border-sky-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
                     >
-                      <span>🎣 Lempar Pancing</span>
-                      <span className="text-[10px] font-mono text-amber-300 bg-sky-950/80 px-1 py-0.5 rounded border border-sky-500/30">
+                      <span>🎣 Pancing</span>
+                      <span className="text-[9px] font-mono text-amber-300 bg-sky-950/75 px-1 py-0.5 rounded border border-sky-500/30">
                         -3 XP
                       </span>
                     </button>
@@ -10026,9 +10274,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     <button
                       onClick={handlePullFishingRod}
                       disabled={fishingPhase === 'pulling'}
-                      className={`py-2 px-3.5 rounded-xl text-white text-xs font-extrabold border shadow-lg transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap ${
+                      className={`py-1.5 px-2.5 rounded-lg text-white text-[10.5px] font-extrabold border shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap ${
                         fishingPhase === 'pulling'
-                          ? 'bg-amber-600 border-amber-300/60 opacity-90'
+                          ? 'bg-amber-600/90 border-amber-300/60 opacity-90'
                           : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-400 hover:to-sky-400 border-emerald-300/70 animate-bounce shadow-emerald-500/30'
                       }`}
                     >
@@ -10041,16 +10289,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               )}
             </aside>
           ) : cafeToast ? (
-            /* 5. FALLBACK SINGLE TOAST NOTIFICATION */
+            /* 5. FALLBACK SINGLE TOAST NOTIFICATION (Compact & Semi-Transparent) */
             <div
               role="status"
-              className="pointer-events-auto bg-[#121e2c]/95 backdrop-blur-md text-emerald-300 font-bold text-xs sm:text-sm px-4 py-2 rounded-2xl border border-emerald-500/45 shadow-2xl animate-fade-in-down flex items-center gap-2 max-w-md text-center"
+              className="pointer-events-auto bg-[#121e2c]/70 backdrop-blur-md text-emerald-200 font-bold text-[11px] sm:text-xs px-3 py-1.5 rounded-xl border border-emerald-500/40 shadow-lg animate-fade-in-down flex items-center gap-1.5 max-w-[310px] sm:max-w-[340px] text-center"
             >
               <span>✨</span>
               <span>{cafeToast}</span>
               <button
                 onClick={() => showToast(null, 0)}
-                className="ml-1 text-slate-400 hover:text-white text-xs cursor-pointer"
+                className="ml-1 text-slate-300 hover:text-white text-[10px] cursor-pointer"
                 title="Tutup"
               >
                 ✕

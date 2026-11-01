@@ -850,7 +850,7 @@ export default function App() {
       )}
 
       {/* TOP HEADER OVERLAY (Clean & Perfectly Responsive on Mobile) */}
-      {/* TOP HEADER OVERLAY (Clean & Perfectly Responsive on Mobile, Never Overlaps) */}
+      {/* TOP HEADER OVERLAY (Clean, Semi-Transparent & Perfectly Responsive on Mobile, Never Overlaps) */}
       {!activeBuilding && !isQuickNavOpen && (
         <header className="absolute top-2 sm:top-3.5 left-2 sm:left-4 right-2 sm:right-4 flex items-center justify-between pointer-events-none z-20 gap-1 sm:gap-2 max-w-full">
           {/* Left: < Back button, Profile Capsule, and Teacher Ruang Guru button */}
@@ -858,7 +858,7 @@ export default function App() {
             {/* Back button */}
             <button
               onClick={handleLogout}
-              className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-200 hover:text-white border border-slate-600/50 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Ganti Siswa / Keluar"
               aria-label="Kembali"
             >
@@ -866,7 +866,7 @@ export default function App() {
             </button>
 
             {/* Profile Capsule */}
-            <div className="bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 flex items-center gap-1 sm:gap-1.5 shadow-xl min-w-0 shrink">
+            <div className="bg-[#121e2c]/68 backdrop-blur-md border border-slate-600/50 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 flex items-center gap-1 sm:gap-1.5 shadow-lg min-w-0 shrink">
               {/* Circular Avatar with gold border */}
               <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[10px] sm:text-[11px] shadow-sm shrink-0">
                 {student.name.toLowerCase().includes('kikybahsoan') || student.name.toLowerCase().includes('kikybahoan')
@@ -894,7 +894,7 @@ export default function App() {
               <div className="flex items-center gap-0.5 font-bold text-[10.5px] sm:text-xs text-amber-400 font-mono shrink-0">
                 <span>🪙</span>
                 <span>{student.points}</span>
-                <span className="hidden md:inline font-sans text-[10px] text-slate-400 font-normal ml-0.5">XP</span>
+                <span className="hidden md:inline font-sans text-[10px] text-slate-300 font-normal ml-0.5">XP</span>
               </div>
             </div>
 
@@ -902,7 +902,7 @@ export default function App() {
             {student.isTeacher && (
               <button
                 onClick={() => setIsTeacherModalOpen(true)}
-                className="w-7.5 h-7.5 sm:w-auto sm:px-2.5 sm:py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-extrabold text-[10.5px] sm:text-xs shadow-xl flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer border border-amber-300/40 shrink-0"
+                className="w-7.5 h-7.5 sm:w-auto sm:px-2.5 sm:py-1 rounded-full bg-gradient-to-r from-amber-500/85 to-orange-500/85 hover:from-amber-400 hover:to-orange-400 backdrop-blur-md text-white font-extrabold text-[10.5px] sm:text-xs shadow-lg flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer border border-amber-300/40 shrink-0"
                 title="Buka Ruang Guru (Panel Pengajar)"
                 aria-label="Ruang Guru"
               >
@@ -915,7 +915,7 @@ export default function App() {
           {/* Right: Clock • Class • Chart/Nav • Bell • Lo-Fi • Audio • Day/Night */}
           <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto shrink-0 ml-auto">
             {/* Live WITA Clock Pill & Subject for teacher */}
-            <div className="flex items-center gap-1 bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 shadow-xl text-[10px] sm:text-xs font-bold text-amber-400 font-mono shrink-0">
+            <div className="flex items-center gap-1 bg-[#121e2c]/68 backdrop-blur-md border border-slate-600/50 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 shadow-lg text-[10px] sm:text-xs font-bold text-amber-400 font-mono shrink-0">
               <Clock className="w-3 h-3 text-amber-400 shrink-0" />
               <span>{currentTimeWita}</span>
               {student.isTeacher && student.subject && (
@@ -927,7 +927,7 @@ export default function App() {
 
             {/* Class Badge Pill (Hidden on narrowest screens < 370px to preserve space) */}
             <div
-              className="hidden min-[370px]:flex bg-[#121e2c]/95 backdrop-blur-md border border-slate-700/60 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 shadow-xl text-[10px] sm:text-xs font-bold text-emerald-400 shrink-0"
+              className="hidden min-[370px]:flex bg-[#121e2c]/68 backdrop-blur-md border border-slate-600/50 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 shadow-lg text-[10px] sm:text-xs font-bold text-emerald-400 shrink-0"
               title={student.isTeacher ? 'DKV SMKN 2 Gorontalo' : student.className}
             >
               <GraduationCap className="w-3 h-3 text-emerald-400 shrink-0" />
@@ -939,7 +939,7 @@ export default function App() {
             {/* Chart / Quick Navigation */}
             <button
               onClick={() => setIsQuickNavOpen(true)}
-              className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-200 hover:text-white border border-slate-600/50 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Daftar Gedung & Peta Kota"
               aria-label="Peta Gedung"
             >
@@ -949,7 +949,7 @@ export default function App() {
             {/* Balai Kota Announcements (Bell) */}
             <button
               onClick={() => setActiveBuilding('balai_kota')}
-              className="hidden min-[480px]:flex w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-200 hover:text-white border border-slate-700/60 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="hidden min-[480px]:flex w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-200 hover:text-white border border-slate-600/50 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Pengumuman & Misi Balai Kota"
               aria-label="Pengumuman"
             >
@@ -962,11 +962,11 @@ export default function App() {
             {/* Audio Toggle (Desktop only) */}
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
-              className="hidden md:flex w-8 h-8 rounded-full bg-[#121e2c]/95 hover:bg-[#1a293b] text-slate-300 hover:text-white border border-slate-700/60 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="hidden md:flex w-8 h-8 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-300 hover:text-white border border-slate-600/50 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title={audioEnabled ? 'Matikan Suara Chime' : 'Nyalakan Suara Chime'}
               aria-label="Toggle Suara"
             >
-              {audioEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
+              {audioEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
             </button>
           </div>
         </header>

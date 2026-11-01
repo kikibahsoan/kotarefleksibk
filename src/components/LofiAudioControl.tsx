@@ -59,8 +59,8 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
         }}
         className={`group relative h-7.5 sm:h-9 w-7.5 sm:w-auto px-0 sm:px-3 rounded-full backdrop-blur-md border shadow-lg flex items-center justify-center sm:justify-start gap-1.5 transition active:scale-95 cursor-pointer shrink-0 ${
           isPlaying
-            ? 'bg-amber-950/80 border-amber-500/70 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
-            : 'bg-[#121e2c]/95 border-slate-700/60 text-slate-300 hover:text-white hover:bg-[#1a293b]'
+            ? 'bg-amber-950/68 border-amber-500/70 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
+            : 'bg-[#121e2c]/68 border-slate-600/50 text-slate-200 hover:text-white hover:bg-[#1a293b]/80'
         }`}
         title={
           isPlaying
@@ -90,8 +90,8 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
           </>
         ) : (
           <>
-            <Radio className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-300 transition" />
-            <span className="text-[11px] sm:text-xs font-bold text-slate-300 font-mono hidden sm:inline">
+            <Radio className="w-3.5 h-3.5 text-slate-300 group-hover:text-amber-300 transition" />
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 font-mono hidden sm:inline">
               Radio
             </span>
           </>
@@ -112,7 +112,7 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
 
       {/* Floating Radio Tuner Dropdown */}
       {showVolumeSlider && (
-        <div className="absolute right-0 top-11 z-50 bg-[#121e2c]/95 backdrop-blur-md border border-amber-500/40 rounded-2xl p-3 shadow-2xl flex flex-col gap-2.5 min-w-[210px] animate-fade-in-up">
+        <div className="absolute right-0 top-11 z-50 bg-[#121e2c]/72 backdrop-blur-md border border-amber-500/40 rounded-2xl p-3 shadow-2xl flex flex-col gap-2.5 min-w-[210px] animate-fade-in-up">
           {/* Station Title & Frequency */}
           <div className="pb-2 border-b border-slate-700/60">
             <div className="flex items-center justify-between text-[11px] font-extrabold text-white">
