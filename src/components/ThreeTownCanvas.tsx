@@ -695,8 +695,36 @@ export const WELCOME_GATE_COORDS = { wx: 0, wy: 6.15 };
 export interface TreeWaterCycle {
   count: number; // 0, 1, 2, or 3
   lastWateredTime: number; // performance.now()
-  appleStartTime: number | null; // performance.now() when 3rd watering triggers 15s apples
+  appleStartTime: number | null; // performance.now() when 3rd watering triggers apples
+  hasRipeApples?: boolean; // true when ripe apples are ready to be harvested (+2 XP)
+  harvestFadeStartTime?: number | null; // performance.now() when apples were harvested -> 1.5s fade-out animation
+  nextAutoAppleSpawnAt?: number; // Date.now() timestamp when apples respawn (every 5 minutes = 300,000 ms)
 }
+
+export interface DryLeafItem {
+  id: number;
+  wx: number;
+  wy: number;
+  rot: number;
+  pickedAt: number | null; // Date.now() when picked
+  fadeStartTime: number | null; // performance.now() for smooth fade-out animation
+}
+
+// 10 titik daun kering gugur yang rapi & estetik tersebar di taman/bawah pohon (kota tetap terlihat bersih dan asri)
+export const DRY_LEAVES_SPOTS: Array<{ id: number; wx: number; wy: number; rot: number }> = [
+  { id: 0, wx: -1.45, wy: -1.55, rot: 0.35 },
+  { id: 1, wx: 1.55, wy: -1.45, rot: -0.42 },
+  { id: 2, wx: -1.52, wy: 1.48, rot: 0.65 },
+  { id: 3, wx: 1.48, wy: 1.52, rot: -0.28 },
+  { id: 4, wx: -0.82, wy: 2.35, rot: 0.18 },
+  { id: 5, wx: 0.85, wy: 2.42, rot: -0.38 },
+  { id: 6, wx: -2.45, wy: -0.35, rot: 0.52 },
+  { id: 7, wx: 2.45, wy: 0.42, rot: -0.48 },
+  { id: 8, wx: -1.65, wy: 3.35, rot: 0.25 },
+  { id: 9, wx: 1.68, wy: -3.25, rot: -0.45 },
+];
+
+export const TOTAL_SCATTERED_DRY_LEAVES = DRY_LEAVES_SPOTS.length; // 10 daun kering tersebar di kota
 
 export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTownCanvas({
   onSelectBuilding,
@@ -990,10 +1018,74 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     };
   }, []);
 
-  // Tree 3-step watering & 15-second apple fruiting cycle state (treeIndex -> TreeWaterCycle)
-  const [treeCycles, setTreeCycles] = useState<Record<number, TreeWaterCycle>>({});
-  const treeCyclesRef = useRef<Record<number, TreeWaterCycle>>({});
+  // Tree watering & apple fruiting cycle state (treeIndex -> TreeWaterCycle)
+  // Saat Avatar baru login, seluruh pohon BELUM mengeluarkan buah (hasRipeApples: false), baru berbuah nanti saat disiram!
+  const [treeCycles, setTreeCycles] = useState<Record<number, TreeWaterCycle>>(() => {
+    const initial: Record<number, TreeWaterCycle> = {};
+    TREES_LIST.forEach((_, idx) => {
+      initial[idx] = {
+        count: 0,
+        lastWateredTime: 0,
+        appleStartTime: null,
+        hasRipeApples: false,
+        harvestFadeStartTime: null,
+      };
+    });
+    return initial;
+  });
+  const treeCyclesRef = useRef<Record<number, TreeWaterCycle>>(treeCycles);
   treeCyclesRef.current = treeCycles;
+
+  // Aesthetic Dry Leaves (Daun Kering) state & 5-leaves = +1 XP counter
+  const [dryLeaves, setDryLeaves] = useState<DryLeafItem[]>(() =>
+    DRY_LEAVES_SPOTS.map((spot) => ({
+      ...spot,
+      pickedAt: null,
+      fadeStartTime: null,
+    }))
+  );
+  const dryLeavesRef = useRef<DryLeafItem[]>(dryLeaves);
+  dryLeavesRef.current = dryLeaves;
+
+  const dryLeafStorageKey = `kota_refleksi_dry_leaves_${studentId || studentName}`;
+  const [pickedDryLeavesCount, setPickedDryLeavesCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const saved = parseInt(localStorage.getItem(dryLeafStorageKey) || '0', 10);
+      return Number.isNaN(saved) ? 0 : saved % 5;
+    } catch {
+      return 0;
+    }
+  });
+  const pickedDryLeavesCountRef = useRef<number>(pickedDryLeavesCount);
+  pickedDryLeavesCountRef.current = pickedDryLeavesCount;
+
+  // Respawn picked dry leaves gently after 90 seconds so the city always has neat garden leaves to tidy up
+  useEffect(() => {
+    const leafRespawnTimer = window.setInterval(() => {
+      const now = Date.now();
+      let updated = false;
+      const nextLeaves = dryLeavesRef.current.map((leaf) => {
+        if (leaf.pickedAt && now - leaf.pickedAt >= 90 * 1000) {
+          updated = true;
+          return { ...leaf, pickedAt: null, fadeStartTime: null };
+        }
+        return leaf;
+      });
+      if (updated) {
+        dryLeavesRef.current = nextLeaves;
+        setDryLeaves(nextLeaves);
+      }
+    }, 2000);
+    return () => window.clearInterval(leafRespawnTimer);
+  }, []);
+
+  // Pending interactive walk-to-harvest-apple or walk-to-pick-leaf target
+  const pendingEnvActionRef = useRef<
+    | { type: 'harvest_apple'; treeIndex: number; targetX: number; targetY: number }
+    | { type: 'pick_leaf'; leafId: number; targetX: number; targetY: number }
+    | null
+  >(null);
 
   // Active minimalist water spray effect from avatar to tree { treeIndex, startTime, avatarWx, avatarWy, treeWx, treeWy }
   const activeWaterSprayRef = useRef<{
@@ -1026,16 +1118,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [isLiteracyModalOpen, setIsLiteracyModalOpen] = useState(false);
   const [activeLiteracyDoc, setActiveLiteracyDoc] = useState<'komik' | 'majalah' | 'koran' | null>(null);
 
-  // Nearby interaction (tree watering, fishing spot, literacy corner, bench, town rules board, or beringin tree journal)
+  // Nearby interaction (tree watering/apple harvesting, dry leaf pickup, fishing spot, literacy corner, bench, town rules board, or beringin tree journal)
   const [nearbyAction, setNearbyAction] = useState<{
-    type: 'tree' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
+    type: 'tree' | 'dry_leaf' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
     treeIndex?: number;
+    leafId?: number;
     benchId?: BenchId;
     benchName?: string;
   } | null>(null);
   const nearbyActionRef = useRef<{
-    type: 'tree' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
+    type: 'tree' | 'dry_leaf' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
     treeIndex?: number;
+    leafId?: number;
     benchId?: BenchId;
     benchName?: string;
   } | null>(null);
@@ -1103,6 +1197,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   studentPointsRef.current = studentPoints;
   const onDeductPointsRef = useRef(onDeductPoints);
   onDeductPointsRef.current = onDeductPoints;
+  const onAddXpRef = useRef(onAddXp);
+  onAddXpRef.current = onAddXp;
+  const handleHarvestTreeAppleRef = useRef<(treeIdx: number) => void>(() => {});
+  const handlePickDryLeafRef = useRef<(leafId: number) => void>(() => {});
 
   // Helper to check if a specific seat ID is occupied by any remote online player
   const isSeatOccupiedByRemote = (seatId: BenchId): boolean => {
@@ -2227,6 +2325,76 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
+      // 4a. Check Click on Dry Leaf (Daun Kering) -> Walk to leaf & pick it up (5 leaves = +1 XP)
+      for (const leaf of dryLeavesRef.current) {
+        if (leaf.pickedAt !== null) continue;
+        const leafDist = Math.hypot(wx - leaf.wx, wy - leaf.wy);
+        if (leafDist < 0.72) {
+          sounds.playClick();
+          if (isSittingRef.current) {
+            setIsSitting(false);
+            setSittingSeat(null);
+          }
+          pendingSeatRef.current = null;
+          pendingBuildingId = null;
+          lastTouchedIdRef.current = null;
+          const pDist = Math.hypot(player.wx - leaf.wx, player.wy - leaf.wy);
+          if (pDist <= 0.95) {
+            handlePickDryLeafRef.current(leaf.id);
+          } else {
+            pendingEnvActionRef.current = {
+              type: 'pick_leaf',
+              leafId: leaf.id,
+              targetX: leaf.wx,
+              targetY: leaf.wy,
+            };
+            player.targetWx = leaf.wx;
+            player.targetWy = leaf.wy;
+            player.isMoving = true;
+            clickRippleRef.current = { wx: leaf.wx, wy: leaf.wy, time: performance.now() };
+          }
+          return;
+        }
+      }
+
+      // 4b. Check Click on Map Trees -> Walk to tree & harvest ripe apples (+2 XP) or select tree
+      for (let tIdx = 0; tIdx < TREES_LIST.length; tIdx++) {
+        const [tx, ty] = TREES_LIST[tIdx];
+        const tDist = Math.hypot(wx - tx, wy - ty);
+        if (tDist < 0.85) {
+          sounds.playClick();
+          if (isSittingRef.current) {
+            setIsSitting(false);
+            setSittingSeat(null);
+          }
+          pendingSeatRef.current = null;
+          pendingBuildingId = null;
+          lastTouchedIdRef.current = null;
+          const pDist = Math.hypot(player.wx - tx, player.wy - ty);
+          const cyc = treeCyclesRef.current[tIdx];
+          if (pDist <= 1.05) {
+            setNearbyAction({ type: 'tree', treeIndex: tIdx });
+            if (cyc?.hasRipeApples) {
+              handleHarvestTreeAppleRef.current(tIdx);
+            }
+          } else {
+            const standX = tx + (player.wx >= tx ? 0.42 : -0.42);
+            const standY = ty + (player.wy >= ty ? 0.42 : -0.42);
+            pendingEnvActionRef.current = {
+              type: 'harvest_apple',
+              treeIndex: tIdx,
+              targetX: standX,
+              targetY: standY,
+            };
+            player.targetWx = standX;
+            player.targetWy = standY;
+            player.isMoving = true;
+            clickRippleRef.current = { wx: standX, wy: standY, time: performance.now() };
+          }
+          return;
+        }
+      }
+
       // 5. Check Click on Buildings
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
@@ -2321,7 +2489,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy) < 1.35 ||
         Math.hypot(wx - 0, wy - 6.15) < 1.45 ||
         ALL_TWO_PERSON_BENCHES.some((g) => Math.hypot(wx - g.wx, wy - g.wy) < 1.05) ||
-        SWING_STRUCTURES.some((s) => Math.hypot(wx - s.wx, wy - s.wy) < 1.15);
+        SWING_STRUCTURES.some((s) => Math.hypot(wx - s.wx, wy - s.wy) < 1.15) ||
+        dryLeavesRef.current.some((l) => l.pickedAt === null && Math.hypot(wx - l.wx, wy - l.wy) < 0.7) ||
+        TREES_LIST.some(([tx, ty]) => Math.hypot(wx - tx, wy - ty) < 0.85);
 
       if (isOverInteractiveSpot) {
         canvas.style.cursor = 'pointer';
@@ -2568,7 +2738,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
         } else {
-          // Arrived at target destination! Check if avatar was walking to a seat/swing
+          // Arrived at target destination! Check if avatar was walking to a seat/swing or tree apple / dry leaf
           if (pendingSeatRef.current) {
             const ps = pendingSeatRef.current;
             pendingSeatRef.current = null;
@@ -2582,6 +2752,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             setIsSitting(true);
             setSittingSeat(ps.seatId);
             ps.onArrive?.();
+            sendHeartbeatRef.current?.();
+          } else if (pendingEnvActionRef.current) {
+            const envAct = pendingEnvActionRef.current;
+            pendingEnvActionRef.current = null;
+            player.isMoving = false;
+            player.walkFrame = 0;
+            if (envAct.type === 'pick_leaf') {
+              handlePickDryLeafRef.current(envAct.leafId);
+            } else if (envAct.type === 'harvest_apple') {
+              setNearbyAction({ type: 'tree', treeIndex: envAct.treeIndex });
+              if (treeCyclesRef.current[envAct.treeIndex]?.hasRipeApples) {
+                handleHarvestTreeAppleRef.current(envAct.treeIndex);
+              }
+            }
             sendHeartbeatRef.current?.();
           } else {
             player.isMoving = false;
@@ -2627,11 +2811,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         nearBench = { id: 'literacy', name: 'Bangku Sudut Literasi' };
       }
 
+      let nearLeafId = -1;
+      for (const leaf of dryLeavesRef.current) {
+        if (leaf.pickedAt !== null) continue;
+        if (Math.hypot(player.wx - leaf.wx, player.wy - leaf.wy) < 0.85) {
+          nearLeafId = leaf.id;
+          break;
+        }
+      }
+
       let nearTreeIdx = -1;
       for (let tIdx = 0; tIdx < trees.length; tIdx++) {
         const [tx, ty] = trees[tIdx];
         const tDist = Math.hypot(player.wx - tx, player.wy - ty);
-        if (tDist < 0.85) {
+        if (tDist < 0.95) {
           nearTreeIdx = tIdx;
           break;
         }
@@ -2649,6 +2842,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           else if (matchedSwing) seatName = matchedSwing.name;
           else if (currentSeat === 'literacy') seatName = 'Bangku Sudut Literasi';
           setNearbyAction({ type: 'bench', benchId: currentSeat || undefined, benchName: seatName });
+        }
+      } else if (nearLeafId !== -1) {
+        if (nearbyActionRef.current?.type !== 'dry_leaf' || nearbyActionRef.current?.leafId !== nearLeafId) {
+          setNearbyAction({ type: 'dry_leaf', leafId: nearLeafId });
         }
       } else if (nearBench) {
         if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== nearBench.id) {
@@ -3192,7 +3389,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'campfire_spot'; wx: number; wy: number; depth: number }
         | { type: 'welcome_gate'; wx: number; wy: number; depth: number }
         | { type: 'town_rules_board'; wx: number; wy: number; depth: number }
-        | { type: 'beringin_tree'; wx: number; wy: number; depth: number };
+        | { type: 'beringin_tree'; wx: number; wy: number; depth: number }
+        | { type: 'dry_leaf'; leaf: DryLeafItem; wx: number; wy: number; depth: number };
 
       const drawItems: DrawItem[] = [];
 
@@ -3212,7 +3410,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             return swingDef.structWx + swingDef.structWy + 0.02;
           }
           const benchGroup = ALL_TWO_PERSON_BENCHES.find(
-            (g) => g.groupId === seatId || g.seats[0].id === seatId || g.seats[1].id === seatId
+            (g) => g.groupId === seatId || g.seats[0].id === seatId || g.seats[1].id === currentSeatIdOrDefault(seatId)
           );
           if (benchGroup) {
             return benchGroup.wx + benchGroup.wy + 0.02;
@@ -3220,6 +3418,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
         return avData.wx + avData.wy;
       };
+      function currentSeatIdOrDefault(s: BenchId) {
+        return s;
+      }
 
       drawItems.push({
         type: 'avatar',
@@ -3244,6 +3445,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       trees.forEach(([tx, ty], tIdx) => {
         drawItems.push({ type: 'tree', wx: tx, wy: ty, depth: tx + ty, index: tIdx });
+      });
+
+      // Neat golden-amber dry leaves on garden borders (only active or currently fading out)
+      dryLeavesRef.current.forEach((leaf) => {
+        const isFading = leaf.fadeStartTime !== null && (currentTime - leaf.fadeStartTime) / 1000 < 0.9;
+        if (leaf.pickedAt === null || isFading) {
+          drawItems.push({
+            type: 'dry_leaf',
+            leaf,
+            wx: leaf.wx,
+            wy: leaf.wy,
+            depth: leaf.wx + leaf.wy - 0.15,
+          });
+        }
       });
 
       STREET_LAMPS_LIST.forEach(([lx, ly]) => {
@@ -4874,28 +5089,109 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillText(dockLabel, pt.x, dockTagY);
           }
           ctx.restore();
+        } else if (item.type === 'dry_leaf') {
+          // AESTHETIC GOLDEN-AMBER DRY LEAF (Daun Kering Gugur yang Rapi & Bersih di Tepi Taman)
+          const leaf = item.leaf;
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+
+          let fadeAlpha = 1.0;
+          let liftY = 0;
+          if (leaf.fadeStartTime !== null) {
+            const fadeElapsed = (currentTime - leaf.fadeStartTime) / 1000;
+            fadeAlpha = Math.max(0, 1 - fadeElapsed / 0.85);
+            liftY = fadeElapsed * 18 * z;
+          }
+
+          if (fadeAlpha > 0.01) {
+            ctx.save();
+            ctx.globalAlpha = fadeAlpha;
+            const gentleSway = Math.sin(elapsed * 2.2 + leaf.id) * 0.08;
+            ctx.translate(pt.x, pt.y - liftY);
+            ctx.rotate(leaf.rot + gentleSway);
+
+            // Subtle ground shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
+            ctx.beginPath();
+            ctx.ellipse(0.5 * z, 1.2 * z, 5.2 * z, 2.8 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Warm autumn amber leaf body (clean & scenic)
+            ctx.fillStyle = '#d97706';
+            ctx.beginPath();
+            ctx.moveTo(-5.2 * z, 0);
+            ctx.quadraticCurveTo(0, -4.2 * z, 5.5 * z, 0);
+            ctx.quadraticCurveTo(0, 4.2 * z, -5.2 * z, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Golden inner highlight
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.ellipse(-0.5 * z, -0.6 * z, 3.2 * z, 1.5 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Delicate leaf stem & center vein
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 0.8 * z;
+            ctx.beginPath();
+            ctx.moveTo(-6.8 * z, 0.4 * z);
+            ctx.lineTo(4.2 * z, 0);
+            ctx.stroke();
+
+            ctx.restore();
+
+            // Show subtle floating pill when avatar is close or fading out
+            const distPlayerToLeaf = Math.hypot(player.wx - item.wx, player.wy - item.wy);
+            if (leaf.fadeStartTime !== null) {
+              ctx.save();
+              ctx.globalAlpha = fadeAlpha;
+              ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
+              ctx.fillStyle = '#fef08a';
+              ctx.textAlign = 'center';
+              ctx.fillText('🍂 Diambil!', pt.x, pt.y - 12 * z - liftY);
+              ctx.restore();
+            } else if (distPlayerToLeaf < 1.35) {
+              const badgeY = pt.y - 14 * z;
+              const badgeText = `🍂 Daun Kering (${pickedDryLeavesCountRef.current}/5)`;
+              ctx.save();
+              ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
+              const bm = ctx.measureText(badgeText);
+              const bw = bm.width + 8 * z;
+              const bh = 12 * z;
+              ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+              ctx.beginPath();
+              ctx.roundRect(pt.x - bw / 2, badgeY - bh / 2, bw, bh, 6 * z);
+              ctx.fill();
+              ctx.strokeStyle = '#f59e0b';
+              ctx.lineWidth = 1 * z;
+              ctx.stroke();
+              ctx.fillStyle = '#fef3c7';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(badgeText, pt.x, badgeY);
+              ctx.restore();
+            }
+          }
         } else if (item.type === 'tree') {
-          // Double-Sphere Tree (Minimalist Watering + 3-Watering Cycle -> 15s Red Apples -> Auto Reset)
+          // Double-Sphere Tree (Minimalist Watering + 5-Minute Ripe Apples (+2 XP) with Smooth Fade-Out Animation when Picked)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
           const cycle = treeCyclesRef.current[item.index];
           const elapsedSinceWatered = cycle && cycle.lastWateredTime ? (currentTime - cycle.lastWateredTime) / 1000 : 999;
           const isRecentlyWatered = elapsedSinceWatered >= 0 && elapsedSinceWatered < 1.8;
 
-          let appleElapsed = -1;
-          if (cycle && cycle.appleStartTime !== null) {
-            appleElapsed = (currentTime - cycle.appleStartTime) / 1000;
-            if (appleElapsed >= 15.0) {
-              // 15 seconds of apples completed -> automatically reset tree cycle back to 0/3!
-              treeCyclesRef.current[item.index] = {
-                count: 0,
-                lastWateredTime: 0,
-                appleStartTime: null,
-              };
-              appleElapsed = -1;
+          const hasRipeApples = Boolean(cycle?.hasRipeApples);
+          let harvestFadeElapsed = -1;
+          if (cycle && cycle.harvestFadeStartTime !== null && cycle.harvestFadeStartTime !== undefined) {
+            harvestFadeElapsed = (currentTime - cycle.harvestFadeStartTime) / 1000;
+            if (harvestFadeElapsed >= 1.5) {
+              cycle.harvestFadeStartTime = null;
+              harvestFadeElapsed = -1;
             }
           }
-          const hasApples = appleElapsed >= 0 && appleElapsed < 15.0;
+          const isFadingHarvest = harvestFadeElapsed >= 0 && harvestFadeElapsed < 1.5;
+          const hasApples = hasRipeApples || isFadingHarvest;
           const isLush = isRecentlyWatered || hasApples || (cycle && cycle.count > 0 && elapsedSinceWatered < 15.0);
 
           // Only make tree transparent if avatar is specifically BEHIND tree canopy and tree is NOT being watered/fruiting
@@ -4954,7 +5250,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (isRecentlyWatered) {
             const fade = Math.max(0, 1 - elapsedSinceWatered / 1.8);
             ctx.save();
-            // 8 delicate minimalist vertical rain droplets over the tree crown
             for (let r = 0; r < 8; r++) {
               const offset = ((r - 3.5) * 4.5) * z;
               const dropProg = ((elapsedSinceWatered * 2.4 + r * 0.27) % 1.0);
@@ -4969,7 +5264,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.stroke();
             }
 
-            // Single minimalist expanding water ring ripple around tree crown
             const ringR = (10 + (elapsedSinceWatered / 1.8) * 14) * z;
             ctx.strokeStyle = `rgba(125, 211, 252, ${0.55 * fade})`;
             ctx.lineWidth = 1.1 * z;
@@ -4979,18 +5273,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
 
-          // 2. BUAH APEL MERAH (Muncul setelah 3x disiram, bertahan selama 15 detik lalu hilang otomatis)
+          // 2. BUAH APEL MERAH (Muncul setiap 5 menit atau setelah disiram, dapat dipetik siswa untuk +2 XP dengan animasi buah memudar)
           if (hasApples) {
             let appleAlpha = 1.0;
-            if (appleElapsed < 0.5) {
-              // 0s to 0.5s: smooth pop-in
-              appleAlpha = appleElapsed / 0.5;
-            } else if (appleElapsed <= 12.5) {
-              // 0.5s to 12.5s: ripe bright red apples
-              appleAlpha = 1.0;
-            } else {
-              // 12.5s to 15.0s: smooth fade to 0 before cycle resets
-              appleAlpha = Math.max(0, (15.0 - appleElapsed) / 2.5);
+            let harvestFloatY = 0;
+            if (isFadingHarvest) {
+              // Smooth fade-out & gentle upward float animation after student harvests the apples
+              appleAlpha = Math.max(0, 1 - harvestFadeElapsed / 1.5);
+              harvestFloatY = -harvestFadeElapsed * 14 * z;
             }
 
             if (appleAlpha > 0.01) {
@@ -5010,7 +5300,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               applePositions.forEach(([ax, ay], aIdx) => {
                 const appleBob = Math.sin(elapsed * 3.5 + aIdx) * 0.5 * z;
                 const appleX = pt.x + ax * z;
-                const appleY = pt.y + ay * z + appleBob;
+                const appleY = pt.y + ay * z + appleBob + harvestFloatY;
 
                 // Little brown stem
                 ctx.strokeStyle = '#451a03';
@@ -5045,27 +5335,34 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 ctx.fill();
               });
 
+              if (isFadingHarvest) {
+                ctx.font = `bold ${Math.round(9 * z)}px sans-serif`;
+                ctx.fillStyle = '#fde047';
+                ctx.textAlign = 'center';
+                ctx.fillText('🍎 Dipetik! +2 XP ✨', pt.x, pt.y - 66 * z + harvestFloatY);
+              }
+
               ctx.restore();
             }
           }
 
-          // Minimalist watering progress pill above tree when near or active (💧 1/3, 💧 2/3, or 🍎 15s)
+          // Minimalist status pill above tree when near or when ripe apples are ready
           const distPlayerToThisTree = Math.hypot(player.wx - item.wx, player.wy - item.wy);
           const activeCount = cycle ? cycle.count : 0;
-          if ((distPlayerToThisTree < 1.35 && activeCount > 0) || isRecentlyWatered || hasApples) {
-            const badgeText = hasApples
-              ? `🍎 ${Math.max(1, Math.ceil(15 - appleElapsed))}d`
+          if ((distPlayerToThisTree < 1.65 && (activeCount > 0 || hasRipeApples)) || isRecentlyWatered) {
+            const badgeText = hasRipeApples
+              ? '🍎 Petik Apel (+2 XP)'
               : `💧 ${activeCount}/3`;
             const badgeY = pt.y - 68 * z;
             ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
             const bm = ctx.measureText(badgeText);
             const bw = bm.width + 8 * z;
             const bh = 12 * z;
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
             ctx.beginPath();
             ctx.roundRect(pt.x - bw / 2, badgeY - bh / 2, bw, bh, 6 * z);
             ctx.fill();
-            ctx.strokeStyle = hasApples ? '#ef4444' : '#38bdf8';
+            ctx.strokeStyle = hasRipeApples ? '#ef4444' : '#38bdf8';
             ctx.lineWidth = 1 * z;
             ctx.stroke();
             ctx.fillStyle = '#ffffff';
@@ -8920,23 +9217,119 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   };
 
   // -------------------------------------------------------------
-  // TREE WATERING ACTION (3x Siram -> Muncul Buah Apel 15 Detik -> Hilang Otomatis)
+  // TREE APPLE HARVESTING (+2 XP, Smooth Fade-Out) & WATERING ACTION (Pohon berbuah saat disiram)
   // -------------------------------------------------------------
+  const handleHarvestTreeApple = (treeIdx: number) => {
+    const nowPerf = performance.now();
+    const existingCycle = treeCyclesRef.current[treeIdx];
+    if (!existingCycle || !existingCycle.hasRipeApples) {
+      sounds.playClick();
+      showToast('🌳 Pohon ini belum berbuah apel. Yuk siram pohonnya terlebih dahulu agar berbuah!', 3000);
+      return;
+    }
+
+    setPendingConfirmation(null);
+    setIsCafeMenuOpen(false);
+
+    const updatedCycle: TreeWaterCycle = {
+      ...existingCycle,
+      count: 0,
+      appleStartTime: null,
+      hasRipeApples: false,
+      harvestFadeStartTime: nowPerf,
+    };
+
+    treeCyclesRef.current[treeIdx] = updatedCycle;
+    setTreeCycles((prev) => ({ ...prev, [treeIdx]: updatedCycle }));
+
+    sounds.playRewardXp();
+    if (onAddXpRef.current) {
+      onAddXpRef.current(2, 'Memetik Buah Apel Segar di Pohon Kota');
+    } else {
+      addXpFloat(2, 'Memetik Buah Apel Pohon');
+    }
+
+    showToast('🍎 Berhasil memetik buah apel segar! (+2 XP) • Siram pohon lagi untuk menumbuhkan buah berikutnya.', 3600);
+    playerSpeechRef.current = {
+      text: 'Segar banget buah apelnya! Dapat +2 XP 🍎✨',
+      expiresAt: Date.now() + 4000,
+    };
+    sendHeartbeatRef.current?.();
+  };
+  handleHarvestTreeAppleRef.current = handleHarvestTreeApple;
+
+  // -------------------------------------------------------------
+  // DRY LEAF PICKUP ACTION (10 Daun Kering Tersebar di Kota, Memungut 5 Daun Kering = +1 XP, Kota Tetap Bersih)
+  // -------------------------------------------------------------
+  const handlePickDryLeaf = (leafId: number) => {
+    const targetLeaf = dryLeavesRef.current.find((l) => l.id === leafId);
+    if (!targetLeaf || targetLeaf.pickedAt !== null) return;
+
+    const nowPerf = performance.now();
+    const nowMs = Date.now();
+    setPendingConfirmation(null);
+    setIsCafeMenuOpen(false);
+
+    const nextLeaves = dryLeavesRef.current.map((l) =>
+      l.id === leafId ? { ...l, pickedAt: nowMs, fadeStartTime: nowPerf } : l
+    );
+    dryLeavesRef.current = nextLeaves;
+    setDryLeaves(nextLeaves);
+
+    const remainingLeavesOnMap = nextLeaves.filter((l) => l.pickedAt === null).length;
+    const nextCount = pickedDryLeavesCountRef.current + 1;
+    if (nextCount >= 5) {
+      pickedDryLeavesCountRef.current = 0;
+      setPickedDryLeavesCount(0);
+      try {
+        localStorage.setItem(dryLeafStorageKey, '0');
+      } catch {}
+
+      sounds.playRewardXp();
+      if (onAddXpRef.current) {
+        onAddXpRef.current(1, 'Peduli Lingkungan: Memungut 5 Daun Kering');
+      } else {
+        addXpFloat(1, 'Memungut 5 Daun Kering');
+      }
+      showToast(
+        `🍂 Luar biasa! Kamu telah memungut 5 Daun Kering & menjaga kebersihan kota (+1 XP)! (${remainingLeavesOnMap}/10 daun tersisa di peta)`,
+        3800
+      );
+      playerSpeechRef.current = {
+        text: '5 daun kering terkumpul! Kota tetap bersih & dapat +1 XP 🍂✨',
+        expiresAt: Date.now() + 4500,
+      };
+    } else {
+      pickedDryLeavesCountRef.current = nextCount;
+      setPickedDryLeavesCount(nextCount);
+      try {
+        localStorage.setItem(dryLeafStorageKey, String(nextCount));
+      } catch {}
+
+      sounds.playClick();
+      showToast(
+        `🍂 Memungut daun kering (${nextCount}/5). Kumpulkan ${5 - nextCount} daun lagi untuk +1 XP! (${remainingLeavesOnMap}/10 tersebar di peta)`,
+        3200
+      );
+      playerSpeechRef.current = {
+        text: `Memungut daun kering (${nextCount}/5) 🍂`,
+        expiresAt: Date.now() + 3200,
+      };
+    }
+
+    sendHeartbeatRef.current?.();
+  };
+  handlePickDryLeafRef.current = handlePickDryLeaf;
+
   const handleWaterTree = (treeIdx: number) => {
     const nowPerf = performance.now();
     const existingCycle = treeCyclesRef.current[treeIdx];
     setPendingConfirmation(null);
     setIsCafeMenuOpen(false);
 
-    // Check if tree is currently in its 15-second apple fruiting phase
-    if (existingCycle && existingCycle.appleStartTime !== null) {
-      const appleElapsed = (nowPerf - existingCycle.appleStartTime) / 1000;
-      if (appleElapsed < 15.0) {
-        const secsLeft = Math.max(1, Math.ceil(15.0 - appleElapsed));
-        sounds.playClick();
-        showToast(`🍎 Pohon sedang berbuah apel merah! Siklus baru dapat dimulai dalam ${secsLeft} detik.`, 3000);
-        return;
-      }
+    if (existingCycle && existingCycle.hasRipeApples) {
+      handleHarvestTreeApple(treeIdx);
+      return;
     }
 
     const cost = 1;
@@ -8951,16 +9344,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       sounds.playRewardXp();
       const remaining = studentPoints - cost;
       const prevCount =
-        existingCycle && existingCycle.appleStartTime === null && existingCycle.count < 3
+        existingCycle && !existingCycle.hasRipeApples && existingCycle.count < 3
           ? existingCycle.count
           : 0;
       const nextCount = prevCount + 1;
       const isThirdWatering = nextCount >= 3;
 
       const updatedCycle: TreeWaterCycle = {
-        count: nextCount,
+        count: isThirdWatering ? 3 : nextCount,
         lastWateredTime: nowPerf,
         appleStartTime: isThirdWatering ? nowPerf : null,
+        hasRipeApples: isThirdWatering ? true : false,
+        harvestFadeStartTime: null,
       };
 
       treeCyclesRef.current[treeIdx] = updatedCycle;
@@ -8977,19 +9372,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       };
 
       if (isThirdWatering) {
-        showToast(`🍎 Siraman ke-3 (3/3)! Pohon berbuah apel merah segar selama 15 detik (-1 XP) • Sisa: ${remaining} XP`, 3500);
+        showToast(`🍎 Pohon telah disiram (3/3) dan langsung mengeluarkan buah apel merah segar! Klik "Petik Apel" untuk +2 XP!`, 3800);
         playerSpeechRef.current = {
-          text: 'Siraman ke-3! Pohonnya berbuah apel 🍎✨',
+          text: 'Wah pohonnya sudah disiram dan berbuah apel! Ayo kita petik (+2 XP)! 🍎✨',
           expiresAt: Date.now() + 4500,
         };
-        // Schedule UI state sync after 15 seconds when apples disappear
-        window.setTimeout(() => {
-          const resetCycle: TreeWaterCycle = { count: 0, lastWateredTime: 0, appleStartTime: null };
-          treeCyclesRef.current[treeIdx] = resetCycle;
-          setTreeCycles((prev) => ({ ...prev, [treeIdx]: resetCycle }));
-        }, 15000);
       } else {
-        showToast(`💧 Pohon disiram (${nextCount}/3)! Siram ${3 - nextCount}x lagi agar muncul buah apel (-1 XP) • Sisa: ${remaining} XP`, 3500);
+        showToast(`💧 Pohon disiram (${nextCount}/3)! Siram ${3 - nextCount}x lagi agar pohon mengeluarkan buah apel (-1 XP) • Sisa: ${remaining} XP`, 3500);
         playerSpeechRef.current = {
           text: `Menyiram pohon (${nextCount}/3) 💧🌱`,
           expiresAt: Date.now() + 3500,
@@ -9108,12 +9497,26 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       <div className="absolute top-12 sm:top-14 left-2.5 right-2.5 sm:left-4 sm:right-4 z-30 pointer-events-none flex flex-col gap-2">
         {/* ROW 1: STATUS PILLS (Left: Warga Online & Radar | Right: Active Held Item + Countdown) */}
         <div className="w-full flex flex-wrap items-start justify-between gap-1.5">
-          {/* Left: Online Citizens Badge & Quick Teleport Chips */}
-          <div className="flex flex-col items-start gap-1 max-w-[62vw] sm:max-w-[380px] pointer-events-auto">
-            <div className="bg-[#121e2c]/92 backdrop-blur-md border border-emerald-500/45 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-emerald-300 font-mono">{onlineCount}</span>
-              <span className="text-slate-200">Warga Online</span>
+          {/* Left: Online Citizens Badge, Dry Leaf Counter & Quick Teleport Chips */}
+          <div className="flex flex-col items-start gap-1 max-w-[68vw] sm:max-w-[430px] pointer-events-auto">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div className="bg-[#121e2c]/92 backdrop-blur-md border border-emerald-500/45 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-emerald-300 font-mono">{onlineCount}</span>
+                <span className="text-slate-200">Warga Online</span>
+              </div>
+
+              <div
+                className="bg-[#121e2c]/92 backdrop-blur-md border border-amber-500/45 rounded-full px-2.5 py-0.5 sm:py-1 text-amber-200 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1"
+                title="10 Daun Kering tersebar di kota • Pungut setiap 5 daun kering untuk mendapatkan +1 XP"
+              >
+                <span>🍂</span>
+                <span className="font-mono text-amber-300">{pickedDryLeavesCount}/5</span>
+                <span className="hidden sm:inline text-slate-300">
+                  Daun ({dryLeaves.filter((l) => l.pickedAt === null).length}/{TOTAL_SCATTERED_DRY_LEAVES} di Peta)
+                </span>
+                <span className="text-[9px] text-emerald-300 font-mono">(+1 XP)</span>
+              </div>
             </div>
 
             {onlineRemoteList.length > 0 && (
@@ -9323,38 +9726,80 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               aria-label="Aksi Lingkungan Kota"
               className="w-full max-w-md pointer-events-auto animate-fade-in-down"
             >
-              {nearbyAction.type === 'tree' ? (
-                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-emerald-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+              {nearbyAction.type === 'dry_leaf' ? (
+                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/55 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
-                      {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime ? '🍎' : '🌳'}
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                      🍂
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-400">
-                        Pohon Rindang Kota • Siklus {treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3
+                      <div className="text-[10px] font-bold tracking-wider uppercase text-amber-400">
+                        10 Daun Kering Tersebar • Terkumpul {pickedDryLeavesCount}/5
                       </div>
                       <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
-                        {treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime
-                          ? 'Sedang Berbuah Apel (15d)'
-                          : `Siram Pohon (${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3)`}
+                        Pungut Daun Kering Gugur ({pickedDryLeavesCount}/5)
                       </h4>
-                      <p className={`text-[10px] truncate ${cafeToast ? 'text-emerald-300 font-semibold' : 'text-slate-300'}`}>
-                        {cafeToast ||
-                          (treeCycles[nearbyAction.treeIndex || 0]?.appleStartTime
-                            ? 'Buah apel merah hilang otomatis setelah 15 detik'
-                            : 'Siram 3 kali agar pohon mengeluarkan buah apel')}
+                      <p className="text-[10px] truncate text-slate-300">
+                        {cafeToast || 'Kumpulkan 5 dari 10 daun kering yang tersebar agar kota tetap bersih (+1 XP)'}
                       </p>
                     </div>
                   </div>
                   <button
-                    onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
-                    className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold border border-emerald-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                    onClick={() => handlePickDryLeaf(nearbyAction.leafId ?? 0)}
+                    className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold border border-amber-400/50 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
                   >
-                    <span>💧 Siram ({Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)</span>
-                    <span className="text-[10px] font-mono text-amber-300 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-500/30">
-                      -1 XP
+                    <span>🍂 Pungut Daun</span>
+                    <span className="text-[10px] font-mono text-emerald-200 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-400/30">
+                      5 Daun = +1 XP
                     </span>
                   </button>
+                </div>
+              ) : nearbyAction.type === 'tree' ? (
+                <div className="bg-[#121e2c]/95 backdrop-blur-md border border-emerald-400/50 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                      {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples ? '🍎' : '🌳'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-400">
+                        {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
+                          ? 'Pohon Telah Disiram & Berbuah Apel • Siap Dipetik!'
+                          : `Pohon Rindang Kota • Disiram ${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3`}
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-extrabold text-white truncate">
+                        {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
+                          ? 'Petik Buah Apel Merah (+2 XP)'
+                          : `Siram Pohon (${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3)`}
+                      </h4>
+                      <p className={`text-[10px] truncate ${cafeToast ? 'text-emerald-300 font-semibold' : 'text-slate-300'}`}>
+                        {cafeToast ||
+                          (treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
+                            ? 'Pohon sudah disiram & mengeluarkan buah apel segar (+2 XP)'
+                            : 'Pohon belum berbuah • Siram pohon 3 kali agar mengeluarkan buah apel (+2 XP)')}
+                      </p>
+                    </div>
+                  </div>
+                  {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples ? (
+                    <button
+                      onClick={() => handleHarvestTreeApple(nearbyAction.treeIndex || 0)}
+                      className="py-1.5 px-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold border border-rose-400/50 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <span>🍎 Petik Apel</span>
+                      <span className="text-[10px] font-mono text-amber-200 bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-400/30">
+                        +2 XP
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
+                      className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold border border-emerald-400/40 shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <span>💧 Siram ({Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)</span>
+                      <span className="text-[10px] font-mono text-amber-300 bg-emerald-950/80 px-1 py-0.5 rounded border border-emerald-500/30">
+                        -1 XP
+                      </span>
+                    </button>
+                  )}
                 </div>
               ) : nearbyAction.type === 'town_rules' ? (
                 <div className="bg-[#121e2c]/95 backdrop-blur-md border border-amber-400/60 rounded-2xl p-2.5 sm:p-3 shadow-xl flex items-center justify-between gap-2.5">

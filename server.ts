@@ -892,9 +892,9 @@ app.post('/api/gemini/podcast-host', async (req, res) => {
     rencanaBelajarSiswa,
   } = req.body;
 
-  // Step 1: After student shares 'Yang Sudah Kamu Kuasai' -> Host responds warmly and asks 'Area Perlu Diperkuat'
+  // Step 1: After student shares 'Yang Sudah Kamu Kuasai' -> Host responds with a friendly, warm, casual/santai female podcast host style and asks 'Area Perlu Diperkuat'
   if (step === 'after_mastered') {
-    const fallbackReply = `Wah, luar biasa sekali ${studentName}! Pemahamanmu tentang "${sudahDikuasai}" pada materi ${materiTitle} sudah sangat mantap dan aplikatif untuk anak DKV. Nah, sekarang kita geser sedikit nih obrolannya: dari materi ini, bagian atau area mana yang menurutmu masih agak membingungkan dan perlu diperkuat? Ceritakan santai saja!`;
+    const fallbackReply = `Wah, keren banget ${studentName}! Penjelasan kamu soal "${sudahDikuasai}" di materi ${materiTitle} udah mantap dan gampang banget dipahami. Nah, kalau kita ngobrol jujur-jujuran santai nih, dari materi ini bagian atau area mana sih yang menurutmu masih agak bikin bingung atau perlu diperkuat lagi? Ceritain aja santai ke aku ya!`;
 
     if (!ai || !apiKey) {
       return res.json({ success: true, data: { hostReply: fallbackReply } });
@@ -906,7 +906,7 @@ app.post('/api/gemini/podcast-host', async (req, res) => {
         contents: `Siswa bernama ${studentName} (${className}) sedang menjadi bintang tamu di Podcast Studio ON AIR Menara Mentor membahas materi "${materiTitle}".
 Ringkasan materi: ${materiSummary || materiTitle}.
 Siswa baru saja menjawab tentang Hal yang Sudah Dikuasai: "${sudahDikuasai}".
-Sebagai Host Podcast AI yang seru, hangat, dan suportif, berikan tanggapan singkat yang mengapresiasi jawaban tersebut (1-2 kalimat), lalu tanyakan dengan santai: "Bagian atau area mana dari materi ini yang menurutmu masih perlu diperkuat atau masih membingungkan?"`,
+Sebagai Host Podcast cewek sekaligus AI Mentor yang super friendly, akrab, hangat, dan santai (seperti kakak mentor atau teman ngobrol podcast yang asyik tapi tetap sopan untuk anak SMK DKV), berikan tanggapan singkat yang mengapresiasi jawaban tersebut dengan bahasa santai dan akrab (1-2 kalimat), lalu tanyakan dengan santai: "Bagian atau area mana nih dari materi ini yang menurut kamu masih perlu diperkuat atau dipelajari lebih lanjut?"`,
         config: {
           responseMimeType: 'application/json',
           responseSchema: {
@@ -928,12 +928,12 @@ Sebagai Host Podcast AI yang seru, hangat, dan suportif, berikan tanggapan singk
   // Step 2: After student shares 'Area Perlu Diperkuat' -> Host gives 3 Concrete Advice (Saran Konkret dari AI) + 1 Pertanyaan Pemantik + asks for Rencana Belajar
   if (step === 'after_strengthen') {
     const fallbackAdvice = [
-      `Ulas kembali poin inti "${perluDiperkuat}" pada modul di Perpustakaan sambil membuat catatan visual berwarna.`,
-      `Praktikkan langsung lewat contoh kasus sederhana di studio desain atau diskusikan dengan teman sebangku.`,
-      `Coba uji pemahaman di Bengkel Latihan atau kirim pertanyaan spesifik ke guru lewat Kantor Pos.`,
+      `Coba intip lagi poin inti "${perluDiperkuat}" di modul Perpustakaan Kampus sambil bikin coretan visual berwarna biar makin kebayang.`,
+      `Coba praktikkan langsung pakai contoh kasus sederhana di studio desain atau ngobrol bareng teman sebangku.`,
+      `Latih terus pemahamanmu secara santai di Bengkel Latihan atau tanya ke Bapak/Ibu Guru lewat Kantor Pos.`,
     ];
-    const fallbackTrigger = `Kalau konsep "${materiTitle}" ini kamu terapkan saat mengerjakan proyek desain klien di dunia nyata nanti, langkah kreatif apa yang paling ingin kamu coba pertama kali?`;
-    const fallbackHostSpeech = `Terima kasih sudah jujur berbagi, ${studentName}! Wajar banget kalau bagian "${perluDiperkuat}" terasa menantang. Sebagai Host sekaligus Mentor AI, saya punya beberapa saran konkret dan satu pertanyaan pemantik spesial untukmu. Setelah ini, yuk bagikan jawabanmu atas pertanyaan pemantik tersebut sekaligus Rencana Belajarmu ke depan!`;
+    const fallbackTrigger = `Kalau nanti konsep "${materiTitle}" ini kamu pakai pas lagi ngerjain project desain di dunia nyata, langkah kreatif apa nih yang paling pengen kamu coba duluan?`;
+    const fallbackHostSpeech = `Makasih udah cerita jujur ya, ${studentName}! Wajar banget kok kalau bagian "${perluDiperkuat}" masih terasa menantang pas lagi belajar. Biar makin paham dan pede, aku udah siapin 3 tips santai plus 1 pertanyaan seru buat kamu. Habis ini langsung ceritain jawabanmu bareng 3 langkah Rencana Belajarmu ya!`;
 
     if (!ai || !apiKey) {
       return res.json({
@@ -954,16 +954,16 @@ Sebagai Host Podcast AI yang seru, hangat, dan suportif, berikan tanggapan singk
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3.8-flash',
-        contents: `Kamu adalah Host Podcast AI sekaligus Mentor Kota di SMK Negeri 2 Gorontalo (Jurusan DKV).
+        contents: `Kamu adalah Host Podcast cewek sekaligus AI Mentor Kota di SMK Negeri 2 Gorontalo (Jurusan DKV) yang gayanya friendly, hangat, asyik, akrab, dan santai.
 Bintang tamu siswa: ${studentName} (${className}).
 Materi yang dibahas: "${materiTitle}".
 1. Hal yang sudah dikuasai siswa: "${sudahDikuasai}"
 2. Area yang masih perlu diperkuat menurut siswa: "${perluDiperkuat}"
 
 Tugasmu di segmen podcast ini:
-- Buat "hostIntro": Tanggapan gaya host podcast yang hangat dan memvalidasi usaha siswa (2 kalimat).
-- Buat "saranKonkret": Tepat 3 saran konkret, praktis, dan relevan dengan siswa SMK DKV untuk memperkuat area yang masih sulit tersebut.
-- Buat "pertanyaanPemantik": 1 pertanyaan pemantik reflektif yang menantang rasa ingin tahu siswa terkait penerapan materi di dunia desain/komputasi.
+- Buat "hostIntro": Tanggapan gaya host podcast cewek yang friendly, santai, akrab, dan menyemangati siswa (2 kalimat).
+- Buat "saranKonkret": Tepat 3 tips/saran konkret dengan bahasa santai, praktis, dan relevan dengan anak SMK DKV untuk memperkuat area yang masih sulit tersebut.
+- Buat "pertanyaanPemantik": 1 pertanyaan pemantik yang seru, santai, dan bikin siswa penasaran terkait penerapan materi di dunia desain/komputasi.
 - Buat "suggestedRencana": 3 ide langkah rencana belajar singkat sebagai referensi siswa.`,
         config: {
           responseMimeType: 'application/json',
@@ -1010,8 +1010,8 @@ Tugasmu di segmen podcast ini:
     }
   }
 
-  // Step 3: After student answers trigger question & submits Rencana Belajar -> Host closes the podcast episode warmly
-  const fallbackClosing = `Luar biasa sekali, ${studentName}! Jawaban dan rencana belajarmu sangat matang. Terima kasih sudah hadir di Studio Podcast ON AIR Menara Mentor Kota hari ini. Rekaman teks transkrip podcast ini sudah disimpan ke Riwayat Podcast dan Google Spreadsheet! Tetap semangat berkarya!`;
+  // Step 3: After student answers trigger question & submits Rencana Belajar -> Host closes the podcast episode in a friendly & casual style
+  const fallbackClosing = `Wih, mantap banget ${studentName}! Jawaban atas pertanyaan pemantik dan 3 langkah rencana belajar yang kamu susun udah keren banget dan siap dipraktikkan. Seru banget bisa ngobrol santai bareng kamu di Studio Podcast ON AIR Menara Mentor hari ini! Rekaman transkrip podcast kita udah tersimpan rapi di Riwayat Podcast dan Google Spreadsheet. Semangat terus belajarnya ya, sampai ketemu di episode berikutnya!`;
 
   if (!ai || !apiKey) {
     return res.json({ success: true, data: { hostClosing: fallbackClosing } });
@@ -1020,11 +1020,11 @@ Tugasmu di segmen podcast ini:
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
-      contents: `Kamu adalah Host Podcast AI di Menara Mentor Kota.
+      contents: `Kamu adalah Host Podcast cewek sekaligus AI Mentor di Menara Mentor Kota yang gayanya friendly, akrab, hangat, dan santai.
 Siswa ${studentName} (${className}) baru saja menyelesaikan sesi podcast materi "${materiTitle}".
 Jawaban siswa atas pertanyaan pemantik: "${jawabanPemantikSiswa || '-'}"
 Rencana belajar siswa: "${Array.isArray(rencanaBelajarSiswa) ? rencanaBelajarSiswa.join('; ') : rencanaBelajarSiswa || '-'}"
-Berikan kalimat penutup podcast (closing statement) yang antusias, mengapresiasi komitmen belajar siswa, dan menutup siaran ON AIR dengan hangat (2-3 kalimat).`,
+Berikan kalimat penutup podcast (closing statement) dengan gaya cewek yang friendly, santai, mengapresiasi rencana belajar siswa dengan antusias, dan menutup siaran ON AIR dengan hangat (2-3 kalimat).`,
       config: {
         responseMimeType: 'application/json',
         responseSchema: {

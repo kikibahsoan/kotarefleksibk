@@ -37,6 +37,9 @@ import {
   Copy,
   Check,
   Play,
+  Volume2,
+  VolumeX,
+  MicOff,
 } from 'lucide-react';
 
 interface MenaraMentorModalProps {
@@ -356,6 +359,260 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
   const [planStep3, setPlanStep3] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
 
+  // Voice & Speech States for Studio ON AIR Podcast (Host Female TTS + Student Voice Input)
+  const [isHostVoiceEnabled, setIsHostVoiceEnabled] = useState(true);
+  const isHostVoiceEnabledRef = useRef(true);
+  isHostVoiceEnabledRef.current = isHostVoiceEnabled;
+  const [isHostSpeaking, setIsHostSpeaking] = useState(false);
+  const [isListeningVoice, setIsListeningVoice] = useState(false);
+  const [activeVoiceTarget, setActiveVoiceTarget] = useState<'main' | 'plan1' | 'plan2' | 'plan3'>('main');
+  const activeVoiceTargetRef = useRef<'main' | 'plan1' | 'plan2' | 'plan3'>('main');
+  activeVoiceTargetRef.current = activeVoiceTarget;
+  const [voiceStatusMsg, setVoiceStatusMsg] = useState<string | null>(null);
+  const speechRecRef = useRef<any>(null);
+  const voiceBaseTextRef = useRef<string>('');
+
+  // Clean text from emojis, markdown headers & symbols for smooth, natural, friendly & casual female Indonesian speech
+  const cleanTextForPoliteSpeech = (rawText: string): string => {
+    return rawText
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+      .replace(/TIPS SANTAI DARI AI MENTOR:/gi, 'Nah, ini tiga tips santai dari aku buat kamu.')
+      .replace(/SARAN KONKRET DARI AI MENTOR:/gi, 'Nah, ini tiga tips santai dari aku buat kamu.')
+      .replace(/PERTANYAAN PEMANTIK UNTUKMU:/gi, 'Sekarang ada pertanyaan seru nih buat kamu:')
+      .replace(/PERTANYAAN PEMANTIK:/gi, 'Sekarang ada pertanyaan seru nih buat kamu:')
+      .replace(/[•*#_~`>|"]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const stopHostSpeech = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+    setIsHostSpeaking(false);
+  };
+
+  // Speak Host text automatically with a friendly, warm, upbeat, and casual/santai female Indonesian voice
+  const speakPoliteFemaleHost = (text: string, forcePlay = false) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (!isHostVoiceEnabledRef.current && !forcePlay) return;
+
+    try {
+      window.speechSynthesis.cancel();
+      const cleaned = cleanTextForPoliteSpeech(text);
+      if (!cleaned) return;
+
+      // Split into natural conversational sentence chunks so browser TTS flows smoothly without cutting off
+      const rawChunks = cleaned
+        .split(/(?<=[.!?])\s+|\n+/)
+        .map((c) => c.trim())
+        .filter((c) => c.length > 0);
+      const chunks = rawChunks.length > 0 ? rawChunks : [cleaned];
+
+      const selectFriendlyFemaleIndonesianVoice = (): SpeechSynthesisVoice | null => {
+        const voices = window.speechSynthesis.getVoices();
+        if (!voices || voices.length === 0) return null;
+
+        const idVoices = voices.filter(
+          (v) =>
+            v.lang.toLowerCase().includes('id') ||
+            v.lang.toLowerCase().includes('ind') ||
+            v.name.toLowerCase().includes('indonesia')
+        );
+
+        // Prefer natural female Indonesian voices (Gadis, Google Bahasa Indonesia, Damayanti, Siti, etc.)
+        const femaleKeywords = ['gadis', 'google bahasa indonesia', 'damayanti', 'female', 'perempuan', 'wanita', 'siti', 'putri', 'natural'];
+        const preferredFemale = idVoices.find((v) =>
+          femaleKeywords.some((kw) => v.name.toLowerCase().includes(kw))
+        );
+        if (preferredFemale) return preferredFemale;
+        if (idVoices.length > 0) return idVoices[0];
+
+        // Fallback to any lively female voice if Indonesian pack is not yet loaded
+        const anyFemale = voices.find((v) =>
+          ['female', 'zira', 'samantha', 'victoria', 'google'].some((kw) =>
+            v.name.toLowerCase().includes(kw)
+          )
+        );
+        return anyFemale || voices[0] || null;
+      };
+
+      let currentChunkIdx = 0;
+      setIsHostSpeaking(true);
+
+      const speakNextChunk = () => {
+        if (!isHostVoiceEnabledRef.current && !forcePlay) {
+          setIsHostSpeaking(false);
+          return;
+        }
+        if (currentChunkIdx >= chunks.length) {
+          setIsHostSpeaking(false);
+          return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(chunks[currentChunkIdx]);
+        utterance.lang = 'id-ID';
+        // Friendly, upbeat, relaxed conversational female cadence (friendly & santai)
+        utterance.rate = 1.03;
+        utterance.pitch = 1.12;
+        utterance.volume = 1.0;
+
+        const chosenVoice = selectFriendlyFemaleIndonesianVoice();
+        if (chosenVoice) {
+          utterance.voice = chosenVoice;
+        }
+
+        utterance.onend = () => {
+          currentChunkIdx += 1;
+          if (currentChunkIdx < chunks.length) {
+            speakNextChunk();
+          } else {
+            setIsHostSpeaking(false);
+          }
+        };
+
+        utterance.onerror = () => {
+          setIsHostSpeaking(false);
+        };
+
+        window.speechSynthesis.speak(utterance);
+      };
+
+      // Ensure voices are loaded (Chrome loads voices asynchronously on first call)
+      if (window.speechSynthesis.getVoices().length === 0) {
+        const handleVoicesChanged = () => {
+          window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+          speakNextChunk();
+        };
+        window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
+        setTimeout(() => {
+          window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+          if (currentChunkIdx === 0) speakNextChunk();
+        }, 250);
+      } else {
+        speakNextChunk();
+      }
+    } catch {
+      setIsHostSpeaking(false);
+    }
+  };
+
+  // Stop voice recognition & TTS when modal unmounts or closes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+    }
+    return () => {
+      stopHostSpeech();
+      if (speechRecRef.current) {
+        try {
+          speechRecRef.current.stop();
+        } catch {}
+      }
+    };
+  }, []);
+
+  // Student Interactive Voice Input (Speech-to-Text Bahasa Indonesia) across all podcast stages
+  const toggleStudentVoiceInput = (targetField: 'main' | 'plan1' | 'plan2' | 'plan3' = 'main') => {
+    sounds.playClick();
+
+    // If already listening on the same field, stop recording
+    if (isListeningVoice && activeVoiceTargetRef.current === targetField) {
+      if (speechRecRef.current) {
+        try {
+          speechRecRef.current.stop();
+        } catch {}
+      }
+      setIsListeningVoice(false);
+      setVoiceStatusMsg(null);
+      return;
+    }
+
+    // Stop any previous recognition or Host TTS so student's voice is captured clearly
+    stopHostSpeech();
+    if (speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {}
+    }
+
+    const SpeechRecognitionAPI =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) {
+      setVoiceStatusMsg('⚠️ Browser perangkat ini belum mendukung input suara langsung. Silakan ketik jawabanmu ya.');
+      setTimeout(() => setVoiceStatusMsg(null), 4000);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.lang = 'id-ID';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      setActiveVoiceTarget(targetField);
+      activeVoiceTargetRef.current = targetField;
+
+      if (targetField === 'main') {
+        voiceBaseTextRef.current = userInput ? userInput.trim() + ' ' : '';
+      } else if (targetField === 'plan1') {
+        voiceBaseTextRef.current = planStep1 ? planStep1.trim() + ' ' : '';
+      } else if (targetField === 'plan2') {
+        voiceBaseTextRef.current = planStep2 ? planStep2.trim() + ' ' : '';
+      } else {
+        voiceBaseTextRef.current = planStep3 ? planStep3.trim() + ' ' : '';
+      }
+
+      recognition.onstart = () => {
+        setIsListeningVoice(true);
+        setVoiceStatusMsg('🎙️ Mikrofon aktif! Silakan bicara dengan santai, jawabanmu sedang ditulis otomatis...');
+      };
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const transcriptPiece = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcriptPiece + ' ';
+          } else {
+            interimTranscript += transcriptPiece;
+          }
+        }
+        const combined = (voiceBaseTextRef.current + finalTranscript + interimTranscript).replace(/\s+/g, ' ');
+        const tgt = activeVoiceTargetRef.current;
+        if (tgt === 'main') {
+          setUserInput(combined);
+        } else if (tgt === 'plan1') {
+          setPlanStep1(combined);
+        } else if (tgt === 'plan2') {
+          setPlanStep2(combined);
+        } else if (tgt === 'plan3') {
+          setPlanStep3(combined);
+        }
+      };
+
+      recognition.onerror = () => {
+        setIsListeningVoice(false);
+        setVoiceStatusMsg(null);
+      };
+
+      recognition.onend = () => {
+        setIsListeningVoice(false);
+        setVoiceStatusMsg(null);
+      };
+
+      speechRecRef.current = recognition;
+      recognition.start();
+    } catch {
+      setIsListeningVoice(false);
+      setVoiceStatusMsg('⚠️ Gagal mengaktifkan mikrofon. Pastikan izin mikrofon browser sudah aktif.');
+    }
+  };
+
   // Podcast Session Collected Data
   const [sudahDikuasai, setSudahDikuasai] = useState('');
   const [perluDiperkuat, setPerluDiperkuat] = useState('');
@@ -429,7 +686,14 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
   // Start Live Podcast Session
   const handleStartPodcast = () => {
     sounds.playClick();
-    const introText = `🎙️ Halo pendengar setia Radio Refleksia! Selamat datang di Studio Podcast ON AIR Menara Mentor Kota bersama saya Host AI Mentor. Hari ini kita kedatangan bintang tamu spesial, ${student.name} dari kelas ${student.className || 'X DKV'}! Kita akan mengobrol santai mengupas materi "${selectedMateri.title}".\n\nHalo ${student.name}, senang sekali kamu hadir di studio! Untuk membuka obrolan kita: dari materi "${selectedMateri.title}" ini, bagian mana yang menurutmu SUDAH PALING KAMU KUASAI?`;
+    if (isListeningVoice && speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {}
+      setIsListeningVoice(false);
+    }
+
+    const introText = `🎙️ Halo semuanya! Balik lagi bareng aku, Host AI Mentor di Studio Podcast ON AIR Kota Refleksi! Hari ini seru banget karena kita kedatangan bintang tamu kece, ${student.name} dari kelas ${student.className || 'X DKV'}! Kita bakal ngobrol santai bahas topik "${selectedMateri.title}".\n\nHalo ${student.name}, apa kabar nih? Senang banget kamu udah mampir ke studio! Yuk langsung kita mulai obrolan santainya: dari materi "${selectedMateri.title}" ini, bagian mana sih yang menurut kamu SUDAH PALING KAMU KUASAI atau paling nyantol di kepala? Ceritain aja santai ya, bisa diketik atau langsung ngomong pakai tombol suara!`;
 
     setPodcastStage('ask_mastered');
     setSudahDikuasai('');
@@ -454,12 +718,24 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
         stage: 'intro',
       },
     ]);
+
+    // Automatically speak Host opening in friendly & casual female voice
+    speakPoliteFemaleHost(introText);
   };
 
   // Step 1 Submit: Student submits "Yang Sudah Kamu Kuasai"
   const handleSendMastered = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim() || isAiTyping) return;
+
+    if (isListeningVoice && speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {}
+      setIsListeningVoice(false);
+      setVoiceStatusMsg(null);
+    }
+    stopHostSpeech();
 
     const answerText = userInput.trim();
     sounds.playClick();
@@ -493,7 +769,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
       const json = await res.json();
       const hostReply =
         json?.data?.hostReply ||
-        `Keren banget ${student.name}! Penguasaanmu tentang "${answerText}" sudah sangat bagus. Nah, sekarang pertanyaan kedua dari Host: bagian atau AREA MANA YANG PERLU DIPERKUAT dari materi "${selectedMateri.title}" ini?`;
+        `Wah, keren banget ${student.name}! Penjelasan kamu soal "${answerText}" udah mantap dan gampang banget dipahami. Nah, kalau kita ngobrol jujur-jujuran santai nih, dari materi "${selectedMateri.title}" ini bagian atau AREA MANA SIH YANG MASIH PERLU DIPERKUAT? Santai aja, ceritain ke aku ya!`;
 
       setChatMessages((prev) => [
         ...prev,
@@ -506,18 +782,21 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
         },
       ]);
       setPodcastStage('ask_strengthen');
+      speakPoliteFemaleHost(hostReply);
     } catch {
+      const fallbackReply = `Wih, mantap banget penjelasan kamu, ${student.name}! Sekarang kita lanjut ngobrol santai ke segmen kedua yuk: dari materi "${selectedMateri.title}" ini, bagian atau AREA MANA SIH YANG MASIH PERLU DIPERKUAT menurut kamu?`;
       setChatMessages((prev) => [
         ...prev,
         {
           role: 'host',
           speakerName: 'Host AI Mentor',
-          text: `Mantap sekali ${student.name}! Sekarang kita lanjut ke pertanyaan kedua: bagian atau AREA MANA YANG MASIH PERLU DIPERKUAT dari materi "${selectedMateri.title}" ini?`,
+          text: fallbackReply,
           timestamp: nowTimeStr(),
           stage: 'strengthen',
         },
       ]);
       setPodcastStage('ask_strengthen');
+      speakPoliteFemaleHost(fallbackReply);
     } finally {
       setIsAiTyping(false);
     }
@@ -527,6 +806,15 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
   const handleSendStrengthen = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim() || isAiTyping) return;
+
+    if (isListeningVoice && speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {}
+      setIsListeningVoice(false);
+      setVoiceStatusMsg(null);
+    }
+    stopHostSpeech();
 
     const strengthenText = userInput.trim();
     sounds.playClick();
@@ -562,17 +850,17 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
       const data = json?.data || {};
       const hostIntro =
         data.hostIntro ||
-        `Terima kasih sudah terbuka berbagi, ${student.name}! Itu hal yang sangat wajar saat mempelajari "${selectedMateri.title}".`;
+        `Makasih udah cerita jujur ya, ${student.name}! Wajar banget kok kalau bagian "${strengthenText}" masih terasa menantang pas belajar "${selectedMateri.title}". Tenang aja, kita bahas bareng-bareng!`;
       const adviceList: string[] = Array.isArray(data.saranKonkret) && data.saranKonkret.length > 0
         ? data.saranKonkret
         : [
-            `Pelajari ulang konsep "${strengthenText}" pada modul Perpustakaan Kampus dengan membuat sketsa alur visual.`,
-            `Diskusikan contoh penerapan praktisnya bersama teman sekelas atau tanyakan ke guru lewat Kantor Pos.`,
-            `Latih ketelitian dengan mengerjakan soal terkait di Bengkel Latihan.`,
+            `Coba intip lagi bagian "${strengthenText}" di Perpustakaan Kampus sambil bikin coretan sketsa visual biar makin kebayang.`,
+            `Obrolin contoh serunya bareng teman sebangku atau tanya santai ke Bapak/Ibu Guru lewat Kantor Pos.`,
+            `Latih terus secara santai lewat kuis interaktif di Bengkel Latihan.`,
           ];
       const triggerQ: string =
         data.pertanyaanPemantik ||
-        `Jika konsep "${selectedMateri.title}" ini kamu gunakan dalam proyek desain nyata di studio DKV, bagaimana cara terbaik menerapkannya?`;
+        `Kalau nanti konsep "${selectedMateri.title}" ini kamu pakai pas lagi ngerjain project desain di studio DKV, kira-kira gimana cara paling seru buat nerapinnya?`;
       const suggestedPlans: string[] = Array.isArray(data.suggestedRencana) ? data.suggestedRencana : [];
 
       setSaranKonkretAI(adviceList);
@@ -581,9 +869,9 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
       if (suggestedPlans[1]) setPlanStep2(suggestedPlans[1]);
       if (suggestedPlans[2]) setPlanStep3(suggestedPlans[2]);
 
-      const formattedHostAdviceMsg = `${hostIntro}\n\n💡 SARAN KONKRET DARI AI MENTOR:\n${adviceList
+      const formattedHostAdviceMsg = `${hostIntro}\n\n💡 TIPS SANTAI DARI AI MENTOR:\n${adviceList
         .map((s, idx) => `${idx + 1}. ${s}`)
-        .join('\n')}\n\n🔥 PERTANYAAN PEMANTIK UNTUKMU:\n"${triggerQ}"\n\nSekarang giliranmu menutup segmen ini: Apa tanggapanmu terhadap pertanyaan pemantik di atas, dan tuliskan Rencana Belajar konkretmu!`;
+        .join('\n')}\n\n🔥 PERTANYAAN PEMANTIK UNTUKMU:\n"${triggerQ}"\n\nNah, sekarang giliran kamu cerita santai ya, ${student.name}! Gimana nih tanggapanmu soal pertanyaan di atas, terus apa 3 langkah Rencana Belajar kamu? Bisa langsung diketik atau ngomong pakai suara ya!`;
 
       setChatMessages((prev) => [
         ...prev,
@@ -596,27 +884,31 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
         },
       ]);
       setPodcastStage('ask_plan_and_trigger');
+      speakPoliteFemaleHost(formattedHostAdviceMsg);
     } catch {
       const fallbackAdvice = [
-        `Ulas kembali poin "${strengthenText}" di Perpustakaan Kampus sambil mencatat kata kunci.`,
-        `Praktikkan dengan studi kasus desain sederhana bersama teman sebangku.`,
-        `Uji pemahamanmu di Bengkel Latihan Kota Refleksi.`,
+        `Coba baca santai lagi poin "${strengthenText}" di Perpustakaan Kampus sambil catat kata kuncinya.`,
+        `Praktikkan langsung pakai studi kasus desain sederhana bareng teman sekelas.`,
+        `Coba tes pemahamanmu secara berkala di Bengkel Latihan Kota Refleksi.`,
       ];
-      const fallbackTrigger = `Menurutmu, mengapa pemahaman tentang "${selectedMateri.title}" sangat penting bagi seorang desainer komunikasi visual masa depan?`;
+      const fallbackTrigger = `Menurut kamu nih ${student.name}, kenapa sih paham konsep "${selectedMateri.title}" itu penting banget buat anak DKV?`;
       setSaranKonkretAI(fallbackAdvice);
       setPertanyaanPemantikAI(fallbackTrigger);
+
+      const fallbackMsg = `Makasih udah cerita jujur ya, ${student.name}! Tenang, aku punya tips santai buat kamu:\n\n💡 TIPS SANTAI DARI AI MENTOR:\n1. ${fallbackAdvice[0]}\n2. ${fallbackAdvice[1]}\n3. ${fallbackAdvice[2]}\n\n🔥 PERTANYAAN PEMANTIK:\n"${fallbackTrigger}"\n\nYuk ceritain jawabanmu bareng 3 langkah Rencana Belajarmu ya!`;
 
       setChatMessages((prev) => [
         ...prev,
         {
           role: 'host',
           speakerName: 'Host AI Mentor',
-          text: `Terima kasih atas kejujuranmu, ${student.name}!\n\n💡 SARAN KONKRET DARI AI MENTOR:\n1. ${fallbackAdvice[0]}\n2. ${fallbackAdvice[1]}\n3. ${fallbackAdvice[2]}\n\n🔥 PERTANYAAN PEMANTIK:\n"${fallbackTrigger}"\n\nSilakan berikan jawabanmu beserta Rencana Belajar 3 langkahmu!`,
+          text: fallbackMsg,
           timestamp: nowTimeStr(),
           stage: 'advice_trigger',
         },
       ]);
       setPodcastStage('ask_plan_and_trigger');
+      speakPoliteFemaleHost(fallbackMsg);
     } finally {
       setIsAiTyping(false);
     }
@@ -626,6 +918,15 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
   const handleFinishPodcast = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim() || isAiTyping) return;
+
+    if (isListeningVoice && speechRecRef.current) {
+      try {
+        speechRecRef.current.stop();
+      } catch {}
+      setIsListeningVoice(false);
+      setVoiceStatusMsg(null);
+    }
+    stopHostSpeech();
 
     const triggerAnswer = userInput.trim();
     const finalPlans = [
@@ -653,7 +954,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
     setChatMessages(updatedMessagesWithStudent);
     setIsAiTyping(true);
 
-    let closingText = `Luar biasa sekali, ${student.name}! Jawaban dan rencana belajar 3 langkahmu sangat inspiratif. Terima kasih sudah berbincang di Studio Podcast ON AIR Menara Mentor Kota! Seluruh transkrip obrolan kita telah disimpan ke Riwayat Podcast dan Google Spreadsheet.`;
+    let closingText = `Wih, mantap banget ${student.name}! Jawaban dan 3 langkah rencana belajar kamu keren banget dan siap dipraktikkan. Seru banget bisa ngobrol santai bareng kamu hari ini di Studio Podcast ON AIR Menara Mentor! Obrolan kita udah tersimpan rapi di Riwayat Podcast dan Google Spreadsheet. Semangat terus berkaryanya ya, sampai ketemu di episode podcast berikutnya!`;
 
     try {
       const res = await fetch('/api/gemini/podcast-host', {
@@ -687,6 +988,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
     setApresiasiHost(closingText);
     setIsAiTyping(false);
     setPodcastStage('completed');
+    speakPoliteFemaleHost(closingText);
 
     // Build formatted full text transcript for Spreadsheet & History
     const todayStr = new Date().toLocaleDateString('id-ID', {
@@ -1042,13 +1344,59 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setPodcastStage('select_topic')}
-                      className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-[11px] font-bold transition cursor-pointer"
-                    >
-                      Ganti Materi
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Toggle Suara Host Cewek Friendly & Santai */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sounds.playClick();
+                          const nextState = !isHostVoiceEnabled;
+                          setIsHostVoiceEnabled(nextState);
+                          isHostVoiceEnabledRef.current = nextState;
+                          if (!nextState) {
+                            stopHostSpeech();
+                          } else if (chatMessages.length > 0) {
+                            const lastHostMsg = [...chatMessages].reverse().find((m) => m.role === 'host');
+                            if (lastHostMsg) speakPoliteFemaleHost(lastHostMsg.text, true);
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition flex items-center gap-1.5 cursor-pointer border ${
+                          isHostVoiceEnabled
+                            ? 'bg-pink-600/25 border-pink-400/50 text-pink-200 hover:bg-pink-600/35'
+                            : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+                        }`}
+                        title="Aktifkan/Matikan Suara Otomatis Host AI Cewek Friendly & Santai"
+                      >
+                        {isHostVoiceEnabled ? (
+                          <>
+                            <Volume2 className={`w-3.5 h-3.5 text-pink-300 ${isHostSpeaking ? 'animate-bounce' : ''}`} />
+                            <span>{isHostSpeaking ? 'Host AI Ngobrol (Suara Cewek Friendly)...' : 'Suara Host Cewek: ON'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <VolumeX className="w-3.5 h-3.5" />
+                            <span>Suara Host: OFF</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stopHostSpeech();
+                          if (isListeningVoice && speechRecRef.current) {
+                            try {
+                              speechRecRef.current.stop();
+                            } catch {}
+                            setIsListeningVoice(false);
+                          }
+                          setPodcastStage('select_topic');
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-[11px] font-bold transition cursor-pointer"
+                      >
+                        Ganti Materi
+                      </button>
+                    </div>
                   </div>
 
                   {/* Step Progress Indicator */}
@@ -1107,8 +1455,8 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                           }`}
                         >
                           {isHost && (
-                            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 border border-purple-400/50 flex items-center justify-center text-lg shrink-0 shadow-md">
-                              🎙️
+                            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-pink-600 to-purple-700 border border-pink-400/50 flex items-center justify-center text-lg shrink-0 shadow-md">
+                              👩‍💼
                             </div>
                           )}
 
@@ -1119,11 +1467,24 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                                 : 'bg-gradient-to-r from-emerald-700 to-teal-700 border border-emerald-400/40 text-white rounded-tr-none'
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-3 mb-1 text-[10px] font-extrabold uppercase tracking-wider opacity-80">
-                              <span className={isHost ? 'text-purple-300' : 'text-emerald-200'}>
-                                {isHost ? '🎧 Host AI Mentor' : `🎤 ${msg.speakerName} (Bintang Tamu)`}
+                            <div className="flex items-center justify-between gap-3 mb-1 text-[10px] font-extrabold uppercase tracking-wider opacity-90">
+                              <span className={isHost ? 'text-pink-300 flex items-center gap-1.5' : 'text-emerald-200'}>
+                                {isHost ? '👩‍💼 Host AI Mentor (Cewek Friendly & Santai)' : `🎤 ${msg.speakerName} (Bintang Tamu)`}
                               </span>
-                              <span>{msg.timestamp}</span>
+                              <div className="flex items-center gap-2">
+                                {isHost && (
+                                  <button
+                                    type="button"
+                                    onClick={() => speakPoliteFemaleHost(msg.text, true)}
+                                    className="px-2 py-0.5 rounded-md bg-pink-500/20 hover:bg-pink-500/35 border border-pink-400/40 text-pink-200 text-[9.5px] font-bold flex items-center gap-1 transition cursor-pointer"
+                                    title="Putar ulang suara Host AI"
+                                  >
+                                    <Volume2 className="w-2.5 h-2.5" />
+                                    <span>Putar Suara</span>
+                                  </button>
+                                )}
+                                <span>{msg.timestamp}</span>
+                              </div>
                             </div>
                             <div>{msg.text}</div>
                           </div>
@@ -1138,36 +1499,81 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                     })}
 
                     {isAiTyping && (
-                      <div className="flex items-center gap-3 text-xs text-purple-300 animate-pulse">
-                        <div className="w-8 h-8 rounded-xl bg-purple-600/30 border border-purple-400/40 flex items-center justify-center">
-                          🎙️
+                      <div className="flex items-center gap-3 text-xs text-pink-300 animate-pulse">
+                        <div className="w-8 h-8 rounded-xl bg-pink-600/30 border border-pink-400/40 flex items-center justify-center">
+                          👩‍💼
                         </div>
-                        <span>Host AI Mentor sedang merangkai tanggapan & saran podcast...</span>
+                        <span>Host AI Mentor lagi nyiapin obrolan santai buat kamu...</span>
                       </div>
                     )}
                     <div ref={chatEndRef} />
                   </div>
 
+                  {/* Live Voice Input Banner Notification */}
+                  {voiceStatusMsg && (
+                    <div className="px-3.5 py-2 rounded-xl bg-rose-950/60 border border-rose-400/50 text-rose-200 text-xs font-bold flex items-center justify-between gap-2 animate-pulse">
+                      <div className="flex items-center gap-2">
+                        <Mic className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>{voiceStatusMsg}</span>
+                      </div>
+                      {isListeningVoice && (
+                        <button
+                          type="button"
+                          onClick={() => toggleStudentVoiceInput(activeVoiceTarget)}
+                          className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-black shrink-0 cursor-pointer"
+                        >
+                          Selesai Bicara
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Input Form for Stage 1: Yang Sudah Kamu Kuasai */}
                   {podcastStage === 'ask_mastered' && (
                     <form onSubmit={handleSendMastered} className="p-4 rounded-2xl bg-emerald-950/25 border border-emerald-500/40 space-y-3">
-                      <label className="block text-xs font-extrabold text-emerald-300 flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4" />
-                        <span>Segmen 1 — Ceritakan ke Host AI: Bagian mana yang SUDAH KAMU KUASAI?</span>
-                      </label>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label className="text-xs font-extrabold text-emerald-300 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Segmen 1 — Ceritakan ke Host AI: Bagian mana yang SUDAH KAMU KUASAI?</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => toggleStudentVoiceInput('main')}
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 transition cursor-pointer border ${
+                            isListeningVoice && activeVoiceTarget === 'main'
+                              ? 'bg-rose-600 border-rose-300 text-white animate-pulse shadow-lg shadow-rose-600/40'
+                              : 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/50 text-emerald-200'
+                          }`}
+                        >
+                          {isListeningVoice && activeVoiceTarget === 'main' ? (
+                            <>
+                              <MicOff className="w-3.5 h-3.5" />
+                              <span>⏹️ Hentikan Rekam Suara</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mic className="w-3.5 h-3.5" />
+                              <span>🎤 Jawab Pakai Suara</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                       <textarea
                         rows={2}
                         required
                         value={userInput}
                         onChange={(e) => setUserInput(e.target.value)}
-                        placeholder={`Contoh: Saya sudah mengerti konsep dasar ${selectedMateri.title} dan cara kerjanya saat praktik desain...`}
+                        placeholder={`Ketik atau klik "🎤 Jawab Pakai Suara": Saya sudah mengerti konsep dasar ${selectedMateri.title}...`}
                         className="w-full p-3 rounded-xl bg-slate-900 border border-white/15 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
                       />
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-slate-400">
+                          💡 Jawaban bisa diketik maupun diucapkan dengan suara mikrofon hingga podcast selesai.
+                        </span>
                         <button
                           type="submit"
                           disabled={!userInput.trim() || isAiTyping}
-                          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-2 transition cursor-pointer"
+                          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-2 transition cursor-pointer shrink-0"
                         >
                           <Send className="w-3.5 h-3.5" />
                           <span>Jawab ke Mikrofon Host AI</span>
@@ -1179,23 +1585,49 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                   {/* Input Form for Stage 2: Area Perlu Diperkuat */}
                   {podcastStage === 'ask_strengthen' && (
                     <form onSubmit={handleSendStrengthen} className="p-4 rounded-2xl bg-amber-950/25 border border-amber-500/40 space-y-3">
-                      <label className="block text-xs font-extrabold text-amber-300 flex items-center gap-1.5">
-                        <Lightbulb className="w-4 h-4" />
-                        <span>Segmen 2 — Bagian atau AREA MANA YANG PERLU DIPERKUAT dari materi ini?</span>
-                      </label>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label className="text-xs font-extrabold text-amber-300 flex items-center gap-1.5">
+                          <Lightbulb className="w-4 h-4" />
+                          <span>Segmen 2 — Bagian atau AREA MANA YANG PERLU DIPERKUAT dari materi ini?</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => toggleStudentVoiceInput('main')}
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 transition cursor-pointer border ${
+                            isListeningVoice && activeVoiceTarget === 'main'
+                              ? 'bg-rose-600 border-rose-300 text-white animate-pulse shadow-lg shadow-rose-600/40'
+                              : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-400/50 text-amber-200'
+                          }`}
+                        >
+                          {isListeningVoice && activeVoiceTarget === 'main' ? (
+                            <>
+                              <MicOff className="w-3.5 h-3.5" />
+                              <span>⏹️ Hentikan Rekam Suara</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mic className="w-3.5 h-3.5" />
+                              <span>🎤 Jawab Pakai Suara</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                       <textarea
                         rows={2}
                         required
                         value={userInput}
                         onChange={(e) => setUserInput(e.target.value)}
-                        placeholder="Contoh: Saya masih agak bingung membedakan tahapan teknisnya saat menghadapi studi kasus kompleks..."
+                        placeholder='Ketik atau klik "🎤 Jawab Pakai Suara": Saya masih ingin memperkuat pemahaman pada bagian...'
                         className="w-full p-3 rounded-xl bg-slate-900 border border-white/15 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                       />
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-slate-400">
+                          💡 Host AI akan ngobrol balik dengan suara cewek yang friendly & santai, plus kasih tips seru buatmu!
+                        </span>
                         <button
                           type="submit"
                           disabled={!userInput.trim() || isAiTyping}
-                          className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-2 transition cursor-pointer"
+                          className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-2 transition cursor-pointer shrink-0"
                         >
                           <Send className="w-3.5 h-3.5" />
                           <span>Kirim & Minta Saran Konkret AI</span>
@@ -1228,44 +1660,112 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-xs font-extrabold text-purple-200 mb-1">
-                          1. Jawabanmu atas Pertanyaan Pemantik Host AI:
-                        </label>
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                          <label className="text-xs font-extrabold text-purple-200">
+                            1. Jawabanmu atas Pertanyaan Pemantik Host AI:
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => toggleStudentVoiceInput('main')}
+                            className={`px-3 py-1 rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 transition cursor-pointer border ${
+                              isListeningVoice && activeVoiceTarget === 'main'
+                                ? 'bg-rose-600 border-rose-300 text-white animate-pulse shadow-lg shadow-rose-600/40'
+                                : 'bg-purple-500/25 hover:bg-purple-500/35 border-purple-400/50 text-purple-200'
+                            }`}
+                          >
+                            {isListeningVoice && activeVoiceTarget === 'main' ? (
+                              <>
+                                <MicOff className="w-3.5 h-3.5" />
+                                <span>⏹️ Hentikan Suara</span>
+                              </>
+                            ) : (
+                              <>
+                                <Mic className="w-3.5 h-3.5" />
+                                <span>🎤 Isi Jawaban Pakai Suara</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                         <textarea
                           rows={2}
                           required
                           value={userInput}
                           onChange={(e) => setUserInput(e.target.value)}
-                          placeholder="Tuliskan tanggapan atau ide kreatifmu menjawab pertanyaan pemantik di atas..."
+                          placeholder='Ketik atau klik "🎤 Isi Jawaban Pakai Suara" untuk menjawab pertanyaan pemantik Host AI...'
                           className="w-full p-3 rounded-xl bg-slate-900 border border-white/15 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
                         />
                       </div>
 
                       <div className="space-y-2">
                         <label className="block text-xs font-extrabold text-emerald-300">
-                          2. Rencana Belajar Siswa (3 Langkah Konkret — dapat kamu sesuaikan):
+                          2. Rencana Belajar Siswa (3 Langkah Konkret — bisa diketik atau pakai suara 🎤):
                         </label>
-                        <input
-                          type="text"
-                          value={planStep1}
-                          onChange={(e) => setPlanStep1(e.target.value)}
-                          placeholder="Langkah 1: Membaca kembali modul di Perpustakaan..."
-                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-400"
-                        />
-                        <input
-                          type="text"
-                          value={planStep2}
-                          onChange={(e) => setPlanStep2(e.target.value)}
-                          placeholder="Langkah 2: Mempraktikkan materi pada proyek desain..."
-                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-400"
-                        />
-                        <input
-                          type="text"
-                          value={planStep3}
-                          onChange={(e) => setPlanStep3(e.target.value)}
-                          placeholder="Langkah 3: Mengerjakan latihan soal di Bengkel Latihan..."
-                          className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-400"
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={planStep1}
+                            onChange={(e) => setPlanStep1(e.target.value)}
+                            placeholder="Langkah 1: Membaca kembali modul di Perpustakaan..."
+                            className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleStudentVoiceInput('plan1')}
+                            className={`px-2.5 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1 border shrink-0 cursor-pointer ${
+                              isListeningVoice && activeVoiceTarget === 'plan1'
+                                ? 'bg-rose-600 border-rose-300 text-white animate-pulse'
+                                : 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/40 text-emerald-200'
+                            }`}
+                            title="Isi Langkah 1 dengan Suara"
+                          >
+                            <Mic className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Suara</span>
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={planStep2}
+                            onChange={(e) => setPlanStep2(e.target.value)}
+                            placeholder="Langkah 2: Mempraktikkan materi pada proyek desain..."
+                            className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleStudentVoiceInput('plan2')}
+                            className={`px-2.5 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1 border shrink-0 cursor-pointer ${
+                              isListeningVoice && activeVoiceTarget === 'plan2'
+                                ? 'bg-rose-600 border-rose-300 text-white animate-pulse'
+                                : 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/40 text-emerald-200'
+                            }`}
+                            title="Isi Langkah 2 dengan Suara"
+                          >
+                            <Mic className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Suara</span>
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={planStep3}
+                            onChange={(e) => setPlanStep3(e.target.value)}
+                            placeholder="Langkah 3: Mengerjakan latihan soal di Bengkel Latihan..."
+                            className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleStudentVoiceInput('plan3')}
+                            className={`px-2.5 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1 border shrink-0 cursor-pointer ${
+                              isListeningVoice && activeVoiceTarget === 'plan3'
+                                ? 'bg-rose-600 border-rose-300 text-white animate-pulse'
+                                : 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-400/40 text-emerald-200'
+                            }`}
+                            title="Isi Langkah 3 dengan Suara"
+                          >
+                            <Mic className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Suara</span>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="flex justify-end pt-1">
