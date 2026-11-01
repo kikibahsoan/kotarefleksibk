@@ -125,7 +125,7 @@ export default function App() {
   const weatherOverrideRef = useRef(weatherOverride);
   weatherOverrideRef.current = weatherOverride;
 
-  // Live WITA Clock (Waktu Indonesia Tengah - Asia/Makassar)
+  // Live Clock (Asia/Makassar)
   const [currentTimeWita, setCurrentTimeWita] = useState(() => {
     const now = new Date();
     return new Intl.DateTimeFormat('id-ID', {
@@ -133,7 +133,7 @@ export default function App() {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
-    }).format(now) + ' WITA';
+    }).format(now);
   });
 
   useEffect(() => {
@@ -150,7 +150,7 @@ export default function App() {
           hour: '2-digit',
           minute: '2-digit',
           hour12: false,
-        }).format(now) + ' WITA'
+        }).format(now)
       );
     }, 1000);
     return () => clearInterval(timer);
@@ -844,6 +844,14 @@ export default function App() {
   const studentHandle = `@${cleanHandle || 'siswa'}`;
   const roomNum = student.className.includes('DKV 3') ? 3 : 2;
 
+  const isMaster = Boolean(
+    student.className === 'Master Guru' ||
+    student.studentNumber === 'MASTER-DKV' ||
+    student.name.toLowerCase().includes('kikybahsoan') ||
+    student.name.toLowerCase().includes('kikybahoan') ||
+    student.id.toLowerCase().includes('kikybahsoan')
+  );
+
   return (
     <div
       className={`relative w-full h-[100dvh] min-h-[100dvh] overflow-hidden ${
@@ -892,12 +900,11 @@ export default function App() {
         </div>
       )}
 
-      {/* TOP HEADER OVERLAY (Clean & Perfectly Responsive on Mobile) */}
-      {/* TOP HEADER OVERLAY (Clean, Semi-Transparent & Perfectly Responsive on Mobile, Never Overlaps) */}
+      {/* TOP HEADER OVERLAY (Clean, Semi-Transparent & Guaranteed No Overlap on Mobile) */}
       {!activeBuilding && !isQuickNavOpen && (
-        <header className="absolute top-2 sm:top-3.5 left-2 sm:left-4 right-2 sm:right-4 flex items-center justify-between pointer-events-none z-20 gap-1 sm:gap-2 max-w-full">
-          {/* Left: < Back button, Profile Capsule, and Teacher Ruang Guru button */}
-          <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto min-w-0 shrink">
+        <header className="absolute top-2 sm:top-3.5 left-2 sm:left-4 right-2 sm:right-4 flex items-center justify-between pointer-events-none z-20 gap-1 sm:gap-2 max-w-[calc(100vw-16px)] sm:max-w-[calc(100vw-32px)]">
+          {/* Left: < Back button, Profile Capsule, and Master-only Ruang Guru button */}
+          <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto min-w-0 shrink max-w-[54%] sm:max-w-none">
             {/* Back button */}
             <button
               onClick={handleLogout}
@@ -912,7 +919,7 @@ export default function App() {
             <div className="bg-[#121e2c]/68 backdrop-blur-md border border-slate-600/50 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 flex items-center gap-1 sm:gap-1.5 shadow-lg min-w-0 shrink">
               {/* Circular Avatar with gold border */}
               <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[10px] sm:text-[11px] shadow-sm shrink-0">
-                {student.name.toLowerCase().includes('kikybahsoan') || student.name.toLowerCase().includes('kikybahoan')
+                {isMaster
                   ? '⏳'
                   : student.isTeacher
                   ? (student.gender === 'P' ? '👩‍🏫' : '👨‍🏫')
@@ -922,32 +929,32 @@ export default function App() {
               </div>
 
               {/* Username Handle (Responsively Truncated so it never overlaps) */}
-              <span className="font-extrabold text-[11px] sm:text-xs text-white max-w-[46px] min-[360px]:max-w-[62px] min-[420px]:max-w-[95px] sm:max-w-[130px] md:max-w-[160px] truncate leading-none">
+              <span className="font-extrabold text-[11px] sm:text-xs text-white max-w-[42px] min-[360px]:max-w-[55px] min-[400px]:max-w-[78px] sm:max-w-[125px] md:max-w-[155px] truncate leading-none">
                 {studentHandle}
               </span>
 
-              {/* Teacher Badge if teacher */}
+              {/* Teacher/Master Badge - shown only on sm+ to prevent cramping on mobile */}
               {student.isTeacher && (
-                <span className="hidden min-[480px]:inline-block px-1.5 py-0.5 rounded text-[8.5px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-400/40 shrink-0">
-                  GURU
+                <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[8.5px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-400/40 shrink-0">
+                  {isMaster ? 'MASTER' : 'GURU'}
                 </span>
               )}
 
               {/* Gold Coin & Saldo */}
-              <div className="flex items-center gap-0.5 font-bold text-[10.5px] sm:text-xs text-amber-400 font-mono shrink-0">
+              <div className="flex items-center gap-0.5 font-bold text-[10px] sm:text-xs text-amber-400 font-mono shrink-0">
                 <span>🪙</span>
                 <span>{student.points}</span>
                 <span className="hidden md:inline font-sans text-[10px] text-slate-300 font-normal ml-0.5">XP</span>
               </div>
             </div>
 
-            {/* Teacher Ruang Guru Quick Button (Compact 28px circle on mobile, expanded pill on sm+) */}
-            {student.isTeacher && (
+            {/* Ruang Guru Button - ONLY visible to Master; completely removed for regular teachers */}
+            {isMaster && (
               <button
                 onClick={() => setIsTeacherModalOpen(true)}
                 className="w-7.5 h-7.5 sm:w-auto sm:px-2.5 sm:py-1 rounded-full bg-gradient-to-r from-amber-500/85 to-orange-500/85 hover:from-amber-400 hover:to-orange-400 backdrop-blur-md text-white font-extrabold text-[10.5px] sm:text-xs shadow-lg flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer border border-amber-300/40 shrink-0"
-                title="Buka Ruang Guru (Panel Pengajar)"
-                aria-label="Ruang Guru"
+                title="Buka Ruang Guru (Panel Master)"
+                aria-label="Panel Master"
               >
                 <span>📋</span>
                 <span className="hidden sm:inline">Ruang Guru</span>
@@ -957,7 +964,7 @@ export default function App() {
 
           {/* Right: Clock • Class • Chart/Nav • Bell • Lo-Fi • Audio • Day/Night */}
           <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto shrink-0 ml-auto">
-            {/* Live WITA Clock Pill & Subject for teacher */}
+            {/* Live Clock Pill (without WITA) & Subject for teacher */}
             <div className="flex items-center gap-1 bg-[#121e2c]/68 backdrop-blur-md border border-slate-600/50 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 shadow-lg text-[10px] sm:text-xs font-bold text-amber-400 font-mono shrink-0">
               <Clock className="w-3 h-3 text-amber-400 shrink-0" />
               <span>{currentTimeWita}</span>
@@ -968,11 +975,11 @@ export default function App() {
               )}
             </div>
 
-            {/* Realtime Gorontalo Weather & Celsius Pill (Replaces former Class badge) */}
+            {/* Realtime Gorontalo Weather & Celsius Pill */}
             <button
               type="button"
               onClick={() => setIsWeatherModalOpen(true)}
-              className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-2 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold cursor-pointer transition active:scale-95 shrink-0 ${
+              className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold cursor-pointer transition active:scale-95 shrink-0 ${
                 weatherType === 'hujan_ringan'
                   ? 'border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
                   : weatherType === 'salju'
@@ -1142,7 +1149,7 @@ export default function App() {
           onClose={() => setIsQuickNavOpen(false)}
           onSelectBuilding={(id) => handleSelectBuilding(id)}
           newMateriBuildingIds={newMateriBuildingIds}
-          onOpenTeacher={() => setIsTeacherPinModalOpen(true)}
+          onOpenTeacher={isMaster ? () => setIsTeacherPinModalOpen(true) : undefined}
         />
       )}
 

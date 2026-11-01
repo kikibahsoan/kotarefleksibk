@@ -157,7 +157,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
                     <select
                       value={selectedSubject || subjectsList[0]}
                       onChange={(e) => setSelectedSubject(e.target.value)}
-                      className="w-full text-xs font-semibold py-2 px-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full text-xs font-semibold py-2.5 px-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                     >
                       {subjectsList.map((subj) => (
                         <option key={subj} value={subj}>
@@ -177,27 +177,13 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
                         destination: 'town',
                       })
                     }
-                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-xl flex items-center gap-3 transition transform hover:scale-[1.02] active:scale-95 cursor-pointer border border-emerald-400/40 text-left"
+                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-3 transition transform hover:scale-[1.02] active:scale-95 cursor-pointer border border-emerald-400/40 text-left"
                   >
                     <span className="text-2xl shrink-0">🏛️</span>
                     <div className="flex-1">
-                      <div className="font-extrabold">Masuk ke Kota (Sebagai {authenticatedTeacher.isMasterPin ? 'Penjelajah Waktu' : 'Guru'})</div>
+                      <div className="font-extrabold text-sm">Masuk ke Kota</div>
                       <div className="text-[10px] text-emerald-100/90 font-normal mt-0.5">
-                        Jelajahi kota Refleksia {authenticatedTeacher.isMasterPin ? 'dengan avatar Penjelajah Waktu' : `dengan akun ${authenticatedTeacher.name}`}
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onSuccess({ ...authenticatedTeacher, subject: selectedSubject || matchedT.subjects[0], destination: 'panel' })}
-                    className="w-full py-2.5 px-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white font-bold text-xs shadow-md flex items-center gap-3 transition cursor-pointer border border-slate-700 hover:border-amber-500/50 text-left"
-                  >
-                    <span className="text-xl shrink-0">📋</span>
-                    <div className="flex-1">
-                      <div className="font-bold text-amber-300">Buka Panel Ruang Guru</div>
-                      <div className="text-[10px] text-slate-400 font-normal">
-                        Rekap refleksi & manajemen materi DKV
+                        Jelajahi kota Refleksia {authenticatedTeacher.isMasterPin ? 'sebagai Penjelajah Waktu' : `sebagai Guru (${authenticatedTeacher.name.split(',')[0]})`}
                       </div>
                     </div>
                   </button>
@@ -361,7 +347,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
                   type="submit"
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-xs shadow transition cursor-pointer active:scale-95"
                 >
-                  Buka Ruang Guru
+                  Verifikasi Master PIN
                 </button>
               </form>
             )}
