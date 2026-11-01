@@ -133,10 +133,10 @@ export const WeatherGorontaloModal: React.FC<WeatherGorontaloModalProps> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="font-extrabold text-slate-200 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Mode Cuaca Aktif:</span>
+                <span>Atur Cuaca Kota (Master Control):</span>
               </span>
-              <span className="text-[10px] font-mono text-slate-400">
-                {weatherOverride === 'auto' ? 'Otomatis (Sesuai Jam)' : 'Preview Khusus'}
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                👑 Khusus Master kikybahsoan
               </span>
             </div>
 

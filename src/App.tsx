@@ -975,28 +975,50 @@ export default function App() {
               )}
             </div>
 
-            {/* Realtime Gorontalo Weather & Celsius Pill */}
-            <button
-              type="button"
-              onClick={() => setIsWeatherModalOpen(true)}
-              className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold cursor-pointer transition active:scale-95 shrink-0 ${
-                weatherType === 'hujan_ringan'
-                  ? 'border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
-                  : weatherType === 'salju'
-                  ? 'border-indigo-300/50 text-indigo-200 hover:bg-indigo-950/40'
-                  : weatherType === 'berawan'
-                  ? 'border-sky-400/50 text-sky-200 hover:bg-sky-950/40'
-                  : 'border-amber-400/50 text-amber-300 hover:bg-amber-950/40'
-              }`}
-              title={`Cuaca Gorontalo Realtime: ${currentWeatherInfo.name} (${currentWeatherInfo.tempCelsius}°C) • Klik untuk melihat jadwal 4 cuaca & detail`}
-              aria-label="Cuaca Realtime Gorontalo"
-            >
-              <span className="text-xs sm:text-sm leading-none drop-shadow-sm">{currentWeatherInfo.icon}</span>
-              <span className="font-mono font-extrabold text-white">{currentWeatherInfo.tempCelsius}°C</span>
-              <span className="hidden sm:inline font-sans text-[10.5px] opacity-90 truncate max-w-[70px] md:max-w-none">
-                {currentWeatherInfo.name}
-              </span>
-            </button>
+            {/* Realtime Gorontalo Weather & Celsius Pill - Only Master kikybahsoan can click or change */}
+            {isMaster ? (
+              <button
+                type="button"
+                onClick={() => setIsWeatherModalOpen(true)}
+                className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold cursor-pointer transition active:scale-95 shrink-0 ${
+                  weatherType === 'hujan_ringan'
+                    ? 'border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
+                    : weatherType === 'salju'
+                    ? 'border-indigo-300/50 text-indigo-200 hover:bg-indigo-950/40'
+                    : weatherType === 'berawan'
+                    ? 'border-sky-400/50 text-sky-200 hover:bg-sky-950/40'
+                    : 'border-amber-400/50 text-amber-300 hover:bg-amber-950/40'
+                }`}
+                title={`Cuaca Gorontalo Realtime: ${currentWeatherInfo.name} (${currentWeatherInfo.tempCelsius}°C) • Klik untuk Mengatur Cuaca (Khusus Master)`}
+                aria-label="Atur Cuaca (Khusus Master)"
+              >
+                <span className="text-xs sm:text-sm leading-none drop-shadow-sm">{currentWeatherInfo.icon}</span>
+                <span className="font-mono font-extrabold text-white">{currentWeatherInfo.tempCelsius}°C</span>
+                <span className="hidden sm:inline font-sans text-[10.5px] opacity-90 truncate max-w-[70px] md:max-w-none">
+                  {currentWeatherInfo.name}
+                </span>
+              </button>
+            ) : (
+              <div
+                className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold select-none cursor-default shrink-0 ${
+                  weatherType === 'hujan_ringan'
+                    ? 'border-cyan-400/50 text-cyan-300'
+                    : weatherType === 'salju'
+                    ? 'border-indigo-300/50 text-indigo-200'
+                    : weatherType === 'berawan'
+                    ? 'border-sky-400/50 text-sky-200'
+                    : 'border-amber-400/50 text-amber-300'
+                }`}
+                title={`Cuaca Realtime Gorontalo: ${currentWeatherInfo.name} (${currentWeatherInfo.tempCelsius}°C)`}
+                aria-label="Cuaca Realtime Gorontalo"
+              >
+                <span className="text-xs sm:text-sm leading-none drop-shadow-sm">{currentWeatherInfo.icon}</span>
+                <span className="font-mono font-extrabold text-white">{currentWeatherInfo.tempCelsius}°C</span>
+                <span className="hidden sm:inline font-sans text-[10.5px] opacity-90 truncate max-w-[70px] md:max-w-none">
+                  {currentWeatherInfo.name}
+                </span>
+              </div>
+            )}
 
             {/* Chart / Quick Navigation */}
             <button
@@ -1229,8 +1251,8 @@ export default function App() {
         />
       )}
 
-      {/* GORONTALO REAL-TIME WEATHER MODAL */}
-      {isWeatherModalOpen && (
+      {/* GORONTALO REAL-TIME WEATHER MODAL (Khusus Master kikybahsoan) */}
+      {isWeatherModalOpen && isMaster && (
         <WeatherGorontaloModal
           onClose={() => setIsWeatherModalOpen(false)}
           currentWeather={currentWeatherInfo}
