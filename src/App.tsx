@@ -156,6 +156,33 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // Atmospheric weather automatic change notification with smooth fade-in/fade-out
+  const [weatherChangeToast, setWeatherChangeToast] = useState<{ icon: string; title: string; desc: string } | null>(null);
+  const prevWeatherForToastRef = useRef<WeatherType>(weatherType);
+
+  useEffect(() => {
+    if (prevWeatherForToastRef.current !== weatherType) {
+      prevWeatherForToastRef.current = weatherType;
+
+      if (studentRef.current) {
+        const infoMap: Record<WeatherType, { icon: string; title: string; desc: string }> = {
+          berawan: { icon: '☁️', title: 'Cuaca Berawan (15.00 - 17.00)', desc: 'Awan kumulus sejuk berarak menaungi kota Refleksia' },
+          hujan_ringan: { icon: '🌧️', title: 'Hujan Ringan (10.00-12.00 & 21.00-22.30)', desc: 'Rintik hujan lembut membasahi tanah kota' },
+          salju: { icon: '❄️', title: 'Salju Malam (00.00 - 02.30)', desc: 'Serpihan salju melayang anggun di keheningan kota' },
+          normal: { icon: '☀️', title: 'Cuaca Normal', desc: 'Langit cerah alami menyinari Kota Refleksia' },
+        };
+        const info = infoMap[weatherType];
+        if (info) {
+          setWeatherChangeToast(info);
+          const t = setTimeout(() => {
+            setWeatherChangeToast(null);
+          }, 4500);
+          return () => clearTimeout(t);
+        }
+      }
+    }
+  }, [weatherType]);
+
   // Fetch real-time temperature & humidity for Gorontalo
   useEffect(() => {
     let isCancelled = false;
@@ -864,7 +891,7 @@ export default function App() {
           : timePeriod === 'sore'
           ? 'bg-[#9a3412]'
           : 'bg-[#0c1527]'
-      } select-none transition-colors duration-700`}
+      } select-none transition-colors duration-1000 ease-in-out`}
     >
       {/* 2D Isometric Town Canvas */}
       <ThreeTownCanvas
@@ -884,6 +911,39 @@ export default function App() {
         onDeductPoints={handleDeductPoints}
         onAddXp={handleAddPoints}
       />
+
+      {/* Atmospheric Weather Mood Transition Layer (Smooth fade-in / fade-out) */}
+      <div
+        className={`pointer-events-none absolute inset-0 z-10 transition-opacity duration-1000 ease-in-out ${
+          weatherType === 'berawan'
+            ? 'opacity-100 bg-gradient-to-b from-slate-900/35 via-slate-800/15 to-transparent'
+            : weatherType === 'hujan_ringan'
+            ? 'opacity-100 bg-gradient-to-b from-blue-950/40 via-slate-900/20 to-cyan-950/25'
+            : weatherType === 'salju'
+            ? 'opacity-100 bg-gradient-to-b from-indigo-950/35 via-slate-900/15 to-purple-950/20'
+            : 'opacity-0'
+        }`}
+      />
+
+      {/* ATMOSPHERIC WEATHER AUTO-CHANGE NOTIFICATION BANNER (Smooth fade-in / fade-out) */}
+      {weatherChangeToast && (
+        <div className="fixed top-12 sm:top-14 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-fade-in flex flex-col items-center transition-all duration-700">
+          <div className="bg-[#121e2c]/85 backdrop-blur-md border border-sky-400/50 text-white px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.6)] flex items-center gap-2.5 max-w-[90vw]">
+            <span className="text-lg sm:text-xl shrink-0">{weatherChangeToast.icon}</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black text-sky-200">{weatherChangeToast.title}</span>
+                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30">
+                  Otomatis
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-300 truncate max-w-[240px] sm:max-w-[340px]">
+                {weatherChangeToast.desc}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* INTERACTIVE FLOATING POP-UP BADGE (+XP Feedback) */}
       {latestXpGain && (

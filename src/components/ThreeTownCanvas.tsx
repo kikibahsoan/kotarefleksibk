@@ -2770,6 +2770,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const trees = TREES_LIST;
 
     // -----------------------------------------------------------
+    // WEATHER TRANSITION WEIGHTS (Smooth fade-in / fade-out)
+    // -----------------------------------------------------------
+    const initialWeather = weatherTypeRef.current || 'normal';
+    const weatherWeights: Record<WeatherType, number> = {
+      berawan: initialWeather === 'berawan' ? 1.0 : 0.0,
+      hujan_ringan: initialWeather === 'hujan_ringan' ? 1.0 : 0.0,
+      salju: initialWeather === 'salju' ? 1.0 : 0.0,
+      normal: initialWeather === 'normal' || !initialWeather ? 1.0 : 0.0,
+    };
+
+    // -----------------------------------------------------------
     // MAIN RENDER LOOP
     // -----------------------------------------------------------
     let animId: number;
@@ -2782,6 +2793,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       lastTime = currentTime;
       const elapsed = currentTime / 1000;
       beaconBlink += delta * 4;
+
+      // Smoothly interpolate weather weights for dynamic fade-in and fade-out (~1.2s crossfade)
+      const activeTargetWeather = weatherTypeRef.current || 'normal';
+      const WEATHER_FADE_SPEED = 0.85;
+      (['berawan', 'hujan_ringan', 'salju', 'normal'] as WeatherType[]).forEach((wt) => {
+        const target = activeTargetWeather === wt ? 1.0 : 0.0;
+        const cur = weatherWeights[wt];
+        if (cur < target) {
+          weatherWeights[wt] = Math.min(target, cur + delta * WEATHER_FADE_SPEED);
+        } else if (cur > target) {
+          weatherWeights[wt] = Math.max(target, cur - delta * WEATHER_FADE_SPEED);
+        }
+      });
 
       const currentTileW = BASE_TILE_W * zoomLevelRef.current;
       const currentTileH = BASE_TILE_H * zoomLevelRef.current;
@@ -3440,6 +3464,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         grassBorder = '#0a1c15';
         pathColor = '#1e293b';
         pathBorder = '#334155';
+      }
+
+      // Smooth atmospheric weather sky wash (fade-in / fade-out)
+      if (weatherWeights['berawan'] > 0.005) {
+        ctx.fillStyle = isNight
+          ? `rgba(30, 41, 59, ${weatherWeights['berawan'] * 0.32})`
+          : `rgba(100, 116, 139, ${weatherWeights['berawan'] * 0.22})`;
+        ctx.fillRect(0, 0, width, height);
+      }
+      if (weatherWeights['hujan_ringan'] > 0.005) {
+        ctx.fillStyle = isNight
+          ? `rgba(15, 23, 42, ${weatherWeights['hujan_ringan'] * 0.38})`
+          : `rgba(30, 58, 138, ${weatherWeights['hujan_ringan'] * 0.22})`;
+        ctx.fillRect(0, 0, width, height);
+      }
+      if (weatherWeights['salju'] > 0.005) {
+        ctx.fillStyle = `rgba(165, 180, 252, ${weatherWeights['salju'] * 0.16})`;
+        ctx.fillRect(0, 0, width, height);
       }
 
       // ---------------------------------------------------------
@@ -9439,13 +9481,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       }
 
       // ---------------------------------------------------------
-      // 7. DYNAMIC 4 WEATHER PARTICLES & OVERLAYS
+      // 7. DYNAMIC 4 WEATHER PARTICLES & OVERLAYS (Smooth Fade-In / Fade-Out)
       // (Berawan: 15.00-17.00 | Hujan Ringan: 10.00-12.00 & 21.00-22.30 | Salju: 00.00-02.30 | Normal)
       // ---------------------------------------------------------
       {
-        const activeWeather = weatherTypeRef.current || 'normal';
+        // 7a. Hujan Ringan (Smooth crossfade)
+        const rainWeight = weatherWeights['hujan_ringan'];
+        if (rainWeight > 0.005) {
+          ctx.save();
+          ctx.globalAlpha = rainWeight;
 
-        if (activeWeather === 'hujan_ringan') {
           // Soft atmospheric drizzle tint
           ctx.fillStyle = isNight ? 'rgba(15, 23, 42, 0.22)' : 'rgba(30, 41, 59, 0.12)';
           ctx.fillRect(0, 0, width, height);
@@ -9488,9 +9533,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.stroke();
             }
           }
-        } else if (activeWeather === 'salju') {
+          ctx.restore();
+        }
+
+        // 7b. Salju (Smooth crossfade)
+        const snowWeight = weatherWeights['salju'];
+        if (snowWeight > 0.005) {
+          ctx.save();
+          ctx.globalAlpha = snowWeight;
+
           // Soft frosted cool midnight tint
-          ctx.fillStyle = 'rgba(199, 210, 254, 0.07)';
+          ctx.fillStyle = 'rgba(199, 210, 254, 0.09)';
           ctx.fillRect(0, 0, width, height);
 
           // Gentle fluttering snowflakes
@@ -9506,7 +9559,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
             ctx.fill();
           }
-        } else if (activeWeather === 'berawan') {
+          ctx.restore();
+        }
+
+        // 7c. Berawan (Smooth crossfade)
+        const cloudWeight = weatherWeights['berawan'];
+        if (cloudWeight > 0.005) {
+          ctx.save();
+          ctx.globalAlpha = cloudWeight;
+
           // Drifting soft cumulus cloud wisps across upper screen
           for (const oc of extraOvercastClouds) {
             oc.x += oc.speed * delta;
@@ -9516,6 +9577,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.roundRect(oc.x, oc.y, oc.w, oc.h, oc.h / 2);
             ctx.fill();
           }
+          ctx.restore();
         }
       }
     };
