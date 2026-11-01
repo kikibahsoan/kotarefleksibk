@@ -60,7 +60,7 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
       {/* ------------------------------------------------------------- */}
       {/* 1. FLOATING CHAT PANEL (Positioned above input on mobile & desktop) */}
       {/* ------------------------------------------------------------- */}
-      {isOpen ? (
+      {isOpen && (
         <div
           onPointerDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
@@ -181,16 +181,6 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
             )}
           </div>
         </div>
-      ) : (
-        /* Minimized Chat Pill: Placed on bottom-left, cleanly above bottom input on mobile */
-        <button
-          onClick={() => setIsOpen(true)}
-          className="absolute bottom-[calc(max(0.85rem,env(safe-area-inset-bottom))+3.5rem)] sm:bottom-6 left-3 sm:left-6 z-40 bg-[#121e2c]/80 hover:bg-[#1a293b]/90 backdrop-blur-md text-white border border-slate-600/50 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 sm:gap-2 pointer-events-auto transition transform hover:scale-105 active:scale-95 text-xs font-bold cursor-pointer"
-          title="Buka Obrolan Warga"
-        >
-          <MessageSquare className="w-4 h-4 text-emerald-400" />
-          <span>Obrolan Warga ({messages.length})</span>
-        </button>
       )}
 
       {/* ------------------------------------------------------------- */}
@@ -203,12 +193,27 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
       >
         <form
           onSubmit={handleSend}
-          className="bg-[#121e2c]/80 backdrop-blur-md border border-slate-600/60 rounded-full px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center gap-2.5 sm:gap-3 shadow-[0_10px_30px_0_rgba(0,0,0,0.5)] hover:border-emerald-500/60 focus-within:border-emerald-400/80 transition-colors w-full"
+          className="bg-[#121e2c]/80 backdrop-blur-md border border-slate-600/60 rounded-full px-2.5 sm:px-3.5 py-1.5 sm:py-2 flex items-center gap-2 sm:gap-3 shadow-[0_10px_30px_0_rgba(0,0,0,0.5)] hover:border-emerald-500/60 focus-within:border-emerald-400/80 transition-colors w-full"
         >
-          {/* Chat Icon */}
-          <div className="text-emerald-400 shrink-0">
-            <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
-          </div>
+          {/* Chat Toggle Icon Button at the left end */}
+          <button
+            type="button"
+            onClick={() => setIsOpen((prev) => !prev)}
+            className={`relative w-7 h-7 sm:w-8.5 sm:h-8.5 rounded-full flex items-center justify-center transition shrink-0 cursor-pointer ${
+              isOpen
+                ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-400/50 shadow-sm'
+                : 'bg-slate-800/80 hover:bg-slate-700/80 text-emerald-400 border border-slate-600/60'
+            }`}
+            title={isOpen ? 'Sembunyikan Obrolan Kelas' : `Buka Obrolan Kelas (${messages.length} pesan)`}
+            aria-label={isOpen ? 'Sembunyikan Obrolan Kelas' : 'Buka Obrolan Kelas'}
+          >
+            <MessageSquare className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            {!isOpen && messages.length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] flex items-center justify-center shadow">
+                {messages.length}
+              </span>
+            )}
+          </button>
 
           {/* Input field */}
           <input

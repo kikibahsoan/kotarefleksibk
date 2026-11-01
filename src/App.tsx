@@ -41,6 +41,8 @@ import { LofiAudioControl } from './components/LofiAudioControl.tsx';
 import { getTimePeriodWita, TimePeriod } from './utils/lofiAudio.ts';
 import { WeatherType, getWeatherTypeWita, getWeatherMeta, fetchGorontaloLiveWeather } from './utils/weather.ts';
 import { WeatherGorontaloModal } from './components/modals/WeatherGorontaloModal.tsx';
+import { KalenderNasionalModal } from './components/modals/KalenderNasionalModal.tsx';
+import { KartuWargaModal } from './components/modals/KartuWargaModal.tsx';
 import { sounds } from './utils/audio.ts';
 import { PublicChatMessage } from './types/index.ts';
 import {
@@ -122,6 +124,8 @@ export default function App() {
   const [liveGorontaloHumidity, setLiveGorontaloHumidity] = useState<number | undefined>(undefined);
   const [weatherOverride, setWeatherOverride] = useState<WeatherType | 'auto'>('auto');
   const [isWeatherModalOpen, setIsWeatherModalOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [isKwrModalOpen, setIsKwrModalOpen] = useState(false);
   const weatherOverrideRef = useRef(weatherOverride);
   weatherOverrideRef.current = weatherOverride;
 
@@ -975,8 +979,14 @@ export default function App() {
               <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-200" />
             </button>
 
-            {/* Profile Capsule */}
-            <div className="bg-[#121e2c]/68 backdrop-blur-md border border-slate-600/50 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 flex items-center gap-1 sm:gap-1.5 shadow-lg min-w-0 shrink">
+            {/* Profile Capsule -> Click to open KWR (Kartu Warga Refleksia) */}
+            <button
+              type="button"
+              onClick={() => setIsKwrModalOpen(true)}
+              className="bg-[#121e2c]/68 hover:bg-[#1a293b]/85 backdrop-blur-md border border-slate-600/50 hover:border-amber-400/60 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 flex items-center gap-1 sm:gap-1.5 shadow-lg min-w-0 shrink transition active:scale-95 cursor-pointer"
+              title="Buka KWR (Kartu Warga Refleksia)"
+              aria-label="Buka Kartu Warga Refleksia"
+            >
               {/* Circular Avatar with gold border */}
               <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[10px] sm:text-[11px] shadow-sm shrink-0">
                 {isMaster
@@ -1006,7 +1016,7 @@ export default function App() {
                 <span>{student.points}</span>
                 <span className="hidden md:inline font-sans text-[10px] text-slate-300 font-normal ml-0.5">XP</span>
               </div>
-            </div>
+            </button>
 
             {/* Ruang Guru Button - ONLY visible to Master; completely removed for regular teachers */}
             {isMaster && (
@@ -1022,10 +1032,16 @@ export default function App() {
             )}
           </div>
 
-          {/* Right: Clock • Class • Chart/Nav • Bell • Lo-Fi • Audio • Day/Night */}
+          {/* Right: Clock • Weather • Notifikasi Misi Harian • QuickNav (Desktop) • Radio • Audio */}
           <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto shrink-0 ml-auto">
-            {/* Live Clock Pill (without WITA) & Subject for teacher */}
-            <div className="flex items-center gap-1 bg-[#121e2c]/68 backdrop-blur-md border border-slate-600/50 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 shadow-lg text-[10px] sm:text-xs font-bold text-amber-400 font-mono shrink-0">
+            {/* Live Clock Pill (without WITA) -> Click to open Kalender Bulanan & Hari Nasional */}
+            <button
+              type="button"
+              onClick={() => setIsCalendarModalOpen(true)}
+              className="flex items-center gap-1 bg-[#121e2c]/68 hover:bg-[#1a293b]/85 backdrop-blur-md border border-slate-600/50 hover:border-amber-400/60 rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 shadow-lg text-[10px] sm:text-xs font-bold text-amber-400 font-mono shrink-0 transition active:scale-95 cursor-pointer"
+              title="Buka Kalender Bulanan & Daftar Hari Nasional RI"
+              aria-label="Buka Kalender Nasional"
+            >
               <Clock className="w-3 h-3 text-amber-400 shrink-0" />
               <span>{currentTimeWita}</span>
               {student.isTeacher && student.subject && (
@@ -1033,7 +1049,7 @@ export default function App() {
                   {student.subject}
                 </span>
               )}
-            </div>
+            </button>
 
             {/* Realtime Gorontalo Weather & Celsius Pill - Only Master kikybahsoan can click or change */}
             {isMaster ? (
@@ -1080,24 +1096,37 @@ export default function App() {
               </div>
             )}
 
-            {/* Chart / Quick Navigation */}
+            {/* Notifikasi Misi Harian (Displayed right after Cuaca on Mobile & Desktop) */}
             <button
+              type="button"
+              onClick={() => setActiveBuilding('balai_kota')}
+              className="relative flex w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-200 hover:text-white border border-slate-600/50 hover:border-amber-400/60 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              title={`Notifikasi Misi Harian (${completedMissionIds.length}/${assignedMissions.length} Tuntas)`}
+              aria-label="Notifikasi Misi Harian"
+            >
+              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+              {assignedMissions.length > 0 && (
+                <span
+                  className={`absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full text-[8.5px] font-black flex items-center justify-center shadow ${
+                    completedMissionIds.length >= assignedMissions.length
+                      ? 'bg-emerald-500 text-slate-950'
+                      : 'bg-amber-500 text-slate-950'
+                  }`}
+                >
+                  {completedMissionIds.length}/{assignedMissions.length}
+                </span>
+              )}
+            </button>
+
+            {/* Daftar Gedung & Peta Kota (Hidden on Mobile Student Header, shown on sm+ screens) */}
+            <button
+              type="button"
               onClick={() => setIsQuickNavOpen(true)}
-              className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-200 hover:text-white border border-slate-600/50 shadow-lg flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="hidden sm:flex w-8.5 h-8.5 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-200 hover:text-white border border-slate-600/50 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title="Daftar Gedung & Peta Kota"
               aria-label="Peta Gedung"
             >
-              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400" />
-            </button>
-
-            {/* Balai Kota Announcements (Bell) */}
-            <button
-              onClick={() => setActiveBuilding('balai_kota')}
-              className="hidden min-[480px]:flex w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-200 hover:text-white border border-slate-600/50 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
-              title="Pengumuman & Misi Balai Kota"
-              aria-label="Pengumuman"
-            >
-              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+              <BarChart3 className="w-4 h-4 text-sky-400" />
             </button>
 
             {/* Radio Background Music Controller (Dynamic 5 Time-of-Day Stations) */}
@@ -1327,6 +1356,28 @@ export default function App() {
             }
           }}
           currentTimeWita={currentTimeWita}
+        />
+      )}
+
+      {/* KALENDER BULANAN & HARI-HARI NASIONAL RI MODAL */}
+      {isCalendarModalOpen && (
+        <KalenderNasionalModal
+          onClose={() => setIsCalendarModalOpen(false)}
+          currentTimeWita={currentTimeWita}
+        />
+      )}
+
+      {/* KWR (KARTU WARGA REFLEKSIA) MODAL */}
+      {isKwrModalOpen && (
+        <KartuWargaModal
+          onClose={() => setIsKwrModalOpen(false)}
+          student={student}
+          studentHandle={studentHandle}
+          levelInfo={levelInfo}
+          reflectionsCount={reflections.filter((r) => r.studentId === student.id).length}
+          completedMissionsCount={completedMissionIds.length}
+          totalMissionsCount={assignedMissions.length || 5}
+          isMaster={isMaster}
         />
       )}
     </div>
