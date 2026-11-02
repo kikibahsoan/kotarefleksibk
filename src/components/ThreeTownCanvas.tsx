@@ -173,30 +173,31 @@ interface MinimalistBird {
   phase: number;
 }
 
+export const FISHING_SPOT_COORDS = { wx: 5.9, wy: -2.2 };
+
 export const TREES_LIST: [number, number][] = [
-  // Outer perimeter for 15x15 island (North edge - center is reserved for Pohon Beringin at [0, -5.8])
-  [-2.2, -6.4],
-  [2.2, -6.4],
-  [-4.4, -6.0],
-  [4.4, -6.0],
-  // West edge
-  [-6.6, 0],
-  [-6.4, -2.2],
-  [-6.4, 2.2],
-  [-6.0, -4.4],
-  [-6.0, 4.4],
+  // Outer perimeter for 17x17 island (North edge - center is reserved for Pohon Beringin at [0, -5.8])
+  [-2.2, -7.2],
+  [2.2, -7.2],
+  [-4.8, -6.8],
+  [4.8, -6.8],
+  // West edge (framing Perumahan Guru & Siswa behind Perpustakaan Kampus at wx = -7.05)
+  [-7.25, -4.85],
+  [-7.25, -2.38],
+  [-7.25, 2.35],
+  [-6.75, 4.85],
   // South edge (flanking the Welcome Gapura at [0, 6.15])
-  [-1.5, 6.4],
-  [1.5, 6.4],
-  [-2.8, 6.4],
-  [2.8, 6.4],
-  [-4.4, 6.0],
-  [4.4, 6.0],
-  // East edge (leaving [4.6, -2.2] clear for Kolam)
-  [6.6, 0],
-  [6.4, 2.2],
-  [6.0, 4.4],
-  [6.0, -4.4],
+  [-1.6, 7.0],
+  [1.6, 7.0],
+  [-3.2, 7.0],
+  [3.2, 7.0],
+  [-5.0, 6.6],
+  [5.0, 6.6],
+  // East riverbank edge (framing the long flowing river at wx=7.0..8.1 & leaving [5.9, -2.2] clear for Kolam Tepi Sungai)
+  [6.35, -0.85],
+  [6.35, 2.2],
+  [6.25, 4.6],
+  [6.25, -4.6],
   // Mid-park groves (tree moved from [3.8, 3.8] to [-0.5, 2.4] to clear view for Toko Roti & Kafe behind Lab DKV)
   [-5.2, -1.8],
   [5.2, 1.8],
@@ -207,6 +208,66 @@ export const TREES_LIST: [number, number][] = [
   [1.72, -1.72],
   [-1.72, 1.72],
   [1.72, 1.72],
+];
+
+export interface HousingUnitDef {
+  id: 'guru_1' | 'guru_2' | 'siswa_1' | 'siswa_2';
+  kind: 'guru' | 'siswa';
+  name: string;
+  subtitle: string;
+  wx: number;
+  wy: number;
+  roofColor: string;
+  roofDark: string;
+  accentColor: string;
+}
+
+// Perumahan Guru & Siswa di Belakang Perpustakaan Kampus di Ujung Barat Peta
+export const HOUSING_UNITS: HousingUnitDef[] = [
+  {
+    id: 'guru_1',
+    kind: 'guru',
+    name: '🏡 Rumah Dinas Guru 1',
+    subtitle: 'Perumahan Guru Refleksia',
+    wx: -7.05,
+    wy: -3.45,
+    roofColor: '#c2410c',
+    roofDark: '#9a3412',
+    accentColor: '#f59e0b',
+  },
+  {
+    id: 'guru_2',
+    kind: 'guru',
+    name: '🏡 Rumah Dinas Guru 2',
+    subtitle: 'Perumahan Guru Refleksia',
+    wx: -7.05,
+    wy: -1.35,
+    roofColor: '#b45309',
+    roofDark: '#78350f',
+    accentColor: '#fbbf24',
+  },
+  {
+    id: 'siswa_1',
+    kind: 'siswa',
+    name: '🏘️ Wisma Siswa 1',
+    subtitle: 'Perumahan Siswa DKV',
+    wx: -7.05,
+    wy: 1.35,
+    roofColor: '#0284c7',
+    roofDark: '#0369a1',
+    accentColor: '#38bdf8',
+  },
+  {
+    id: 'siswa_2',
+    kind: 'siswa',
+    name: '🏘️ Wisma Siswa 2',
+    subtitle: 'Perumahan Siswa DKV',
+    wx: -7.05,
+    wy: 3.35,
+    roofColor: '#0d9488',
+    roofDark: '#0f766e',
+    accentColor: '#34d399',
+  },
 ];
 
 export const STREET_LAMPS_LIST: [number, number][] = [
@@ -224,7 +285,7 @@ export const STREET_LAMPS_LIST: [number, number][] = [
   [1.8, 0],
   [0, -1.9],
   [0, 1.9],
-  // Outer promenade ring (for 15x15 grid)
+  // Outer promenade ring (for 17x17 grid)
   [-5.0, -2.5],
   [-5.0, 2.5],
   [5.0, -2.5],
@@ -233,6 +294,10 @@ export const STREET_LAMPS_LIST: [number, number][] = [
   [2.5, -5.0],
   [-2.5, 5.0],
   [2.5, 5.0],
+  // Residential boulevard lamps in front of Perumahan Guru & Siswa
+  [-6.0, -2.4],
+  [-6.0, 0.0],
+  [-6.0, 2.4],
   // Corners
   [-3.0, -3.0],
   [3.0, -3.0],
@@ -278,9 +343,21 @@ export const SOLID_BUILDING_OBSTACLES: SolidObstacle[] = [
 ];
 
 export const isSolidCollision = (wx: number, wy: number, padding: number = 0.16): boolean => {
-  // 15x15 Island edges (from -7.0 to +7.0)
-  if (wx < -7.0 + padding || wx > 7.0 - padding || wy < -7.0 + padding || wy > 7.0 - padding) {
+  // 17x17 Island edges (from -8.2 to +8.2)
+  if (wx < -8.2 + padding || wx > 8.2 - padding || wy < -8.2 + padding || wy > 8.2 - padding) {
     return true;
+  }
+
+  // Long Flowing River behind Studio ON AIR (wx > 6.82, except across the wooden river bridge at |wy| < 0.75)
+  if (wx > 6.82 - padding && Math.abs(wy) >= 0.72) {
+    return true;
+  }
+
+  // Perumahan Guru & Siswa footprint along West edge behind Perpustakaan Kampus
+  for (const h of HOUSING_UNITS) {
+    if (Math.abs(wx - h.wx) < 0.62 + padding && Math.abs(wy - h.wy) < 0.62 + padding) {
+      return true;
+    }
   }
 
   // Central Fountain pool
@@ -932,6 +1009,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [pendingConfirmation, setPendingConfirmation] = useState<EntryConfirmation | null>(null);
   const pendingConfirmationRef = useRef<EntryConfirmation | null>(null);
   pendingConfirmationRef.current = pendingConfirmation;
+
+  // Exclusive Master kikybahsoan movement mode ('walk' | 'teleport')
+  const isMasterKiky = isTimeTravelerAccount(studentName, studentId);
+  const isMasterKikyRef = useRef<boolean>(isMasterKiky);
+  isMasterKikyRef.current = isMasterKiky;
+  const [masterMoveMode, setMasterMoveMode] = useState<'walk' | 'teleport'>('walk');
+  const masterMoveModeRef = useRef<'walk' | 'teleport'>('walk');
+  masterMoveModeRef.current = masterMoveMode;
+  const teleportFlashRef = useRef<{
+    fromWx: number;
+    fromWy: number;
+    toWx: number;
+    toWy: number;
+    startTime: number;
+  } | null>(null);
 
   // Held item (kopi: 90s, roti: 60s, eskrim: 30s)
   const [heldItem, setHeldItem] = useState<'kopi' | 'roti' | 'eskrim' | null>(null);
@@ -2074,20 +2166,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       speechTimer: 5.5,
     };
 
-    // 5. Penjaga Kolam (Tomi) - East Fishing Pier & Pond
+    // 5. Penjaga Kolam (Tomi) - Riverside Fishing Pier & Pond (Tepi Sungai)
     const tomi: AvatarData = {
       id: 'tomi',
       role: 'penjaga_kolam',
       handle: 'tomi',
       name: 'Tomi',
       roleLabel: 'Penjaga Kolam',
-      wx: 4.0,
+      wx: 5.15,
       wy: -1.8,
-      targetWx: 4.0,
+      targetWx: 5.15,
       targetWy: -1.8,
-      anchorX: 4.0,
+      anchorX: 5.15,
       anchorY: -1.8,
-      wanderRadius: 1.5,
+      wanderRadius: 1.2,
       speed: 0.85,
       shirtColor: '#0d9488',
       pantsColor: '#334155',
@@ -2493,16 +2585,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 2. Check Click on Kolam Pemancingan Timur [4.6, -2.2]
-      const fishSpotDist = Math.hypot(wx - 4.6, wy - (-2.2));
-      if (fishSpotDist < 2.2) {
+      // 2. Check Click on Kolam Pemancingan Tepi Sungai [5.9, -2.2]
+      const fishSpotDist = Math.hypot(wx - FISHING_SPOT_COORDS.wx, wy - FISHING_SPOT_COORDS.wy);
+      if (fishSpotDist < 2.3) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
           setSittingSeat(null);
         }
         pendingSeatRef.current = null;
-        player.targetWx = 4.2;
+        player.targetWx = 5.45;
         player.targetWy = -2.0;
         player.isMoving = true;
         clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
@@ -2637,11 +2729,36 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
+      // 4c. Check Click on Perumahan Guru & Siswa behind Perpustakaan Kampus
+      for (const h of HOUSING_UNITS) {
+        if (Math.hypot(wx - h.wx, wy - h.wy) < 1.35) {
+          sounds.playClick();
+          if (isSittingRef.current) {
+            setIsSitting(false);
+            setSittingSeat(null);
+          }
+          pendingSeatRef.current = null;
+          player.targetWx = -5.95;
+          player.targetWy = h.wy;
+          player.isMoving = true;
+          clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+          pendingBuildingId = null;
+          lastTouchedIdRef.current = null;
+          showToast(
+            h.kind === 'guru'
+              ? `${h.name} • Kompleks Perumahan Guru di belakang Perpustakaan Kampus`
+              : `${h.name} • Kompleks Perumahan & Wisma Siswa di belakang Perpustakaan Kampus`,
+            3000
+          );
+          return;
+        }
+      }
+
       // 5. Check Click on Buildings
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
         const dist = Math.hypot(wx - bx, wy - by);
-        if (dist < 2.2 || (Math.abs(wx - bx) < 1.8 && Math.abs(wy - by) < 1.8)) {
+        if (dist < 2.35 || (Math.abs(wx - bx) < 1.95 && Math.abs(wy - by) < 1.95)) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
@@ -2673,15 +2790,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 6. Click on ground anywhere across 15x15 platform
+      // 6. Click on ground anywhere across 17x17 platform
       sounds.playClick();
       if (isSittingRef.current) {
         setIsSitting(false);
         setSittingSeat(null);
       }
       pendingSeatRef.current = null;
-      let targetX = Math.max(-6.8, Math.min(6.8, wx));
-      let targetY = Math.max(-6.8, Math.min(6.8, wy));
+      let targetX = Math.max(-7.8, Math.min(8.0, wx));
+      let targetY = Math.max(-7.8, Math.min(7.8, wy));
+      // Keep target on the inner bank if clicking onto the river water (unless crossing the bridge at |wy| < 0.72)
+      if (targetX > 6.72 && Math.abs(targetY) >= 0.72) {
+        targetX = 6.68;
+      }
       if (isSolidCollision(targetX, targetY, 0.1)) {
         // Nudge away from fountain center basin
         const dirX = player.wx - targetX;
@@ -2722,14 +2843,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       const isOverInteractiveSpot =
         isOverPlayer ||
-        Math.hypot(wx - cafeWx, wy - cafeWy) < 2.0 ||
-        Math.hypot(wx - 4.6, wy - (-2.2)) < 2.2 ||
+        Math.hypot(wx - cafeWx, wy - cafeWy) < 2.1 ||
+        Math.hypot(wx - FISHING_SPOT_COORDS.wx, wy - FISHING_SPOT_COORDS.wy) < 2.3 ||
         Math.hypot(wx - (-4.3), wy - 1.8) < 2.0 ||
         Math.hypot(wx - (-3.7), wy - 1.8) < 1.05 ||
         Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 1.35 ||
         Math.hypot(wx - BERINGIN_TREE_COORDS.wx, wy - BERINGIN_TREE_COORDS.wy) < 1.65 ||
         Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy) < 1.35 ||
         Math.hypot(wx - 0, wy - 6.15) < 1.45 ||
+        HOUSING_UNITS.some((h) => Math.hypot(wx - h.wx, wy - h.wy) < 1.35) ||
         ALL_TWO_PERSON_BENCHES.some((g) => Math.hypot(wx - g.wx, wy - g.wy) < 1.05) ||
         SWING_STRUCTURES.some((s) => Math.hypot(wx - s.wx, wy - s.wy) < 1.15) ||
         dryLeavesRef.current.some((l) => l.pickedAt === null && Math.hypot(wx - l.wx, wy - l.wy) < 0.7) ||
@@ -2854,21 +2976,34 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         const dist = Math.hypot(dx, dy);
 
         if (dist > 0.08) {
-          // Soft, gentle deceleration easing as avatar approaches target
-          const easeSpeed = player.speed * Math.min(1.0, 0.45 + dist * 1.5);
-          const step = Math.min(dist, easeSpeed * delta);
-          const stepX = (dx / dist) * step;
-          const stepY = (dy / dist) * step;
-
-          const nextWx = player.wx + stepX;
-          const nextWy = player.wy + stepY;
-
-          // Solid obstacle collision check with smooth fountain tangential steering & wall sliding
-          if (!isSolidCollision(nextWx, nextWy, 0.16)) {
-            player.wx = nextWx;
-            player.wy = nextWy;
-            player.walkFrame += delta * (2.8 + (easeSpeed / player.speed) * 1.5);
+          if (isMasterKikyRef.current && masterMoveModeRef.current === 'teleport') {
+            // Instant Chrono-Teleportation exclusively for Master kikybahsoan
+            teleportFlashRef.current = {
+              fromWx: player.wx,
+              fromWy: player.wy,
+              toWx: player.targetWx,
+              toWy: player.targetWy,
+              startTime: currentTime,
+            };
+            player.wx = player.targetWx;
+            player.wy = player.targetWy;
+            player.walkFrame = 0;
           } else {
+            // Soft, gentle deceleration easing as avatar approaches target
+            const easeSpeed = player.speed * Math.min(1.0, 0.45 + dist * 1.5);
+            const step = Math.min(dist, easeSpeed * delta);
+            const stepX = (dx / dist) * step;
+            const stepY = (dy / dist) * step;
+
+            const nextWx = player.wx + stepX;
+            const nextWy = player.wy + stepY;
+
+            // Solid obstacle collision check with smooth fountain tangential steering & wall sliding
+            if (!isSolidCollision(nextWx, nextWy, 0.16)) {
+              player.wx = nextWx;
+              player.wy = nextWy;
+              player.walkFrame += delta * (2.8 + (easeSpeed / player.speed) * 1.5);
+            } else {
             const fDist = Math.hypot(nextWx, nextWy);
             if (fDist < 1.12 && fDist > 0.001) {
               // Tangential glide around central fountain basin so walking to any fountain bench never gets stuck
@@ -2921,6 +3056,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 player.walkFrame = 0;
               }
             }
+          }
           }
 
           if (player.isMoving) {
@@ -3047,8 +3183,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // Proximity checks: East Fishing Dock & Kolam [4.6, -2.2], West Literacy Corner [-4.3, 1.8], 4 Minimalist Fountain Benches (2-seater), 2 Campfire Benches, 2 Swing Structures + Literacy Bench
-      const fishDist = Math.hypot(player.wx - 4.6, player.wy - (-2.2));
+      // Proximity checks: Riverside Fishing Dock & Kolam [5.9, -2.2], West Literacy Corner [-4.3, 1.8], 4 Minimalist Fountain Benches (2-seater), 2 Campfire Benches, 2 Swing Structures + Literacy Bench
+      const fishDist = Math.hypot(player.wx - FISHING_SPOT_COORDS.wx, player.wy - FISHING_SPOT_COORDS.wy);
       const litDist = Math.hypot(player.wx - (-4.3), player.wy - 1.8);
       const litBenchDist = Math.hypot(player.wx - (-3.7), player.wy - 1.8);
 
@@ -3485,12 +3621,358 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       }
 
       // ---------------------------------------------------------
-      // 2. ISOMETRIC CHECKERBOARD / TILE GRID PLATFORM
-      // (15x15 Grid, Green Lawn & Cream Paved Pathways)
+      // 2. ISOMETRIC 17x17 PLATFORM, POLYGONAL TAPERING BROWN CLIFF,
+      //    LONG FLOWING RIVER BEHIND STUDIO ON AIR & FRONT WATERFALL
       // ---------------------------------------------------------
-      const GRID_RADIUS = 7; // -7 to +7 tiles (15x15 = 225 isometric tiles)
+      const GRID_RADIUS = 8; // -8 to +8 tiles (17x17 = 289 isometric tiles)
+      const edgeLim = GRID_RADIUS + 0.5; // 8.5
 
-      // Helper to check if tile (gx, gy) is a paved walkway across 15x15 island
+      // ---------------------------------------------------------
+      // 2A. BONGKAHAN BATU TEBING POLIGONAL BERSUDUT MERUNCING KE BAWAH
+      //     (Tekstur Tanah & Batuan Geometris Warna Cokelat di Bawah Peta
+      //      + Animasi Melayang Halus / Floating Mengikuti Tema Awan)
+      // ---------------------------------------------------------
+      ctx.save();
+      const zCliff = zoomLevelRef.current;
+
+      // Slow, gentle floating/breathing wave for the lower cliff mass (sky-island levitation effect)
+      const cliffFloatBase = Math.sin(elapsed * 1.25) * 4.8;
+      const cliffSwayX = Math.cos(elapsed * 0.95) * 0.08;
+      const cliffSwayY = Math.sin(elapsed * 0.95) * 0.08;
+
+      // Helper to project 3D cliff vertices (wx, wy, negative altitude)
+      const cPt = (wx: number, wy: number, alt: number) => toScreen(wx, wy, alt, camera.x, camera.y);
+
+      const fillCliffPoly = (
+        pts: Array<{ x: number; y: number }>,
+        fill: string,
+        stroke?: string,
+        lw = 1
+      ) => {
+        if (pts.length < 3) return;
+        ctx.fillStyle = fill;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        if (stroke) {
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = lw * zCliff;
+          ctx.stroke();
+        }
+      };
+
+      // 8-segment division along Left-Front Edge (wx: -8.5 -> +8.5 at wy = +8.5)
+      // and 8-segment division along Right-Front Edge (wy: +8.5 -> -8.5 at wx = +8.5)
+      const leftSoilAlt = [-14, -20, -17, -24, -19, -26, -22, -28, -26];
+      const leftMidAlt = [-48, -74, -62, -98, -86, -124, -112, -148, -142];
+      const leftMidIn = [0.25, 0.55, 0.35, 0.85, 0.65, 1.15, 0.95, 1.35, 1.25];
+      const leftPeakAlt = [-82, -128, -105, -168, -144, -202, -178, -226, -252];
+
+      const rightSoilAlt = [-26, -24, -27, -21, -25, -19, -22, -17, -14];
+      const rightMidAlt = [-142, -136, -118, -128, -96, -104, -74, -64, -46];
+      const rightMidIn = [1.25, 1.30, 0.95, 1.10, 0.72, 0.85, 0.52, 0.42, 0.25];
+      const rightPeakAlt = [-252, -218, -184, -198, -152, -162, -116, -96, -78];
+
+      // Sunlit warm brown & bronze-sienna palette (Left-Front) & Shaded deep umber-cocoa palette (Right-Front)
+      const soilColorsLeft = isNight
+        ? ['#451a03', '#52250a', '#3e1a06', '#451a03']
+        : ['#92400e', '#854d0e', '#78350f', '#9a3412'];
+      const soilColorsRight = isNight
+        ? ['#2d1204', '#3b1506', '#270f03', '#331405']
+        : ['#65320d', '#52250a', '#5c280b', '#451a03'];
+
+      const rockColorsLeftUpper = isNight
+        ? ['#52250a', '#451a03', '#5c280b', '#3e1a06', '#4a1d05']
+        : ['#b45309', '#9a3412', '#a16207', '#854d0e', '#92400e'];
+      const rockColorsLeftLower = isNight
+        ? ['#3b1506', '#2d1204', '#451a03', '#230d03']
+        : ['#78350f', '#65320d', '#713f12', '#52250a'];
+
+      const rockColorsRightUpper = isNight
+        ? ['#3b1506', '#2d1204', '#331405', '#230d03', '#2a1004']
+        : ['#78350f', '#65320d', '#5c280b', '#713f12', '#52250a'];
+      const rockColorsRightLower = isNight
+        ? ['#230d03', '#1a0902', '#2a1004', '#140701']
+        : ['#451a03', '#3b1506', '#52250a', '#2d1204'];
+
+      const facetStrokeLeft = isNight ? 'rgba(15, 23, 42, 0.55)' : 'rgba(69, 26, 3, 0.45)';
+      const facetStrokeRight = isNight ? 'rgba(9, 13, 22, 0.65)' : 'rgba(45, 18, 4, 0.55)';
+
+      const deepApexAlt = -268 + cliffFloatBase * 1.35;
+      const deepCenterApex = cPt(edgeLim - 1.2 + cliffSwayX, edgeLim - 1.2 + cliffSwayY, deepApexAlt);
+
+      // 1) Draw Left-Front Polygonal Cliff Face (wx from -8.5 to +8.5 at wy = +8.5)
+      for (let i = 0; i < 8; i++) {
+        const wx0 = -edgeLim + i * (17 / 8);
+        const wx1 = -edgeLim + (i + 1) * (17 / 8);
+        const wxMid = (wx0 + wx1) * 0.5;
+
+        const segWave0 = Math.sin(elapsed * 1.45 + i * 0.6) * 2.6;
+        const segWave1 = Math.sin(elapsed * 1.45 + (i + 1) * 0.6) * 2.6;
+        const peakWave = cliffFloatBase + Math.sin(elapsed * 1.65 + i * 0.85) * 4.2;
+
+        const top0 = cPt(wx0, edgeLim, 0);
+        const top1 = cPt(wx1, edgeLim, 0);
+        const soil0 = cPt(wx0, edgeLim, leftSoilAlt[i] + segWave0 * 0.25);
+        const soil1 = cPt(wx1, edgeLim, leftSoilAlt[i + 1] + segWave1 * 0.25);
+
+        const mid0 = cPt(
+          wx0 + leftMidIn[i] * 0.35 + cliffSwayX * 0.4,
+          edgeLim - leftMidIn[i] * 0.45 + cliffSwayY * 0.4,
+          leftMidAlt[i] + cliffFloatBase * 0.65 + segWave0
+        );
+        const mid1 = cPt(
+          wx1 + leftMidIn[i + 1] * 0.35 + cliffSwayX * 0.4,
+          edgeLim - leftMidIn[i + 1] * 0.45 + cliffSwayY * 0.4,
+          leftMidAlt[i + 1] + cliffFloatBase * 0.65 + segWave1
+        );
+
+        const spikeTip = cPt(
+          wxMid + (leftMidIn[i] + leftMidIn[i + 1]) * 0.38 + cliffSwayX * 0.75,
+          edgeLim - (leftMidIn[i] + leftMidIn[i + 1]) * 0.55 + cliffSwayY * 0.75,
+          leftPeakAlt[i + 1] + peakWave
+        );
+
+        // Deep inner core triangle connecting to central bottom spire (ensures continuous tapering mass)
+        fillCliffPoly(
+          [mid0, mid1, deepCenterApex],
+          rockColorsLeftLower[(i + 1) % rockColorsLeftLower.length],
+          facetStrokeLeft,
+          0.8
+        );
+
+        // Lower tapering jagged spike triangles (Meruncing ke bawah)
+        fillCliffPoly(
+          [mid0, mid1, spikeTip],
+          rockColorsLeftLower[i % rockColorsLeftLower.length],
+          facetStrokeLeft,
+          0.95
+        );
+        fillCliffPoly(
+          [mid1, deepCenterApex, spikeTip],
+          rockColorsLeftLower[(i + 2) % rockColorsLeftLower.length],
+          facetStrokeLeft,
+          0.85
+        );
+
+        // Upper geometric rock facets (split quad into 2 crisp low-poly triangles)
+        fillCliffPoly(
+          [soil0, soil1, mid0],
+          rockColorsLeftUpper[i % rockColorsLeftUpper.length],
+          facetStrokeLeft,
+          0.95
+        );
+        fillCliffPoly(
+          [soil1, mid1, mid0],
+          rockColorsLeftUpper[(i + 2) % rockColorsLeftUpper.length],
+          facetStrokeLeft,
+          0.95
+        );
+
+        // Top earthen soil crust (Tekstur Tanah Cokelat)
+        fillCliffPoly(
+          [top0, top1, soil1, soil0],
+          soilColorsLeft[i % soilColorsLeft.length],
+          facetStrokeLeft,
+          0.85
+        );
+
+        // Geometric soil strata & pebble details on earthen crust
+        ctx.fillStyle = isNight ? '#78350f' : '#b45309';
+        ctx.beginPath();
+        ctx.arc(
+          (top0.x + soil1.x) * 0.5,
+          (top0.y + soil1.y) * 0.5,
+          1.8 * zCliff,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+
+      // 2) Draw Right-Front Polygonal Cliff Face (wy from +8.5 to -8.5 at wx = +8.5)
+      for (let i = 0; i < 8; i++) {
+        const wy0 = edgeLim - i * (17 / 8);
+        const wy1 = edgeLim - (i + 1) * (17 / 8);
+        const wyMid = (wy0 + wy1) * 0.5;
+
+        const segWave0 = Math.cos(elapsed * 1.45 + i * 0.6) * 2.6;
+        const segWave1 = Math.cos(elapsed * 1.45 + (i + 1) * 0.6) * 2.6;
+        const peakWave = cliffFloatBase + Math.cos(elapsed * 1.65 + i * 0.85) * 4.2;
+
+        const top0 = cPt(edgeLim, wy0, 0);
+        const top1 = cPt(edgeLim, wy1, 0);
+        const soil0 = cPt(edgeLim, wy0, rightSoilAlt[i] + segWave0 * 0.25);
+        const soil1 = cPt(edgeLim, wy1, rightSoilAlt[i + 1] + segWave1 * 0.25);
+
+        const mid0 = cPt(
+          edgeLim - rightMidIn[i] * 0.45 + cliffSwayX * 0.4,
+          wy0 - rightMidIn[i] * 0.35 + cliffSwayY * 0.4,
+          rightMidAlt[i] + cliffFloatBase * 0.65 + segWave0
+        );
+        const mid1 = cPt(
+          edgeLim - rightMidIn[i + 1] * 0.45 + cliffSwayX * 0.4,
+          wy1 - rightMidIn[i + 1] * 0.35 + cliffSwayY * 0.4,
+          rightMidAlt[i + 1] + cliffFloatBase * 0.65 + segWave1
+        );
+
+        const spikeTip = cPt(
+          edgeLim - (rightMidIn[i] + rightMidIn[i + 1]) * 0.55 + cliffSwayX * 0.75,
+          wyMid - (rightMidIn[i] + rightMidIn[i + 1]) * 0.38 + cliffSwayY * 0.75,
+          rightPeakAlt[i] + peakWave
+        );
+
+        // Deep inner core triangle connecting to central bottom spire
+        fillCliffPoly(
+          [mid0, mid1, deepCenterApex],
+          rockColorsRightLower[(i + 1) % rockColorsRightLower.length],
+          facetStrokeRight,
+          0.8
+        );
+
+        // Lower tapering jagged spike triangles (Meruncing ke bawah)
+        fillCliffPoly(
+          [mid0, mid1, spikeTip],
+          rockColorsRightLower[i % rockColorsRightLower.length],
+          facetStrokeRight,
+          0.95
+        );
+        fillCliffPoly(
+          [mid0, spikeTip, deepCenterApex],
+          rockColorsRightLower[(i + 2) % rockColorsRightLower.length],
+          facetStrokeRight,
+          0.85
+        );
+
+        // Upper geometric rock facets (split quad into 2 crisp low-poly triangles)
+        fillCliffPoly(
+          [soil0, soil1, mid1],
+          rockColorsRightUpper[i % rockColorsRightUpper.length],
+          facetStrokeRight,
+          0.95
+        );
+        fillCliffPoly(
+          [soil0, mid1, mid0],
+          rockColorsRightUpper[(i + 2) % rockColorsRightUpper.length],
+          facetStrokeRight,
+          0.95
+        );
+
+        // Top earthen soil crust (Tekstur Tanah Cokelat)
+        fillCliffPoly(
+          [top0, top1, soil1, soil0],
+          soilColorsRight[i % soilColorsRight.length],
+          facetStrokeRight,
+          0.85
+        );
+      }
+
+      // 3) Central Front Spire Ridge Highlight (Sharp Polygonal Central Keel under cornerS)
+      const cTopS = cPt(edgeLim, edgeLim, 0);
+      const cSoilS = cPt(edgeLim, edgeLim, -26 + cliffFloatBase * 0.2);
+      const cMidS = cPt(
+        edgeLim - 0.65 + cliffSwayX * 0.5,
+        edgeLim - 0.65 + cliffSwayY * 0.5,
+        -145 + cliffFloatBase * 0.75
+      );
+      const cMidL = cPt(
+        edgeLim - 1.65 + cliffSwayX * 0.5,
+        edgeLim + cliffSwayY * 0.5,
+        -135 + cliffFloatBase * 0.7
+      );
+      const cMidR = cPt(
+        edgeLim + cliffSwayX * 0.5,
+        edgeLim - 1.65 + cliffSwayY * 0.5,
+        -135 + cliffFloatBase * 0.7
+      );
+      const cApexS = deepCenterApex;
+
+      fillCliffPoly(
+        [cSoilS, cMidL, cMidS],
+        isNight ? '#5c280b' : '#b45309',
+        facetStrokeLeft,
+        1.1
+      );
+      fillCliffPoly(
+        [cSoilS, cMidS, cMidR],
+        isNight ? '#3b1506' : '#65320d',
+        facetStrokeRight,
+        1.1
+      );
+      fillCliffPoly(
+        [cMidL, cApexS, cMidS],
+        isNight ? '#451a03' : '#92400e',
+        facetStrokeLeft,
+        1.1
+      );
+      fillCliffPoly(
+        [cMidS, cApexS, cMidR],
+        isNight ? '#270f03' : '#451a03',
+        facetStrokeRight,
+        1.1
+      );
+      // Crisp vertical ridge line on the front-most central spire
+      ctx.strokeStyle = isNight ? 'rgba(251, 191, 36, 0.22)' : 'rgba(254, 243, 199, 0.45)';
+      ctx.lineWidth = 1.2 * zCliff;
+      ctx.beginPath();
+      ctx.moveTo(cTopS.x, cTopS.y);
+      ctx.lineTo(cSoilS.x, cSoilS.y);
+      ctx.lineTo(cMidS.x, cMidS.y);
+      ctx.lineTo(cApexS.x, cApexS.y);
+      ctx.stroke();
+
+      // 4) Floating Detached Polygonal Cliff Shards (Bongkahan Batu Kecil Melayang di Sekitar Tebing Bawah)
+      const floatingShards = [
+        { wx: -5.4, wy: 8.8, baseAlt: -125, sz: 0.42, spd: 1.7, ph: 0.0 },
+        { wx: -1.6, wy: 8.9, baseAlt: -175, sz: 0.52, spd: 1.4, ph: 1.3 },
+        { wx: 3.2, wy: 8.8, baseAlt: -215, sz: 0.48, spd: 1.9, ph: 2.5 },
+        { wx: 7.4, wy: 8.4, baseAlt: -260, sz: 0.58, spd: 1.3, ph: 3.7 },
+        { wx: 8.8, wy: 4.2, baseAlt: -205, sz: 0.46, spd: 1.6, ph: 0.8 },
+        { wx: 8.9, wy: -0.8, baseAlt: -165, sz: 0.50, spd: 1.5, ph: 2.1 },
+        { wx: 8.8, wy: -5.2, baseAlt: -118, sz: 0.38, spd: 1.8, ph: 4.2 },
+      ];
+      for (const sh of floatingShards) {
+        const bobAlt = sh.baseAlt + Math.sin(elapsed * sh.spd + sh.ph) * 9.5;
+        const sTop = cPt(sh.wx, sh.wy, bobAlt + 12 * sh.sz);
+        const sL = cPt(sh.wx - sh.sz, sh.wy + sh.sz * 0.4, bobAlt);
+        const sM = cPt(sh.wx + sh.sz * 0.2, sh.wy + sh.sz * 0.2, bobAlt - 5 * sh.sz);
+        const sR = cPt(sh.wx + sh.sz * 0.4, sh.wy - sh.sz, bobAlt);
+        const sBot = cPt(sh.wx, sh.wy, bobAlt - 26 * sh.sz);
+
+        fillCliffPoly(
+          [sTop, sL, sM],
+          isNight ? '#5c280b' : '#b45309',
+          facetStrokeLeft,
+          0.75
+        );
+        fillCliffPoly(
+          [sTop, sM, sR],
+          isNight ? '#3b1506' : '#78350f',
+          facetStrokeRight,
+          0.75
+        );
+        fillCliffPoly(
+          [sL, sBot, sM],
+          isNight ? '#451a03' : '#92400e',
+          facetStrokeLeft,
+          0.75
+        );
+        fillCliffPoly(
+          [sM, sBot, sR],
+          isNight ? '#270f03' : '#451a03',
+          facetStrokeRight,
+          0.75
+        );
+      }
+      ctx.restore();
+
+      // ---------------------------------------------------------
+      // 2B. 17x17 ISOMETRIC BASE TILES & PATHWAYS
+      // ---------------------------------------------------------
       const isPathway = (gx: number, gy: number) => {
         // Inner loop road at |gx| == 3 or |gy| == 3
         if (Math.abs(gx) === 3 && Math.abs(gy) <= 5) return true;
@@ -3498,14 +3980,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         // Outer promenade loop road at |gx| == 5 or |gy| == 5
         if (Math.abs(gx) === 5 && Math.abs(gy) <= 5) return true;
         if (Math.abs(gy) === 5 && Math.abs(gx) <= 5) return true;
-        // Connecting central spokes to north/east/west, and South Welcome Gate avenue all the way to gy = 7
-        if (gx === 0 && gy >= -6 && gy <= 7) return true;
+        // Connecting central spokes to north/east/west, and South Welcome Gate avenue all the way to gy = 8
+        if (gx === 0 && gy >= -6 && gy <= 8) return true;
         if (Math.abs(gx) <= 1 && gy === 6) return true;
-        if (gy === 0 && Math.abs(gx) <= 6) return true;
+        if (gy === 0 && gx >= -7 && gx <= 8) return true;
+        // Residential Boulevard in front of Perumahan Guru & Siswa behind Perpustakaan Kampus
+        if (gx === -6 && gy >= -4 && gy <= 3) return true;
         // Central ring
         if (Math.abs(gx) <= 1 && Math.abs(gy) <= 1) return true;
-        // Walkway spur to East Pier & Kolam at [4.6, -2.2]
-        if (gx >= 3 && gx <= 5 && gy === -2) return true;
+        // Walkway spur to Relocated Riverside Kolam at [5.9, -2.2]
+        if (gx >= 3 && gx <= 6 && gy === -2) return true;
         // Walkway spur to West Sudut Literasi at [-4.3, 1.8]
         if (gx <= -3 && gx >= -5 && gy === 2) return true;
         // Garden paths to Tempat Ayunan 1 [-3..-2, -4] and Tempat Ayunan 2 [2..3, -4]
@@ -3518,7 +4002,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return false;
       };
 
-      // Draw all isometric base tiles
+      // Draw all 17x17 isometric base tiles
       for (let gy = -GRID_RADIUS; gy <= GRID_RADIUS; gy++) {
         for (let gx = -GRID_RADIUS; gx <= GRID_RADIUS; gx++) {
           const pN = toScreen(gx - 0.5, gy - 0.5, 0, camera.x, camera.y);
@@ -3526,9 +4010,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const pS = toScreen(gx + 0.5, gy + 0.5, 0, camera.x, camera.y);
           const pW = toScreen(gx - 0.5, gy + 0.5, 0, camera.x, camera.y);
 
+          const isRiverZone = gx === 7 || gx === 8;
           const isRoad = isPathway(gx, gy);
-          ctx.fillStyle = isRoad ? pathColor : grassColor;
-          ctx.strokeStyle = isRoad ? pathBorder : grassBorder;
+          ctx.fillStyle = isRiverZone
+            ? isNight
+              ? '#1e293b'
+              : '#cbd5e1'
+            : isRoad
+            ? pathColor
+            : grassColor;
+          ctx.strokeStyle = isRiverZone
+            ? isNight
+              ? '#334155'
+              : '#94a3b8'
+            : isRoad
+            ? pathBorder
+            : grassBorder;
           ctx.lineWidth = 1;
 
           ctx.beginPath();
@@ -3541,6 +4038,351 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.stroke();
         }
       }
+
+      // ---------------------------------------------------------
+      // 2C. SUNGAI PANJANG YANG MENGALIR DI UJUNG PETA BELAKANG STUDIO ON AIR
+      //     (wx: 6.95 .. 8.15, mengalir dari wy: -8.5 ke wy: +8.5)
+      // ---------------------------------------------------------
+      ctx.save();
+      const zRiv = zoomLevelRef.current;
+      const rivW0 = 6.94;
+      const rivW1 = 8.16;
+      const rivYStart = -edgeLim;
+      const rivYEnd = edgeLim;
+
+      // 1) Stone & Pebble Riverbank Coping (Tepi Batu Sungai)
+      const bankNW = toScreen(rivW0 - 0.14, rivYStart, 0, camera.x, camera.y);
+      const bankNE = toScreen(rivW1 + 0.14, rivYStart, 0, camera.x, camera.y);
+      const bankSE = toScreen(rivW1 + 0.14, rivYEnd, 0, camera.x, camera.y);
+      const bankSW = toScreen(rivW0 - 0.14, rivYEnd, 0, camera.x, camera.y);
+
+      ctx.fillStyle = isNight ? '#334155' : '#94a3b8';
+      ctx.beginPath();
+      ctx.moveTo(bankNW.x, bankNW.y);
+      ctx.lineTo(bankNE.x, bankNE.y);
+      ctx.lineTo(bankSE.x, bankSE.y);
+      ctx.lineTo(bankSW.x, bankSW.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Recessed inner stone riverbed wall
+      const bedNW = toScreen(rivW0, rivYStart, 0, camera.x, camera.y);
+      const bedNE = toScreen(rivW1, rivYStart, 0, camera.x, camera.y);
+      const bedSE = toScreen(rivW1, rivYEnd, 0, camera.x, camera.y);
+      const bedSW = toScreen(rivW0, rivYEnd, 0, camera.x, camera.y);
+
+      ctx.fillStyle = isNight ? '#0f172a' : '#475569';
+      ctx.beginPath();
+      ctx.moveTo(bedNW.x, bedNW.y);
+      ctx.lineTo(bedNE.x, bedNE.y);
+      ctx.lineTo(bedSE.x, bedSE.y);
+      ctx.lineTo(bedSW.x, rivYEnd ? bedSW.y : bedSW.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 2) Flowing River Water Channel (Gradasi Biru Toska & Cyan Jernih)
+      const rivNW = toScreen(rivW0 + 0.04, rivYStart, -1.5, camera.x, camera.y);
+      const rivNE = toScreen(rivW1 - 0.04, rivYStart, -1.5, camera.x, camera.y);
+      const rivSE = toScreen(rivW1 - 0.04, rivYEnd, -1.5, camera.x, camera.y);
+      const rivSW = toScreen(rivW0 + 0.04, rivYEnd, -1.5, camera.x, camera.y);
+
+      const rivGrad = ctx.createLinearGradient(rivNW.x, rivNW.y, rivSE.x, rivSE.y);
+      rivGrad.addColorStop(0, isNight ? '#0369a1' : '#0284c7');
+      rivGrad.addColorStop(0.45, isNight ? '#0284c7' : '#0ea5e9');
+      rivGrad.addColorStop(0.85, isNight ? '#0ea5e9' : '#38bdf8');
+      rivGrad.addColorStop(1, isNight ? '#38bdf8' : '#7dd3fc');
+
+      ctx.fillStyle = rivGrad;
+      ctx.beginPath();
+      ctx.moveTo(rivNW.x, rivNW.y);
+      ctx.lineTo(rivNE.x, rivNE.y);
+      ctx.lineTo(rivSE.x, rivSE.y);
+      ctx.lineTo(rivSW.x, rivSW.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3) Water Inlet Connecting Riverside Koi Pond [5.9, -2.2] to the Flowing River
+      const inletNW = toScreen(6.48, -2.52, -1.0, camera.x, camera.y);
+      const inletNE = toScreen(rivW0 + 0.08, -2.52, -1.0, camera.x, camera.y);
+      const inletSE = toScreen(rivW0 + 0.08, -1.82, -1.0, camera.x, camera.y);
+      const inletSW = toScreen(6.48, -1.82, -1.0, camera.x, camera.y);
+      ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(inletNW.x, inletNW.y);
+      ctx.lineTo(inletNE.x, inletNE.y);
+      ctx.lineTo(inletSE.x, inletSE.y);
+      ctx.lineTo(inletSW.x, inletSW.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 4) Animated Flowing Water Currents (Arus Air Mengalir dari Hulu wy=-8.5 ke Hilir Air Terjun wy=+8.5)
+      ctx.lineCap = 'round';
+      for (let st = 0; st < 26; st++) {
+        const laneFrac = 0.14 + ((st * 37) % 72) / 100; // across width of river
+        const laneWx = rivW0 + 0.08 + laneFrac * (rivW1 - rivW0 - 0.16);
+        const speed = 1.9 + (st % 3) * 0.45;
+        const streamLen = 0.75 + (st % 3) * 0.35;
+        const rawWy = ((st * 0.68 + elapsed * speed) % (17.0 - streamLen)) - edgeLim;
+        const sPt0 = toScreen(laneWx, rawWy, -1.2, camera.x, camera.y);
+        const sPt1 = toScreen(laneWx, Math.min(edgeLim - 0.05, rawWy + streamLen), -1.2, camera.x, camera.y);
+
+        ctx.strokeStyle =
+          st % 3 === 0
+            ? 'rgba(255, 255, 255, 0.55)'
+            : st % 2 === 0
+            ? 'rgba(186, 230, 253, 0.45)'
+            : 'rgba(125, 211, 252, 0.38)';
+        ctx.lineWidth = (st % 3 === 0 ? 1.5 : 1.0) * zRiv;
+        ctx.beginPath();
+        ctx.moveTo(sPt0.x, sPt0.y);
+        ctx.lineTo(sPt1.x, sPt1.y);
+        ctx.stroke();
+      }
+
+      // 5) Natural River Stones & Mossy Pebbles along Both Riverbanks
+      for (let rb = 0; rb <= 16; rb++) {
+        const rWy = -8.0 + rb * 1.0;
+        if (Math.abs(rWy) < 0.65 || Math.abs(rWy - (-2.2)) < 0.65) continue; // keep bridge & pond inlet clear
+        const leftRockPt = toScreen(rivW0 - 0.08, rWy, 0, camera.x, camera.y);
+        const rightRockPt = toScreen(rivW1 + 0.08, rWy + 0.35, 0, camera.x, camera.y);
+
+        ctx.fillStyle = rb % 2 === 0 ? (isNight ? '#475569' : '#64748b') : (isNight ? '#334155' : '#94a3b8');
+        ctx.beginPath();
+        ctx.ellipse(leftRockPt.x, leftRockPt.y, 4.2 * zRiv, 2.2 * zRiv, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.ellipse(rightRockPt.x, rightRockPt.y, 3.8 * zRiv, 2.0 * zRiv, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 6) Minimalist Wooden Footbridge across the River behind Studio ON AIR (at wy = 0, gx = 7..8)
+      const brNW = toScreen(rivW0 - 0.18, -0.46, 2.5, camera.x, camera.y);
+      const brNE = toScreen(rivW1 + 0.18, -0.46, 2.5, camera.x, camera.y);
+      const brSE = toScreen(rivW1 + 0.18, 0.46, 2.5, camera.x, camera.y);
+      const brSW = toScreen(rivW0 - 0.18, 0.46, 2.5, camera.x, camera.y);
+
+      ctx.fillStyle = isNight ? '#78350f' : '#b45309';
+      ctx.beginPath();
+      ctx.moveTo(brNW.x, brNW.y);
+      ctx.lineTo(brNE.x, brNE.y);
+      ctx.lineTo(brSE.x, brSE.y);
+      ctx.lineTo(brSW.x, brSW.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = isNight ? '#fbbf24' : '#fef3c7';
+      ctx.lineWidth = 0.85 * zRiv;
+      ctx.stroke();
+
+      // Bridge timber handrails
+      ctx.strokeStyle = isNight ? '#d97706' : '#78350f';
+      ctx.lineWidth = 1.4 * zRiv;
+      ctx.beginPath();
+      ctx.moveTo(brNW.x, brNW.y - 4 * zRiv);
+      ctx.lineTo(brNE.x, brNE.y - 4 * zRiv);
+      ctx.moveTo(brSW.x, brSW.y - 4 * zRiv);
+      ctx.lineTo(brSE.x, brSE.y - 4 * zRiv);
+      ctx.stroke();
+
+      // ---------------------------------------------------------
+      // 2D. AIR TERJUN ESTETIK, HIDUP & DINAMIS DI UJUNG SUNGAI BAGIAN DEPAN
+      //     (Spilling over the Front Cliff Edge at wy = +8.5, wx = 6.96 .. 8.12)
+      // ---------------------------------------------------------
+      const wfSway = Math.sin(elapsed * 4.5) * 0.025;
+      const wfW0 = rivW0 + 0.03 + wfSway;
+      const wfW1 = rivW1 - 0.03 - wfSway;
+      const wfTopL = toScreen(wfW0, edgeLim, -1.0, camera.x, camera.y);
+      const wfTopR = toScreen(wfW1, edgeLim, -1.0, camera.x, camera.y);
+      const wfMidL = toScreen(wfW0 + 0.06, edgeLim + 0.08, -78, camera.x, camera.y);
+      const wfMidR = toScreen(wfW1 - 0.06, edgeLim + 0.08, -78, camera.x, camera.y);
+      const wfBotL = toScreen(wfW0 + 0.14, edgeLim + 0.15, -172, camera.x, camera.y);
+      const wfBotR = toScreen(wfW1 - 0.14, edgeLim + 0.15, -172, camera.x, camera.y);
+
+      // Architectural Minimalist Cut-Stone Spillway Lip at Cliff Edge
+      const lipL = toScreen(rivW0 - 0.06, edgeLim, 0, camera.x, camera.y);
+      const lipR = toScreen(rivW1 + 0.06, edgeLim, 0, camera.x, camera.y);
+      ctx.strokeStyle = isNight ? '#94a3b8' : '#e2e8f0';
+      ctx.lineWidth = 3.2 * zRiv;
+      ctx.beginPath();
+      ctx.moveTo(lipL.x, lipL.y);
+      ctx.lineTo(lipR.x, lipR.y);
+      ctx.stroke();
+
+      // Soft Ambient Aqua Glow Behind Waterfall
+      const wfGlowCenter = toScreen((wfW0 + wfW1) * 0.5, edgeLim + 0.06, -85, camera.x, camera.y);
+      const wfAmbientGlow = ctx.createRadialGradient(
+        wfGlowCenter.x,
+        wfGlowCenter.y,
+        4 * zRiv,
+        wfGlowCenter.x,
+        wfGlowCenter.y,
+        46 * zRiv
+      );
+      wfAmbientGlow.addColorStop(0, 'rgba(125, 211, 252, 0.36)');
+      wfAmbientGlow.addColorStop(0.6, 'rgba(56, 189, 248, 0.14)');
+      wfAmbientGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      ctx.fillStyle = wfAmbientGlow;
+      ctx.beginPath();
+      ctx.ellipse(wfGlowCenter.x, wfGlowCenter.y, 26 * zRiv, 52 * zRiv, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Upper Sheer Waterfall Curtain (alt 0 -> -78)
+      const wfGradUpper = ctx.createLinearGradient(wfTopL.x, wfTopL.y, wfMidL.x, wfMidL.y);
+      wfGradUpper.addColorStop(0, 'rgba(240, 249, 255, 0.98)');
+      wfGradUpper.addColorStop(0.3, 'rgba(56, 189, 248, 0.92)');
+      wfGradUpper.addColorStop(0.75, 'rgba(14, 165, 233, 0.88)');
+      wfGradUpper.addColorStop(1, 'rgba(224, 242, 254, 0.96)');
+
+      ctx.fillStyle = wfGradUpper;
+      ctx.beginPath();
+      ctx.moveTo(wfTopL.x, wfTopL.y);
+      ctx.lineTo(wfTopR.x, wfTopR.y);
+      ctx.lineTo(wfMidR.x, wfMidR.y);
+      ctx.lineTo(wfMidL.x, wfMidL.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Stepped Minimalist Brown Rock Ledge Mid-Waterfall (at alt = -78)
+      const ledgeL = toScreen(wfW0 - 0.1, edgeLim + 0.05, -78, camera.x, camera.y);
+      const ledgeR = toScreen(wfW1 + 0.1, edgeLim + 0.05, -78, camera.x, camera.y);
+      const ledgeBot = toScreen((wfW0 + wfW1) * 0.5, edgeLim + 0.08, -90, camera.x, camera.y);
+      fillCliffPoly(
+        [ledgeL, ledgeR, ledgeBot],
+        isNight ? '#451a03' : '#78350f',
+        isNight ? '#270f03' : '#451a03',
+        1.0
+      );
+
+      // Lower Cascading Waterfall Curtain (alt -78 -> -172)
+      const wfGradLower = ctx.createLinearGradient(wfMidL.x, wfMidL.y, wfBotL.x, wfBotL.y);
+      wfGradLower.addColorStop(0, 'rgba(240, 249, 255, 0.95)');
+      wfGradLower.addColorStop(0.35, 'rgba(56, 189, 248, 0.85)');
+      wfGradLower.addColorStop(0.75, 'rgba(125, 211, 252, 0.68)');
+      wfGradLower.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      ctx.fillStyle = wfGradLower;
+      ctx.beginPath();
+      ctx.moveTo(wfMidL.x, wfMidL.y);
+      ctx.lineTo(wfMidR.x, wfMidR.y);
+      ctx.lineTo(wfBotR.x, wfBotR.y);
+      ctx.lineTo(wfBotL.x, wfBotL.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 1) Lively Multi-Speed Vertical Cascading Water Ribbons & Foaming Veins
+      for (let ws = 0; ws < 24; ws++) {
+        const t = (ws + 0.5) / 24;
+        const wWx = wfW0 + 0.04 + t * (wfW1 - wfW0 - 0.08);
+        const speed = 105 + (ws % 4) * 24;
+        const dropOffset = (elapsed * speed + ws * 19) % 162;
+        const dropAlt0 = -dropOffset;
+        const ribbonLen = 22 + (ws % 3) * 11;
+        const dropAlt1 = Math.max(-168, dropAlt0 - ribbonLen);
+        const wyShift0 = edgeLim + (dropOffset / 162) * 0.14;
+        const wyShift1 = edgeLim + (Math.min(168, dropOffset + ribbonLen) / 162) * 0.14;
+        const dPt0 = toScreen(wWx, wyShift0, dropAlt0, camera.x, camera.y);
+        const dPt1 = toScreen(wWx, wyShift1, dropAlt1, camera.x, camera.y);
+
+        ctx.strokeStyle =
+          ws % 3 === 0
+            ? 'rgba(255, 255, 255, 0.92)'
+            : ws % 2 === 0
+            ? 'rgba(224, 242, 254, 0.78)'
+            : 'rgba(125, 211, 252, 0.65)';
+        ctx.lineWidth = (ws % 3 === 0 ? 1.8 : 1.1) * zRiv;
+        ctx.beginPath();
+        ctx.moveTo(dPt0.x, dPt0.y);
+        ctx.lineTo(dPt1.x, dPt1.y);
+        ctx.stroke();
+      }
+
+      // 2) Dynamic Bouncing Water Droplets & Spray Arcs off the Spillway & Mid-Ledge
+      for (let dp = 0; dp < 18; dp++) {
+        const phase = (elapsed * 2.4 + dp * 0.37) % 1.0;
+        const isMidSplash = dp % 2 === 0;
+        const baseWx = wfW0 + ((dp * 0.19) % 1.0) * (wfW1 - wfW0);
+        const spreadWx = (dp % 3 - 1) * 0.16 * phase;
+        const startAlt = isMidSplash ? -76 : -4;
+        // Parabolic arc upward bounce then gravity drop
+        const arcAlt = startAlt + Math.sin(phase * Math.PI) * 12 - phase * phase * 42;
+        const spPt = toScreen(
+          baseWx + spreadWx,
+          edgeLim + 0.08 + phase * 0.18,
+          arcAlt,
+          camera.x,
+          camera.y
+        );
+        const alpha = Math.max(0, 1 - phase * 0.95);
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.9).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(spPt.x, spPt.y, (1.4 + (1 - phase) * 1.1) * zRiv, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 3) Churning White-Cyan Spillway Crest Foam at Top Lip & Mid Rock Ledge
+      for (let f = 0; f < 9; f++) {
+        const ft = f / 8;
+        const fxTop = wfTopL.x + ft * (wfTopR.x - wfTopL.x);
+        const fyTop = wfTopL.y + ft * (wfTopR.y - wfTopL.y);
+        const rPulse = (3.0 + Math.sin(elapsed * 8.5 + f * 1.1) * 1.1) * zRiv;
+        ctx.fillStyle = f % 2 === 0 ? 'rgba(255, 255, 255, 0.94)' : 'rgba(224, 242, 254, 0.85)';
+        ctx.beginPath();
+        ctx.arc(fxTop, fyTop, rPulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        const fxMid = wfMidL.x + ft * (wfMidR.x - wfMidL.x);
+        const fyMid = wfMidL.y + ft * (wfMidR.y - wfMidL.y);
+        ctx.beginPath();
+        ctx.arc(
+          fxMid + Math.sin(elapsed * 6 + f) * 1.2 * zRiv,
+          fyMid + Math.cos(elapsed * 7 + f) * 1.0 * zRiv,
+          rPulse * 1.25,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+
+      // 4) Billowing Multi-Layered Mist & Rising Vapor Clouds at Waterfall Base
+      const mistCenter = toScreen((wfW0 + wfW1) * 0.5, edgeLim + 0.14, -158, camera.x, camera.y);
+      const mistGrad = ctx.createRadialGradient(
+        mistCenter.x,
+        mistCenter.y,
+        3 * zRiv,
+        mistCenter.x,
+        mistCenter.y,
+        38 * zRiv
+      );
+      mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+      mistGrad.addColorStop(0.45, 'rgba(186, 230, 253, 0.48)');
+      mistGrad.addColorStop(1, 'rgba(186, 230, 253, 0)');
+      ctx.fillStyle = mistGrad;
+      ctx.beginPath();
+      ctx.ellipse(
+        mistCenter.x,
+        mistCenter.y,
+        (32 + Math.sin(elapsed * 4.5) * 4) * zRiv,
+        (16 + Math.cos(elapsed * 4.5) * 2.5) * zRiv,
+        -0.22,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      // Rising animated mist puffs drifting upward from the plunge zone
+      for (let mp = 0; mp < 4; mp++) {
+        const mProg = (elapsed * 0.65 + mp * 0.25) % 1.0;
+        const mWx = wfW0 + 0.15 + ((mp * 0.27) % 0.75) * (wfW1 - wfW0);
+        const mAlt = -162 + mProg * 46;
+        const mPt = toScreen(mWx, edgeLim + 0.16, mAlt, camera.x, camera.y);
+        const mAlpha = Math.sin(mProg * Math.PI) * 0.52;
+        const mRad = (9 + mProg * 14) * zRiv;
+        ctx.fillStyle = `rgba(224, 242, 254, ${mAlpha.toFixed(2)})`;
+        ctx.beginPath();
+        ctx.ellipse(mPt.x, mPt.y, mRad, mRad * 0.58, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
 
       // Outer platform border line
       const cornerN = toScreen(-GRID_RADIUS - 0.5, -GRID_RADIUS - 0.5, 0, camera.x, camera.y);
@@ -3674,6 +4516,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'welcome_gate'; wx: number; wy: number; depth: number }
         | { type: 'town_rules_board'; wx: number; wy: number; depth: number }
         | { type: 'beringin_tree'; wx: number; wy: number; depth: number }
+        | { type: 'housing_unit'; unit: HousingUnitDef; wx: number; wy: number; depth: number }
+        | { type: 'housing_gate'; wx: number; wy: number; depth: number }
         | { type: 'dry_leaf'; leaf: DryLeafItem; wx: number; wy: number; depth: number };
 
       const drawItems: DrawItem[] = [];
@@ -3681,6 +4525,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       BUILDINGS_INFO.forEach((b) => {
         if (b.id === 'monumen_warga') return; // drawn as fountain
         drawItems.push({ type: 'building', info: b, depth: b.position[0] + b.position[2] });
+      });
+
+      // 10. Perumahan Guru & Siswa di Belakang Perpustakaan Kampus (Ujung Barat Peta)
+      HOUSING_UNITS.forEach((unit) => {
+        drawItems.push({
+          type: 'housing_unit',
+          unit,
+          wx: unit.wx,
+          wy: unit.wy,
+          depth: unit.wx + unit.wy,
+        });
+      });
+
+      drawItems.push({
+        type: 'housing_gate',
+        wx: -6.55,
+        wy: 0.0,
+        depth: -6.55 + 0.0,
       });
 
       drawItems.push({ type: 'cafe', depth: cafeWx + cafeWy });
@@ -3749,8 +4611,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         drawItems.push({ type: 'lamp', wx: lx, wy: ly, depth: lx + ly });
       });
 
-      // 1. Spot Memancing & Kolam Ikan Relocated far to East End at [4.6, -2.2]
-      drawItems.push({ type: 'fishing_spot', wx: 4.6, wy: -2.2, depth: 4.6 + -2.2 });
+      // 1. Spot Memancing & Kolam Ikan Relocated to Tepi Sungai at [5.9, -2.2]
+      drawItems.push({
+        type: 'fishing_spot',
+        wx: FISHING_SPOT_COORDS.wx,
+        wy: FISHING_SPOT_COORDS.wy,
+        depth: FISHING_SPOT_COORDS.wx + FISHING_SPOT_COORDS.wy,
+      });
 
       // 2. Sudut Literasi Siswa at West End at [-4.3, 1.8]
       drawItems.push({ type: 'literacy_corner', wx: -4.3, wy: 1.8, depth: -4.3 + 1.8 });
@@ -4640,10 +5507,41 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.ellipse(pt.x, pt.y + 1 * z, 27 * z, 12 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // 3. Sprawling Gnarled Banyan Roots & Broad Trunk
-          const trunkH = 58 * z;
-          const trunkBaseW = 28 * z;
-          const trunkTopW = 16 * z;
+          // 3. Sprawling Gnarled Banyan Roots, Broad Trunk & Spreading Upper Crown Branches
+          const trunkH = 52 * z;
+          const trunkBaseW = 30 * z;
+          const trunkTopW = 18 * z;
+
+          // Upper Spreading Wooden Crown Branches (Supporting the wide Beringin Canopy)
+          const crownBranches = [
+            { xEnd: -28, yEnd: -68, ctrlX: -16, ctrlY: -54, w: 6.5 },
+            { xEnd: -14, yEnd: -78, ctrlX: -8, ctrlY: -62, w: 5.5 },
+            { xEnd: 0, yEnd: -84, ctrlX: 0, ctrlY: -66, w: 6.5 },
+            { xEnd: 14, yEnd: -78, ctrlX: 8, ctrlY: -62, w: 5.5 },
+            { xEnd: 28, yEnd: -68, ctrlX: 16, ctrlY: -54, w: 6.5 },
+          ];
+          crownBranches.forEach((br) => {
+            ctx.strokeStyle = isNight ? '#2b1406' : '#54260a';
+            ctx.lineWidth = br.w * z;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(pt.x + br.ctrlX * 0.25 * z, pt.y - (trunkH - 8 * z));
+            ctx.quadraticCurveTo(pt.x + br.ctrlX * z, pt.y + br.ctrlY * z, pt.x + br.xEnd * z, pt.y + br.yEnd * z);
+            ctx.stroke();
+
+            // Subtle sunlit branch bark highlight
+            ctx.strokeStyle = isNight ? '#422006' : '#78350f';
+            ctx.lineWidth = br.w * 0.38 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + (br.ctrlX * 0.25 - 0.8) * z, pt.y - (trunkH - 8 * z));
+            ctx.quadraticCurveTo(
+              pt.x + (br.ctrlX - 0.8) * z,
+              pt.y + (br.ctrlY - 1) * z,
+              pt.x + (br.xEnd - 0.8) * z,
+              pt.y + (br.yEnd - 1) * z
+            );
+            ctx.stroke();
+          });
 
           // Main Trunk Body
           ctx.fillStyle = isNight ? '#2b1406' : '#54260a';
@@ -4665,10 +5563,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           // 4. Aerial Hanging Roots (Sulur Beringin)
           const aerialRoots = [
-            { xOff: -16, topY: -44, botY: -1, width: 2 },
-            { xOff: -10, topY: -50, botY: 1, width: 1.8 },
-            { xOff: 10, topY: -48, botY: 1, width: 2 },
-            { xOff: 16, topY: -42, botY: -1, width: 1.8 },
+            { xOff: -24, topY: -54, botY: -2, width: 1.8 },
+            { xOff: -16, topY: -50, botY: -1, width: 2.0 },
+            { xOff: -10, topY: -54, botY: 1, width: 1.7 },
+            { xOff: 10, topY: -52, botY: 1, width: 1.9 },
+            { xOff: 16, topY: -49, botY: -1, width: 1.8 },
+            { xOff: 24, topY: -53, botY: -2, width: 1.7 },
           ];
           aerialRoots.forEach((ar) => {
             const rx = pt.x + ar.xOff * z;
@@ -4681,41 +5581,114 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           });
 
-          // 5. Massive Layered Canopy Foliage
-          // Layer A: Deep Base Canopy Lobes (Outer Dark Green)
-          ctx.fillStyle = isNight ? '#022c22' : '#064e3b';
-          ctx.beginPath();
-          ctx.arc(pt.x - 24 * z, pt.y - 68 * z, 26 * z, 0, Math.PI * 2);
-          ctx.arc(pt.x + 24 * z, pt.y - 68 * z, 26 * z, 0, Math.PI * 2);
-          ctx.arc(pt.x, pt.y - 82 * z, 32 * z, 0, Math.PI * 2);
-          ctx.fill();
+          // 5. Majestic Multi-Tiered Banyan Canopy Crown (Mahkota Rimbun Pohon Jurnal Diperbaiki)
+          const drawFoliagePuff = (cx: number, cy: number, r: number, color: string) => {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+          };
 
-          // Layer B: Mid Lush Jade Canopy
-          ctx.fillStyle = isNight ? '#065f46' : '#047857';
-          ctx.beginPath();
-          ctx.arc(pt.x - 16 * z, pt.y - 74 * z, 24 * z, 0, Math.PI * 2);
-          ctx.arc(pt.x + 16 * z, pt.y - 74 * z, 24 * z, 0, Math.PI * 2);
-          ctx.arc(pt.x, pt.y - 92 * z, 28 * z, 0, Math.PI * 2);
-          ctx.fill();
+          // Layer A: Deep Shadowed Under-Canopy Base Lobes (Wide spreading banyan skirt)
+          const colLayerA = isNight ? '#022c22' : '#064e3b';
+          [
+            [-32, -62, 19],
+            [-18, -60, 22],
+            [0, -61, 24],
+            [18, -60, 22],
+            [32, -62, 19],
+            [-26, -74, 21],
+            [26, -74, 21],
+          ].forEach(([dx, dy, r]) => {
+            drawFoliagePuff(pt.x + dx * z, pt.y + dy * z, r * z, colLayerA);
+          });
 
-          // Layer C: Upper Mint / Spring Highlights
-          ctx.fillStyle = isNight ? '#047857' : '#10b981';
-          ctx.beginPath();
-          ctx.arc(pt.x - 10 * z, pt.y - 82 * z, 18 * z, 0, Math.PI * 2);
-          ctx.arc(pt.x + 10 * z, pt.y - 82 * z, 18 * z, 0, Math.PI * 2);
-          ctx.arc(pt.x, pt.y - 98 * z, 20 * z, 0, Math.PI * 2);
-          ctx.fill();
+          // Layer B: Rich Emerald Mid-Canopy Domes
+          const colLayerB = isNight ? '#065f46' : '#047857';
+          [
+            [-28, -68, 18],
+            [-14, -71, 22],
+            [0, -73, 25],
+            [14, -71, 22],
+            [28, -68, 18],
+            [-18, -83, 19],
+            [18, -83, 19],
+            [0, -86, 23],
+          ].forEach(([dx, dy, r]) => {
+            drawFoliagePuff(pt.x + dx * z, pt.y + dy * z, r * z, colLayerB);
+          });
 
-          // Layer D: Top Soft Sunlight Canopy Glow
-          ctx.fillStyle = isNight ? '#059669' : '#34d399';
+          // Layer C: Lush Jade-Mint Upper Crown Lobes
+          const colLayerC = isNight ? '#047857' : '#059669';
+          [
+            [-21, -74, 15],
+            [-9, -79, 18],
+            [9, -79, 18],
+            [21, -74, 15],
+            [-11, -90, 16],
+            [11, -90, 16],
+            [0, -94, 18],
+          ].forEach(([dx, dy, r]) => {
+            drawFoliagePuff(pt.x + dx * z, pt.y + dy * z, r * z, colLayerC);
+          });
+
+          // Layer D: Vibrant Sunlit Spring-Green Crown Highlights
+          const colLayerD = isNight ? '#059669' : '#10b981';
+          [
+            [-15, -78, 11],
+            [-4, -84, 13],
+            [8, -83, 12],
+            [16, -77, 10],
+            [-7, -94, 12],
+            [6, -93, 11],
+            [0, -99, 13],
+          ].forEach(([dx, dy, r]) => {
+            drawFoliagePuff(pt.x + dx * z, pt.y + dy * z, r * z, colLayerD);
+          });
+
+          // Layer E: Soft Top Crown Sunlight Rim & Glowing Leaf Buds
+          const colLayerE = isNight ? '#10b981' : '#34d399';
+          [
+            [-10, -97, 7.5],
+            [7, -96, 7.0],
+            [-2, -103, 8.5],
+            [3, -102, 7.0],
+          ].forEach(([dx, dy, r]) => {
+            drawFoliagePuff(pt.x + dx * z, pt.y + dy * z, r * z, colLayerE);
+          });
+
+          // Delicate Golden-Mint Leaf Highlights & Hanging Wooden "POHON JURNAL" Plaque on Upper Trunk
+          ctx.fillStyle = isNight ? '#34d399' : '#6ee7b7';
+          [
+            [-24, -76, 3.2],
+            [-12, -96, 3.5],
+            [-1, -106, 4.0],
+            [12, -94, 3.2],
+            [23, -75, 3.0],
+          ].forEach(([dx, dy, r]) => {
+            ctx.beginPath();
+            ctx.arc(pt.x + dx * z, pt.y + dy * z, r * z, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          // Wooden "JURNAL" Signboard nestled at the Crown Fork (pt.y - 47 * z)
+          ctx.fillStyle = '#451a03';
           ctx.beginPath();
-          ctx.arc(pt.x - 4 * z, pt.y - 102 * z, 12 * z, 0, Math.PI * 2);
+          ctx.roundRect(pt.x - 13 * z, pt.y - 50 * z, 26 * z, 6.5 * z, 2 * z);
           ctx.fill();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 0.85 * z;
+          ctx.stroke();
+          ctx.fillStyle = '#fef08a';
+          ctx.font = `bold ${Math.max(3, Math.round(3.6 * z))}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🌳 POHON JURNAL', pt.x, pt.y - 46.7 * z);
 
           // 6. Hanging Warm Glowing Paper Lanterns
           const lanterns = [
-            { lx: pt.x - 22 * z, ly: pt.y - 52 * z },
-            { lx: pt.x + 22 * z, ly: pt.y - 50 * z },
+            { lx: pt.x - 25 * z, ly: pt.y - 50 * z },
+            { lx: pt.x + 25 * z, ly: pt.y - 49 * z },
           ];
           lanterns.forEach((lan) => {
             // Cord
@@ -5660,7 +6633,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const b = item.info;
           const [bx, , by] = b.position;
           const pt = toScreen(bx, by, 0, camera.x, camera.y);
-          const z = zoomLevelRef.current;
+          // Ukuran setiap bangunan diperbesar sedikit (~18% lebih besar & proporsional)
+          const z = zoomLevelRef.current * 1.18;
           const isHovered = hoveredBuildingRef?.id === b.id;
 
           const distToPlayer = Math.hypot(player.wx - bx, player.wy - by);
@@ -6825,19 +7799,110 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.stroke();
             }
 
-            // Rooftop Dispatch Radio Antenna & Weather Vane
-            ctx.strokeStyle = '#334155';
+            // Rooftop Iconic 3D Origami Paper Airplane (Model Pesawat Kertas di Bagian Atas Kantor Pos)
+            const planeFloatY = Math.sin(elapsed * 2.8) * 1.6 * z;
+            const planeTilt = Math.sin(elapsed * 1.8) * 0.04;
+            const pylonTopY = pt.y - 38.5 * z;
+
+            // Sleek Golden & Slate Mounting Pedestal Pylon on Roof Peak
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 3.2 * z, pt.y - 31.5 * z);
+            ctx.lineTo(pt.x - 1.4 * z, pylonTopY);
+            ctx.lineTo(pt.x + 1.4 * z, pylonTopY);
+            ctx.lineTo(pt.x + 3.2 * z, pt.y - 31.5 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y - 32 * z, 4.5 * z, 2.0 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(pt.x, pylonTopY, 2.2 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.save();
+            ctx.translate(pt.x, pylonTopY - 6.5 * z + planeFloatY);
+            ctx.rotate(-0.22 + planeTilt); // Angled dynamically nose-up toward the sky
+
+            // Subtle Wind Trail / Swoosh Lines behind the Paper Airplane
+            ctx.strokeStyle = isNight ? 'rgba(125, 211, 252, 0.55)' : 'rgba(255, 255, 255, 0.78)';
+            ctx.lineWidth = 1.1 * z;
+            ctx.lineCap = 'round';
+            const trailPulse = (elapsed * 12) % 6;
+            ctx.beginPath();
+            ctx.moveTo(-16 * z - trailPulse * z, 2.5 * z);
+            ctx.lineTo(-23 * z - trailPulse * z, 4.2 * z);
+            ctx.moveTo(-14 * z - trailPulse * 0.7 * z, 7.5 * z);
+            ctx.lineTo(-20 * z - trailPulse * 0.7 * z, 9.0 * z);
+            ctx.stroke();
+
+            // Nose Point: (19*z, -3*z)
+            const noseX = 19 * z;
+            const noseY = -3 * z;
+
+            // 1) Left / Rear Upper Paper Wing (Crisp White Paper with Soft Sky Shading)
+            ctx.fillStyle = '#f1f5f9';
+            ctx.beginPath();
+            ctx.moveTo(noseX, noseY);
+            ctx.lineTo(-15 * z, -11.5 * z); // Left wingtip
+            ctx.lineTo(-9.5 * z, -1.5 * z); // Inner fold rear
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 0.85 * z;
+            ctx.stroke();
+
+            // 2) Deep Origami Center Valley Crease & Under-Keel Fin (Shaded Slate-Blue Paper Fold)
+            ctx.fillStyle = '#94a3b8';
+            ctx.beginPath();
+            ctx.moveTo(noseX, noseY);
+            ctx.lineTo(-9.5 * z, -1.5 * z);
+            ctx.lineTo(-11.5 * z, 6.2 * z); // Bottom keel point
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+
+            // Inner fold shadow triangle
+            ctx.fillStyle = '#cbd5e1';
+            ctx.beginPath();
+            ctx.moveTo(noseX, noseY);
+            ctx.lineTo(-9.5 * z, -1.5 * z);
+            ctx.lineTo(-7.5 * z, 1.8 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // 3) Right / Front Sunlit Main Paper Wing (Pure Crisp White Origami Wing)
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(noseX, noseY);
+            ctx.lineTo(-7.5 * z, 1.8 * z); // Center crease rear
+            ctx.lineTo(-14.5 * z, 9.8 * z); // Right-front wingtip
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+
+            // Express Airmail Red & Blue Stripes on Front Paper Wing
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1.5 * z;
+            ctx.beginPath();
+            ctx.moveTo(7 * z, 0.2 * z);
+            ctx.lineTo(-11.2 * z, 6.8 * z);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#2563eb';
             ctx.lineWidth = 1.2 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x, pt.y - 34 * z);
-            ctx.lineTo(pt.x, pt.y - 44 * z);
-            ctx.moveTo(pt.x - 4 * z, pt.y - 40 * z);
-            ctx.lineTo(pt.x + 4 * z, pt.y - 40 * z);
+            ctx.moveTo(4 * z, 1.8 * z);
+            ctx.lineTo(-12.5 * z, 8.0 * z);
             ctx.stroke();
-            ctx.fillStyle = '#f59e0b';
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y - 44.5 * z, 1.5 * z, 0, Math.PI * 2);
-            ctx.fill();
+
+            ctx.restore();
 
             // Classic International Airmail Red-White-Blue Stripe Band
             ctx.strokeStyle = '#ef4444';
@@ -7297,9 +8362,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
           ctx.restore();
         } else if (item.type === 'cafe') {
-          // SOUTH: TOKO ROTI & KAFE WARGA (Enriched Bakery & Espresso Stall)
+          // SOUTH: TOKO ROTI & KAFE WARGA (Enriched Bakery & Espresso Stall - Enlarged Slightly)
           const pt = toScreen(cafeWx, cafeWy, 0, camera.x, camera.y);
-          const z = zoomLevelRef.current;
+          const z = zoomLevelRef.current * 1.16;
 
           const cafeDistToPlayer = Math.hypot(player.wx - cafeWx, player.wy - cafeWy);
           const isCafeTransparent = cafeDistToPlayer < 2.0;
@@ -7502,6 +8567,254 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.font = `bold ${Math.round(2.2 * z)}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillText('FLOUR', barrelX + 11 * z, barrelY + 2.5 * z);
+          ctx.restore();
+        } else if (item.type === 'housing_gate') {
+          // GERBANG & PAPAN KOMPLEKS PERUMAHAN GURU & SISWA (Di Belakang Perpustakaan Kampus [-6.55, 0])
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current * 1.12;
+          ctx.save();
+
+          // Soft shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 2 * z, 18 * z, 7 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Ornamental stone & flower planter base on both sides of the boulevard sign
+          [-12, 12].forEach((ox) => {
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(pt.x + (ox - 2.5) * z, pt.y - 18 * z, 5 * z, 19 * z);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x + (ox - 3.2) * z, pt.y - 19.5 * z, 6.4 * z, 2.2 * z);
+            // Mini garden bush at post base
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.arc(pt.x + ox * z, pt.y - 1 * z, 3.8 * z, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          // Overhead Neighborhood Arch Signboard
+          const signW = 46 * z;
+          const signH = 11.5 * z;
+          const signY = pt.y - 25 * z;
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - signW / 2, signY, signW, signH, 4 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1.2 * z;
+          ctx.stroke();
+
+          ctx.fillStyle = '#fef08a';
+          ctx.font = `bold ${Math.max(4, Math.round(4.6 * z))}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🏡 PERUMAHAN GURU & SISWA', pt.x, signY + signH / 2);
+
+          ctx.restore();
+        } else if (item.type === 'housing_unit') {
+          // KOMPLEKS PERUMAHAN GURU & SISWA DI BELAKANG PERPUSTAKAAN KAMPUS (Ujung Barat Peta)
+          const u = item.unit;
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current * 1.16;
+          const distToPlayer = Math.hypot(player.wx - item.wx, player.wy - item.wy);
+
+          ctx.save();
+          if (distToPlayer < 1.55) {
+            ctx.globalAlpha = 0.55;
+          }
+
+          // 1. Soft Ground & Garden Lawn Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x + 2 * z, pt.y + 5 * z, 32 * z, 16 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 2. Isometric Stone Foundation & Front Terrace Stepping Stones
+          ctx.fillStyle = '#64748b';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 24 * z, pt.y + 11 * z);
+          ctx.lineTo(pt.x, pt.y + 23 * z);
+          ctx.lineTo(pt.x + 24 * z, pt.y + 11 * z);
+          ctx.lineTo(pt.x + 24 * z, pt.y + 15 * z);
+          ctx.lineTo(pt.x, pt.y + 27 * z);
+          ctx.lineTo(pt.x - 24 * z, pt.y + 15 * z);
+          ctx.closePath();
+          ctx.fill();
+
+          // 3. Left Shaded House Wall
+          ctx.fillStyle = u.kind === 'guru' ? '#f1f5f9' : '#e0f2fe';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 22 * z, pt.y - 11 * z);
+          ctx.lineTo(pt.x, pt.y + 1 * z);
+          ctx.lineTo(pt.x, pt.y + 23 * z);
+          ctx.lineTo(pt.x - 22 * z, pt.y + 11 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 0.8 * z;
+          ctx.stroke();
+
+          // 4. Right Sunlit Front House Wall (Facing Perpustakaan & City Center)
+          ctx.fillStyle = u.kind === 'guru' ? '#fffbeb' : '#f8fafc';
+          ctx.beginPath();
+          ctx.moveTo(pt.x, pt.y + 1 * z);
+          ctx.lineTo(pt.x + 22 * z, pt.y - 11 * z);
+          ctx.lineTo(pt.x + 22 * z, pt.y + 11 * z);
+          ctx.lineTo(pt.x, pt.y + 23 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 0.8 * z;
+          ctx.stroke();
+
+          // Architectural Timber Accent Slats on Guru Houses / Cheerful Color Trim on Siswa Houses
+          ctx.fillStyle = u.accentColor;
+          ctx.fillRect(pt.x - 1 * z, pt.y + 1 * z, 2 * z, 22 * z);
+          ctx.fillRect(pt.x + 20 * z, pt.y - 10 * z, 2 * z, 21 * z);
+
+          // 5. Isometric Pitched Gable Roof with Chimney & Dormer Window
+          // Left Roof Slope
+          ctx.fillStyle = u.roofDark;
+          ctx.beginPath();
+          ctx.moveTo(pt.x, pt.y - 25 * z);
+          ctx.lineTo(pt.x - 25 * z, pt.y - 11 * z);
+          ctx.lineTo(pt.x, pt.y + 3 * z);
+          ctx.closePath();
+          ctx.fill();
+
+          // Right Sunlit Roof Slope
+          ctx.fillStyle = u.roofColor;
+          ctx.beginPath();
+          ctx.moveTo(pt.x, pt.y - 25 * z);
+          ctx.lineTo(pt.x + 25 * z, pt.y - 11 * z);
+          ctx.lineTo(pt.x, pt.y + 3 * z);
+          ctx.closePath();
+          ctx.fill();
+
+          // Roof Eaves Trim
+          ctx.strokeStyle = u.accentColor;
+          ctx.lineWidth = 1.4 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 25 * z, pt.y - 11 * z);
+          ctx.lineTo(pt.x, pt.y + 3 * z);
+          ctx.lineTo(pt.x + 25 * z, pt.y - 11 * z);
+          ctx.stroke();
+
+          // Cozy Chimney on Roof Peak
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(pt.x - 10 * z, pt.y - 24 * z, 4.5 * z, 8 * z);
+          ctx.fillStyle = '#451a03';
+          ctx.fillRect(pt.x - 10.6 * z, pt.y - 25.2 * z, 5.7 * z, 1.6 * z);
+
+          // 6. Front Door & Porch Canopy on Right Sunlit Wall
+          const doorX = pt.x + 6.5 * z;
+          const doorY = pt.y + 19.5 * z;
+          ctx.fillStyle = u.kind === 'guru' ? '#78350f' : '#1e3a8a';
+          ctx.beginPath();
+          ctx.roundRect(doorX - 3.5 * z, doorY - 10.5 * z, 7 * z, 10.5 * z, [2 * z, 2 * z, 0, 0]);
+          ctx.fill();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 0.75 * z;
+          ctx.stroke();
+
+          // Warm Door Window & Handle
+          ctx.fillStyle = isNight ? '#fef08a' : '#bae6fd';
+          ctx.beginPath();
+          ctx.arc(doorX, doorY - 6.8 * z, 1.8 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Illuminated Windows on Left & Right Walls with Flower Boxes
+          const winColor = isNight ? '#fef08a' : '#38bdf8';
+          // Left wall window
+          ctx.fillStyle = winColor;
+          ctx.fillRect(pt.x - 14.5 * z, pt.y + 2 * z, 7.5 * z, 6.5 * z);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.8 * z;
+          ctx.strokeRect(pt.x - 14.5 * z, pt.y + 2 * z, 7.5 * z, 6.5 * z);
+          // Flower box under left window
+          ctx.fillStyle = '#92400e';
+          ctx.fillRect(pt.x - 15.2 * z, pt.y + 8.2 * z, 8.9 * z, 1.8 * z);
+          ctx.fillStyle = '#ec4899';
+          ctx.beginPath();
+          ctx.arc(pt.x - 12.5 * z, pt.y + 7.8 * z, 1.2 * z, 0, Math.PI * 2);
+          ctx.arc(pt.x - 9.2 * z, pt.y + 7.8 * z, 1.2 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Right wall study window
+          ctx.fillStyle = winColor;
+          ctx.fillRect(pt.x + 12.5 * z, pt.y + 1.5 * z, 6.5 * z, 6.5 * z);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.8 * z;
+          ctx.strokeRect(pt.x + 12.5 * z, pt.y + 1.5 * z, 6.5 * z, 6.5 * z);
+
+          // Front Yard Garden Fence & Mailbox (Guru) or Study Bicycle (Siswa)
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 1.1 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x + 2 * z, pt.y + 24.5 * z);
+          ctx.lineTo(pt.x + 16 * z, pt.y + 17 * z);
+          ctx.stroke();
+
+          if (u.kind === 'guru') {
+            // Red/Gold Mailbox in front of Teacher House
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(pt.x + 16.5 * z, pt.y + 12 * z, 1.2 * z, 5 * z);
+            ctx.fillStyle = '#dc2626';
+            ctx.beginPath();
+            ctx.roundRect(pt.x + 15 * z, pt.y + 9.8 * z, 4.2 * z, 2.8 * z, 1.2 * z);
+            ctx.fill();
+          } else {
+            // Cute Parked Student Bicycle in front of Student Wisma
+            const bx = pt.x + 16.5 * z;
+            const by = pt.y + 15.5 * z;
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 0.9 * z;
+            ctx.beginPath();
+            ctx.arc(bx - 2.2 * z, by, 1.8 * z, 0, Math.PI * 2);
+            ctx.arc(bx + 2.2 * z, by, 1.8 * z, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = u.accentColor;
+            ctx.beginPath();
+            ctx.moveTo(bx - 2.2 * z, by);
+            ctx.lineTo(bx, by - 2.4 * z);
+            ctx.lineTo(bx + 2.2 * z, by);
+            ctx.stroke();
+          }
+
+          // House Badge Plate on Gable ("GURU" / "SISWA")
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 8.5 * z, pt.y - 7.5 * z, 17 * z, 5.2 * z, 2 * z);
+          ctx.fill();
+          ctx.strokeStyle = u.accentColor;
+          ctx.lineWidth = 0.8 * z;
+          ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `bold ${Math.max(3, Math.round(3.3 * z))}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(u.kind === 'guru' ? '🏡 GURU' : '🏘️ SISWA', pt.x, pt.y - 4.8 * z);
+
+          // Floating Hover / Proximity Label when Player is Nearby
+          if (distToPlayer < 2.35) {
+            const hTagY = pt.y - 34 * z;
+            ctx.font = `bold ${Math.round(6.8 * z)}px sans-serif`;
+            const tw = ctx.measureText(u.name).width + 10 * z;
+            const th = 13 * z;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - tw / 2, hTagY - th / 2, tw, th, 6.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = u.accentColor;
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(u.name, pt.x, hTagY);
+          }
+
           ctx.restore();
         } else if (item.type === 'avatar') {
           // AVATARS (Smooth, Natural Leg Swing, Arm Swing, and Gentle Bobbing)
@@ -7724,6 +9037,58 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.beginPath();
               ctx.arc(sx, sy, 1.3 * z, 0, Math.PI * 2);
               ctx.fill();
+            }
+
+            // Chrono-Teleport Flash Burst (at origin & destination when Master kikybahsoan teleports)
+            if (item.isPlayer && teleportFlashRef.current) {
+              const tf = teleportFlashRef.current;
+              const tfAge = (currentTime - tf.startTime) / 1000;
+              if (tfAge < 0.65) {
+                const tfAlpha = Math.max(0, 1 - tfAge / 0.65);
+                const fromPt = toScreen(tf.fromWx, tf.fromWy, 0, camera.x, camera.y);
+                const toPt = toScreen(tf.toWx, tf.toWy, 0, camera.x, camera.y);
+
+                // Origin departure ring & vertical beam
+                ctx.strokeStyle = `rgba(34, 211, 238, ${(tfAlpha * 0.85).toFixed(2)})`;
+                ctx.lineWidth = 2.0 * z;
+                ctx.beginPath();
+                ctx.ellipse(
+                  fromPt.x,
+                  fromPt.y,
+                  (8 + tfAge * 26) * z,
+                  (4 + tfAge * 12) * z,
+                  0,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.stroke();
+
+                // Destination arrival chrono beam & golden burst
+                const beamGrad = ctx.createLinearGradient(toPt.x, toPt.y - 48 * z, toPt.x, toPt.y + 4 * z);
+                beamGrad.addColorStop(0, 'rgba(34, 211, 238, 0)');
+                beamGrad.addColorStop(0.5, `rgba(34, 211, 238, ${(tfAlpha * 0.55).toFixed(2)})`);
+                beamGrad.addColorStop(1, `rgba(250, 204, 21, ${(tfAlpha * 0.85).toFixed(2)})`);
+                ctx.fillStyle = beamGrad;
+                ctx.beginPath();
+                ctx.ellipse(toPt.x, toPt.y - 20 * z, (11 - tfAge * 8) * z, 26 * z, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = `rgba(250, 204, 21, ${(tfAlpha * 0.95).toFixed(2)})`;
+                ctx.lineWidth = 2.2 * z;
+                ctx.beginPath();
+                ctx.ellipse(
+                  toPt.x,
+                  toPt.y,
+                  (6 + tfAge * 28) * z,
+                  (3 + tfAge * 13) * z,
+                  0,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.stroke();
+              } else {
+                teleportFlashRef.current = null;
+              }
             }
             ctx.restore();
           }
@@ -9975,6 +11340,47 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 <span className="font-mono text-amber-300">{pickedDryLeavesCount}/5</span>
                 <span className="text-[9px] text-emerald-300 font-mono">(+1 XP)</span>
               </div>
+
+              {/* Exclusive Movement Mode Selector for Master kikybahsoan (Jalan Normal vs Teleportasi) */}
+              {isMasterKiky && (
+                <div
+                  className="bg-[#0f172a]/85 backdrop-blur-md border border-cyan-400/60 rounded-full p-0.5 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-0.5"
+                  title="Mode Pergerakan Khusus Master kikybahsoan: Pilih Jalan Normal atau Teleportasi Instan"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playClick();
+                      setMasterMoveMode('walk');
+                      showToast('🚶 Mode Pergerakan Master: Jalan Normal Aktif', 2000);
+                    }}
+                    className={`px-2 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ${
+                      masterMoveMode === 'walk'
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    <span>🚶</span>
+                    <span>Jalan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playClick();
+                      setMasterMoveMode('teleport');
+                      showToast('⚡ Mode Pergerakan Master: Teleportasi Chrono Aktif', 2000);
+                    }}
+                    className={`px-2 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ${
+                      masterMoveMode === 'teleport'
+                        ? 'bg-gradient-to-r from-cyan-400 to-amber-300 text-slate-950 shadow-sm'
+                        : 'text-cyan-200 hover:text-white'
+                    }`}
+                  >
+                    <span>⚡</span>
+                    <span>Teleport</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {onlineRemoteList.length > 0 && (
