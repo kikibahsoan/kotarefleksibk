@@ -6,7 +6,8 @@ export type BuildingId =
   | 'bengkel_latihan'
   | 'kantor_pos'
   | 'pasar_prestasi'
-  | 'monumen_warga';
+  | 'monumen_warga'
+  | 'masjid';
 
 export interface PublicChatMessage {
   id: string;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, CheckCircle2, Award, Target, Sparkles, ArrowRight, Shuffle } from 'lucide-react';
+import { X, CheckCircle2, Award, Target, Sparkles, Shuffle } from 'lucide-react';
 import { sounds } from '../../utils/audio';
 import { BuildingId } from '../../types/index.ts';
 
@@ -77,6 +77,14 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
     targetId: 'pasar_prestasi',
     icon: '🎪',
   },
+  {
+    id: 'm_masjid',
+    title: 'Belajar Iqro & Tuntunan Sholat di Masjid Al-Hikmah',
+    desc: 'Kunjungi Masjid Al-Hikmah di samping kolam awal aliran sungai untuk belajar Iqro (1-6) atau Tuntunan Sholat',
+    xp: 1,
+    targetId: 'masjid',
+    icon: '🕌',
+  },
 ];
 
 export function getOrInitUserRandomMissions(userId: string, forceNew = false): TownMissionDef[] {
@@ -142,12 +150,11 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
   studentName = 'Siswa',
   studentXp = 5,
   onClose,
-  onOpenBuilding,
-  onNavigateBuilding,
+  onOpenBuilding: _onOpenBuilding,
+  onNavigateBuilding: _onNavigateBuilding,
   assignedMissions,
   completedMissionIds,
 }) => {
-  const openTarget = onNavigateBuilding || onOpenBuilding || (() => {});
   const completedCount = assignedMissions.filter((m) => completedMissionIds.includes(m.id)).length;
 
   return (
@@ -258,17 +265,10 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
                         <span>Misi Tuntas</span>
                       </span>
                     ) : (
-                      <button
-                        onClick={() => {
-                          sounds.playClick();
-                          onClose();
-                          openTarget(mission.targetId);
-                        }}
-                        className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition active:scale-95 shadow-sm flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <span>Kerjakan Misi</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/80 text-slate-300 border border-slate-700/60 flex items-center gap-1.5 cursor-default select-none">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        <span>Belum Tuntas</span>
+                      </span>
                     )}
                   </div>
                 </div>

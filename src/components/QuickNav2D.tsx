@@ -18,6 +18,7 @@ const BUILDING_ICONS: Record<BuildingId, string> = {
   bengkel_latihan: '🛠️',
   kantor_pos: '📮',
   pasar_prestasi: '🏆',
+  masjid: '🕌',
   monumen_warga: '⛲',
 };
 
@@ -29,6 +30,7 @@ const BUILDING_DESCRIPTIONS: Record<BuildingId, string> = {
   bengkel_latihan: 'Kuis cepat dan tantangan kejuruan untuk menambah poin XP.',
   kantor_pos: 'Kirim surat pertanyaan atau kesulitan langsung ke gurumu.',
   pasar_prestasi: 'Papan Peringkat (Top 5 Siswa XP Tertinggi), Dewan Guru Pembimbing & Pengawas Sekolah.',
+  masjid: 'Belajar membaca Iqro (Jilid 1 s.d. 6) bersuara tajwid/makhraj serta panduan lengkap Tuntunan Sholat & Wudhu.',
   monumen_warga: 'Sapa & obrolan langsung sesama warga dan teman kelas di tengah kota.',
 };
 

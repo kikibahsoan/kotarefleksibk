@@ -60,6 +60,7 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'kantor_pos', name: 'Kantor Pos Kilat', tagline: 'Kirim Pesan ke Guru', position: [2.8, 0, -2.8], color: 0xef4444, icon: '📮' },
   { id: 'taman_refleksi', name: 'Pusat Refleksi', tagline: 'Tulis Jurnal Refleksi (+3 Poin)', position: [-2.8, 0, -2.8], color: 0xd97706, icon: '🌍' },
   { id: 'bengkel_latihan', name: 'Lab DKV & Tefa', tagline: 'Tower Kontrol & Kuis', position: [2.8, 0, 2.8], color: 0xf59e0b, icon: '🛠️' },
+  { id: 'masjid', name: 'Masjid Al-Hikmah', tagline: 'Belajar Iqro (1-6) & Tuntunan Sholat', position: [5.45, 0, -4.85], color: 0x10b981, icon: '🕌' },
   { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
 ];
 
@@ -193,11 +194,11 @@ export const TREES_LIST: [number, number][] = [
   [3.2, 7.0],
   [-5.0, 6.6],
   [5.0, 6.6],
-  // East riverbank edge (framing the long flowing river at wx=7.0..8.1 & leaving [5.9, -2.2] clear for Kolam Tepi Sungai)
+  // East riverbank edge (framing the long flowing river at wx=7.0..8.1 & leaving [5.9, -2.2] clear for Kolam Tepi Sungai and [5.45, -4.85] clear for Masjid Al-Hikmah)
   [6.35, -0.85],
   [6.35, 2.2],
   [6.25, 4.6],
-  [6.25, -4.6],
+  [6.35, -7.2],
   // Mid-park groves (tree moved from [3.8, 3.8] to [-0.5, 2.4] to clear view for Toko Roti & Kafe behind Lab DKV)
   [-5.2, -1.8],
   [5.2, 1.8],
@@ -340,6 +341,8 @@ export const SOLID_BUILDING_OBSTACLES: SolidObstacle[] = [
   { minWx: 2.0, maxWx: 3.6, minWy: 2.0, maxWy: 3.6 },
   // Toko Roti & Kafe (Di ujung kota belakang Lab DKV)
   { minWx: 4.05, maxWx: 5.25, minWy: 4.05, maxWy: 5.05 },
+  // Masjid Al-Hikmah (Di samping Kolam Awal Aliran Sungai)
+  { minWx: 4.65, maxWx: 6.25, minWy: -5.65, maxWy: -4.05 },
 ];
 
 export const isSolidCollision = (wx: number, wy: number, padding: number = 0.16): boolean => {
@@ -2778,6 +2781,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           } else if (b.id === 'monumen_warga') {
             player.targetWx = 0;
             player.targetWy = 1.25;
+          } else if (b.id === 'masjid') {
+            player.targetWx = 4.45;
+            player.targetWy = -4.65;
           } else {
             player.targetWx = bx * 0.68;
             player.targetWy = by * 0.68;
@@ -3988,8 +3994,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (gx === -6 && gy >= -4 && gy <= 3) return true;
         // Central ring
         if (Math.abs(gx) <= 1 && Math.abs(gy) <= 1) return true;
-        // Walkway spur to Relocated Riverside Kolam at [5.9, -2.2]
+        // Walkway spur to Relocated Riverside Kolam at [5.9, -2.2] & Masjid Al-Hikmah Courtyard at [5.45, -4.85]
         if (gx >= 3 && gx <= 6 && gy === -2) return true;
+        if ((gx === 5 || gx === 6) && gy >= -6 && gy <= -2) return true;
         // Walkway spur to West Sudut Literasi at [-4.3, 1.8]
         if (gx <= -3 && gx >= -5 && gy === 2) return true;
         // Garden paths to Tempat Ayunan 1 [-3..-2, -4] and Tempat Ayunan 2 [2..3, -4]
@@ -4112,6 +4119,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ctx.lineTo(inletNE.x, inletNE.y);
       ctx.lineTo(inletSE.x, inletSE.y);
       ctx.lineTo(inletSW.x, inletSW.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3B) Upstream Sacred Water Channel Connecting Awal Aliran Sungai to Masjid Al-Hikmah Ablution Pavilion [5.45, -4.85]
+      const wudhuInNW = toScreen(6.22, -5.15, -1.0, camera.x, camera.y);
+      const wudhuInNE = toScreen(rivW0 + 0.08, -5.15, -1.0, camera.x, camera.y);
+      const wudhuInSE = toScreen(rivW0 + 0.08, -4.62, -1.0, camera.x, camera.y);
+      const wudhuInSW = toScreen(6.22, -4.62, -1.0, camera.x, camera.y);
+      ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(wudhuInNW.x, wudhuInNW.y);
+      ctx.lineTo(wudhuInNE.x, wudhuInNE.y);
+      ctx.lineTo(wudhuInSE.x, wudhuInSE.y);
+      ctx.lineTo(wudhuInSW.x, wudhuInSW.y);
       ctx.closePath();
       ctx.fill();
 
@@ -8335,12 +8356,304 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
 
             ctx.restore();
+          } else if (b.id === 'masjid') {
+            // =========================================================================
+            // 9. MASJID AL-HIKMAH (Di Samping Kolam Awal Aliran Sungai)
+            //    Tempat Belajar Baca Iqro (Jilid 1-6) & Tuntunan Sholat Lengkap
+            // =========================================================================
+            const drawIsoBox = (
+              c: CanvasRenderingContext2D,
+              cx: number,
+              cy: number,
+              zBase: number,
+              w: number,
+              d: number,
+              h: number,
+              topCol: string,
+              leftCol: string,
+              rightCol: string,
+              camX: number,
+              camY: number,
+              strokeCol?: string
+            ) => {
+              const hw = w / 2;
+              const hd = d / 2;
+              const bW = toScreen(cx - hw, cy + hd, zBase, camX, camY);
+              const bS = toScreen(cx + hw, cy + hd, zBase, camX, camY);
+              const bE = toScreen(cx + hw, cy - hd, zBase, camX, camY);
+              const tN = toScreen(cx - hw, cy - hd, zBase + h, camX, camY);
+              const tW = toScreen(cx - hw, cy + hd, zBase + h, camX, camY);
+              const tS = toScreen(cx + hw, cy + hd, zBase + h, camX, camY);
+              const tE = toScreen(cx + hw, cy - hd, zBase + h, camX, camY);
+
+              // Left Face (West-South)
+              c.fillStyle = leftCol;
+              c.beginPath();
+              c.moveTo(tW.x, tW.y);
+              c.lineTo(tS.x, tS.y);
+              c.lineTo(bS.x, bS.y);
+              c.lineTo(bW.x, bW.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.7 * z;
+                c.stroke();
+              }
+
+              // Right Face (South-East)
+              c.fillStyle = rightCol;
+              c.beginPath();
+              c.moveTo(tS.x, tS.y);
+              c.lineTo(tE.x, tE.y);
+              c.lineTo(bE.x, bE.y);
+              c.lineTo(bS.x, bS.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.7 * z;
+                c.stroke();
+              }
+
+              // Top Face (North-East-South-West)
+              c.fillStyle = topCol;
+              c.beginPath();
+              c.moveTo(tN.x, tN.y);
+              c.lineTo(tE.x, tE.y);
+              c.lineTo(tS.x, tS.y);
+              c.lineTo(tW.x, tW.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.7 * z;
+                c.stroke();
+              }
+            };
+
+            // 1) Stepped White Marble & Emerald Granite Courtyard Plinth (Pelataran Marmer Suci)
+            drawIsoBox(ctx, bx, by, 0, 1.56, 1.56, 4.5, '#f8fafc', '#cbd5e1', '#e2e8f0', camera.x, camera.y, '#94a3b8');
+            drawIsoBox(ctx, bx, by, 4.5, 1.42, 1.42, 3.0, '#10b981', '#047857', '#059669', camera.x, camera.y, '#065f46');
+            drawIsoBox(ctx, bx, by, 7.5, 1.32, 1.32, 2.5, '#ffffff', '#e2e8f0', '#f1f5f9', camera.x, camera.y, '#cbd5e1');
+
+            // Front & West Welcoming Marble Steps (Tangga Pelataran Jamaah)
+            drawIsoBox(ctx, bx - 0.56, by + 0.56, 0, 0.52, 0.52, 2.6, '#fef3c7', '#fde68a', '#f59e0b', camera.x, camera.y);
+            drawIsoBox(ctx, bx - 0.46, by + 0.46, 2.6, 0.42, 0.42, 2.6, '#fffbeb', '#fef3c7', '#fbbf24', camera.x, camera.y);
+
+            // 2) Riverside Ablution Pavilion (Tempat Wudhu Air Hulu Sungai di sisi kanan dekat kolam & hulu sungai)
+            drawIsoBox(ctx, bx + 0.58, by - 0.08, 4.5, 0.36, 0.72, 14, '#f8fafc', '#cbd5e1', '#e2e8f0', camera.x, camera.y, '#94a3b8');
+            drawIsoBox(ctx, bx + 0.58, by - 0.08, 18.5, 0.42, 0.78, 3.2, '#10b981', '#047857', '#059669', camera.x, camera.y);
+            // Water basin & flowing ablution water spouts
+            drawIsoBox(ctx, bx + 0.68, by - 0.08, 4.5, 0.24, 0.62, 5.5, '#38bdf8', '#0284c7', '#0ea5e9', camera.x, camera.y);
+            for (const wOff of [-0.2, 0, 0.2]) {
+              const spoutTop = toScreen(bx + 0.64, by - 0.08 + wOff, 12.5, camera.x, camera.y);
+              const spoutBot = toScreen(bx + 0.72, by - 0.08 + wOff, 6.5, camera.x, camera.y);
+              ctx.strokeStyle = '#bae6fd';
+              ctx.lineWidth = 1.4 * z;
+              ctx.beginPath();
+              ctx.moveTo(spoutTop.x, spoutTop.y);
+              ctx.lineTo(spoutBot.x, spoutBot.y);
+              ctx.stroke();
+            }
+
+            // 3) Main Mosque Sanctuary Hall (Ruang Utama Sholat & Kajian Iqro)
+            drawIsoBox(ctx, bx - 0.04, by - 0.04, 10, 1.12, 1.12, 32, '#fffbeb', '#e2e8f0', '#f8fafc', camera.x, camera.y, '#cbd5e1');
+
+            // Emerald & Gold Calligraphic Frieze Band around upper sanctuary wall
+            drawIsoBox(ctx, bx - 0.04, by - 0.04, 35, 1.15, 1.15, 4.5, '#059669', '#065f46', '#047857', camera.x, camera.y);
+            drawIsoBox(ctx, bx - 0.04, by - 0.04, 39.5, 1.17, 1.17, 2.5, '#fbbf24', '#b45309', '#d97706', camera.x, camera.y);
+
+            // Corner Marble Pilasters with Gold Capitals
+            for (const [px, py] of [
+              [-0.54, -0.54],
+              [0.46, -0.54],
+              [-0.54, 0.46],
+              [0.46, 0.46],
+            ]) {
+              drawIsoBox(ctx, bx + px, by + py, 10, 0.14, 0.14, 32, '#f1f5f9', '#94a3b8', '#cbd5e1', camera.x, camera.y);
+              drawIsoBox(ctx, bx + px, by + py, 42, 0.17, 0.17, 3.2, '#fde047', '#ca8a04', '#eab308', camera.x, camera.y);
+            }
+
+            // 4) Front Grand Portal Iwan & Pointed Islamic Archway (Pintu Utama Mihrab & Serambi)
+            drawIsoBox(ctx, bx - 0.36, by + 0.36, 10, 0.56, 0.56, 26, '#f8fafc', '#cbd5e1', '#e2e8f0', camera.x, camera.y, '#94a3b8');
+            drawIsoBox(ctx, bx - 0.36, by + 0.36, 36, 0.62, 0.62, 3.5, '#10b981', '#047857', '#059669', camera.x, camera.y);
+
+            // Pointed Islamic Arch Doorway & Illuminated Emerald Prayer Carpet Inside
+            const doorC = toScreen(bx - 0.46, by + 0.46, 10, camera.x, camera.y);
+            ctx.save();
+            ctx.fillStyle = '#064e3b';
+            ctx.beginPath();
+            ctx.moveTo(doorC.x - 8.5 * z, doorC.y);
+            ctx.lineTo(doorC.x - 8.5 * z, doorC.y - 12 * z);
+            ctx.quadraticCurveTo(doorC.x - 8.5 * z, doorC.y - 19 * z, doorC.x, doorC.y - 22.5 * z);
+            ctx.quadraticCurveTo(doorC.x + 8.5 * z, doorC.y - 19 * z, doorC.x + 8.5 * z, doorC.y - 12 * z);
+            ctx.lineTo(doorC.x + 8.5 * z, doorC.y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.6 * z;
+            ctx.stroke();
+
+            // Warm Golden Lantern Glow Inside Mosque Sanctuary
+            const inGlow = ctx.createRadialGradient(doorC.x, doorC.y - 10 * z, 1 * z, doorC.x, doorC.y - 10 * z, 11 * z);
+            inGlow.addColorStop(0, isNight ? 'rgba(253, 224, 71, 0.9)' : 'rgba(254, 240, 138, 0.65)');
+            inGlow.addColorStop(1, 'rgba(16, 185, 129, 0)');
+            ctx.fillStyle = inGlow;
+            ctx.fill();
+            ctx.restore();
+
+            // Arched Stained-Glass Windows on Left & Right Facades
+            for (const wOffset of [-0.26, 0.22]) {
+              const winL = toScreen(bx - 0.56, by + wOffset, 20, camera.x, camera.y);
+              const winR = toScreen(bx + wOffset, by + 0.52, 20, camera.x, camera.y);
+              for (const wPt of [winL, winR]) {
+                ctx.fillStyle = isNight ? '#fde047' : '#34d399';
+                ctx.beginPath();
+                ctx.arc(wPt.x, wPt.y - 4 * z, 3.6 * z, Math.PI, 0);
+                ctx.lineTo(wPt.x + 3.6 * z, wPt.y + 3 * z);
+                ctx.lineTo(wPt.x - 3.6 * z, wPt.y + 3 * z);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#fbbf24';
+                ctx.lineWidth = 1 * z;
+                ctx.stroke();
+              }
+            }
+
+            // 5) Octagonal Drum & Grand Emerald-Gold Onion Dome (Kubah Utama Masjid Al-Hikmah)
+            drawIsoBox(ctx, bx - 0.04, by - 0.04, 42, 0.78, 0.78, 6.5, '#f8fafc', '#cbd5e1', '#e2e8f0', camera.x, camera.y, '#94a3b8');
+            drawIsoBox(ctx, bx - 0.04, by - 0.04, 48.5, 0.82, 0.82, 2.2, '#fbbf24', '#b45309', '#d97706', camera.x, camera.y);
+
+            const domeBase = toScreen(bx - 0.04, by - 0.04, 50.5, camera.x, camera.y);
+            const domeR = 20.5 * z;
+            ctx.save();
+            const domeGrad = ctx.createRadialGradient(
+              domeBase.x - domeR * 0.28,
+              domeBase.y - domeR * 0.65,
+              domeR * 0.1,
+              domeBase.x,
+              domeBase.y - domeR * 0.35,
+              domeR * 1.15
+            );
+            domeGrad.addColorStop(0, '#6ee7b7');
+            domeGrad.addColorStop(0.35, '#10b981');
+            domeGrad.addColorStop(0.78, '#047857');
+            domeGrad.addColorStop(1, '#064e3b');
+
+            // Pointed Onion Dome Silhouette
+            ctx.fillStyle = domeGrad;
+            ctx.beginPath();
+            ctx.moveTo(domeBase.x - domeR, domeBase.y);
+            ctx.bezierCurveTo(
+              domeBase.x - domeR * 1.08,
+              domeBase.y - domeR * 0.75,
+              domeBase.x - domeR * 0.35,
+              domeBase.y - domeR * 1.18,
+              domeBase.x,
+              domeBase.y - domeR * 1.38
+            );
+            ctx.bezierCurveTo(
+              domeBase.x + domeR * 0.35,
+              domeBase.y - domeR * 1.18,
+              domeBase.x + domeR * 1.08,
+              domeBase.y - domeR * 0.75,
+              domeBase.x + domeR,
+              domeBase.y
+            );
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.4 * z;
+            ctx.stroke();
+
+            // Golden Ribbed Meridian Lines on Mosque Dome
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)';
+            ctx.lineWidth = 1.0 * z;
+            for (const ribF of [-0.55, -0.25, 0.25, 0.55]) {
+              ctx.beginPath();
+              ctx.moveTo(domeBase.x + domeR * ribF, domeBase.y);
+              ctx.quadraticCurveTo(
+                domeBase.x + domeR * ribF * 1.05,
+                domeBase.y - domeR * 0.75,
+                domeBase.x,
+                domeBase.y - domeR * 1.36
+              );
+              ctx.stroke();
+            }
+
+            // Golden Spire & Crescent Moon Hilal Finial (Bulan Sabit Emas di Puncak Kubah)
+            const spireTopY = domeBase.y - domeR * 1.38 - 10 * z;
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2.0 * z;
+            ctx.beginPath();
+            ctx.moveTo(domeBase.x, domeBase.y - domeR * 1.36);
+            ctx.lineTo(domeBase.x, spireTopY + 3 * z);
+            ctx.stroke();
+
+            // Three stacked brass orbs on spire
+            for (const [orbOff, orbRad] of [
+              [7.5, 2.1],
+              [5.0, 1.6],
+              [2.8, 1.2],
+            ]) {
+              ctx.fillStyle = '#fde047';
+              ctx.beginPath();
+              ctx.arc(domeBase.x, spireTopY + orbOff * z, orbRad * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            // Golden Crescent Moon (Hilal)
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath();
+            ctx.arc(domeBase.x, spireTopY - 1.5 * z, 4.6 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = isNight ? '#0f172a' : '#bae6fd';
+            ctx.beginPath();
+            ctx.arc(domeBase.x + 1.6 * z, spireTopY - 2.6 * z, 3.7 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 6) Slender Tall Minaret Tower (Menara Masjid di Sudut Utara-Barat)
+            const minX = bx - 0.52;
+            const minY = by - 0.52;
+            drawIsoBox(ctx, minX, minY, 10, 0.28, 0.28, 44, '#f8fafc', '#cbd5e1', '#e2e8f0', camera.x, camera.y, '#94a3b8');
+            drawIsoBox(ctx, minX, minY, 32, 0.31, 0.31, 3.0, '#10b981', '#047857', '#059669', camera.x, camera.y);
+            // Muazin Balcony with Golden Mashrabiya Railing
+            drawIsoBox(ctx, minX, minY, 54, 0.38, 0.38, 4.0, '#fbbf24', '#b45309', '#d97706', camera.x, camera.y);
+            drawIsoBox(ctx, minX, minY, 58, 0.22, 0.22, 12, '#ffffff', '#cbd5e1', '#e2e8f0', camera.x, camera.y);
+            // Minaret Emerald Cupola & Golden Crescent
+            const minTop = toScreen(minX, minY, 70, camera.x, camera.y);
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.arc(minTop.x, minTop.y - 3 * z, 5.2 * z, Math.PI, 0);
+            ctx.lineTo(minTop.x, minTop.y - 10.5 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+
+            // 7) Illuminated Mosque Name Signboard ("🕌 MASJID AL-HIKMAH • IQRO & SHOLAT")
+            const signM = toScreen(bx - 0.42, by + 0.42, 39.5, camera.x, camera.y);
+            ctx.fillStyle = '#064e3b';
+            ctx.beginPath();
+            ctx.roundRect(signM.x - 36 * z, signM.y - 6.5 * z, 72 * z, 12 * z, 3.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#fef08a';
+            ctx.font = `bold ${Math.round(5.6 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🕌 MASJID AL-HIKMAH', signM.x, signM.y - 0.5 * z);
           }
 
           // Floating Building Label ONLY when touched, hovered or active (compact & semi-transparent)
           const shouldShowLabel = isHovered || activeBuilding === b.id || lastTouchedIdRef.current === b.id;
           if (shouldShowLabel) {
-            const tagY = pt.y - (b.id === 'balai_kota' ? 86 : b.id === 'menara_mentor' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
+            const tagY = pt.y - (b.id === 'balai_kota' ? 86 : b.id === 'masjid' ? 78 : b.id === 'menara_mentor' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
             const labelText = `${b.icon} ${b.name}`;
             ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
             const tMetrics = ctx.measureText(labelText);

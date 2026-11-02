@@ -36,6 +36,7 @@ import { KantorPosModal } from './components/modals/KantorPosModal.tsx';
 import { PasarPrestasiModal } from './components/modals/PasarPrestasiModal.tsx';
 import { RuangGuruModal } from './components/modals/RuangGuruModal.tsx';
 import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal.tsx';
+import { MasjidModal } from './components/modals/MasjidModal.tsx';
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
 import { LofiAudioControl } from './components/LofiAudioControl.tsx';
 import { getTimePeriodWita, TimePeriod } from './utils/lofiAudio.ts';
@@ -395,6 +396,8 @@ export default function App() {
         completeMissionIfActive('m_papan');
       } else if (buildingId === 'pasar_prestasi') {
         completeMissionIfActive('m_pasar');
+      } else if (buildingId === 'masjid') {
+        completeMissionIfActive('m_masjid');
       }
     },
     [completeMissionIfActive]
@@ -1233,6 +1236,15 @@ export default function App() {
         <MonumenWargaChatModal
           onClose={() => setActiveBuilding(null)}
           student={student}
+        />
+      )}
+
+      {activeBuilding === 'masjid' && (
+        <MasjidModal
+          onClose={() => setActiveBuilding(null)}
+          student={student}
+          onAddXp={handleAddPoints}
+          onCompleteMasjidMission={() => completeMissionIfActive('m_masjid')}
         />
       )}
 

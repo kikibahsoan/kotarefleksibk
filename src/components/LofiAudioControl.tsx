@@ -107,11 +107,11 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
 
   return (
     <div className="relative pointer-events-auto" ref={dropdownRef}>
-      {/* Radio Trigger Pill Button */}
+      {/* Radio Trigger Pill Button (Icon Radar + Icon Pilihan: 📻 Radio, 🍃 Daun Jatuh, ☕ Kopi) */}
       <div className="flex items-center">
         <button
           onClick={handleTogglePlay}
-          className={`group relative h-7.5 sm:h-9 px-2 sm:px-3 rounded-full backdrop-blur-md border shadow-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0 ${
+          className={`group relative h-7.5 sm:h-8.5 px-2 sm:px-2.5 rounded-full backdrop-blur-md border shadow-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0 ${
             isPlaying
               ? 'bg-amber-950/70 border-amber-500/70 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
               : 'bg-[#121e2c]/68 border-slate-600/50 text-slate-200 hover:text-white hover:bg-[#1a293b]/80'
@@ -125,7 +125,7 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
         >
           {isPlaying ? (
             <>
-              {/* Broadcast Pulse or Loading Spinner */}
+              {/* Broadcast Pulse or Loading Spinner (Radar Icon) */}
               <div className="relative flex items-center justify-center">
                 {isRriConnecting && activeChannel === 'rri_gorontalo' ? (
                   <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
@@ -137,31 +137,15 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
                 )}
               </div>
 
-              {/* Station icon badge */}
-              <span className="text-xs">{stationMeta.icon}</span>
-
-              {/* Radio frequency bars animation */}
-              <div className="hidden sm:flex items-end gap-0.5 h-3.5 w-3 py-0.5">
-                <span className="w-0.5 bg-amber-400 rounded-full animate-[pulse_0.7s_ease-in-out_infinite] h-2"></span>
-                <span className="w-0.5 bg-amber-300 rounded-full animate-[pulse_1.1s_ease-in-out_infinite] h-3.5"></span>
-                <span className="w-0.5 bg-amber-400 rounded-full animate-[pulse_0.85s_ease-in-out_infinite] h-2.5"></span>
-              </div>
-
-              <span className="text-[11px] sm:text-xs font-bold text-amber-300 font-mono hidden sm:inline truncate max-w-[85px] md:max-w-[110px]">
-                {activeChannel === 'rri_gorontalo'
-                  ? 'RRI 101.8'
-                  : activeChannel === 'ghibli'
-                  ? 'Ghibli'
-                  : 'Lo-Fi'}
-              </span>
+              {/* Station icon badge (📻 Radio, 🍃 Daun Jatuh, ☕ Kopi) */}
+              <span className="text-xs sm:text-sm leading-none drop-shadow-sm">{stationMeta.icon}</span>
             </>
           ) : (
             <>
+              {/* Radar Icon (Off) */}
               <Radio className="w-3.5 h-3.5 text-slate-300 group-hover:text-amber-300 transition" />
-              <span className="text-xs">{stationMeta.icon}</span>
-              <span className="text-[11px] sm:text-xs font-bold text-slate-200 font-mono hidden sm:inline">
-                Radio
-              </span>
+              {/* Station icon badge (📻 Radio, 🍃 Daun Jatuh, ☕ Kopi) */}
+              <span className="text-xs sm:text-sm leading-none drop-shadow-sm opacity-90">{stationMeta.icon}</span>
             </>
           )}
 
@@ -171,8 +155,8 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
               e.stopPropagation();
               setShowTuner((prev) => !prev);
             }}
-            className="ml-0.5 text-[10px] text-slate-300 hover:text-white px-0.5 py-0.5 rounded transition"
-            title="Pilih Saluran Manual / Atur Suara"
+            className="text-[10px] text-slate-300 hover:text-white px-0.5 py-0.5 rounded transition"
+            title="Pilih Saluran Manual (📻 RRI Gorontalo, 🍃 Ghibli, ☕ Lo-Fi) / Atur Suara"
           >
             ▾
           </span>

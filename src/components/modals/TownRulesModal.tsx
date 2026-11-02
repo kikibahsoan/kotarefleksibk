@@ -71,6 +71,12 @@ export const TownRulesModal: React.FC<TownRulesModalProps> = ({ onClose, student
 
   const studentActivities = [
     {
+      title: 'Belajar Baca Iqro (1–6) & Tuntunan Sholat di Masjid Al-Hikmah',
+      desc: 'Kunjungi Masjid Al-Hikmah di samping kolam awal aliran sungai untuk belajar membaca Iqro Jilid 1 s.d. 6 lengkap dengan audio makhraj/tajwid & latihan baris, serta panduan 13 gerakan & bacaan Tuntunan Sholat, Niat 5 Waktu, dan Wudhu (+1 XP per jilid/amalan)!',
+      icon: '🕌',
+      badge: 'Iqro 1-6 & Sholat • +XP',
+    },
+    {
       title: 'Siaran Podcast Interaktif di Studio ON AIR (Menara Mentor)',
       desc: 'Ngobrol santai bersama Host AI Mentor cewek yang ramah (bersuara otomatis & bisa dijawab lewat mikrofon suara atau ketikan) membahas materi yang dikuasai, area yang perlu diperkuat, saran AI, pertanyaan pemantik, hingga rencana belajar. Selesai podcast dapat +3 XP & terekam di Spreadsheet!',
       icon: '🎙️',
