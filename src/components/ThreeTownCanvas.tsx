@@ -9973,9 +9973,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               >
                 <span>🍂</span>
                 <span className="font-mono text-amber-300">{pickedDryLeavesCount}/5</span>
-                <span className="hidden sm:inline text-slate-200">
-                  Daun ({dryLeaves.filter((l) => l.pickedAt === null).length}/{TOTAL_SCATTERED_DRY_LEAVES} di Peta)
-                </span>
                 <span className="text-[9px] text-emerald-300 font-mono">(+1 XP)</span>
               </div>
             </div>

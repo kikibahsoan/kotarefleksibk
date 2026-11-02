@@ -55,7 +55,6 @@ import {
   Users,
   Sprout,
   Bell,
-  BarChart3,
   Clock,
   GraduationCap,
 } from 'lucide-react';
@@ -1056,7 +1055,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsWeatherModalOpen(true)}
-                className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold cursor-pointer transition active:scale-95 shrink-0 ${
+                className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-2 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold cursor-pointer transition active:scale-95 shrink-0 ${
                   weatherType === 'hujan_ringan'
                     ? 'border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
                     : weatherType === 'salju'
@@ -1070,13 +1069,10 @@ export default function App() {
               >
                 <span className="text-xs sm:text-sm leading-none drop-shadow-sm">{currentWeatherInfo.icon}</span>
                 <span className="font-mono font-extrabold text-white">{currentWeatherInfo.tempCelsius}°C</span>
-                <span className="hidden sm:inline font-sans text-[10.5px] opacity-90 truncate max-w-[70px] md:max-w-none">
-                  {currentWeatherInfo.name}
-                </span>
               </button>
             ) : (
               <div
-                className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-1.5 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold select-none cursor-default shrink-0 ${
+                className={`hidden min-[360px]:flex bg-[#121e2c]/68 backdrop-blur-md border rounded-full px-2 sm:px-2.5 py-1 sm:py-1.5 items-center gap-1 sm:gap-1.5 shadow-lg text-[10px] sm:text-xs font-bold select-none cursor-default shrink-0 ${
                   weatherType === 'hujan_ringan'
                     ? 'border-cyan-400/50 text-cyan-300'
                     : weatherType === 'salju'
@@ -1090,9 +1086,6 @@ export default function App() {
               >
                 <span className="text-xs sm:text-sm leading-none drop-shadow-sm">{currentWeatherInfo.icon}</span>
                 <span className="font-mono font-extrabold text-white">{currentWeatherInfo.tempCelsius}°C</span>
-                <span className="hidden sm:inline font-sans text-[10.5px] opacity-90 truncate max-w-[70px] md:max-w-none">
-                  {currentWeatherInfo.name}
-                </span>
               </div>
             )}
 
@@ -1116,17 +1109,6 @@ export default function App() {
                   {completedMissionIds.length}/{assignedMissions.length}
                 </span>
               )}
-            </button>
-
-            {/* Daftar Gedung & Peta Kota (Hidden on Mobile Student Header, shown on sm+ screens) */}
-            <button
-              type="button"
-              onClick={() => setIsQuickNavOpen(true)}
-              className="hidden sm:flex w-8.5 h-8.5 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-200 hover:text-white border border-slate-600/50 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
-              title="Daftar Gedung & Peta Kota"
-              aria-label="Peta Gedung"
-            >
-              <BarChart3 className="w-4 h-4 text-sky-400" />
             </button>
 
             {/* Radio Background Music Controller (Dynamic 5 Time-of-Day Stations) */}
