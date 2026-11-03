@@ -1495,6 +1495,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
   // Player avatar object reference for direct snapping/controls
   const playerRef = useRef<AvatarData | null>(null);
+  // 5-Second Soft Fade-Out for in-world overhead text tags above buildings, places, leaves, campfire, etc. when avatar stays still in position
+  const playerStationaryStartTimeRef = useRef<number>(performance.now());
+  const playerStationaryLastPosRef = useRef<{ wx: number; wy: number }>({ wx: 0, wy: 0 });
   const npcsRef = useRef<AvatarData[]>([]);
   const lastMoveBroadcastTimeRef = useRef<number>(0);
 
@@ -3142,6 +3145,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       lastClickTimestamp = now;
       lastClickPos = { x: clientX, y: clientY };
+      playerStationaryStartTimeRef.current = now;
 
       handlePointerAction(clientX, clientY, isDoubleClick);
       // Immediately notify other devices of new position and movement
@@ -3255,6 +3259,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       const currentTileW = BASE_TILE_W * zoomLevelRef.current;
       const currentTileH = BASE_TILE_H * zoomLevelRef.current;
+
+      // Calculate overhead text tag fade multiplier for interactive world objects (bangunan, tempat, daun kering, api unggun, dll.)
+      // When avatar stays still in a position for >= 5s, tags fade out softly (smooth transition between 4.2s and 5.0s)
+      const pMoved = player.isMoving || Math.hypot(player.wx - playerStationaryLastPosRef.current.wx, player.wy - playerStationaryLastPosRef.current.wy) > 0.04;
+      if (pMoved) {
+        playerStationaryStartTimeRef.current = currentTime;
+        playerStationaryLastPosRef.current = { wx: player.wx, wy: player.wy };
+      }
+      const stationarySecs = (currentTime - playerStationaryStartTimeRef.current) / 1000;
+      let overheadTagAlpha = 1.0;
+      if (stationarySecs >= 5.0) {
+        overheadTagAlpha = 0.0;
+      } else if (stationarySecs > 4.2) {
+        overheadTagAlpha = Math.max(0, 1.0 - (stationarySecs - 4.2) / 0.8);
+      }
 
       // Handle Reset Camera to Player
       if (resetCameraRequestedRef.current) {
@@ -5458,9 +5477,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           });
 
-          // Floating Badge above Swing Structure ONLY when player approaches
+          // Floating Badge above Swing Structure ONLY when player approaches & not stationary > 5s
           const distToSwing = Math.hypot(player.wx - item.wx, player.wy - item.wy);
-          if (distToSwing < 2.15) {
+          if (distToSwing < 2.15 && overheadTagAlpha > 0.005) {
+            ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             const swBadgeY = pt.y - 39 * z;
             ctx.font = `bold ${Math.round(7.6 * z)}px sans-serif`;
             const swM = ctx.measureText(st.badgeText);
@@ -5477,6 +5498,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(st.badgeText, pt.x, swBadgeY);
+            ctx.restore();
           }
         } else if (item.type === 'campfire_spot') {
           // API UNGGUN DI SUDUT KOTA [-4.65, 4.65] (Dikelilingi Bangku Penghangat Tubuh)
@@ -5597,9 +5619,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           }
 
-          // Floating Badge above Campfire ONLY when player approaches
+          // Floating Badge above Campfire ONLY when player approaches & not stationary > 5s
           const distToCampfire = Math.hypot(player.wx - item.wx, player.wy - item.wy);
-          if (distToCampfire < 2.25) {
+          if (distToCampfire < 2.25 && overheadTagAlpha > 0.005) {
+            ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             const cfTagY = pt.y - 42 * z;
             const cfLabel = '🔥 Api Unggun & Bangku Hangat';
             ctx.font = `bold ${Math.round(8.5 * z)}px sans-serif`;
@@ -5617,6 +5641,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(cfLabel, pt.x, cfTagY);
+            ctx.restore();
           }
         } else if (item.type === 'welcome_gate') {
           // GAPURA SELAMAT DATANG DI UJUNG PETA [wx: 0, wy: 6.15] ("SELAMAT DATANG DI REFLEKSIA CITY")
@@ -5949,9 +5974,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(lX, lY, 14 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // 7. Floating Hover Badge: "📋 Papan Peraturan Kota" (compact & semi-transparent)
+          // 7. Floating Hover Badge: "📋 Papan Peraturan Kota" (compact & semi-transparent, fades after 5s stationary)
           const distToRulesBoard = Math.hypot(player.wx - item.wx, player.wy - item.wy);
-          if (distToRulesBoard < 2.35) {
+          if (distToRulesBoard < 2.35 && overheadTagAlpha > 0.005) {
+            ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             const hoverBounce = Math.sin(elapsed * 4) * 1.8 * z;
             const badgeY = roofApexY - 13 * z + hoverBounce;
             const bText = '📋 Papan Peraturan Kota';
@@ -5972,6 +5999,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(bText, pt.x, badgeY);
+            ctx.restore();
           }
 
           ctx.restore();
@@ -6278,9 +6306,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
 
-          // 8. Floating Hover Tag: "🌳 Pohon Beringin Jurnal Harian" — muncul saat avatar mendekati Pohon Beringin (kecil & agak transparan)
+          // 8. Floating Hover Tag: "🌳 Pohon Beringin Jurnal Harian" — muncul saat avatar mendekati Pohon Beringin & fades after 5s stationary
           const distToBeringin = Math.hypot(player.wx - item.wx, player.wy - item.wy);
-          if (distToBeringin < 2.35) {
+          if (distToBeringin < 2.35 && overheadTagAlpha > 0.005) {
+            ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             const treeHoverBounce = Math.sin(elapsed * 3.5) * 1.6 * z;
             const tagY = pt.y - 116 * z + treeHoverBounce;
             const tagTitle = '🌳 Pohon Beringin Jurnal Harian';
@@ -6314,6 +6344,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#fde047';
             ctx.font = `bold ${Math.round(6.6 * z)}px sans-serif`;
             ctx.fillText(subText, pt.x, tagY + 4.8 * z);
+            ctx.restore();
           }
 
           ctx.restore();
@@ -6560,9 +6591,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.arc(lampX, lampY + 2 * z, 1.8 * z, 0, Math.PI);
           ctx.fill();
 
-          // Floating Pill Badge: 📖 Sudut Literasi ONLY when player approaches (compact & semi-transparent)
+          // Floating Pill Badge: 📖 Sudut Literasi ONLY when player approaches & not stationary > 5s
           const distToLiteracy = Math.hypot(player.wx - item.wx, player.wy - item.wy);
-          if (distToLiteracy < 2.2) {
+          if (distToLiteracy < 2.2 && overheadTagAlpha > 0.005) {
+            ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             const litTagY = pt.y - 52 * z;
             const litLabel = '📖 Sudut Literasi';
             ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
@@ -6582,6 +6615,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(litLabel, pt.x, litTagY);
+            ctx.restore();
           }
           ctx.restore();
         } else if (item.type === 'fishing_spot') {
@@ -6819,9 +6853,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           }
 
-          // 3. FLOATING BADGE: 🎣 Kolam Pemancingan ONLY when player approaches (compact & semi-transparent)
+          // 3. FLOATING BADGE: 🎣 Kolam Pemancingan ONLY when player approaches & not stationary > 5s
           const distToFishing = Math.hypot(player.wx - item.wx, player.wy - item.wy);
-          if (distToFishing < 2.3) {
+          if (distToFishing < 2.3 && overheadTagAlpha > 0.005) {
+            ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             const dockTagY = pt.y - 44 * z;
             const dockLabel = '🎣 Kolam Pemancingan';
             ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
@@ -6841,6 +6877,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(dockLabel, pt.x, dockTagY);
+            ctx.restore();
           }
           ctx.restore();
         } else if (item.type === 'dry_leaf') {
@@ -6905,10 +6942,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.textAlign = 'center';
               ctx.fillText('🍂 Diambil!', pt.x, pt.y - 12 * z - liftY);
               ctx.restore();
-            } else if (distPlayerToLeaf < 1.35) {
+            } else if (distPlayerToLeaf < 1.35 && overheadTagAlpha > 0.005) {
               const badgeY = pt.y - 14 * z;
               const badgeText = `🍂 Daun Kering (${pickedDryLeavesCountRef.current}/5)`;
               ctx.save();
+              ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
               ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
               const bm = ctx.measureText(badgeText);
               const bw = bm.width + 8 * z;
@@ -7146,13 +7184,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Minimalist status pill above tree when near, when autumn leaves need watering, or when ripe apples are ready
           const distPlayerToThisTree = Math.hypot(player.wx - item.wx, player.wy - item.wy);
           const activeCount = cycle ? cycle.count : 0;
-          if ((distPlayerToThisTree < 1.65 && (activeCount > 0 || hasRipeApples || isAutumnTree)) || isRecentlyWatered) {
+          if (((distPlayerToThisTree < 1.65 && (activeCount > 0 || hasRipeApples || isAutumnTree)) || isRecentlyWatered) && (overheadTagAlpha > 0.005 || hasRipeApples)) {
             const badgeText = hasRipeApples
               ? '🍎 Petik Apel (+2 XP)'
               : isAutumnTree
               ? '🍂 Siram agar Hijau'
               : `💧 ${activeCount}/3`;
             const badgeY = pt.y - 68 * z;
+            ctx.save();
+            if (!hasRipeApples) {
+              ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
+            }
             ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
             const bm = ctx.measureText(badgeText);
             const bw = bm.width + 8 * z;
@@ -7168,6 +7210,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(badgeText, pt.x, badgeY);
+            ctx.restore();
           }
 
           ctx.restore();
@@ -9507,9 +9550,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillText('🔒 KHUSUS GURU • GENERATE AI', signBM.x, signBM.y + 3.4 * z);
           }
 
-          // Floating Building Label ONLY when touched, hovered or active (compact & semi-transparent)
-          const shouldShowLabel = isHovered || activeBuilding === b.id || lastTouchedIdRef.current === b.id;
+          // Floating Building Label ONLY when touched, hovered or active (compact & semi-transparent, fades after 5s stationary)
+          const tagAlpha = isHovered ? 1.0 : overheadTagAlpha;
+          const shouldShowLabel = (isHovered || activeBuilding === b.id || lastTouchedIdRef.current === b.id) && tagAlpha > 0.005;
           if (shouldShowLabel) {
+            ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * tagAlpha;
             const tagY = pt.y - (b.id === 'balai_kota' ? 86 : b.id === 'masjid' || b.id === 'bank_materi' ? 78 : b.id === 'menara_mentor' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
             const labelText = `${b.icon} ${b.name}`;
             ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
@@ -9529,6 +9575,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(labelText, pt.x, tagY);
+            ctx.restore();
           }
           ctx.restore();
         } else if (item.type === 'cafe') {
@@ -9611,11 +9658,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           }
 
-          // Floating Pill Badge above Toko Roti awning ONLY when touched/opened (compact & semi-transparent)
-          const isCafeTouched = lastTouchedIdRef.current === 'cafe' || isCafeMenuOpen;
+          // Floating Pill Badge above Toko Roti awning ONLY when touched/opened (compact & semi-transparent, fades after 5s stationary)
+          const isCafeTouched = (lastTouchedIdRef.current === 'cafe' || isCafeMenuOpen) && overheadTagAlpha > 0.005;
           if (isCafeTouched) {
             const trBadgeY = pt.y - 36 * z;
             ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             ctx.fillStyle = 'rgba(15, 23, 42, 0.62)';
             const trLabel = '🥐 Toko Roti & Kafe';
             ctx.font = `bold ${Math.round(8.0 * z)}px sans-serif`;
@@ -9984,8 +10032,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.textBaseline = 'middle';
           ctx.fillText(gableLabel, pt.x, pt.y - 5.0 * z, gableW - 3 * z);
 
-          // Floating Hover / Proximity Label when Player is Nearby
-          if (distToPlayer < 2.35) {
+          // Floating Hover / Proximity Label when Player is Nearby (fades after 5s stationary)
+          if (distToPlayer < 2.35 && overheadTagAlpha > 0.005) {
+            ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             const hTagY = pt.y - 34 * z;
             ctx.font = `bold ${Math.round(6.8 * z)}px sans-serif`;
             const tw = ctx.measureText(u.name).width + 10 * z;
@@ -10001,6 +10051,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(u.name, pt.x, hTagY);
+            ctx.restore();
           }
 
           ctx.restore();
@@ -12929,8 +12980,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       <div className="absolute top-12 sm:top-14 left-2.5 right-2.5 sm:left-4 sm:right-4 z-30 pointer-events-none flex flex-col gap-2">
         {/* ROW 1: STATUS PILLS (Left: Warga Online & Radar | Right: Active Held Item + Countdown) */}
         <div className="w-full flex flex-wrap items-start justify-between gap-1.5">
-          {/* Left: Header Jumlah Warga Online (Hanya menampilkan Icon Online + Angka Jumlah + "Warga Online", diklik baru muncul daftar warga online tanpa NPC) & Dry Leaf Counter */}
-          <div className="flex flex-col items-start gap-1 max-w-[78vw] sm:max-w-[420px] pointer-events-auto relative">
+          {/* Left: Header Jumlah Warga Online, Daun Kering Counter, and Held Item Countdown (Roti, Kopi, Eskrim) */}
+          <div className="flex flex-col items-start gap-1 max-w-full pointer-events-auto relative">
             {(() => {
               const myHandle =
                 studentName
@@ -12966,7 +13017,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                         setIsOnlineListOpen((prev) => !prev);
                         setOnlineListInteractionTick((t) => t + 1);
                       }}
-                      className="bg-[#121e2c]/78 hover:bg-[#1a293b]/90 backdrop-blur-md border border-emerald-500/55 hover:border-emerald-400 rounded-full px-3 py-1 sm:py-1.5 text-white shadow-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                      className="bg-[#121e2c]/78 hover:bg-[#1a293b]/90 backdrop-blur-md border border-emerald-500/55 hover:border-emerald-400 rounded-full px-3 py-1 sm:py-1.5 text-white shadow-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
                       title="Klik untuk melihat daftar nama Warga Online & menuju ke lokasinya"
                     >
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
@@ -12980,13 +13031,39 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
                     {/* Daun Kering Counter */}
                     <div
-                      className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-500/45 rounded-full px-2.5 py-1 sm:py-1.5 text-amber-200 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1"
+                      className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-500/45 rounded-full px-2.5 py-1 sm:py-1.5 text-amber-200 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1 shrink-0"
                       title="10 Daun Kering tersebar di kota • Pungut setiap 5 daun kering untuk mendapatkan +1 XP"
                     >
                       <span>🍂</span>
                       <span className="font-mono text-amber-300">{pickedDryLeavesCount}/5</span>
                       <span className="text-[9px] text-emerald-300 font-mono">(+1 XP)</span>
                     </div>
+
+                    {/* Info Header Memegang Item (Kopi, Roti, Eskrim) Bersama Countdown Timer di Samping Info Daun */}
+                    {heldItem && (
+                      <div className="bg-[#121e2c]/78 backdrop-blur-md border border-amber-400/55 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 flex items-center gap-1.5 text-[10.5px] sm:text-[11px] font-bold text-amber-200 shadow-lg animate-fade-in-down shrink-0">
+                        <span className="text-xs sm:text-sm">
+                          {heldItem === 'kopi' ? '☕' : heldItem === 'roti' ? '🥐' : '🍦'}
+                        </span>
+                        <span className="whitespace-nowrap font-medium text-amber-100">
+                          {heldItem === 'kopi' ? 'Kopi Hangat' : heldItem === 'roti' ? 'Roti Panggang' : 'Eskrim Segar'}
+                        </span>
+                        <span className="text-[9.5px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/50 text-amber-300">
+                          {heldItemRemainingSec}d
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            equipHeldItem(null);
+                          }}
+                          className="w-4 h-4 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[9px] cursor-pointer transition active:scale-90"
+                          title="Habiskan / Simpan"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
 
                     {/* Exclusive Movement Mode Selector for Master kikybahsoan (Jalan Normal vs Teleportasi) */}
                     {isMasterKiky && (
@@ -13144,31 +13221,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               );
             })()}
           </div>
-
-          {/* Right: Held Item Badge with Live Auto-Disappear Countdown (90s Kopi, 60s Roti, 30s Eskrim) */}
-          {heldItem && (
-            <div className="pointer-events-auto bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/50 rounded-full px-2.5 sm:px-3 py-1 flex items-center gap-1.5 text-xs font-bold text-amber-200 shadow-lg animate-fade-in-down ml-auto shrink-0">
-              <span className="text-sm sm:text-base">
-                {heldItem === 'kopi' ? '☕' : heldItem === 'roti' ? '🥐' : '🍦'}
-              </span>
-              <span className="text-[10.5px] sm:text-xs whitespace-nowrap">
-                {heldItem === 'kopi' ? 'Kopi Hangat' : heldItem === 'roti' ? 'Roti Panggang' : 'Eskrim Segar'}
-              </span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300">
-                {heldItemRemainingSec}d
-              </span>
-              <button
-                onClick={() => {
-                  sounds.playClick();
-                  equipHeldItem(null);
-                }}
-                className="w-4 h-4 rounded-full bg-slate-800/75 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] cursor-pointer"
-                title="Habiskan / Simpan"
-              >
-                ✕
-              </button>
-            </div>
-          )}
         </div>
 
         {/* ROW 2: SINGLE MUTUALLY-EXCLUSIVE POPUP SLOT (Auto-hilang dengan soft setelah 5 detik jika tidak diklik, dan muncul secara soft) */}
