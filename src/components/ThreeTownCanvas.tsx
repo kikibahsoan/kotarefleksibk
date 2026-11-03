@@ -4,7 +4,7 @@ import { sounds } from '../utils/audio.ts';
 import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
 import { WeatherType, getWeatherTypeWita } from '../utils/weather.ts';
 import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
-import { X, Plus, Minus, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin } from 'lucide-react';
+import { X, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin } from 'lucide-react';
 import { TownRulesModal } from './modals/TownRulesModal.tsx';
 import {
   JurnalHarianModal,
@@ -98,6 +98,7 @@ interface AvatarData {
   hairColor: string;
   gender?: 'L' | 'P';
   isMoving: boolean;
+  isRunning?: boolean;
   pauseTimer: number;
   walkFrame: number;
   facing: 'down-left' | 'down-right' | 'up-left' | 'up-right';
@@ -1426,8 +1427,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const fishingPullStartTimeRef = useRef<number>(0);
   const caughtFishRef = useRef<{ name: string; icon: string } | null>(null);
 
-  // 10-Second Soft Auto-Dismiss State for Information Popups (pendingConfirmation, nearbyAction, isCafeMenuOpen)
+  // 5-Second Soft Auto-Dismiss & Soft Appearance State for Information Popups (pendingConfirmation, nearbyAction, isCafeMenuOpen)
   const [isInfoPopupSoftFading, setIsInfoPopupSoftFading] = useState(false);
+  const [isInfoPopupSoftEntering, setIsInfoPopupSoftEntering] = useState(false);
   const [popupInteractionTick, setPopupInteractionTick] = useState(0);
 
   const activeInfoPopupKey = isCafeMenuOpen
@@ -1439,13 +1441,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     : null;
 
   useEffect(() => {
-    setIsInfoPopupSoftFading(false);
-    if (!activeInfoPopupKey) return;
+    if (!activeInfoPopupKey) {
+      setIsInfoPopupSoftFading(false);
+      setIsInfoPopupSoftEntering(false);
+      return;
+    }
 
-    // Soft fade-out begins at 9.2s (800ms smooth transition before full removal at 10.0s)
+    // Soft entrance: start with entering true, then animate to full visibility
+    setIsInfoPopupSoftFading(false);
+    setIsInfoPopupSoftEntering(true);
+    const enterTimer = window.setTimeout(() => {
+      setIsInfoPopupSoftEntering(false);
+    }, 40);
+
+    // Soft fade-out begins at 4.2s (800ms smooth transition before full removal at 5.0s)
     const fadeTimer = window.setTimeout(() => {
       setIsInfoPopupSoftFading(true);
-    }, 9200);
+    }, 4200);
 
     const dismissTimer = window.setTimeout(() => {
       if (isCafeMenuOpen) {
@@ -1459,15 +1471,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setNearbyAction(null);
       }
       setIsInfoPopupSoftFading(false);
-    }, 10000);
+      setIsInfoPopupSoftEntering(false);
+    }, 5000);
 
     return () => {
+      window.clearTimeout(enterTimer);
       window.clearTimeout(fadeTimer);
       window.clearTimeout(dismissTimer);
     };
   }, [activeInfoPopupKey, popupInteractionTick, isCafeMenuOpen]);
 
-  // User Camera Zoom State (+ / -)
+  // User Camera Zoom State
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const zoomLevelRef = useRef(zoomLevel);
   zoomLevelRef.current = zoomLevel;
@@ -1476,8 +1490,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const playerSpeechRef = useRef<{ text: string; expiresAt: number } | null>(null);
   const baristaSpeechRef = useRef<{ text: string; expiresAt: number } | null>(null);
 
-  // Animated destination click ripple
-  const clickRippleRef = useRef<{ wx: number; wy: number; time: number } | null>(null);
+  // Animated destination click ripple (supports single-click walk and double-click sprint)
+  const clickRippleRef = useRef<{ wx: number; wy: number; time: number; isRun?: boolean } | null>(null);
 
   // Player avatar object reference for direct snapping/controls
   const playerRef = useRef<AvatarData | null>(null);
@@ -1564,7 +1578,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     targetX: number,
     targetY: number,
     facingDir: 'down-left' | 'down-right' | 'up-left' | 'up-right',
-    onArrive?: () => void
+    onArrive?: () => void,
+    isRun: boolean = false
   ) => {
     const p = playerRef.current;
     if (!p) return;
@@ -1573,7 +1588,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     setIsCafeMenuOpen(false);
 
     const dist = Math.hypot(p.wx - targetX, p.wy - targetY);
-    clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now() };
+    clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now(), isRun };
 
     if (dist <= 0.14) {
       pendingSeatRef.current = null;
@@ -1582,6 +1597,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       p.targetWx = targetX;
       p.targetWy = targetY;
       p.isMoving = false;
+      p.isRunning = false;
+      p.speed = 0.88;
       p.walkFrame = 0;
       p.facing = facingDir;
       setIsSitting(true);
@@ -1606,13 +1623,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     p.targetWx = targetX;
     p.targetWy = targetY;
     p.isMoving = true;
+    p.isRunning = isRun;
+    p.speed = isRun ? 1.28 : 0.88;
     sendHeartbeatRef.current?.();
   };
 
   // Helper to sit on a 2-person minimalist fountain bench or campfire warming bench (walks there first)
   const sitOnTwoPersonBench = (
     group: TwoPersonBenchGroup,
-    preferredIdx: 0 | 1 = 0
+    preferredIdx: 0 | 1 = 0,
+    isRun: boolean = false
   ): boolean => {
     const p = playerRef.current;
     if (!p) return false;
@@ -1647,12 +1667,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           3000
         );
       }
-    });
+    }, isRun);
     return true;
   };
 
   // Helper to ride a swing at either of the 2 Swing Locations (walks there first, then deducts 1 XP upon sitting)
-  const rideSwingWithXp = (preferredSwing: SwingSeatDef): boolean => {
+  const rideSwingWithXp = (preferredSwing: SwingSeatDef, isRun: boolean = false): boolean => {
     const p = playerRef.current;
     if (!p) return false;
 
@@ -1705,7 +1725,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       sounds.playRewardXp();
       const remaining = Math.max(0, studentPointsRef.current - cost);
       showToast(`🎠 Naik & berayun di ${targetSwing.name} (-1 XP) • Sisa Saldo: ${remaining} XP`, 3200);
-    });
+    }, isRun);
     return true;
   };
 
@@ -2231,6 +2251,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       hairColor: studentGender === 'P' ? playerOutfit.hijab : '#0f172a',
       gender: studentGender === 'P' ? 'P' : 'L',
       isMoving: false,
+      isRunning: false,
       pauseTimer: 0,
       walkFrame: 0,
       facing: 'up-left',
@@ -2677,7 +2698,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       return { sx, sy, ...toWorld(sx, sy, camera.x, camera.y) };
     };
 
-    const handlePointerAction = (clientX: number, clientY: number) => {
+    const handlePointerAction = (clientX: number, clientY: number, isRun: boolean = false) => {
       const { sx, sy, wx, wy } = getPointerWorldPos(clientX, clientY);
 
       // 0. Check Click on Player Avatar -> Open/toggle radial emote picker!
@@ -2715,7 +2736,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         player.targetWx = 4.15;
         player.targetWy = 4.15; // Counter front
         player.isMoving = true;
-        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+        player.isRunning = isRun;
+        player.speed = isRun ? 1.28 : 0.88;
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
         pendingBuildingId = null;
         lastTouchedIdRef.current = 'cafe';
         setPendingConfirmation({
@@ -2747,7 +2770,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         player.targetWx = 1.25;
         player.targetWy = 5.95;
         player.isMoving = !playerNearRules;
-        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+        if (player.isMoving) {
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.28 : 0.88;
+        }
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
@@ -2778,7 +2805,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         player.targetWx = 0;
         player.targetWy = -5.2;
         player.isMoving = !playerNearBeringin;
-        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+        if (player.isMoving) {
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.28 : 0.88;
+        }
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
@@ -2803,7 +2834,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         player.targetWx = 5.45;
         player.targetWy = -2.0;
         player.isMoving = true;
-        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+        player.isRunning = isRun;
+        player.speed = isRun ? 1.28 : 0.88;
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
@@ -2821,7 +2854,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const preferredIdx: 0 | 1 = distB < distA ? 1 : 0;
           pendingBuildingId = null;
           lastTouchedIdRef.current = null;
-          sitOnTwoPersonBench(group, preferredIdx);
+          sitOnTwoPersonBench(group, preferredIdx, isRun);
           return;
         }
       }
@@ -2834,8 +2867,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         const secondGroup = distRight < distLeft ? CAMPFIRE_BENCHES[0] : CAMPFIRE_BENCHES[1];
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
-        if (!sitOnTwoPersonBench(firstGroup, 0)) {
-          sitOnTwoPersonBench(secondGroup, 0);
+        if (!sitOnTwoPersonBench(firstGroup, 0, isRun)) {
+          sitOnTwoPersonBench(secondGroup, 0, isRun);
         }
         return;
       }
@@ -2846,7 +2879,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (swingDist < 0.95) {
           pendingBuildingId = null;
           lastTouchedIdRef.current = null;
-          rideSwingWithXp(swing);
+          rideSwingWithXp(swing, isRun);
           return;
         }
       }
@@ -2861,7 +2894,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         walkToSeatAndSit(targetLitBench.seats[0].id, targetLitBench.seats[0].wx, targetLitBench.seats[0].wy, targetLitBench.facing, () => {
           sounds.playOpenModal();
           setIsLiteracyModalOpen(true);
-        });
+        }, isRun);
         return;
       }
 
@@ -2891,7 +2924,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWx = leaf.wx;
             player.targetWy = leaf.wy;
             player.isMoving = true;
-            clickRippleRef.current = { wx: leaf.wx, wy: leaf.wy, time: performance.now() };
+            player.isRunning = isRun;
+            player.speed = isRun ? 1.28 : 0.88;
+            clickRippleRef.current = { wx: leaf.wx, wy: leaf.wy, time: performance.now(), isRun };
           }
           return;
         }
@@ -2929,7 +2964,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWx = standX;
             player.targetWy = standY;
             player.isMoving = true;
-            clickRippleRef.current = { wx: standX, wy: standY, time: performance.now() };
+            player.isRunning = isRun;
+            player.speed = isRun ? 1.28 : 0.88;
+            clickRippleRef.current = { wx: standX, wy: standY, time: performance.now(), isRun };
           }
           return;
         }
@@ -2947,7 +2984,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           player.targetWx = -5.95;
           player.targetWy = h.wy;
           player.isMoving = true;
-          clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.28 : 0.88;
+          clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
           pendingBuildingId = null;
           lastTouchedIdRef.current = null;
           showToast(
@@ -2995,7 +3034,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWy = by * 0.68;
           }
           player.isMoving = true;
-          clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now() };
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.28 : 0.88;
+          clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
           pendingBuildingId = b.id;
           lastTouchedIdRef.current = null;
           return;
@@ -3023,19 +3064,67 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         targetX += (dirX / d) * 0.45;
         targetY += (dirY / d) * 0.45;
       }
-      clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now() };
+      clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now(), isRun };
       player.targetWx = targetX;
       player.targetWy = targetY;
       player.isMoving = true;
+      player.isRunning = isRun;
+      player.speed = isRun ? 1.28 : 0.88;
       pendingBuildingId = null;
       lastTouchedIdRef.current = null;
     };
 
-    let lastTouchTime = 0;
+    let lastClickTimestamp = 0;
+    let lastClickPos = { x: 0, y: 0 };
+    let initialPinchDist: number | null = null;
+    let initialPinchZoom = 1.0;
+    let isPinching = false;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        isPinching = true;
+        initialPinchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        initialPinchZoom = zoomLevelRef.current;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialPinchDist !== null && initialPinchDist > 0) {
+        if (e.cancelable) e.preventDefault();
+        const currentDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const scale = currentDist / initialPinchDist;
+        const newZoom = Math.min(1.65, Math.max(0.60, Number((initialPinchZoom * scale).toFixed(3))));
+        zoomLevelRef.current = newZoom;
+        setZoomLevel(newZoom);
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        initialPinchDist = null;
+        setTimeout(() => {
+          isPinching = false;
+        }, 180);
+      }
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.cancelable) e.preventDefault();
+      const zoomStep = e.deltaY > 0 ? -0.06 : 0.06;
+      const nextZoom = Math.min(1.65, Math.max(0.60, Number((zoomLevelRef.current + zoomStep).toFixed(2))));
+      zoomLevelRef.current = nextZoom;
+      setZoomLevel(nextZoom);
+    };
+
     const onPointerDown = (e: MouseEvent | TouchEvent) => {
-      const now = performance.now();
-      if (now - lastTouchTime < 180) return;
-      lastTouchTime = now;
+      if (isPinching) return;
+      if ('touches' in e && e.touches && e.touches.length >= 2) return;
 
       let clientX = (e as MouseEvent).clientX;
       let clientY = (e as MouseEvent).clientY;
@@ -3043,8 +3132,25 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
       }
-      handlePointerAction(clientX, clientY);
+
+      const now = performance.now();
+      const timeDelta = now - lastClickTimestamp;
+      const distDelta = Math.hypot(clientX - lastClickPos.x, clientY - lastClickPos.y);
+
+      // Detect rapid double-click or double-tap within 380ms and close screen distance (<50px)
+      const isDoubleClick = timeDelta > 30 && timeDelta < 380 && distDelta < 50;
+
+      lastClickTimestamp = now;
+      lastClickPos = { x: clientX, y: clientY };
+
+      handlePointerAction(clientX, clientY, isDoubleClick);
       // Immediately notify other devices of new position and movement
+      sendHeartbeatRef.current?.();
+    };
+
+    const onDblClick = (e: MouseEvent) => {
+      if (isPinching) return;
+      handlePointerAction(e.clientX, e.clientY, true);
       sendHeartbeatRef.current?.();
     };
 
@@ -3091,7 +3197,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     };
 
     canvas.addEventListener('click', onPointerDown);
+    canvas.addEventListener('dblclick', onDblClick);
     canvas.addEventListener('mousemove', onPointerMove);
+    canvas.addEventListener('touchstart', onTouchStart, { passive: true });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: true });
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    canvas.addEventListener('wheel', onWheel, { passive: false });
 
     // Initial camera position centered on student
     camera.x = (player.wx - player.wy) * BASE_TILE_W * zoomLevelRef.current;
@@ -3202,7 +3314,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.walkFrame = 0;
           } else {
             // Soft, gentle deceleration easing as avatar approaches target
-            const easeSpeed = player.speed * Math.min(1.0, 0.45 + dist * 1.5);
+            const curSpeed = player.isRunning ? 1.28 : player.speed;
+            const easeSpeed = curSpeed * Math.min(1.0, 0.45 + dist * 1.5);
             const step = Math.min(dist, easeSpeed * delta);
             const stepX = (dx / dist) * step;
             const stepY = (dy / dist) * step;
@@ -3214,7 +3327,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             if (!isSolidCollision(nextWx, nextWy, 0.16)) {
               player.wx = nextWx;
               player.wy = nextWy;
-              player.walkFrame += delta * (2.8 + (easeSpeed / player.speed) * 1.5);
+              player.walkFrame += delta * (player.isRunning ? 5.8 : (2.8 + (easeSpeed / player.speed) * 1.5));
             } else {
             const fDist = Math.hypot(nextWx, nextWy);
             if (fDist < 1.12 && fDist > 0.001) {
@@ -3265,6 +3378,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               } else {
                 // Blocked completely by building wall
                 player.isMoving = false;
+                player.isRunning = false;
+                player.speed = 0.88;
                 player.walkFrame = 0;
               }
             }
@@ -3361,6 +3476,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWx = ps.targetX;
             player.targetWy = ps.targetY;
             player.isMoving = false;
+            player.isRunning = false;
+            player.speed = 0.88;
             player.walkFrame = 0;
             player.facing = ps.facingDir;
             setIsSitting(true);
@@ -3371,6 +3488,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const envAct = pendingEnvActionRef.current;
             pendingEnvActionRef.current = null;
             player.isMoving = false;
+            player.isRunning = false;
+            player.speed = 0.88;
             player.walkFrame = 0;
             if (envAct.type === 'pick_leaf') {
               handlePickDryLeafRef.current(envAct.leafId);
@@ -3383,6 +3502,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             sendHeartbeatRef.current?.();
           } else {
             player.isMoving = false;
+            player.isRunning = false;
+            player.speed = 0.88;
             player.walkFrame = 0;
             sendHeartbeatRef.current?.();
           }
@@ -4774,21 +4895,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       // Soft Animated Click Destination Ripple on Ground
       if (clickRippleRef.current) {
-        const age = (performance.now() - clickRippleRef.current.time) / 750;
+        const isRun = !!clickRippleRef.current.isRun;
+        const age = (performance.now() - clickRippleRef.current.time) / (isRun ? 680 : 750);
         if (age < 1.0) {
           const rPt = toScreen(clickRippleRef.current.wx, clickRippleRef.current.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
           // Outer expanding ring
-          const rOuter = (6 + age * 24) * z;
-          ctx.strokeStyle = `rgba(56, 189, 248, ${0.85 * (1 - age)})`;
-          ctx.lineWidth = 2 * z;
+          const rOuter = (6 + age * (isRun ? 28 : 24)) * z;
+          ctx.strokeStyle = isRun
+            ? `rgba(250, 204, 21, ${0.9 * (1 - age)})`
+            : `rgba(56, 189, 248, ${0.85 * (1 - age)})`;
+          ctx.lineWidth = (isRun ? 2.6 : 2) * z;
           ctx.beginPath();
           ctx.ellipse(rPt.x, rPt.y, rOuter, rOuter * 0.5, 0, 0, Math.PI * 2);
           ctx.stroke();
 
-          // Inner expanding pulse ring
-          if (age > 0.12) {
+          // Second energetic pulse ring for double-click running
+          if (isRun) {
+            const rSprint = (3 + age * 18) * z;
+            ctx.strokeStyle = `rgba(56, 189, 248, ${0.9 * (1 - age)})`;
+            ctx.lineWidth = 1.8 * z;
+            ctx.beginPath();
+            ctx.ellipse(rPt.x, rPt.y, rSprint, rSprint * 0.5, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          } else if (age > 0.12) {
+            // Inner expanding pulse ring for walking
             const rInner = (age - 0.12) * 18 * z;
             ctx.strokeStyle = `rgba(254, 240, 138, ${0.75 * (1 - age)})`;
             ctx.lineWidth = 1.5 * z;
@@ -4800,7 +4932,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Glowing center dot
           ctx.fillStyle = `rgba(255, 255, 255, ${0.9 * (1 - age)})`;
           ctx.beginPath();
-          ctx.ellipse(rPt.x, rPt.y, 3.2 * z, 1.6 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(rPt.x, rPt.y, (isRun ? 4.0 : 3.2) * z, (isRun ? 2.0 : 1.6) * z, 0, 0, Math.PI * 2);
           ctx.fill();
         } else {
           clickRippleRef.current = null;
@@ -9989,13 +10121,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const isLaughingNow = activeEmote?.type === 'laugh';
           const isLovingNow = activeEmote?.type === 'love';
 
-          // Natural leg swing & gentle bobbing (plus lively rhythmic dancing or giggle bounce)
-          let legSwing = (av.isMoving && !isSittingNow) ? Math.sin(av.walkFrame) * 3.5 * z : 0;
+          // Natural leg swing & gentle bobbing (plus lively running stride, rhythmic dancing or giggle bounce)
+          const isRun = Boolean(item.isPlayer ? player.isRunning : av.isRunning);
+          let legSwing = (av.isMoving && !isSittingNow) ? Math.sin(av.walkFrame) * (isRun ? 5.2 : 3.5) * z : 0;
           if (isDancingNow && !isSittingNow) {
             legSwing = Math.sin(elapsed * 10) * 2.8 * z;
           }
 
-          let avY = pt.y + (isSittingNow ? -1.8 * z : (av.isMoving ? -Math.abs(Math.sin(av.walkFrame * 2)) * 1.5 * z : 0));
+          let avY = pt.y + (isSittingNow ? -1.8 * z : (av.isMoving ? -Math.abs(Math.sin(av.walkFrame * 2)) * (isRun ? 2.3 : 1.5) * z : 0));
 
           if (isDancingNow) {
             const danceBounce = !isSittingNow ? Math.abs(Math.sin(elapsed * 10)) * 3.5 * z : Math.sin(elapsed * 8) * 1.5 * z;
@@ -12409,7 +12542,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
       canvas.removeEventListener('click', onPointerDown);
+      canvas.removeEventListener('dblclick', onDblClick);
       canvas.removeEventListener('mousemove', onPointerMove);
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchEnd);
+      canvas.removeEventListener('wheel', onWheel);
       playerRef.current = null;
     };
   }, [studentName, studentGender, isTeacher]);
@@ -13032,12 +13171,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           )}
         </div>
 
-        {/* ROW 2: SINGLE MUTUALLY-EXCLUSIVE POPUP SLOT (Auto-hilang dengan soft setelah 10 detik jika tidak diklik) */}
+        {/* ROW 2: SINGLE MUTUALLY-EXCLUSIVE POPUP SLOT (Auto-hilang dengan soft setelah 5 detik jika tidak diklik, dan muncul secara soft) */}
         <div
           onPointerDown={() => setPopupInteractionTick((t) => t + 1)}
-          className={`w-full flex justify-center transition-all duration-700 ease-in-out ${
-            isInfoPopupSoftFading
-              ? 'opacity-0 -translate-y-1.5 scale-95 pointer-events-none'
+          className={`w-full flex justify-center transition-all duration-700 ease-out ${
+            isInfoPopupSoftEntering
+              ? 'opacity-0 translate-y-2.5 scale-95 pointer-events-none'
+              : isInfoPopupSoftFading
+              ? 'opacity-0 -translate-y-2 scale-95 pointer-events-none'
               : 'opacity-100 translate-y-0 scale-100'
           }`}
         >
@@ -13889,30 +14030,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         </div>
       )}
 
-      {/* Zoom & Center Controls (Positioned cleanly above mobile chat panel & at bottom-right on laptop) */}
-      <div className="absolute right-2.5 sm:right-4 bottom-[calc(max(0.85rem,env(safe-area-inset-bottom))+15.5rem)] sm:bottom-20 z-30 flex flex-col gap-2">
-        <button
-          onClick={handleZoomIn}
-          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer"
-          title="Perbesar Peta (+)"
-        >
-          <Plus className="w-4 h-4 text-slate-200" />
-        </button>
-        <button
-          onClick={handleZoomOut}
-          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-white border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer"
-          title="Perkecil Peta (-)"
-        >
-          <Minus className="w-4 h-4 text-slate-200" />
-        </button>
-        <button
-          onClick={handleCenterOnPlayer}
-          className="w-9 h-9 rounded-full bg-[#121e2c]/90 hover:bg-[#1c2c3e] text-rose-400 border border-slate-700/60 shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer"
-          title="Fokus ke Posisi Saya"
-        >
-          <MapPin className="w-4 h-4 text-rose-400" />
-        </button>
-      </div>
     </div>
   );
 });
