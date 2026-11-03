@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { SMK_CLASSES } from '../data/initialData.ts';
 import { Student } from '../types/index.ts';
 import { StorageService } from '../utils/storage.ts';
-import { School, User, Lock, Sparkles, BookOpen, MapPin, Compass, KeyRound, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { School, User, Lock, Sparkles, BookOpen, MapPin, Compass, KeyRound, Eye, EyeOff, ShieldCheck, Camera, Newspaper, X } from 'lucide-react';
 
 interface StudentWelcomeProps {
   onLoginStudent: (student: Student) => void;
@@ -20,15 +20,26 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
     existingStudent && !existingStudent.className.includes('DKV 1') ? existingStudent : null;
 
   const [className, setClassName] = useState<string>(
-    validExistingStudent?.className || SMK_CLASSES[0]
+    validExistingStudent && !validExistingStudent.isGuest && !validExistingStudent.isTeacher
+      ? validExistingStudent.className
+      : SMK_CLASSES[0]
   );
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
-    validExistingStudent?.id || ''
+    validExistingStudent && !validExistingStudent.isGuest && !validExistingStudent.isTeacher
+      ? validExistingStudent.id
+      : ''
   );
   const [customName, setCustomName] = useState<string>(validExistingStudent?.name || '');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+
+  // Guest Login ("Tamu Kota") Modal State
+  const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
+  const [guestName, setGuestName] = useState('Tamu Kota');
+  const [guestPassword, setGuestPassword] = useState('');
+  const [showGuestPassword, setShowGuestPassword] = useState(false);
+  const [guestError, setGuestError] = useState('');
 
   // Fetch all authorized students
   const allStudents = useMemo(() => StorageService.getStudents(), []);
@@ -109,9 +120,59 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
     onLoginStudent(loggedStudent);
   };
 
+  // Handle Guest ("Tamu Kota") Login
+  const handleGuestSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setGuestError('');
+
+    const cleanName = guestName.trim();
+    if (cleanName.toLowerCase() !== 'tamu kota') {
+      setGuestError('Nama akun tamu harus "Tamu Kota".');
+      return;
+    }
+
+    if (guestPassword.trim() !== 'Refleksia11') {
+      setGuestError('Password Tamu salah! Gunakan password: Refleksia11');
+      return;
+    }
+
+    const guestStudent: Student = {
+      id: 'guest-tamu-kota',
+      name: 'Tamu Kota',
+      className: 'Tamu Kota (Wartawan)',
+      studentNumber: 'WARTAWAN-01',
+      password: 'Refleksia11',
+      gender: 'L',
+      points: 5,
+      badges: ['reflektor_pertama'],
+      lastLogin: new Date().toISOString().slice(0, 10),
+      streakDays: 1,
+      isTeacher: false,
+      isGuest: true,
+    };
+
+    StorageService.setCurrentStudent(guestStudent);
+    setIsGuestModalOpen(false);
+    onLoginStudent(guestStudent);
+  };
+
   return (
-    <div className="min-h-[100dvh] w-full bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 flex flex-col justify-center items-center py-2 sm:py-5 px-3 sm:px-6 text-slate-100 overflow-y-auto">
-      <div className="w-full max-w-md sm:max-w-lg landscape:max-w-3xl lg:max-w-4xl bg-slate-800/95 border border-slate-700/80 rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-6 landscape:p-5 lg:p-7 relative overflow-hidden my-auto shrink-0 transition-all">
+    <div className="relative min-h-[100dvh] w-full flex flex-col justify-center items-center py-2 sm:py-5 px-3 sm:px-6 text-slate-100 overflow-y-auto">
+      {/* Background: Gambar Kota Refleksia blurred 70% */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src="/assets/aistudio/map_kota_refleksi_composite.webp"
+          alt="Latar Belakang Kota Refleksia"
+          className="w-full h-full object-cover object-center"
+          style={{
+            filter: 'blur(14px)',
+            transform: 'scale(1.1)',
+          }}
+        />
+        <div className="absolute inset-0 bg-slate-950/60" />
+      </div>
+
+      <div className="w-full max-w-md sm:max-w-lg landscape:max-w-3xl lg:max-w-4xl bg-slate-800/95 border border-slate-700/80 rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-6 landscape:p-5 lg:p-7 relative z-10 overflow-hidden my-auto shrink-0 transition-all">
         {/* Decorative background glow */}
         <div className="absolute -top-24 -right-24 w-60 h-60 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-60 h-60 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
@@ -119,7 +180,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
         {/* Responsive Grid Container: 2 columns in landscape or desktop, 1 column in mobile portrait */}
         <div className="landscape:grid landscape:grid-cols-12 lg:grid lg:grid-cols-12 landscape:gap-6 lg:gap-8 items-center relative z-10">
           
-          {/* Left Column: Branding, Title, Badge & (in landscape) Feature Pills + Teacher Entry */}
+          {/* Left Column: Branding, Title, Badge & (in landscape) Feature Pills + Teacher & Guest Entry */}
           <div className="landscape:col-span-5 lg:col-span-5 flex flex-col justify-between text-center landscape:text-left lg:text-left">
             <div>
               <div className="inline-flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 mb-2 sm:mb-2.5">
@@ -129,10 +190,10 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
                 Refleksia City
               </h1>
               <div className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10.5px] sm:text-xs font-bold mb-1.5 sm:mb-2">
-                Informatika (KKA) • X DKV 2 & X DKV 3
+                Kota Meta Pelajar
               </div>
               <p className="text-[11px] sm:text-xs text-slate-300 max-w-sm mx-auto landscape:mx-0 lg:mx-0 leading-relaxed">
-                Media interaktif belajar & refleksi materi <strong className="text-amber-400">Berpikir Komputasional</strong> bersama <strong className="text-emerald-300">AI Mentor Kota</strong>.
+                Peta kolaboratif berbasis media Interaktif untuk belajar, berinteraksi, dan refleksi
               </p>
             </div>
 
@@ -152,15 +213,29 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
               </div>
             </div>
 
-            {/* Teacher Entry Button (Shown on left column in Tablet Landscape / Desktop) */}
-            <div className="hidden landscape:block lg:block mt-3 text-center landscape:text-left lg:text-left">
+            {/* Teacher & Guest Entry Buttons Side-by-Side (Shown on left column in Tablet Landscape / Desktop) */}
+            <div className="hidden landscape:flex lg:flex flex-wrap items-center justify-center landscape:justify-start lg:justify-start gap-2 mt-3">
               <button
                 type="button"
                 onClick={onOpenTeacherLogin}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white px-3 py-1.5 rounded-xl hover:bg-slate-700/50 transition border border-slate-700/50 hover:border-slate-500 cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-xl bg-slate-900/50 hover:bg-slate-700/60 transition border border-slate-700/60 hover:border-amber-400/60 cursor-pointer"
               >
                 <Lock className="w-3.5 h-3.5 text-amber-400" />
                 <span>Masuk sebagai Guru</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setGuestName('Tamu Kota');
+                  setGuestPassword('');
+                  setGuestError('');
+                  setIsGuestModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-200 hover:text-white px-3 py-1.5 rounded-xl bg-sky-950/50 hover:bg-sky-900/60 transition border border-sky-500/40 hover:border-sky-400 cursor-pointer"
+              >
+                <Camera className="w-3.5 h-3.5 text-sky-400" />
+                <span>Login Tamu</span>
               </button>
             </div>
           </div>
@@ -172,12 +247,12 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
               <div className="mb-2.5 sm:mb-3 p-2.5 rounded-xl sm:rounded-2xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 rounded-xl bg-emerald-600/30 text-emerald-300 flex items-center justify-center font-bold text-xs shrink-0">
-                    {validExistingStudent.name.charAt(0).toUpperCase()}
+                    {validExistingStudent.isGuest ? '📸' : validExistingStudent.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] text-emerald-300 font-medium">Akun tersimpan</p>
                     <p className="text-xs sm:text-sm font-bold text-white truncate">
-                      {validExistingStudent.name} ({validExistingStudent.className.split(' ')[0]} {validExistingStudent.className.split(' ')[1]})
+                      {validExistingStudent.name} ({validExistingStudent.isGuest ? 'Wartawan Tamu' : `${validExistingStudent.className.split(' ')[0]} ${validExistingStudent.className.split(' ')[1] || ''}`.trim()})
                     </p>
                   </div>
                 </div>
@@ -188,7 +263,9 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
                       ...validExistingStudent,
                       points: validExistingStudent.isTeacher ? 10 : 5,
                     };
-                    StorageService.saveOrUpdateStudent(resumed);
+                    if (!resumed.isGuest) {
+                      StorageService.saveOrUpdateStudent(resumed);
+                    }
                     StorageService.setCurrentStudent(resumed);
                     onLoginStudent(resumed);
                   }}
@@ -309,7 +386,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
           </div>
         </div>
 
-        {/* Footer (Feature Pills & Teacher Button): Shown ONLY on Mobile Portrait */}
+        {/* Footer (Feature Pills & Teacher + Guest Buttons): Shown ONLY on Mobile Portrait */}
         <div className="landscape:hidden lg:hidden mt-3 pt-3 border-t border-slate-700/60">
           <div className="grid grid-cols-3 gap-1.5 text-center">
             <div className="p-1.5 rounded-xl bg-slate-900/50">
@@ -326,18 +403,146 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
             </div>
           </div>
 
-          <div className="mt-2.5 text-center">
+          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
               onClick={onOpenTeacherLogin}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white px-3 py-1.5 rounded-xl hover:bg-slate-700/50 transition border border-transparent hover:border-slate-600 cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-700/60 transition border border-slate-700/60 hover:border-amber-400/60 cursor-pointer"
             >
               <Lock className="w-3.5 h-3.5 text-amber-400" />
               <span>Masuk sebagai Guru</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setGuestName('Tamu Kota');
+                setGuestPassword('');
+                setGuestError('');
+                setIsGuestModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-200 hover:text-white px-3 py-1.5 rounded-xl bg-sky-950/60 hover:bg-sky-900/60 transition border border-sky-500/40 hover:border-sky-400 cursor-pointer"
+            >
+              <Camera className="w-3.5 h-3.5 text-sky-400" />
+              <span>Login Tamu</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* GUEST LOGIN MODAL ("Tamu Kota" / Pass: Refleksia11) */}
+      {isGuestModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setIsGuestModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-slate-900 border border-sky-500/40 rounded-3xl shadow-2xl p-5 sm:p-6 relative overflow-hidden text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute -top-20 -right-20 w-44 h-44 bg-sky-500/20 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-start justify-between gap-3 mb-4 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-sky-500 to-amber-500 flex items-center justify-center text-2xl shadow-lg shadow-sky-500/30">
+                  📸
+                </div>
+                <div>
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 text-[10px] font-extrabold uppercase tracking-wider">
+                    <Newspaper className="w-3 h-3" />
+                    <span>Akses Kunjungan Wartawan</span>
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-extrabold text-white mt-0.5">
+                    Login Tamu Kota
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGuestModalOpen(false)}
+                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+                aria-label="Tutup"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 rounded-2xl bg-slate-800/80 border border-slate-700/70 text-xs text-slate-300 space-y-1 relative z-10">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Avatar Khusus:</span>
+                <span className="font-bold text-amber-300">📸 Wartawan / Jurnalis Kota</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Hak Akses:</span>
+                <span className="font-bold text-sky-300">👁️ Hanya Melihat-lihat (View Only)</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Modal XP Awal:</span>
+                <span className="font-bold text-emerald-300 font-mono">🪙 +5 XP</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleGuestSubmit} className="space-y-3 relative z-10">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">
+                  Nama Akun Tamu
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={guestName}
+                  onChange={(e) => {
+                    setGuestName(e.target.value);
+                    setGuestError('');
+                  }}
+                  placeholder="Tamu Kota"
+                  className="w-full px-3 py-2 bg-slate-950/90 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs sm:text-sm font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">
+                  Password Tamu
+                </label>
+                <div className="relative">
+                  <input
+                    type={showGuestPassword ? 'text' : 'password'}
+                    required
+                    value={guestPassword}
+                    onChange={(e) => {
+                      setGuestPassword(e.target.value);
+                      setGuestError('');
+                    }}
+                    placeholder="Masukkan password tamu..."
+                    className="w-full pl-3 pr-10 py-2 bg-slate-950/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs sm:text-sm font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGuestPassword(!showGuestPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer"
+                  >
+                    {showGuestPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {guestError && (
+                <p className="text-xs text-red-400 font-semibold bg-red-950/60 p-2 rounded-lg border border-red-800">
+                  {guestError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-2.5 px-4 rounded-xl font-extrabold text-xs sm:text-sm bg-gradient-to-r from-sky-600 via-cyan-600 to-teal-600 hover:from-sky-500 hover:to-teal-500 text-white shadow-lg shadow-sky-600/30 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Masuk sebagai Tamu Kota (5 XP)</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

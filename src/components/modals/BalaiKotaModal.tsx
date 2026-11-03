@@ -2,6 +2,7 @@ import React from 'react';
 import { X, CheckCircle2, Award, Target, Sparkles, Shuffle } from 'lucide-react';
 import { sounds } from '../../utils/audio';
 import { BuildingId } from '../../types/index.ts';
+import { StorageService } from '../../utils/storage.ts';
 
 export interface TownMissionDef {
   id: string;
@@ -276,8 +277,55 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
             })}
           </div>
         </div>
+
+        {/* Distributed Bank Materi AI Section */}
+        {(() => {
+          const bankList = StorageService.getBankMateri();
+          if (!bankList || bankList.length === 0) return null;
+          return (
+            <div className="mt-6 pt-5 border-t border-white/15 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-black text-amber-300 flex items-center gap-2">
+                  <span>🏦 Materi & Misi Terdistribusi dari Bank Materi Guru ({bankList.length})</span>
+                </h3>
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                  ✨ Hasil Generate AI Guru
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Materi berikut telah ditambahkan oleh Bapak/Ibu Guru di Gedung Bank Materi dan tersebar otomatis ke Perpustakaan, Pusat Refleksi, Studio ON AIR, dan Lab DKV & Tefa:
+              </p>
+              <div className="space-y-2.5">
+                {bankList.map((bm) => (
+                  <div
+                    key={bm.id}
+                    className="p-3.5 rounded-2xl bg-indigo-950/50 border border-indigo-500/40 space-y-2"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                        {bm.mataPelajaran} • {bm.kelasTarget}
+                      </span>
+                      <span className="text-[10px] text-amber-300 font-semibold">
+                        👩‍🏫 {bm.teacherName}
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-white">Elemen: {bm.elemen}</h4>
+                    <p className="text-xs text-slate-200">
+                      <strong className="text-indigo-300">Tujuan Pembelajaran:</strong>{' '}
+                      {bm.tujuanPembelajaran}
+                    </p>
+                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-emerald-300">
+                      🎯 <strong>Misi Kota:</strong> {bm.misiBalaiKota}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
 };
+
 

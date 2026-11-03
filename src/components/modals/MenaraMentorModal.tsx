@@ -337,11 +337,15 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
   onNavigateBuilding,
   onAddXp,
 }) => {
-  // Available 5 core materials
-  const availableMateris: Materi[] = INITIAL_MATERI.slice(0, 5).map((initBook, idx) => {
+  // Available core materials + Teacher Bank Materi AI modules
+  const coreFive: Materi[] = INITIAL_MATERI.slice(0, 5).map((initBook, idx) => {
     const matched = materis.find((m) => m.id === initBook.id) || materis[idx];
     return matched || initBook;
   });
+  const extraBankMateris: Materi[] = materis.filter(
+    (m) => !INITIAL_MATERI.slice(0, 5).some((init) => init.id === m.id)
+  );
+  const availableMateris: Materi[] = [...extraBankMateris, ...coreFive];
 
   // Tabs: 'podcast_studio' (Default ON AIR), 'podcast_history' (Riwayat Teks Spreadsheet), 'feedback' (Umpan Balik Refleksi)
   const [activeTab, setActiveTab] = useState<'podcast_studio' | 'podcast_history' | 'feedback'>('podcast_studio');

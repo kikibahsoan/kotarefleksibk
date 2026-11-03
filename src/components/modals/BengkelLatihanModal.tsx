@@ -48,11 +48,47 @@ function shuffleQuestionOptions(q: QuizQuestion): QuizQuestion {
 }
 
 function getTierForQuestion(q: QuizQuestion): number {
-  if (q.id.startsWith('q-bk-1') || q.materiTitle?.includes('Jenjang 1') || q.materiId === 'materi-bk-01') return 1;
-  if (q.id.startsWith('q-bk-2') || q.materiTitle?.includes('Jenjang 2') || q.materiId === 'materi-bk-02') return 2;
-  if (q.id.startsWith('q-bk-3') || q.materiTitle?.includes('Jenjang 3') || q.materiId === 'materi-bk-03') return 3;
-  if (q.id.startsWith('q-bk-4') || q.materiTitle?.includes('Jenjang 4') || q.materiId === 'materi-bk-04') return 4;
-  if (q.id.startsWith('q-bk-5') || q.materiTitle?.includes('Jenjang 5') || q.materiId === 'materi-bk-05') return 5;
+  const qText = q.question || '';
+  if (
+    q.id.startsWith('q-bk-1') ||
+    q.id.endsWith('-1') ||
+    qText.includes('Jenjang 1') ||
+    q.materiTitle?.includes('Jenjang 1') ||
+    q.materiId === 'materi-bk-01'
+  )
+    return 1;
+  if (
+    q.id.startsWith('q-bk-2') ||
+    q.id.endsWith('-2') ||
+    qText.includes('Jenjang 2') ||
+    q.materiTitle?.includes('Jenjang 2') ||
+    q.materiId === 'materi-bk-02'
+  )
+    return 2;
+  if (
+    q.id.startsWith('q-bk-3') ||
+    q.id.endsWith('-3') ||
+    qText.includes('Jenjang 3') ||
+    q.materiTitle?.includes('Jenjang 3') ||
+    q.materiId === 'materi-bk-03'
+  )
+    return 3;
+  if (
+    q.id.startsWith('q-bk-4') ||
+    q.id.endsWith('-4') ||
+    qText.includes('Jenjang 4') ||
+    q.materiTitle?.includes('Jenjang 4') ||
+    q.materiId === 'materi-bk-04'
+  )
+    return 4;
+  if (
+    q.id.startsWith('q-bk-5') ||
+    q.id.endsWith('-5') ||
+    qText.includes('Jenjang 5') ||
+    q.materiTitle?.includes('Jenjang 5') ||
+    q.materiId === 'materi-bk-05'
+  )
+    return 5;
   return 1;
 }
 

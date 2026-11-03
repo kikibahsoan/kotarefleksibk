@@ -7,7 +7,8 @@ export type BuildingId =
   | 'kantor_pos'
   | 'pasar_prestasi'
   | 'monumen_warga'
-  | 'masjid';
+  | 'masjid'
+  | 'bank_materi';
 
 export interface PublicChatMessage {
   id: string;
@@ -22,6 +23,7 @@ export interface PublicChatMessage {
   avatarColor?: string;
   isReported?: boolean;
   isTeacher?: boolean;
+  isGuest?: boolean;
 }
 
 export interface StudentActivityBreakdown {
@@ -46,6 +48,7 @@ export interface Student {
   lastLogin: string;
   streakDays: number;
   isTeacher?: boolean;
+  isGuest?: boolean;
   subject?: string;
   loginCount?: number;
   completedMissionsCount?: number;
@@ -66,6 +69,11 @@ export interface Materi {
   createdAt: string;
   isNew?: boolean;
   customQuestions?: string[];
+  elemen?: string;
+  tujuanPembelajaran?: string;
+  materiEsensial?: string;
+  teacherName?: string;
+  bankMateriId?: string;
 }
 
 export interface LearningObjective {
@@ -256,3 +264,36 @@ export interface WeatherConfig {
   icon: string;
   description: string;
 }
+
+export interface BankMateriBuildingDistribution {
+  buildingId: BuildingId;
+  buildingName: string;
+  buildingIcon: string;
+  activityTitle: string;
+  materialSummary: string;
+  challengePrompt: string;
+}
+
+export interface BankMateriEntry {
+  id: string;
+  materiId: string;
+  objectiveId: string;
+  teacherId: string;
+  teacherName: string;
+  mataPelajaran: string;
+  kelasTarget: string;
+  elemen: string;
+  tujuanPembelajaran: string;
+  materiEsensial: string;
+  ringkasanAI: string;
+  modulPerpustakaan: string;
+  pertanyaanRefleksi: string[];
+  topikPodcastMentor: string;
+  pertanyaanPemantikPodcast: string;
+  misiBalaiKota: string;
+  tantanganBangunanLain: BankMateriBuildingDistribution[];
+  kuisBengkel: QuizQuestion[];
+  createdAt: string;
+  timestamp: number;
+}
+

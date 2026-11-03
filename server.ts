@@ -1322,6 +1322,635 @@ app.post('/api/presence/leave', express.text({ type: '*/*' }), (req, res) => {
   res.json({ success: true });
 });
 
+// ============================================================================
+// BANK MATERI GURU & DISTRIBUSI AI KE SELURUH BANGUNAN REFLEKSIA CITY
+// ============================================================================
+const BANK_MATERI_FILE = path.join(__dirname, 'server_bank_materi.json');
+
+interface ServerBankMateriEntry {
+  id: string;
+  materiId: string;
+  objectiveId: string;
+  teacherId: string;
+  teacherName: string;
+  mataPelajaran: string;
+  kelasTarget: string;
+  elemen: string;
+  tujuanPembelajaran: string;
+  materiEsensial: string;
+  ringkasanAI: string;
+  modulPerpustakaan: string;
+  pertanyaanRefleksi: string[];
+  topikPodcastMentor: string;
+  pertanyaanPemantikPodcast: string;
+  misiBalaiKota: string;
+  tantanganBangunanLain: {
+    buildingId: string;
+    buildingName: string;
+    buildingIcon: string;
+    activityTitle: string;
+    materialSummary: string;
+    challengePrompt: string;
+  }[];
+  kuisBengkel: {
+    id: string;
+    materiId: string;
+    materiTitle?: string;
+    question: string;
+    options: string[];
+    correctIndex: number;
+    explanation: string;
+  }[];
+  createdAt: string;
+  timestamp: number;
+}
+
+const DEFAULT_BANK_MATERI: ServerBankMateriEntry[] = [
+  {
+    id: 'bm-seed-001',
+    materiId: 'materi-bm-001',
+    objectiveId: 'tp-bm-001',
+    teacherId: 'teacher-1',
+    teacherName: 'Mohamad Rizki Bahsoan, S.Kom',
+    mataPelajaran: 'Komputer Grafis & Publikasi',
+    kelasTarget: 'X DKV 2 & X DKV 3',
+    elemen: 'Prinsip Desain Grafis, Tipografi & Hierarki Visual Publikasi',
+    tujuanPembelajaran:
+      'Peserta didik mampu menerapkan prinsip keseimbangan, kontras, penekanan (emphasis), dan hierarki tipografi dalam merancang poster publikasi digital yang komunikatif.',
+    materiEsensial:
+      '1. Hierarki Visual mengatur urutan mata audiens membaca informasi (Judul Utama -> Subjudul -> Isi -> Call to Action).\n2. Kontras warna dan ukuran huruf membantu menonjolkan pesan kunci.\n3. White space (ruang kosong) menjaga desain tetap lega, rapi, dan mudah dipindai.\n4. Grid system menyatukan tata letak elemen grafis dan foto agar proporsional.',
+    ringkasanAI:
+      'Materi ini membekali siswa DKV dengan fondasi penyusunan tata letak visual menggunakan Hierarki Tipografi, Kontras Warna, Grid System, dan White Space agar karya publikasi memiliki pesan yang langsung tertangkap audiens dalam 3 detik pertama.',
+    modulPerpustakaan:
+      'BAB 1 — MENGAPA HIERARKI VISUAL PENTING DALAM DESAIN PUBLIKASI?\nKetika seseorang melihat poster atau konten media sosial, mata mereka hanya membutuhkan waktu kurang dari 3 detik untuk memutuskan apakah informasi tersebut menarik atau membingungkan. Hierarki visual adalah seni memandu pandangan mata pembaca dari elemen terpenting menuju detail pendukung.\n\nBAB 2 — 4 PILAR UTAMA KOMPOSISI GRAFIS\n1. Ukuran & Skala (Scale): Elemen yang lebih besar otomatis dipersepsikan lebih penting. Pastikan Headline memiliki ukuran paling dominan dibanding Body Text.\n2. Kontras Warna & Nilai Gelap-Terang: Gunakan kontras tinggi antara teks utama dan latar belakang agar keterbacaan (readability) tetap terjaga dari jarak jauh.\n3. Keseimbangan & Sistem Grid: Gunakan margin yang konsisten dan rata kiri/tengah yang jelas agar desain tidak terlihat berantakan.\n4. White Space (Ruang Negatif): Jangan memenuhi seluruh kanvas dengan teks atau ornamen. Ruang kosong memberi nafas bagi mata audiens.\n\nBAB 3 — RUMUS CEPAT EVALUASI KARYA (TES 3 DETIK)\nCoba jauhkan desainmu atau kecilkan ukurannya hingga 25%. Apakah judul utamanya masih terbaca jelas? Apa elemen pertama yang dilihat matamu? Jika mata langsung tertuju pada pesan inti, maka hierarki visualmu sudah berhasil!',
+    pertanyaanRefleksi: [
+      'Saat melihat sebuah poster atau desain publikasi, bagian mana dari prinsip hierarki visual (ukuran, kontras warna, atau ruang kosong) yang paling mudah kamu terapkan?',
+      'Kendala apa yang paling sering kamu alami ketika menyusun banyak teks di dalam satu kanvas desain agar tidak terlihat penuh dan semrawut?',
+      'Bagaimana langkah perbaikan yang akan kamu terapkan pada proyek poster DKV berikutnya setelah memahami konsep Grid System dan White Space?',
+    ],
+    topikPodcastMentor:
+      'Strategi menyusun Hierarki Visual & Tipografi agar poster karya siswa DKV langsung menarik perhatian audiens dalam 3 detik pertama.',
+    pertanyaanPemantikPodcast:
+      'Jika kamu diminta mendesain ulang satu poster kegiatan sekolah yang penuh teks, elemen apa yang akan kamu perbesar pertama kali dan bagian mana yang akan kamu beri ruang kosong (white space)?',
+    misiBalaiKota:
+      'Misi Kota: Amati 1 desain poster/informasi di lingkungan sekolah atau kota, lalu identifikasi Headline utama, kontras warna, dan penggunaan White Space-nya!',
+    tantanganBangunanLain: [
+      {
+        buildingId: 'perpustakaan',
+        buildingName: 'Perpustakaan Kampus',
+        buildingIcon: '📚',
+        activityTitle: 'Modul Bacaan & Jurnal 4F: Hierarki Visual & Tipografi',
+        materialSummary:
+          'Pelajari 4 pilar komposisi grafis (Skala, Kontras, Grid, White Space) dan rumus evaluasi karya Tes 3 Detik, lalu catat kesimpulanmu di Jurnal 4F.',
+        challengePrompt: 'Baca modul lengkap di Rak Buku Bank Materi lalu tulis Jurnal 4F (Facts, Feelings, Findings, Future).',
+      },
+      {
+        buildingId: 'taman_refleksi',
+        buildingName: 'Pusat Refleksi',
+        buildingIcon: '🌿',
+        activityTitle: 'Refleksi Mandiri: Evaluasi Tata Letak & Keterbacaan Desain',
+        materialSummary:
+          'Refleksikan pengalamanmu mengatur keseimbangan teks dan gambar dalam karya publikasi digital.',
+        challengePrompt: 'Jawab 3 pertanyaan refleksi khusus dari Guru pada materi Komputer Grafis & Publikasi.',
+      },
+      {
+        buildingId: 'menara_mentor',
+        buildingName: 'Studio ON AIR',
+        buildingIcon: '🎙️',
+        activityTitle: 'Siaran Podcast AI Mentor: Bedah Karya Poster DKV',
+        materialSummary:
+          'Diskusikan bersama Host AI Mentor mengenai cara mengatasi kanvas desain yang terlalu penuh menggunakan prinsip White Space.',
+        challengePrompt: 'Mulai sesi rekaman Podcast ON AIR dengan memilih topik Komputer Grafis & Publikasi.',
+      },
+      {
+        buildingId: 'bengkel_latihan',
+        buildingName: 'Lab DKV & Tefa',
+        buildingIcon: '🛠️',
+        activityTitle: 'Tantangan Kuis 5 Jenjang: Komputer Grafis & Publikasi',
+        materialSummary:
+          'Uji pemahamanmu dari Jenjang 1 (Dasar) hingga Jenjang 5 (Mahir) seputar Hierarki Visual, Tipografi, dan Grid System.',
+        challengePrompt: 'Selesaikan 5 soal berjenjang untuk meraih bintang kompetensi dan XP tambahan.',
+      },
+      {
+        buildingId: 'balai_kota',
+        buildingName: 'Balai Kota',
+        buildingIcon: '🏛️',
+        activityTitle: 'Misi Utama Warga: Audit Visual Poster Kota',
+        materialSummary:
+          'Panduan capaian pembelajaran & misi kolaboratif merancang publikasi visual yang informatif bagi warga Kota Refleksia.',
+        challengePrompt: 'Cek target capaian pembelajaran di papan informasi Balai Kota.',
+      },
+      {
+        buildingId: 'kantor_pos',
+        buildingName: 'Kantor Pos',
+        buildingIcon: '📮',
+        activityTitle: 'Konsultasi Karya ke Guru Pengampu',
+        materialSummary:
+          'Kirimkan pertanyaan atau minta masukan langsung kepada Bapak Mohamad Rizki Bahsoan, S.Kom terkait draf desain publikasimu.',
+        challengePrompt: 'Tulis surat konsultasi desain melalui Kantor Pos.',
+      },
+      {
+        buildingId: 'monumen_warga',
+        buildingName: 'Monumen Warga',
+        buildingIcon: '🗿',
+        activityTitle: 'Diskusi Publik: Warna & Font Favorit Desainer DKV',
+        materialSummary:
+          'Bagikan tips kombinasi font (Font Pairing) atau palet warna andalanmu di papan obrolan Monumen Warga.',
+        challengePrompt: 'Berdiskusi santun dengan teman sekelas di ruang obrolan Monumen Warga.',
+      },
+      {
+        buildingId: 'pasar_prestasi',
+        buildingName: 'Pasar Prestasi',
+        buildingIcon: '🏆',
+        activityTitle: 'Apresiasi Kompetensi Desainer Publikasi',
+        materialSummary:
+          'Kumpulkan XP dari membaca modul, refleksi, podcast, dan kuis Bank Materi untuk menaikkan peringkatmu di Pasar Prestasi.',
+        challengePrompt: 'Pantau lencana dan papan peringkat warga teraktif.',
+      },
+      {
+        buildingId: 'masjid',
+        buildingName: 'Masjid Al-Hikmah',
+        buildingIcon: '🕌',
+        activityTitle: 'Adab & Etika Komunikasi Visual yang Jujur dan Santun',
+        materialSummary:
+          'Setiap karya desain publikasi harus menyampaikan informasi yang benar, jujur, bermanfaat, dan menjauhi unsur hoaks.',
+        challengePrompt: 'Renungkan nilai kejujuran dan kebermanfaatan karya bagi sesama.',
+      },
+    ],
+    kuisBengkel: [
+      {
+        id: 'q-bm-001-1',
+        materiId: 'materi-bm-001',
+        materiTitle: 'Komputer Grafis & Publikasi: Prinsip Desain & Hierarki Visual',
+        question:
+          '[Jenjang 1 - Dasar] Apa fungsi utama dari penerapan Hierarki Visual dalam sebuah desain poster publikasi?',
+        options: [
+          'Memandu urutan pandangan mata audiens dari informasi paling penting ke informasi pendukung',
+          'Membuat seluruh teks memiliki ukuran yang sama rata di seluruh kanvas',
+          'Mengisi seluruh ruang kosong dengan ornamen dekoratif sebanyak mungkin',
+          'Menggunakan lebih dari sepuluh jenis font berbeda dalam satu halaman',
+        ],
+        correctIndex: 0,
+        explanation:
+          'Hierarki visual berfungsi memandu mata pembaca agar langsung menangkap pesan utama (Headline) sebelum membaca detail pendukung.',
+      },
+      {
+        id: 'q-bm-001-2',
+        materiId: 'materi-bm-001',
+        materiTitle: 'Komputer Grafis & Publikasi: Prinsip Desain & Hierarki Visual',
+        question:
+          '[Jenjang 2 - Pemahaman] Mengapa keberadaan White Space (ruang kosong/negatif) sangat penting dalam tata letak publikasi?',
+        options: [
+          'Agar perancang tidak perlu memikirkan isi informasi poster',
+          'Memberi ruang bernafas bagi mata audiens sehingga desain tampak rapi dan mudah dibaca',
+          'Menurunkan kontras warna antara judul dan latar belakang',
+          'Menghilangkan kebutuhan akan sistem grid dan margin',
+        ],
+        correctIndex: 1,
+        explanation:
+          'White space menjaga fokus visual dan mencegah kelelahan mata saat audiens memindai informasi.',
+      },
+      {
+        id: 'q-bm-001-3',
+        materiId: 'materi-bm-001',
+        materiTitle: 'Komputer Grafis & Publikasi: Prinsip Desain & Hierarki Visual',
+        question:
+          '[Jenjang 3 - Penerapan] Seorang siswa DKV membuat poster dengan latar biru tua gelap. Warna teks judul apa yang paling tepat dipilih untuk menghasilkan kontras keterbacaan (readability) tertinggi?',
+        options: [
+          'Ungu tua atau hitam pekat',
+          'Abu-abu gelap dengan transparansi rendah',
+          'Putih bersih atau kuning cerah',
+          'Biru dongker dengan ukuran font kecil',
+        ],
+        correctIndex: 2,
+        explanation:
+          'Pada latar belakang gelap (biru tua), teks berwarna terang seperti putih atau kuning cerah menciptakan kontras nilai (value contrast) yang tinggi sehingga mudah terbaca.',
+      },
+      {
+        id: 'q-bm-001-4',
+        materiId: 'materi-bm-001',
+        materiTitle: 'Komputer Grafis & Publikasi: Prinsip Desain & Hierarki Visual',
+        question:
+          '[Jenjang 4 - Analisis] Saat dilakukan "Tes 3 Detik", audiens justru lebih dulu melihat dekorasi bunga di sudut poster daripada judul acara. Langkah perbaikan apa yang paling tepat?',
+        options: [
+          'Memperbesar ukuran dekorasi bunga agar menutupi setengah kanvas',
+          'Memperbesar ukuran & ketebalan font judul utama serta mengecilkan/meredupkan elemen dekorasi',
+          'Menghapus judul acara dari poster',
+          'Mengubah jenis huruf judul menjadi huruf sambung (script) yang rumit dan tipis',
+        ],
+        correctIndex: 1,
+        explanation:
+          'Penekanan (Emphasis) harus diberikan pada judul utama melalui skala, ketebalan font, dan kontras, sementara elemen dekoratif tidak boleh mendominasi pesan inti.',
+      },
+      {
+        id: 'q-bm-001-5',
+        materiId: 'materi-bm-001',
+        materiTitle: 'Komputer Grafis & Publikasi: Prinsip Desain & Hierarki Visual',
+        question:
+          '[Jenjang 5 - Evaluasi & Kreasi] Dalam merancang katalog produk Teaching Factory DKV yang memuat foto, judul produk, spesifikasi, dan harga, sistem tata letak apa yang paling efektif menjaga konsistensi antarhalaman?',
+        options: [
+          'Menempatkan foto dan teks secara acak di setiap halaman tanpa garis bantu',
+          'Menerapkan Modular Grid System dengan gaya tipografi (Heading, Subheading, Body) yang konsisten',
+          'Mengganti warna latar dan jenis font di setiap baris kalimat',
+          'Menyatukan seluruh teks spesifikasi tanpa paragraf maupun jarak antarbaris (leading)',
+        ],
+        correctIndex: 1,
+        explanation:
+          'Modular Grid System dikombinasikan dengan aturan tipografi yang konsisten memastikan katalog multi-halaman terlihat profesional, terstruktur, dan nyaman dibaca.',
+      },
+    ],
+    createdAt: '3 November 2026',
+    timestamp: Date.now(),
+  },
+];
+
+function loadServerBankMateri(): ServerBankMateriEntry[] {
+  try {
+    if (fs.existsSync(BANK_MATERI_FILE)) {
+      const raw = fs.readFileSync(BANK_MATERI_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed reading server_bank_materi.json:', e);
+  }
+  return [...DEFAULT_BANK_MATERI];
+}
+
+function saveServerBankMateri(list: ServerBankMateriEntry[]) {
+  try {
+    fs.writeFileSync(BANK_MATERI_FILE, JSON.stringify(list, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('Failed saving server_bank_materi.json:', e);
+  }
+}
+
+let serverBankMateriList: ServerBankMateriEntry[] = loadServerBankMateri();
+
+app.get('/api/bank-materi', (_req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.json({
+    success: true,
+    data: serverBankMateriList,
+  });
+});
+
+app.post('/api/bank-materi', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const entry = req.body as ServerBankMateriEntry;
+  if (!entry || !entry.id || !entry.mataPelajaran) {
+    return res.status(400).json({
+      success: false,
+      error: 'Data Bank Materi tidak lengkap.',
+    });
+  }
+
+  const existingIdx = serverBankMateriList.findIndex((item) => item.id === entry.id);
+  if (existingIdx >= 0) {
+    serverBankMateriList[existingIdx] = entry;
+  } else {
+    serverBankMateriList.unshift(entry);
+  }
+  saveServerBankMateri(serverBankMateriList);
+
+  res.json({
+    success: true,
+    data: entry,
+    all: serverBankMateriList,
+  });
+});
+
+app.delete('/api/bank-materi/:id', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const { id } = req.params;
+  serverBankMateriList = serverBankMateriList.filter((item) => item.id !== id);
+  saveServerBankMateri(serverBankMateriList);
+  res.json({
+    success: true,
+    deletedId: id,
+    all: serverBankMateriList,
+  });
+});
+
+app.post('/api/bank-materi/generate-ai', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const {
+    teacherName = 'Guru Pengampu',
+    mataPelajaran = 'Dasar-Dasar Desain Komunikasi Visual',
+    kelasTarget = 'X DKV 2 & X DKV 3',
+    elemen = 'Pemahaman Konsep & Praktik Kejuruan',
+    tujuanPembelajaran = 'Peserta didik mampu memahami dan menerapkan konsep inti materi dalam proyek nyata.',
+    materiEsensial = 'Konsep dasar, langkah kerja, dan penerapan nyata dalam proyek pembelajaran.',
+  } = req.body || {};
+
+  const buildFallbackDistribution = () => {
+    const cleanEss = String(materiEsensial || '').trim();
+    const cleanTp = String(tujuanPembelajaran || '').trim();
+    const cleanEl = String(elemen || '').trim();
+    const cleanMapel = String(mataPelajaran || '').trim();
+
+    return {
+      ringkasanAI: `Materi "${cleanEl}" pada mata pelajaran ${cleanMapel} (${kelasTarget}) yang disusun oleh ${teacherName} ini berfokus pada pencapaian Tujuan Pembelajaran: "${cleanTp}". Siswa dipandu menguasai konsep esensial secara bertahap mulai dari literasi di Perpustakaan, refleksi diri di Pusat Refleksi, diskusi lisan di Studio ON AIR, hingga evaluasi 5 jenjang di Lab DKV & Tefa.`,
+      modulPerpustakaan: `BAB 1 — PENGANTAR ELEMEN: ${cleanEl.toUpperCase()}\nMata Pelajaran: ${cleanMapel} (${kelasTarget})\nGuru Pengampu: ${teacherName}\n\nTujuan Pembelajaran:\n${cleanTp}\n\nBAB 2 — INTI MATERI ESENSIAL\n${cleanEss}\n\nBAB 3 — PENERAPAN KONTEKSTUAL & LANGKAH PRAKTIS DI KOTA REFLEKSIA\n1. Pahami konsep kunci dan istilah utama pada materi ${cleanEl}.\n2. Hubungkan poin-poin materi esensial di atas dengan tugas praktik atau kehidupan sehari-hari sebagai siswa SMK jurusan DKV.\n3. Evaluasi hasil belajarmu melalui pencatatan Jurnal 4F (Facts, Feelings, Findings, Future) serta latihan kuis berjenjang di Lab DKV & Tefa.`,
+      pertanyaanRefleksi: [
+        `Dari materi "${cleanEl}" (${cleanMapel}), bagian konsep esensial mana yang paling cepat kamu pahami dan mengapa?`,
+        `Tantangan atau kesulitan apa yang kamu temukan saat mencoba mencapai Tujuan Pembelajaran: "${cleanTp}"?`,
+        `Langkah konkret apa yang akan kamu lakukan pada proyek atau latihan berikutnya untuk menerapkan materi ini secara lebih optimal?`,
+      ],
+      topikPodcastMentor: `Kupas Tuntas ${cleanMapel}: Strategi Menguasai Elemen "${cleanEl}" bersama ${teacherName}`,
+      pertanyaanPemantikPodcast: `Setelah mempelajari materi esensial "${cleanEl}", bagaimana cara kamu menjelaskan kembali konsep utamanya dengan bahasa sendiri serta menerapkannya dalam karya nyata?`,
+      misiBalaiKota: `Misi Kota (${cleanMapel}): Pelajari modul "${cleanEl}" di Perpustakaan, tulis refleksi di Pusat Refleksi, dan taklukkan Kuis 5 Jenjang di Lab DKV & Tefa!`,
+      tantanganBangunanLain: [
+        {
+          buildingId: 'perpustakaan',
+          buildingName: 'Perpustakaan Kampus',
+          buildingIcon: '📚',
+          activityTitle: `Modul Bacaan & Jurnal 4F: ${cleanEl}`,
+          materialSummary: `Baca modul lengkap ${cleanMapel} yang disusun oleh ${teacherName} tentang "${cleanEl}", lalu rangkum temuanmu di Jurnal 4F.`,
+          challengePrompt: `Baca 3 Bab modul "${cleanEl}" di Rak Buku Perpustakaan dan simpan Jurnal 4F (+XP).`,
+        },
+        {
+          buildingId: 'taman_refleksi',
+          buildingName: 'Pusat Refleksi',
+          buildingIcon: '🌿',
+          activityTitle: `Refleksi Mandiri: ${cleanEl}`,
+          materialSummary: `Evaluasi pemahamanmu terhadap Tujuan Pembelajaran: "${cleanTp}".`,
+          challengePrompt: `Pilih materi "${cleanMapel}: ${cleanEl}" di Pusat Refleksi lalu jawab 3 pertanyaan refleksi Guru.`,
+        },
+        {
+          buildingId: 'menara_mentor',
+          buildingName: 'Studio ON AIR',
+          buildingIcon: '🎙️',
+          activityTitle: `Podcast Interaktif AI Mentor: ${cleanEl}`,
+          materialSummary: `Diskusikan poin penguatan materi "${cleanEl}" bersama Host AI Mentor di Studio ON AIR.`,
+          challengePrompt: `Rekam episode Podcast membahas "${cleanEl}" dan dapatkan umpan balik langsung.`,
+        },
+        {
+          buildingId: 'bengkel_latihan',
+          buildingName: 'Lab DKV & Tefa',
+          buildingIcon: '🛠️',
+          activityTitle: `Kuis Berjenjang 5 Level: ${cleanEl}`,
+          materialSummary: `Uji penguasaan materi esensial "${cleanEl}" dari Jenjang 1 (Dasar) hingga Jenjang 5 (Mahir).`,
+          challengePrompt: `Kerjakan 5 soal kuis "${cleanMapel} - ${cleanEl}" di Lab DKV & Tefa.`,
+        },
+        {
+          buildingId: 'balai_kota',
+          buildingName: 'Balai Kota',
+          buildingIcon: '🏛️',
+          activityTitle: `Papan Misi & Capaian Pembelajaran: ${cleanMapel}`,
+          materialSummary: `Target Capaian (${kelasTarget}): ${cleanTp}`,
+          challengePrompt: `Cek progres penyelesaian misi materi "${cleanEl}" di Balai Kota.`,
+        },
+        {
+          buildingId: 'kantor_pos',
+          buildingName: 'Kantor Pos',
+          buildingIcon: '📮',
+          activityTitle: `Kotak Konsultasi Guru: ${teacherName}`,
+          materialSummary: `Kirimkan pertanyaan kepada ${teacherName} jika ada bagian dari materi "${cleanEl}" yang masih belum jelas.`,
+          challengePrompt: `Kirim pesan konsultasi materi "${cleanEl}" melalui Kantor Pos.`,
+        },
+        {
+          buildingId: 'monumen_warga',
+          buildingName: 'Monumen Warga',
+          buildingIcon: '🗿',
+          activityTitle: `Diskusi Warga: Berbagi Insight ${cleanEl}`,
+          materialSummary: `Diskusikan ide penerapan materi "${cleanEl}" bersama teman sekelas di ruang obrolan Monumen Warga.`,
+          challengePrompt: `Bagikan 1 kesimpulan menarik tentang "${cleanEl}" di Monumen Warga.`,
+        },
+        {
+          buildingId: 'pasar_prestasi',
+          buildingName: 'Pasar Prestasi',
+          buildingIcon: '🏆',
+          activityTitle: `Penghargaan Penguasaan Materi ${cleanMapel}`,
+          materialSummary: `Setiap aktivitas belajar pada materi "${cleanEl}" menambah skor keaktifan dan XP warga di Pasar Prestasi.`,
+          challengePrompt: `Kumpulkan XP dari misi Bank Materi untuk masuk Top 5 Warga Berprestasi.`,
+        },
+        {
+          buildingId: 'masjid',
+          buildingName: 'Masjid Al-Hikmah',
+          buildingIcon: '🕌',
+          activityTitle: `Integrasi Karakter & Keberkahan Ilmu: ${cleanMapel}`,
+          materialSummary: `Niatkan mempelajari "${cleanEl}" dengan jujur, tekun, dan penuh tanggung jawab agar ilmu yang diperoleh membawa manfaat.`,
+          challengePrompt: `Jaga adab menuntut ilmu dan ketekunan belajar di Kota Refleksia.`,
+        },
+      ],
+      kuisBengkel: [
+        {
+          question: `[Jenjang 1 - Dasar] Berdasarkan materi "${cleanEl}" pada mata pelajaran ${cleanMapel}, apa tujuan pembelajaran utama yang ingin dicapai?`,
+          options: [
+            cleanTp.length > 110 ? cleanTp.slice(0, 110) + '...' : cleanTp,
+            'Menghafal daftar istilah tanpa memahami penerapannya dalam proyek',
+            'Melewatkan tahapan perencanaan dan analisis konsep dasar',
+            'Mengabaikan kaidah keselamatan kerja dan kolaborasi tim',
+          ],
+          correctIndex: 0,
+          explanation: `Tujuan pembelajaran utama pada elemen "${cleanEl}" adalah: ${cleanTp}`,
+        },
+        {
+          question: `[Jenjang 2 - Pemahaman] Manakah pernyataan berikut yang paling sesuai dengan pokok Materi Esensial "${cleanEl}" yang diajarkan oleh ${teacherName}?`,
+          options: [
+            'Konsep materi tidak memiliki kaitan dengan praktik nyata siswa',
+            cleanEss.length > 110 ? cleanEss.slice(0, 110) + '...' : cleanEss,
+            'Seluruh tahapan dikerjakan secara acak tanpa struktur yang jelas',
+            'Evaluasi hasil karya tidak diperlukan dalam proses belajar',
+          ],
+          correctIndex: 1,
+          explanation: `Materi esensial menekankan pada pemahaman konsep inti: ${cleanEss.slice(0, 140)}`,
+        },
+        {
+          question: `[Jenjang 3 - Penerapan] Saat menerapkan elemen "${cleanEl}" dalam tugas praktik ${cleanMapel}, langkah awal yang paling tepat dilakukan siswa adalah...`,
+          options: [
+            'Langsung mengumpulkan tugas tanpa membaca instruksi dan tujuan pembelajaran',
+            'Memahami prinsip dasar materi esensial lalu menyusun rencana kerja sesuai indikator capaian',
+            'Menyalin pekerjaan teman tanpa melakukan proses analisis mandiri',
+            'Menghindari diskusi maupun refleksi ketika menemui kesulitan teknis',
+          ],
+          correctIndex: 1,
+          explanation:
+            'Penerapan yang baik selalu dimulai dari pemahaman materi esensial dan perencanaan kerja yang mengacu pada Tujuan Pembelajaran.',
+        },
+        {
+          question: `[Jenjang 4 - Analisis] Mengapa siswa perlu melakukan refleksi setelah mempelajari elemen "${cleanEl}" pada mata pelajaran ${cleanMapel}?`,
+          options: [
+            'Untuk memetakan bagian konsep yang sudah dikuasai dan merancang perbaikan pada bagian yang masih sulit',
+            'Agar tidak perlu mengikuti latihan soal di Lab DKV & Tefa',
+            'Hanya sebagai formalitas tanpa dampak pada peningkatan keterampilan',
+            'Untuk menggantikan seluruh kegiatan praktik kejuruan di kelas',
+          ],
+          correctIndex: 0,
+          explanation:
+            'Refleksi membantu siswa menyadari kekuatan dan celah pemahamannya sehingga dapat menyusun strategi tindak lanjut yang terukur.',
+        },
+        {
+          question: `[Jenjang 5 - Evaluasi & Kreasi] Bagaimana indikator bahwa seorang siswa telah mencapai level Mahir pada elemen "${cleanEl}" (${cleanMapel})?`,
+          options: [
+            'Hanya mampu menyebutkan judul materi tanpa bisa memberi contoh',
+            'Mampu mengintegrasikan konsep materi esensial ke dalam karya/solusi nyata secara mandiri, kritis, dan kreatif',
+            'Bergantung sepenuhnya pada bantuan orang lain saat menyelesaikan masalah dasar',
+            'Belum dapat menghubungkan tujuan pembelajaran dengan hasil pekerjaan',
+          ],
+          correctIndex: 1,
+          explanation:
+            'Pada jenjang Mahir, siswa mampu mengevaluasi dan menerapkan konsep esensial secara kreatif serta mandiri sesuai Tujuan Pembelajaran.',
+        },
+      ],
+    };
+  };
+
+  if (!ai) {
+    return res.json({
+      success: true,
+      source: 'fallback',
+      data: buildFallbackDistribution(),
+    });
+  }
+
+  try {
+    const prompt = `Anda adalah Arsitek Kurikulum AI Kota Refleksia untuk SMK Jurusan Desain Komunikasi Visual (DKV).
+Seorang Guru baru saja menginput data Bank Materi berikut:
+- Nama Guru: ${teacherName}
+- Mata Pelajaran: ${mataPelajaran}
+- Kelas Target: ${kelasTarget}
+- Elemen Kurikulum: ${elemen}
+- Tujuan Pembelajaran (TP): ${tujuanPembelajaran}
+- Materi Esensial: ${materiEsensial}
+
+Tugas Anda adalah mengolah input Guru tersebut menjadi paket pembelajaran lengkap yang OTOMATIS TERSEBAR ke seluruh 9 bangunan di Refleksia City agar bisa langsung diakses dan dipelajari oleh siswa:
+1. "ringkasanAI": Ringkasan eksekutif materi (2-3 kalimat padat dan inspiratif).
+2. "modulPerpustakaan": Modul bacaan lengkap dan mendalam (minimal 3 BAB: BAB 1 Pengantar & Konteks, BAB 2 Kupas Tuntas Materi Esensial, BAB 3 Studi Kasus & Penerapan Praktis bagi siswa SMK DKV) untuk dipasang di gedung Perpustakaan Kampus.
+3. "pertanyaanRefleksi": Array berisi tepat 3 pertanyaan refleksi kontekstual & mendalam untuk dijawab siswa di gedung Pusat Refleksi.
+4. "topikPodcastMentor": Judul/topik diskusi menarik untuk disiarkan bersama AI Host di gedung Studio ON AIR (Menara Mentor).
+5. "pertanyaanPemantikPodcast": 1 pertanyaan pemantik HOTS yang akan ditanyakan oleh Host Podcast AI kepada siswa saat siaran di Studio ON AIR.
+6. "misiBalaiKota": 1 kalimat misi aksi nyata warga Kota Refleksia yang tampil di papan pengumuman Balai Kota.
+7. "tantanganBangunanLain": Array berisi tepat 9 objek distribusi untuk masing-masing bangunan di Kota Refleksia:
+   - buildingId: "perpustakaan" (buildingName: "Perpustakaan Kampus", buildingIcon: "📚")
+   - buildingId: "taman_refleksi" (buildingName: "Pusat Refleksi", buildingIcon: "🌿")
+   - buildingId: "menara_mentor" (buildingName: "Studio ON AIR", buildingIcon: "🎙️")
+   - buildingId: "bengkel_latihan" (buildingName: "Lab DKV & Tefa", buildingIcon: "🛠️")
+   - buildingId: "balai_kota" (buildingName: "Balai Kota", buildingIcon: "🏛️")
+   - buildingId: "kantor_pos" (buildingName: "Kantor Pos", buildingIcon: "📮")
+   - buildingId: "monumen_warga" (buildingName: "Monumen Warga", buildingIcon: "🗿")
+   - buildingId: "pasar_prestasi" (buildingName: "Pasar Prestasi", buildingIcon: "🏆")
+   - buildingId: "masjid" (buildingName: "Masjid Al-Hikmah", buildingIcon: "🕌")
+   Setiap objek memiliki activityTitle, materialSummary (konten spesifik materi di bangunan tersebut), dan challengePrompt (instruksi aktivitas bagi siswa).
+8. "kuisBengkel": Array berisi tepat 5 soal pilihan ganda berjenjang (Jenjang 1 Dasar, Jenjang 2 Pemahaman, Jenjang 3 Penerapan, Jenjang 4 Analisis, Jenjang 5 Evaluasi/Kreasi) untuk gedung Lab DKV & Tefa (Bengkel Latihan). Setiap soal wajib memiliki:
+   - question (diawali label "[Jenjang 1 - Dasar]" s.d. "[Jenjang 5 - Mahir]")
+   - options (array berisi tepat 4 pilihan jawaban dalam Bahasa Indonesia)
+   - correctIndex (angka 0, 1, 2, atau 3)
+   - explanation (pembahasan jelas mengapa jawaban tersebut benar).`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            ringkasanAI: { type: Type.STRING },
+            modulPerpustakaan: { type: Type.STRING },
+            pertanyaanRefleksi: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+            topikPodcastMentor: { type: Type.STRING },
+            pertanyaanPemantikPodcast: { type: Type.STRING },
+            misiBalaiKota: { type: Type.STRING },
+            tantanganBangunanLain: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  buildingId: { type: Type.STRING },
+                  buildingName: { type: Type.STRING },
+                  buildingIcon: { type: Type.STRING },
+                  activityTitle: { type: Type.STRING },
+                  materialSummary: { type: Type.STRING },
+                  challengePrompt: { type: Type.STRING },
+                },
+                required: [
+                  'buildingId',
+                  'buildingName',
+                  'buildingIcon',
+                  'activityTitle',
+                  'materialSummary',
+                  'challengePrompt',
+                ],
+              },
+            },
+            kuisBengkel: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  question: { type: Type.STRING },
+                  options: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                  correctIndex: { type: Type.INTEGER },
+                  explanation: { type: Type.STRING },
+                },
+                required: ['question', 'options', 'correctIndex', 'explanation'],
+              },
+            },
+          },
+          required: [
+            'ringkasanAI',
+            'modulPerpustakaan',
+            'pertanyaanRefleksi',
+            'topikPodcastMentor',
+            'pertanyaanPemantikPodcast',
+            'misiBalaiKota',
+            'tantanganBangunanLain',
+            'kuisBengkel',
+          ],
+        },
+      },
+    });
+
+    const text = response.text;
+    if (!text) {
+      throw new Error('Empty response from Gemini');
+    }
+    const parsed = JSON.parse(text);
+    const fb = buildFallbackDistribution();
+
+    return res.json({
+      success: true,
+      source: 'gemini-ai',
+      data: {
+        ringkasanAI: parsed.ringkasanAI || fb.ringkasanAI,
+        modulPerpustakaan: parsed.modulPerpustakaan || fb.modulPerpustakaan,
+        pertanyaanRefleksi:
+          Array.isArray(parsed.pertanyaanRefleksi) && parsed.pertanyaanRefleksi.length >= 3
+            ? parsed.pertanyaanRefleksi.slice(0, 3)
+            : fb.pertanyaanRefleksi,
+        topikPodcastMentor: parsed.topikPodcastMentor || fb.topikPodcastMentor,
+        pertanyaanPemantikPodcast: parsed.pertanyaanPemantikPodcast || fb.pertanyaanPemantikPodcast,
+        misiBalaiKota: parsed.misiBalaiKota || fb.misiBalaiKota,
+        tantanganBangunanLain:
+          Array.isArray(parsed.tantanganBangunanLain) && parsed.tantanganBangunanLain.length > 0
+            ? parsed.tantanganBangunanLain
+            : fb.tantanganBangunanLain,
+        kuisBengkel:
+          Array.isArray(parsed.kuisBengkel) && parsed.kuisBengkel.length >= 5
+            ? parsed.kuisBengkel.slice(0, 5)
+            : fb.kuisBengkel,
+      },
+    });
+  } catch (err) {
+    console.warn('Gemini generate-ai fallback triggered:', err);
+    return res.json({
+      success: true,
+      source: 'fallback',
+      data: buildFallbackDistribution(),
+    });
+  }
+});
+
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {

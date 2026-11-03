@@ -19,18 +19,20 @@ const BUILDING_ICONS: Record<BuildingId, string> = {
   kantor_pos: '📮',
   pasar_prestasi: '🏆',
   masjid: '🕌',
+  bank_materi: '🏦',
   monumen_warga: '⛲',
 };
 
 const BUILDING_DESCRIPTIONS: Record<BuildingId, string> = {
   balai_kota: 'Misi hari ini, pengumuman sekolah, dan target pembelajaran aktif.',
-  perpustakaan: 'Baca rak 5 buku materi detail, tulis jurnal 4F, dan arsip refleksi.',
+  perpustakaan: 'Baca rak 5 buku materi detail, modul Bank Materi AI Guru, tulis jurnal 4F, dan arsip refleksi.',
   taman_refleksi: 'Tulis refleksi pemahaman 3 pertanyaan dan dapatkan +3 XP per refleksi.',
   menara_mentor: 'Umpan balik personal AI Mentor Kota dan rencana belajar 3 langkah.',
   bengkel_latihan: 'Kuis cepat dan tantangan kejuruan untuk menambah poin XP.',
   kantor_pos: 'Kirim surat pertanyaan atau kesulitan langsung ke gurumu.',
   pasar_prestasi: 'Papan Peringkat (Top 5 Siswa XP Tertinggi), Dewan Guru Pembimbing & Pengawas Sekolah.',
   masjid: 'Belajar membaca Iqro (Jilid 1 s.d. 6) bersuara tajwid/makhraj serta panduan lengkap Tuntunan Sholat & Wudhu.',
+  bank_materi: 'Khusus Guru • Input Mata Pelajaran, Elemen, TP, Materi Esensial & Generate AI otomatis tersebar ke seluruh bangunan kota + Spreadsheet.',
   monumen_warga: 'Sapa & obrolan langsung sesama warga dan teman kelas di tengah kota.',
 };
 
@@ -79,10 +81,15 @@ export const QuickNav2D: React.FC<QuickNav2DProps> = ({
                     {BUILDING_ICONS[b.id]}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h4 className="font-bold text-sm text-white group-hover:text-sky-300 transition">
                         {b.name}
                       </h4>
+                      {b.id === 'bank_materi' && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500/30 text-amber-300 border border-amber-400/40">
+                          🔒 Khusus Guru
+                        </span>
+                      )}
                       {hasNew && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950 flex items-center gap-1">
                           <Sparkles className="w-3 h-3" />

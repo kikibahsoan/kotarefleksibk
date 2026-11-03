@@ -785,6 +785,58 @@ export const MasjidModal: React.FC<MasjidModalProps> = ({
           </div>
         </div>
 
+        {/* Kumandang Azan 5 Waktu (Sinkron & Terlihat Langsung dari Peta Kota) */}
+        <div className="bg-emerald-950/60 px-4 sm:px-6 py-2.5 border-b border-emerald-500/30 flex flex-col lg:flex-row lg:items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-400/50 text-amber-300">
+              🔊
+            </span>
+            <div>
+              <span className="font-bold text-amber-300">Azan 5 Waktu Menara Masjid (Terlihat di Peta Kota):</span>{' '}
+              <span className="text-emerald-100/90">
+                Klik salah satu waktu untuk mengumandangkan & melihat gelombang Azan dari menara masjid di peta
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { id: 'Subuh', time: '04:45', icon: '🌅', isSubuh: true },
+              { id: 'Dzuhur', time: '12:05', icon: '☀️', isSubuh: false },
+              { id: 'Ashar', time: '15:22', icon: '🌤️', isSubuh: false },
+              { id: 'Maghrib', time: '18:08', icon: '🌇', isSubuh: false },
+              { id: 'Isya', time: '19:18', icon: '🌙', isSubuh: false },
+            ].map((az) => (
+              <button
+                key={az.id}
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  window.dispatchEvent(
+                    new CustomEvent('kota_refleksi_trigger_azan', {
+                      detail: { waktu: az.id, time: az.time, fromModal: true },
+                    })
+                  );
+                  speakArabicOrLatin(
+                    az.isSubuh
+                      ? 'اللّٰهُ أَكْبَرُ اللّٰهُ أَكْبَرُ ، حَيَّ عَلَى الصَّلَاةِ ، الصَّلَاةُ خَيْرٌ مِنَ النَّوْمِ'
+                      : 'اللّٰهُ أَكْبَرُ اللّٰهُ أَكْبَرُ ، أَشْهَدُ أَنْ لَا إِلٰهَ إِلَّا اللّٰهُ ، حَيَّ عَلَى الصَّلَاةِ ، حَيَّ عَلَى الْفَلَاحِ',
+                    az.isSubuh
+                      ? `Allaahu Akbar Allaahu Akbar, Hayya 'alash-shalaah, Ash-shalaatu khairum minan-naum`
+                      : `Allaahu Akbar Allaahu Akbar, Asyhadu allaa ilaaha illallaah, Hayya 'alash-shalaah, Hayya 'alal-falaah`
+                  );
+                }}
+                className="px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-emerald-700/80 border border-emerald-400/40 hover:border-amber-300 text-[11px] font-bold text-emerald-100 hover:text-white flex items-center gap-1 transition cursor-pointer shadow-sm"
+                title={`Kumandangkan Azan ${az.id} (${az.time} WITA) di Menara Masjid Peta Kota`}
+              >
+                <span>{az.icon}</span>
+                <span>{az.id}</span>
+                <span className="font-mono text-[10px] text-amber-300">({az.time})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Main Scrollable Content */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5">
           {/* =====================================================================

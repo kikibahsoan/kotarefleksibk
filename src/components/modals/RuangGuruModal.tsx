@@ -36,7 +36,7 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
  * =========================================================================
  * SKRIP GOOGLE APPS SCRIPT - KOTA REFLEKSI SMK NEGERI 2 GORONTALO
  * =========================================================================
- * Versi: 2.6 (Dukungan Studio ON AIR Podcast, Pasar Prestasi, Jurnal Pohon Beringin, Obrolan Warga & Refleksi 4F)
+ * Versi: 2.7 (Dukungan Bank Materi Guru AI, Studio ON AIR Podcast, Pasar Prestasi, Jurnal Pohon Beringin, Obrolan Warga & Refleksi 4F)
  * 
  * Panduan Pemasangan:
  * 1. Buka Google Spreadsheet ini.
@@ -46,11 +46,11 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
  * 5. Klik 'Terapkan' (Deploy) > 'Penerapan baru' (New deployment).
  * 6. Pilih jenis: 'Aplikasi Web' (Web app).
  * 7. Isi Konfigurasi:
- *    - Deskripsi: Kota Refleksi Web App v2.6
+ *    - Deskripsi: Kota Refleksi Web App v2.7 (Bank Materi Guru AI)
  *    - Jalankan sebagai (Execute as): Saya (Me)
  *    - Siapa yang memiliki akses (Who has access): Siapa saja (Anyone)
  * 8. Klik 'Terapkan' (Deploy) lalu berikan izin akses Google (Izinkan/Allow).
- * 9. Salin URL Aplikasi Web yang berakhiran /exec dan masukkan ke menu Pengaturan di Ruang Guru.
+ * 9. Salin URL Aplikasi Web yang berakhiran /exec dan masukkan ke menu Pengaturan di Ruang Guru / Bank Materi.
  */
 
 var SPREADSHEET_ID = ""; // Kosongkan jika skrip ini terikat langsung pada Google Sheet
@@ -76,7 +76,18 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // 2. Aksi Lengkap Semua Data v2.6 (Refleksi, Feedback, Pesan, Obrolan Warga, Jurnal Pohon Beringin, Studio ON AIR Podcast, & Pasar Prestasi)
+  // 2. Aksi Khusus Bank Materi Guru (v2.7)
+  if (action === "get_bank_materi") {
+    var bankMateriOnly = getBankMateri(ss);
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      version: "2.7",
+      bankMateri: bankMateriOnly,
+      timestamp: new Date().toISOString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 3. Aksi Lengkap Semua Data v2.7 (Refleksi, Feedback, Pesan, Obrolan Warga, Jurnal Pohon Beringin, Studio ON AIR Podcast, Pasar Prestasi & Bank Materi Guru AI)
   var reflections = getReflections(ss);
   var feedbacks = getFeedbacks(ss);
   var messages = getMessages(ss);
@@ -84,10 +95,11 @@ function doGet(e) {
   var stickyNotes = getStickyNotes(ss);
   var podcasts = getPodcasts(ss);
   var pasarPrestasi = getPasarPrestasi(ss);
+  var bankMateri = getBankMateri(ss);
 
   return ContentService.createTextOutput(JSON.stringify({
     success: true,
-    version: "2.6",
+    version: "2.7",
     spreadsheet: ss.getName(),
     reflections: reflections,
     feedbacks: feedbacks,
@@ -96,6 +108,7 @@ function doGet(e) {
     stickyNotes: stickyNotes,
     podcasts: podcasts,
     pasarPrestasi: pasarPrestasi,
+    bankMateri: bankMateri,
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
 }
@@ -133,6 +146,14 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "save_pasar_prestasi") {
       savePasarPrestasi(ss, data.student, data.top5);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_bank_materi") {
+      saveBankMateri(ss, data.bankMateri);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "delete_bank_materi") {
+      deleteBankMateri(ss, data.id);
       return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "send_message") {
@@ -698,6 +719,127 @@ function getPasarPrestasi(ss) {
       points: Number(r[10]) || 0,
       rankLabel: String(r[11] || ""),
       updatedAt: String(r[12] || "")
+    });
+  }
+  return list;
+}
+
+// -------------------------------------------------------------
+// MANAJEMEN BANK MATERI GURU & DISTRIBUSI AI KOTA REFLEKSIA (v2.7)
+// -------------------------------------------------------------
+function getOrCreateBankMateriSheet(ss) {
+  var sheet = ss.getSheetByName("Bank_Materi_Guru");
+  if (!sheet) {
+    sheet = ss.insertSheet("Bank_Materi_Guru");
+    sheet.appendRow([
+      "ID Bank Materi", "ID Materi", "ID TP", "ID Guru", "Nama Guru",
+      "Mata Pelajaran", "Kelas Target", "Elemen", "Tujuan Pembelajaran",
+      "Materi Esensial", "Ringkasan AI", "Modul Perpustakaan",
+      "Pertanyaan Refleksi (JSON)", "Topik Podcast Mentor",
+      "Pertanyaan Pemantik Podcast", "Misi Balai Kota",
+      "Distribusi Bangunan Kota (JSON)", "Kuis 5 Jenjang Lab DKV (JSON)",
+      "Tanggal Dibuat", "Timestamp", "Payload JSON Lengkap"
+    ]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function saveBankMateri(ss, bm) {
+  if (!bm || !bm.id) return;
+  var sheet = getOrCreateBankMateriSheet(ss);
+  var rows = sheet.getDataRange().getValues();
+  var rowValues = [
+    bm.id,
+    bm.materiId || ("materi-" + bm.id),
+    bm.objectiveId || ("tp-" + bm.id),
+    bm.teacherId || "",
+    bm.teacherName || "Guru Pengampu",
+    bm.mataPelajaran || "",
+    bm.kelasTarget || "X DKV 2 & X DKV 3",
+    bm.elemen || "",
+    bm.tujuanPembelajaran || "",
+    bm.materiEsensial || "",
+    bm.ringkasanAI || "",
+    bm.modulPerpustakaan || "",
+    JSON.stringify(bm.pertanyaanRefleksi || []),
+    bm.topikPodcastMentor || "",
+    bm.pertanyaanPemantikPodcast || "",
+    bm.misiBalaiKota || "",
+    JSON.stringify(bm.tantanganBangunanLain || []),
+    JSON.stringify(bm.kuisBengkel || []),
+    bm.createdAt || new Date().toLocaleDateString("id-ID"),
+    bm.timestamp || Date.now(),
+    JSON.stringify(bm)
+  ];
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(bm.id)) {
+      sheet.getRange(i + 1, 1, 1, rowValues.length).setValues([rowValues]);
+      return;
+    }
+  }
+  sheet.appendRow(rowValues);
+}
+
+function deleteBankMateri(ss, id) {
+  if (!id) return;
+  var sheet = ss.getSheetByName("Bank_Materi_Guru");
+  if (!sheet) return;
+  var rows = sheet.getDataRange().getValues();
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+}
+
+function getBankMateri(ss) {
+  var sheet = ss.getSheetByName("Bank_Materi_Guru");
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0] || !r[5]) continue;
+    if (r[20]) {
+      try {
+        var fullObj = JSON.parse(String(r[20]));
+        if (fullObj && fullObj.id) {
+          list.push(fullObj);
+          continue;
+        }
+      } catch (e) {}
+    }
+    var pertanyaanRefleksi = [];
+    var tantanganBangunanLain = [];
+    var kuisBengkel = [];
+    try { pertanyaanRefleksi = JSON.parse(String(r[12] || "[]")); } catch (e) {}
+    try { tantanganBangunanLain = JSON.parse(String(r[16] || "[]")); } catch (e) {}
+    try { kuisBengkel = JSON.parse(String(r[17] || "[]")); } catch (e) {}
+
+    list.push({
+      id: String(r[0]),
+      materiId: String(r[1] || ("materi-" + r[0])),
+      objectiveId: String(r[2] || ("tp-" + r[0])),
+      teacherId: String(r[3] || ""),
+      teacherName: String(r[4] || "Guru Pengampu"),
+      mataPelajaran: String(r[5] || ""),
+      kelasTarget: String(r[6] || "X DKV 2 & X DKV 3"),
+      elemen: String(r[7] || ""),
+      tujuanPembelajaran: String(r[8] || ""),
+      materiEsensial: String(r[9] || ""),
+      ringkasanAI: String(r[10] || ""),
+      modulPerpustakaan: String(r[11] || ""),
+      pertanyaanRefleksi: Array.isArray(pertanyaanRefleksi) ? pertanyaanRefleksi : [],
+      topikPodcastMentor: String(r[13] || ""),
+      pertanyaanPemantikPodcast: String(r[14] || ""),
+      misiBalaiKota: String(r[15] || ""),
+      tantanganBangunanLain: Array.isArray(tantanganBangunanLain) ? tantanganBangunanLain : [],
+      kuisBengkel: Array.isArray(kuisBengkel) ? kuisBengkel : [],
+      createdAt: String(r[18] || ""),
+      timestamp: Number(r[19]) || Date.now()
     });
   }
   return list;

@@ -23,6 +23,7 @@ interface ThreeTownCanvasProps {
   studentName?: string;
   studentGender?: string;
   isTeacher?: boolean;
+  isGuest?: boolean;
   timeOfDay?: 'day' | 'night' | 'auto';
   timePeriod?: TimePeriod;
   weatherType?: WeatherType;
@@ -61,6 +62,7 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'taman_refleksi', name: 'Pusat Refleksi', tagline: 'Tulis Jurnal Refleksi (+3 Poin)', position: [-2.8, 0, -2.8], color: 0xd97706, icon: '🌍' },
   { id: 'bengkel_latihan', name: 'Lab DKV & Tefa', tagline: 'Tower Kontrol & Kuis', position: [2.8, 0, 2.8], color: 0xf59e0b, icon: '🛠️' },
   { id: 'masjid', name: 'Masjid Al-Hikmah', tagline: 'Belajar Iqro (1-6) & Tuntunan Sholat', position: [5.45, 0, -4.85], color: 0x10b981, icon: '🕌' },
+  { id: 'bank_materi', name: 'Bank Materi Guru', tagline: 'Khusus Guru • Input TP, Materi Esensial & Generate AI', position: [-5.35, 0, -4.85], color: 0x6366f1, icon: '🏦' },
   { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
 ];
 
@@ -82,7 +84,7 @@ export interface ActiveEmote {
 
 interface AvatarData {
   id: string;
-  role: 'siswa' | 'guru' | 'polisi' | 'petugas_kebersihan' | 'kurir' | 'barista' | 'penjaga_kota' | 'penjaga_lab' | 'penjaga_literasi' | 'penjaga_kolam' | 'pengawas' | 'kepala_balai';
+  role: 'siswa' | 'guru' | 'wartawan' | 'polisi' | 'petugas_kebersihan' | 'kurir' | 'barista' | 'penjaga_kota' | 'penjaga_lab' | 'penjaga_literasi' | 'penjaga_kolam' | 'pengawas' | 'kepala_balai';
   handle: string;
   name?: string;
   roleLabel: string;
@@ -182,11 +184,20 @@ export const TREES_LIST: [number, number][] = [
   [2.2, -7.2],
   [-4.8, -6.8],
   [4.8, -6.8],
-  // West edge (framing Perumahan Guru & Siswa behind Perpustakaan Kampus at wx = -7.05)
+  [-3.5, -7.25],
+  [3.5, -7.25],
+  [-1.05, -6.85],
+  [1.05, -6.85],
+  [-6.35, -7.15],
+  // West edge (framing Perumahan Guru & Wisma X/XI/XII DKV behind Perpustakaan Kampus at wx = -7.05)
   [-7.25, -4.85],
-  [-7.25, -2.38],
-  [-7.25, 2.35],
-  [-6.75, 4.85],
+  [-7.25, -2.45],
+  [-7.35, -0.25],
+  [-7.25, 5.85],
+  [-7.55, -6.25],
+  [-7.55, 1.85],
+  [-7.55, 3.65],
+  [-6.45, 6.65],
   // South edge (flanking the Welcome Gapura at [0, 6.15])
   [-1.6, 7.0],
   [1.6, 7.0],
@@ -194,16 +205,28 @@ export const TREES_LIST: [number, number][] = [
   [3.2, 7.0],
   [-5.0, 6.6],
   [5.0, 6.6],
+  [-4.15, 7.15],
+  [4.15, 7.15],
+  [-2.35, 6.25],
+  [2.45, 6.25],
+  [6.15, 6.65],
   // East riverbank edge (framing the long flowing river at wx=7.0..8.1 & leaving [5.9, -2.2] clear for Kolam Tepi Sungai and [5.45, -4.85] clear for Masjid Al-Hikmah)
   [6.35, -0.85],
   [6.35, 2.2],
   [6.25, 4.6],
   [6.35, -7.2],
-  // Mid-park groves (tree moved from [3.8, 3.8] to [-0.5, 2.4] to clear view for Toko Roti & Kafe behind Lab DKV)
+  [6.35, -3.55],
+  [6.35, 3.45],
+  [6.25, 5.75],
+  // Mid-park groves (carefully placed on open lawns away from all buildings, roads, swings & lamps)
   [-5.2, -1.8],
   [5.2, 1.8],
   [-3.8, 3.4],
   [-0.5, 2.4],
+  [-4.15, -1.25],
+  [4.15, -1.25],
+  [-2.15, 4.2],
+  [2.15, 4.2],
   // Central park trees (spaced around the 8 fountain benches)
   [-1.72, -1.72],
   [1.72, -1.72],
@@ -212,8 +235,9 @@ export const TREES_LIST: [number, number][] = [
 ];
 
 export interface HousingUnitDef {
-  id: 'guru_1' | 'guru_2' | 'siswa_1' | 'siswa_2';
+  id: 'guru_1' | 'guru_2' | 'siswa_1' | 'siswa_2' | 'siswa_3';
   kind: 'guru' | 'siswa';
+  shortBadge: string;
   name: string;
   subtitle: string;
   wx: number;
@@ -223,15 +247,16 @@ export interface HousingUnitDef {
   accentColor: string;
 }
 
-// Perumahan Guru & Siswa di Belakang Perpustakaan Kampus di Ujung Barat Peta
+// Perumahan Guru & Wisma X, XI, XII DKV di Belakang Perpustakaan Kampus di Ujung Barat Peta
 export const HOUSING_UNITS: HousingUnitDef[] = [
   {
     id: 'guru_1',
     kind: 'guru',
+    shortBadge: '🏡 GURU 1',
     name: '🏡 Rumah Dinas Guru 1',
     subtitle: 'Perumahan Guru Refleksia',
     wx: -7.05,
-    wy: -3.45,
+    wy: -3.55,
     roofColor: '#c2410c',
     roofDark: '#9a3412',
     accentColor: '#f59e0b',
@@ -239,10 +264,11 @@ export const HOUSING_UNITS: HousingUnitDef[] = [
   {
     id: 'guru_2',
     kind: 'guru',
+    shortBadge: '🏡 GURU 2',
     name: '🏡 Rumah Dinas Guru 2',
     subtitle: 'Perumahan Guru Refleksia',
     wx: -7.05,
-    wy: -1.35,
+    wy: -1.55,
     roofColor: '#b45309',
     roofDark: '#78350f',
     accentColor: '#fbbf24',
@@ -250,10 +276,11 @@ export const HOUSING_UNITS: HousingUnitDef[] = [
   {
     id: 'siswa_1',
     kind: 'siswa',
-    name: '🏘️ Wisma Siswa 1',
-    subtitle: 'Perumahan Siswa DKV',
+    shortBadge: '🏘️ X DKV',
+    name: '🏘️ Wisma X DKV',
+    subtitle: 'Wisma Siswa Kelas X DKV',
     wx: -7.05,
-    wy: 1.35,
+    wy: 1.05,
     roofColor: '#0284c7',
     roofDark: '#0369a1',
     accentColor: '#38bdf8',
@@ -261,51 +288,59 @@ export const HOUSING_UNITS: HousingUnitDef[] = [
   {
     id: 'siswa_2',
     kind: 'siswa',
-    name: '🏘️ Wisma Siswa 2',
-    subtitle: 'Perumahan Siswa DKV',
+    shortBadge: '🏘️ XI DKV',
+    name: '🏘️ Wisma XI DKV',
+    subtitle: 'Wisma Siswa Kelas XI DKV',
     wx: -7.05,
-    wy: 3.35,
+    wy: 2.75,
     roofColor: '#0d9488',
     roofDark: '#0f766e',
     accentColor: '#34d399',
   },
+  {
+    id: 'siswa_3',
+    kind: 'siswa',
+    shortBadge: '🏘️ XII DKV',
+    name: '🏘️ Wisma XII DKV',
+    subtitle: 'Wisma Siswa Kelas XII DKV',
+    wx: -7.05,
+    wy: 4.45,
+    roofColor: '#7c3aed',
+    roofDark: '#5b21b6',
+    accentColor: '#a78bfa',
+  },
 ];
 
 export const STREET_LAMPS_LIST: [number, number][] = [
-  // Inner ring intersections
-  [-3.0, -1.5],
-  [-3.0, 1.5],
-  [3.0, -1.5],
-  [3.0, 1.5],
-  [-1.5, -3.0],
-  [1.5, -3.0],
-  [-1.5, 3.0],
-  [1.5, 3.0],
-  // Central crossroad spokes
-  [-1.8, 0],
-  [1.8, 0],
-  [0, -1.9],
-  [0, 1.9],
-  // Outer promenade ring (for 17x17 grid)
-  [-5.0, -2.5],
-  [-5.0, 2.5],
-  [5.0, -2.5],
-  [5.0, 2.5],
-  [-2.5, -5.0],
-  [2.5, -5.0],
-  [-2.5, 5.0],
-  [2.5, 5.0],
-  // Residential boulevard lamps in front of Perumahan Guru & Siswa
-  [-6.0, -2.4],
-  [-6.0, 0.0],
-  [-6.0, 2.4],
-  // Corners
-  [-3.0, -3.0],
-  [3.0, -3.0],
-  [-3.0, 3.0],
-  [3.0, 3.0],
-  [-5.0, -5.0],
-  [5.45, 4.55],
+  // Inner park lawn quadrants (neatly flanking the central avenues on grass verges, clear of roads & buildings)
+  [-1.88, -0.82],
+  [1.88, -0.82],
+  [-1.88, 0.82],
+  [1.88, 0.82],
+  [-0.82, -1.88],
+  [0.82, -1.88],
+  [-0.82, 1.88],
+  [0.82, 1.88],
+  // Middle garden belt verges (on grass lawns between inner & outer loops, outside all building footprints)
+  [-4.15, -1.75],
+  [4.15, 1.75],
+  [-1.75, 4.15],
+  [1.75, 4.15],
+  [-0.85, 3.85],
+  [0.85, 3.85],
+  // Outer garden perimeter & entrance verges (on grass lawns outside the ±5 promenade road)
+  [-3.85, -5.75],
+  [3.85, -5.75],
+  [-1.85, 5.75],
+  [2.15, 5.75],
+  // East riverbank garden promenade (on grass verges beside the river & bridge)
+  [5.75, -0.75],
+  [5.75, 0.85],
+  [5.75, 3.15],
+  // West residential garden verge (on lawn between Perumahan Guru & Wisma DKV and the boulevard road)
+  [-6.52, -2.55],
+  [-6.52, 1.9],
+  [-6.52, 3.6],
 ];
 
 export interface EntryConfirmation {
@@ -343,6 +378,8 @@ export const SOLID_BUILDING_OBSTACLES: SolidObstacle[] = [
   { minWx: 4.05, maxWx: 5.25, minWy: 4.05, maxWy: 5.05 },
   // Masjid Al-Hikmah (Di samping Kolam Awal Aliran Sungai)
   { minWx: 4.65, maxWx: 6.25, minWy: -5.65, maxWy: -4.05 },
+  // Gedung Bank Materi Guru (Di sisi Barat Laut simetris dengan Masjid)
+  { minWx: -6.15, maxWx: -4.55, minWy: -5.65, maxWy: -4.05 },
 ];
 
 export const isSolidCollision = (wx: number, wy: number, padding: number = 0.16): boolean => {
@@ -830,6 +867,7 @@ export interface TreeWaterCycle {
   hasRipeApples?: boolean; // true when ripe apples are ready to be harvested (+2 XP)
   harvestFadeStartTime?: number | null; // performance.now() when apples were harvested -> 1.5s fade-out animation
   nextAutoAppleSpawnAt?: number; // Date.now() timestamp when apples respawn (every 5 minutes = 300,000 ms)
+  isAutumn?: boolean; // true when tree has autumn/fallen-leaf colors; turns green (false) when watered!
 }
 
 export interface DryLeafItem {
@@ -865,6 +903,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   studentName = 'Siswa',
   studentGender = 'L',
   isTeacher = false,
+  isGuest = false,
   timeOfDay = 'night',
   timePeriod,
   weatherType,
@@ -1028,6 +1067,69 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     startTime: number;
   } | null>(null);
 
+  // =============================================================
+  // MASJID AL-HIKMAH: INFO ADZAN DI ATAS MASJID (HANYA TAMPIL 10 MENIT SETELAH WAKTU SHOLAT PER 5 WAKTUNYA)
+  // =============================================================
+  const AZAN_5_WAKTU_LIST = [
+    { id: 'Subuh', time: '04:45', minutes: 4 * 60 + 45, icon: '🌅', isSubuh: true },
+    { id: 'Dzuhur', time: '12:05', minutes: 12 * 60 + 5, icon: '☀️', isSubuh: false },
+    { id: 'Ashar', time: '15:22', minutes: 15 * 60 + 22, icon: '🌤️', isSubuh: false },
+    { id: 'Maghrib', time: '18:08', minutes: 18 * 60 + 8, icon: '🌇', isSubuh: false },
+    { id: 'Isya', time: '19:18', minutes: 19 * 60 + 18, icon: '🌙', isSubuh: false },
+  ] as const;
+
+  type AzanWaktuId = (typeof AZAN_5_WAKTU_LIST)[number]['id'];
+
+  // Manual trigger from inside MasjidModal (shows for 10 minutes if triggered inside the mosque modal)
+  const manualAzanOverrideRef = useRef<{ waktu: AzanWaktuId; expiresAt: number } | null>(null);
+
+  // Returns the active prayer time ONLY if current WITA time is within [prayerTime, prayerTime + 10 minutes)
+  const getActiveAzanWithin10MinWita = (): AzanWaktuId | null => {
+    const override = manualAzanOverrideRef.current;
+    if (override && Date.now() < override.expiresAt) {
+      return override.waktu;
+    }
+    try {
+      const witaStr = new Date().toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Makassar',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const [hStr, mStr] = witaStr.split(':');
+      const h = parseInt(hStr, 10);
+      const m = parseInt(mStr, 10);
+      if (!isNaN(h) && !isNaN(m)) {
+        const curMinutes = (h === 24 ? 0 : h) * 60 + m;
+        for (const wk of AZAN_5_WAKTU_LIST) {
+          if (curMinutes >= wk.minutes && curMinutes < wk.minutes + 10) {
+            return wk.id;
+          }
+        }
+      }
+    } catch {}
+    return null;
+  };
+
+  // Listen to custom event from MasjidModal when student tests/triggers Azan from inside the Mosque
+  useEffect(() => {
+    const handleCustomAzan = (e: Event) => {
+      const custom = e as CustomEvent;
+      const waktu = custom.detail?.waktu as AzanWaktuId | undefined;
+      if (waktu) {
+        // Tampil selama 10 menit (600.000 ms)
+        manualAzanOverrideRef.current = {
+          waktu,
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        };
+      }
+    };
+    window.addEventListener('kota_refleksi_trigger_azan', handleCustomAzan);
+    return () => {
+      window.removeEventListener('kota_refleksi_trigger_azan', handleCustomAzan);
+    };
+  }, []);
+
   // Held item (kopi: 90s, roti: 60s, eskrim: 30s)
   const [heldItem, setHeldItem] = useState<'kopi' | 'roti' | 'eskrim' | null>(null);
   const heldItemRef = useRef<'kopi' | 'roti' | 'eskrim' | null>(null);
@@ -1167,9 +1269,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   }, []);
 
   // Tree watering & apple fruiting cycle state (treeIndex -> TreeWaterCycle)
-  // Saat Avatar baru login, seluruh pohon BELUM mengeluarkan buah (hasRipeApples: false), baru berbuah nanti saat disiram!
+  // Beberapa pohon dipilih secara random memiliki warna seperti daun yang gugur (isAutumn: true), yang jika disiram akan hijau kembali!
   const [treeCycles, setTreeCycles] = useState<Record<number, TreeWaterCycle>>(() => {
     const initial: Record<number, TreeWaterCycle> = {};
+    const indices = TREES_LIST.map((_, idx) => idx);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = indices[i];
+      indices[i] = indices[j];
+      indices[j] = tmp;
+    }
+    const autumnSet = new Set(indices.slice(0, Math.max(16, Math.round(TREES_LIST.length * 0.42))));
+    autumnSet.add(TREES_LIST.length - 1);
+    autumnSet.add(TREES_LIST.length - 3);
+    autumnSet.add(12);
+    autumnSet.add(13);
+
     TREES_LIST.forEach((_, idx) => {
       initial[idx] = {
         count: 0,
@@ -1177,6 +1292,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         appleStartTime: null,
         hasRipeApples: false,
         harvestFadeStartTime: null,
+        isAutumn: autumnSet.has(idx),
       };
     });
     return initial;
@@ -1283,6 +1399,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   } | null>(null);
   nearbyActionRef.current = nearbyAction;
 
+  // Signature helper & auto-dismiss tracker so a nearbyAction popup that auto-hides after 10s
+  // does not re-pop on the next animation frame while the avatar stands still at the same spot
+  const getNearbyActionSignature = (
+    act: {
+      type: 'tree' | 'dry_leaf' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
+      treeIndex?: number;
+      leafId?: number;
+      benchId?: BenchId;
+    } | null
+  ): string | null => {
+    if (!act) return null;
+    return `${act.type}:${act.treeIndex ?? ''}:${act.leafId ?? ''}:${act.benchId ?? ''}`;
+  };
+  const dismissedNearbySignatureRef = useRef<string | null>(null);
+
   // Fishing state, phase ('casting' | 'waiting' | 'pulling' | null) & timers
   const [isFishing, setIsFishing] = useState(false);
   const isFishingRef = useRef(false);
@@ -1294,6 +1425,47 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const fishingStartTimeRef = useRef<number>(0);
   const fishingPullStartTimeRef = useRef<number>(0);
   const caughtFishRef = useRef<{ name: string; icon: string } | null>(null);
+
+  // 10-Second Soft Auto-Dismiss State for Information Popups (pendingConfirmation, nearbyAction, isCafeMenuOpen)
+  const [isInfoPopupSoftFading, setIsInfoPopupSoftFading] = useState(false);
+  const [popupInteractionTick, setPopupInteractionTick] = useState(0);
+
+  const activeInfoPopupKey = isCafeMenuOpen
+    ? 'cafe_menu'
+    : pendingConfirmation
+    ? `confirm:${pendingConfirmation.type}:${pendingConfirmation.id}`
+    : nearbyAction
+    ? `nearby:${getNearbyActionSignature(nearbyAction)}:${isFishing ? fishingPhase || 'fishing' : 'idle'}`
+    : null;
+
+  useEffect(() => {
+    setIsInfoPopupSoftFading(false);
+    if (!activeInfoPopupKey) return;
+
+    // Soft fade-out begins at 9.2s (800ms smooth transition before full removal at 10.0s)
+    const fadeTimer = window.setTimeout(() => {
+      setIsInfoPopupSoftFading(true);
+    }, 9200);
+
+    const dismissTimer = window.setTimeout(() => {
+      if (isCafeMenuOpen) {
+        setIsCafeMenuOpen(false);
+      }
+      if (pendingConfirmationRef.current) {
+        setPendingConfirmation(null);
+      }
+      if (nearbyActionRef.current) {
+        dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+        setNearbyAction(null);
+      }
+      setIsInfoPopupSoftFading(false);
+    }, 10000);
+
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(dismissTimer);
+    };
+  }, [activeInfoPopupKey, popupInteractionTick, isCafeMenuOpen]);
 
   // User Camera Zoom State (+ / -)
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -1309,15 +1481,39 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
   // Player avatar object reference for direct snapping/controls
   const playerRef = useRef<AvatarData | null>(null);
+  const npcsRef = useRef<AvatarData[]>([]);
   const lastMoveBroadcastTimeRef = useRef<number>(0);
 
-  // Remote online players from other devices
+  // Remote online players from other devices & Clickable Warga Online Dropdown
   const remotePlayersRef = useRef<Map<string, AvatarData>>(new Map());
   const [onlineCount, setOnlineCount] = useState<number>(1);
   const [onlineRemoteList, setOnlineRemoteList] = useState<
     Array<{ id: string; handle: string; name: string; role: string; isMoving: boolean; isSitting: boolean; wx: number; wy: number }>
   >([]);
+  const [isOnlineListOpen, setIsOnlineListOpen] = useState<boolean>(false);
+  const [isOnlineListSoftFading, setIsOnlineListSoftFading] = useState<boolean>(false);
+  const [onlineListInteractionTick, setOnlineListInteractionTick] = useState<number>(0);
   const sendHeartbeatRef = useRef<(() => void) | null>(null);
+
+  // Auto-close Warga Online dropdown softly after 10 seconds if not clicked
+  useEffect(() => {
+    setIsOnlineListSoftFading(false);
+    if (!isOnlineListOpen) return;
+
+    const fadeTimer = window.setTimeout(() => {
+      setIsOnlineListSoftFading(true);
+    }, 9200);
+
+    const closeTimer = window.setTimeout(() => {
+      setIsOnlineListOpen(false);
+      setIsOnlineListSoftFading(false);
+    }, 10000);
+
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(closeTimer);
+    };
+  }, [isOnlineListOpen, onlineListInteractionTick]);
 
   // Persistent unique device ID per browser tab/device
   const clientDeviceIdRef = useRef<string>('');
@@ -1601,7 +1797,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       .toLowerCase()
       .replace(/[^a-z0-9_]/g, '') || (isTeacher ? 'guru_dkv' : 'siswa');
 
-    const mySessionId = `${isTeacher ? 'guru' : 'siswa'}_${cleanHandle}_${clientDeviceId}`;
+    const mySessionId = `${isTeacher ? 'guru' : isGuest ? 'wartawan' : 'siswa'}_${cleanHandle}_${clientDeviceId}`;
 
     const syncOnlineUiList = () => {
       if (!isMounted) return;
@@ -1609,7 +1805,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         id: r.id,
         handle: r.handle,
         name: r.name || r.handle,
-        role: r.role === 'guru' ? 'guru' : 'siswa',
+        role: r.role === 'guru' ? 'guru' : r.role === 'wartawan' ? 'wartawan' : 'siswa',
         isMoving: Boolean(r.isMoving),
         isSitting: Boolean(r.isSitting),
         wx: r.wx,
@@ -1627,7 +1823,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (!rem || !rem.id || rem.id === mySessionId) return;
 
         const isRemTeacher = rem.role === 'guru' || Boolean(rem.isTeacher);
-        const remRole: 'guru' | 'siswa' = isRemTeacher ? 'guru' : 'siswa';
+        const isRemGuest = rem.role === 'wartawan' || Boolean(rem.isGuest) || String(rem.handle || '').toLowerCase() === 'tamu_kota';
+        const remRole: 'guru' | 'wartawan' | 'siswa' = isRemTeacher ? 'guru' : isRemGuest ? 'wartawan' : 'siswa';
         const remGender: 'L' | 'P' = rem.gender === 'P' ? 'P' : 'L';
         const incomingWx = typeof rem.wx === 'number' && !isNaN(rem.wx) ? rem.wx : 0.0;
         const incomingWy = typeof rem.wy === 'number' && !isNaN(rem.wy) ? rem.wy : 6.38;
@@ -1642,7 +1839,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             role: remRole,
             handle: String(rem.handle || 'warga').replace(/^@/, ''),
             name: rem.name || rem.handle || 'Warga',
-            roleLabel: rem.roleLabel || (isRemTeacher ? 'GURU DKV' : 'Siswa DKV'),
+            roleLabel: rem.roleLabel || (isRemTeacher ? 'GURU DKV' : isRemGuest ? 'WARTAWAN KOTA' : 'Siswa DKV'),
             wx: incomingWx,
             wy: incomingWy,
             targetWx: incomingTargetWx,
@@ -1673,7 +1870,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           existing.role = remRole;
           existing.handle = String(rem.handle || existing.handle).replace(/^@/, '');
           existing.name = rem.name || existing.name;
-          existing.roleLabel = rem.roleLabel || (isRemTeacher ? 'GURU DKV' : 'Siswa DKV');
+          existing.roleLabel = rem.roleLabel || (isRemTeacher ? 'GURU DKV' : isRemGuest ? 'WARTAWAN KOTA' : 'Siswa DKV');
           existing.gender = remGender;
           existing.shirtColor = rem.shirtColor || remOutfit.shirt;
           existing.pantsColor = rem.pantsColor || remOutfit.pants;
@@ -1748,9 +1945,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         id: mySessionId,
         handle: p ? p.handle : cleanHandle,
         name: studentName,
-        role: isTeacher ? 'guru' : 'siswa',
+        role: isTeacher ? 'guru' : isGuest ? 'wartawan' : 'siswa',
         isTeacher: Boolean(isTeacher),
-        roleLabel: isTeacher ? 'GURU DKV' : 'Siswa DKV',
+        isGuest: Boolean(isGuest),
+        roleLabel: isTeacher ? 'GURU DKV' : isGuest ? 'WARTAWAN KOTA' : 'Siswa DKV',
         gender: p?.gender || (studentGender === 'P' ? 'P' : 'L'),
         shirtColor: p?.shirtColor || myOutfit.shirt,
         pantsColor: p?.pantsColor || myOutfit.pants,
@@ -2013,22 +2211,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     ];
     const [initWx, initWy] = WELCOME_GATE_SPAWN_OFFSETS[spawnSlot] || [0.0, 6.38];
 
-    // 1. Player (Siswa / Guru) spawning right at the Welcome Gapura at the edge of the map
+    // 1. Player (Siswa / Guru / Tamu Wartawan) spawning right at the Welcome Gapura at the edge of the map
     const isPlayerTeacher = Boolean(isTeacher);
+    const isPlayerGuest = Boolean(isGuest || studentHandle === 'tamu_kota');
     const playerOutfit = getDistinctAvatarOutfit(`${studentId || ''}_${studentName}`);
     const player: AvatarData = {
-      id: isPlayerTeacher ? 'guru_player' : 'siswa',
-      role: isPlayerTeacher ? 'guru' : 'siswa',
+      id: isPlayerTeacher ? 'guru_player' : isPlayerGuest ? 'tamu_wartawan' : 'siswa',
+      role: isPlayerTeacher ? 'guru' : isPlayerGuest ? 'wartawan' : 'siswa',
       handle: studentHandle,
       name: studentName,
-      roleLabel: isPlayerTeacher ? 'Guru Pembimbing' : 'Kamu',
+      roleLabel: isPlayerTeacher ? 'Guru Pembimbing' : isPlayerGuest ? 'Wartawan Tamu Kota' : 'Kamu',
       wx: initWx,
       wy: initWy,
       targetWx: initWx,
       targetWy: initWy,
       speed: 0.88, // Calmer, slower, relaxed and steady walking speed
-      shirtColor: playerOutfit.shirt,
-      pantsColor: playerOutfit.pants,
+      shirtColor: isPlayerGuest ? '#d97706' : playerOutfit.shirt,
+      pantsColor: isPlayerGuest ? '#334155' : playerOutfit.pants,
       hairColor: studentGender === 'P' ? playerOutfit.hijab : '#0f172a',
       gender: studentGender === 'P' ? 'P' : 'L',
       isMoving: false,
@@ -2239,6 +2438,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     };
 
     const npcs: AvatarData[] = [surya, malik, maUba, patra, tomi, sony];
+    npcsRef.current = npcs;
 
     // Cafe coordinates (Toko Roti & Kafe - Di ujung kota belakang Lab DKV)
     const cafeWx = 4.65;
@@ -2528,6 +2728,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
+      // Reset any auto-dismissed nearby popup when the user explicitly clicks/taps on the map
+      dismissedNearbySignatureRef.current = null;
+
       // 1b. Check Click on Papan Peraturan Kota di Dekat Gapura Masuk [1.45, 5.95] or Welcome Gate [0, 6.15]
       const rulesDist = Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy);
       const gateDist = Math.hypot(wx - 0, wy - 6.15);
@@ -2783,6 +2986,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWy = 1.25;
           } else if (b.id === 'masjid') {
             player.targetWx = 4.45;
+            player.targetWy = -4.65;
+          } else if (b.id === 'bank_materi') {
+            player.targetWx = -4.35;
             player.targetWy = -4.65;
           } else {
             player.targetWx = bx * 0.68;
@@ -3238,59 +3444,69 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
+      let detectedNearby: {
+        type: 'tree' | 'dry_leaf' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
+        treeIndex?: number;
+        leafId?: number;
+        benchId?: BenchId;
+        benchName?: string;
+      } | null = null;
+
       if (isSittingRef.current) {
-        if (nearbyActionRef.current?.type !== 'bench') {
-          const currentSeat = sittingSeatRef.current;
-          let seatName = 'Kursi Taman Kota';
-          const matchedTwoPersonGroup = ALL_TWO_PERSON_BENCHES.find(
-            (g) => g.groupId === currentSeat || g.seats[0].id === currentSeat || g.seats[1].id === currentSeat
-          );
-          const matchedSwing = REFLECTION_SWINGS.find((s) => s.id === currentSeat);
-          if (matchedTwoPersonGroup) seatName = matchedTwoPersonGroup.name;
-          else if (matchedSwing) seatName = matchedSwing.name;
-          else if (currentSeat === 'literacy') seatName = 'Bangku Sudut Literasi';
-          setNearbyAction({ type: 'bench', benchId: currentSeat || undefined, benchName: seatName });
-        }
+        const currentSeat = sittingSeatRef.current;
+        let seatName = 'Kursi Taman Kota';
+        const matchedTwoPersonGroup = ALL_TWO_PERSON_BENCHES.find(
+          (g) => g.groupId === currentSeat || g.seats[0].id === currentSeat || g.seats[1].id === currentSeat
+        );
+        const matchedSwing = REFLECTION_SWINGS.find((s) => s.id === currentSeat);
+        if (matchedTwoPersonGroup) seatName = matchedTwoPersonGroup.name;
+        else if (matchedSwing) seatName = matchedSwing.name;
+        else if (currentSeat === 'literacy') seatName = 'Bangku Sudut Literasi';
+        detectedNearby = { type: 'bench', benchId: currentSeat || undefined, benchName: seatName };
       } else if (nearLeafId !== -1) {
-        if (nearbyActionRef.current?.type !== 'dry_leaf' || nearbyActionRef.current?.leafId !== nearLeafId) {
-          setNearbyAction({ type: 'dry_leaf', leafId: nearLeafId });
-        }
+        detectedNearby = { type: 'dry_leaf', leafId: nearLeafId };
       } else if (nearBench) {
-        if (nearbyActionRef.current?.type !== 'bench' || nearbyActionRef.current?.benchId !== nearBench.id) {
-          setNearbyAction({ type: 'bench', benchId: nearBench.id, benchName: nearBench.name });
-        }
+        detectedNearby = { type: 'bench', benchId: nearBench.id, benchName: nearBench.name };
       } else if (Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 || Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55) {
         if (lastTouchedIdRef.current) {
           lastTouchedIdRef.current = null;
           setPendingConfirmation(null);
         }
-        if (nearbyActionRef.current?.type !== 'town_rules') {
-          sounds.playClick();
-          setNearbyAction({ type: 'town_rules' });
-        }
+        detectedNearby = { type: 'town_rules' };
       } else if (Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.75) {
         if (lastTouchedIdRef.current) {
           lastTouchedIdRef.current = null;
           setPendingConfirmation(null);
         }
-        if (nearbyActionRef.current?.type !== 'beringin') {
-          sounds.playClick();
-          setNearbyAction({ type: 'beringin' });
-        }
+        detectedNearby = { type: 'beringin' };
       } else if (litDist < 1.05) {
-        if (nearbyActionRef.current?.type !== 'literacy') {
-          setNearbyAction({ type: 'literacy' });
-        }
+        detectedNearby = { type: 'literacy' };
       } else if (fishDist < 1.0) {
-        if (nearbyActionRef.current?.type !== 'fishing') {
-          setNearbyAction({ type: 'fishing' });
-        }
+        detectedNearby = { type: 'fishing' };
       } else if (nearTreeIdx !== -1) {
-        if (nearbyActionRef.current?.type !== 'tree' || nearbyActionRef.current?.treeIndex !== nearTreeIdx) {
-          setNearbyAction({ type: 'tree', treeIndex: nearTreeIdx });
+        detectedNearby = { type: 'tree', treeIndex: nearTreeIdx };
+      }
+
+      const detectedSig = getNearbyActionSignature(detectedNearby);
+      const currentSig = getNearbyActionSignature(nearbyActionRef.current);
+
+      if (!detectedSig) {
+        dismissedNearbySignatureRef.current = null;
+        if (nearbyActionRef.current) {
+          setNearbyAction(null);
         }
-      } else if (nearbyActionRef.current) {
-        setNearbyAction(null);
+      } else if (dismissedNearbySignatureRef.current === detectedSig) {
+        // Already auto-dismissed after 10s of inactivity at this exact spot — stay hidden until player moves to another spot or clicks
+      } else {
+        if (dismissedNearbySignatureRef.current !== null && dismissedNearbySignatureRef.current !== detectedSig) {
+          dismissedNearbySignatureRef.current = null;
+        }
+        if (currentSig !== detectedSig) {
+          if (detectedNearby?.type === 'town_rules' || detectedNearby?.type === 'beringin') {
+            sounds.playClick();
+          }
+          setNearbyAction(detectedNearby);
+        }
       }
 
       // Update 6 Town NPCs (Patrol routes for Sony & Surya, Sudut Literasi invitations for Patra, Mayor greetings for Sony)
@@ -3990,13 +4206,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (gx === 0 && gy >= -6 && gy <= 8) return true;
         if (Math.abs(gx) <= 1 && gy === 6) return true;
         if (gy === 0 && gx >= -7 && gx <= 8) return true;
-        // Residential Boulevard in front of Perumahan Guru & Siswa behind Perpustakaan Kampus
-        if (gx === -6 && gy >= -4 && gy <= 3) return true;
+        // Residential Boulevard in front of Perumahan Guru & Wisma X/XI/XII DKV behind Perpustakaan Kampus
+        if (gx === -6 && gy >= -4 && gy <= 5) return true;
         // Central ring
         if (Math.abs(gx) <= 1 && Math.abs(gy) <= 1) return true;
         // Walkway spur to Relocated Riverside Kolam at [5.9, -2.2] & Masjid Al-Hikmah Courtyard at [5.45, -4.85]
         if (gx >= 3 && gx <= 6 && gy === -2) return true;
         if ((gx === 5 || gx === 6) && gy >= -6 && gy <= -2) return true;
+        // Walkway spur to Gedung Bank Materi Guru Courtyard at [-5.35, -4.85]
+        if ((gx === -5 || gx === -6) && gy >= -6 && gy <= -2) return true;
         // Walkway spur to West Sudut Literasi at [-4.3, 1.8]
         if (gx <= -3 && gx >= -5 && gy === 2) return true;
         // Garden paths to Tempat Ayunan 1 [-3..-2, -4] and Tempat Ayunan 2 [2..3, -4]
@@ -4009,7 +4227,81 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return false;
       };
 
-      // Draw all 17x17 isometric base tiles
+      // Helper to check if a tile is directly covered by a solid building footprint
+      const isTileUnderBuilding = (gx: number, gy: number) => {
+        for (const obs of SOLID_BUILDING_OBSTACLES) {
+          if (gx >= obs.minWx + 0.3 && gx <= obs.maxWx - 0.3 && gy >= obs.minWy + 0.3 && gy <= obs.maxWy - 0.3) {
+            return true;
+          }
+        }
+        for (const h of HOUSING_UNITS) {
+          if (Math.abs(gx - h.wx) < 0.55 && Math.abs(gy - h.wy) < 0.55) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const zTile = zoomLevelRef.current;
+      const flowerPalette = [
+        { petal: '#f472b6', center: '#fef08a' }, // Sakura Pink
+        { petal: '#facc15', center: '#92400e' }, // Sunny Marigold
+        { petal: '#38bdf8', center: '#fef9c3' }, // Sky Forget-Me-Not
+        { petal: '#fb7185', center: '#fef08a' }, // Coral Rose
+        { petal: '#c084fc', center: '#fef08a' }, // Lavender Blossom
+        { petal: '#ffffff', center: '#facc15' }, // White Daisy
+      ];
+
+      // Draw a neat, symmetrical botanical blossom with tidy basal leaves
+      const drawTidyFlower = (wx: number, wy: number, colorIdx: number, scale: number = 1) => {
+        const fPt = toScreen(wx, wy, 0, camera.x, camera.y);
+        const r = 1.15 * zTile * scale;
+        const pal = flowerPalette[Math.abs(colorIdx) % flowerPalette.length];
+
+        // Neat paired emerald basal leaves
+        ctx.fillStyle = isNight ? '#065f46' : '#15803d';
+        ctx.beginPath();
+        ctx.ellipse(fPt.x - 1.5 * zTile * scale, fPt.y + 0.5 * zTile * scale, 1.45 * zTile * scale, 0.7 * zTile * scale, -0.35, 0, Math.PI * 2);
+        ctx.ellipse(fPt.x + 1.5 * zTile * scale, fPt.y + 0.5 * zTile * scale, 1.45 * zTile * scale, 0.7 * zTile * scale, 0.35, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 4-petal symmetrical flower head
+        ctx.fillStyle = pal.petal;
+        const pOff = 1.05 * zTile * scale;
+        ctx.beginPath();
+        ctx.arc(fPt.x - pOff, fPt.y, r, 0, Math.PI * 2);
+        ctx.arc(fPt.x + pOff, fPt.y, r, 0, Math.PI * 2);
+        ctx.arc(fPt.x, fPt.y - pOff * 0.85, r, 0, Math.PI * 2);
+        ctx.arc(fPt.x, fPt.y + pOff * 0.85, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Crisp center pistil dot
+        ctx.fillStyle = pal.center;
+        ctx.beginPath();
+        ctx.arc(fPt.x, fPt.y, 0.85 * zTile * scale, 0, Math.PI * 2);
+        ctx.fill();
+      };
+
+      // Draw a neat, symmetrical 3-blade grass tuft with gentle breeze sway
+      const drawTidyGrassTuft = (wx: number, wy: number, swayOffset: number) => {
+        const gPt = toScreen(wx, wy, 0, camera.x, camera.y);
+        ctx.strokeStyle = isNight ? 'rgba(52, 211, 153, 0.38)' : 'rgba(187, 247, 208, 0.65)';
+        ctx.lineWidth = 0.85 * zTile;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        // Left blade
+        ctx.moveTo(gPt.x - 0.8 * zTile, gPt.y);
+        ctx.lineTo(gPt.x - 2.1 * zTile + swayOffset, gPt.y - 2.6 * zTile);
+        // Center blade
+        ctx.moveTo(gPt.x, gPt.y);
+        ctx.lineTo(gPt.x + swayOffset * 1.1, gPt.y - 3.3 * zTile);
+        // Right blade
+        ctx.moveTo(gPt.x + 0.8 * zTile, gPt.y);
+        ctx.lineTo(gPt.x + 2.1 * zTile + swayOffset, gPt.y - 2.6 * zTile);
+        ctx.stroke();
+      };
+
+      // Draw all 17x17 isometric base tiles with manicured lawn & orderly flower beds
       for (let gy = -GRID_RADIUS; gy <= GRID_RADIUS; gy++) {
         for (let gx = -GRID_RADIUS; gx <= GRID_RADIUS; gx++) {
           const pN = toScreen(gx - 0.5, gy - 0.5, 0, camera.x, camera.y);
@@ -4043,6 +4335,65 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
+
+          // Manicured Grass & Neat, Orderly Flower Arrangements on all Grass Tiles across the Map
+          if (!isRiverZone && !isRoad) {
+            // 1) Subtle alternating mowed-lawn checkerboard sheen for a crisp, well-tended park feel
+            if ((gx + gy) % 2 === 0) {
+              ctx.fillStyle = isNight
+                ? 'rgba(52, 211, 153, 0.045)'
+                : 'rgba(255, 255, 255, 0.065)';
+              ctx.beginPath();
+              ctx.moveTo(pN.x, pN.y);
+              ctx.lineTo(pE.x, pE.y);
+              ctx.lineTo(pS.x, pS.y);
+              ctx.lineTo(pW.x, pW.y);
+              ctx.closePath();
+              ctx.fill();
+            }
+
+            if (!isTileUnderBuilding(gx, gy)) {
+              const breeze = Math.sin(elapsed * 2.1 + gx * 0.65 + gy * 0.55) * 0.65 * zTile;
+              const tileColorSeed = Math.abs(gx * 7 + gy * 13);
+
+              // 2) Symmetrical 4-point manicured grass tufts inside each grass tile
+              drawTidyGrassTuft(gx - 0.23, gy - 0.23, breeze);
+              drawTidyGrassTuft(gx + 0.23, gy - 0.23, breeze);
+              drawTidyGrassTuft(gx - 0.23, gy + 0.23, breeze);
+              drawTidyGrassTuft(gx + 0.23, gy + 0.23, breeze);
+
+              // 3) Neat, orderly flower borders along pathway edges & curated center parterres
+              const roadN = isPathway(gx, gy - 1);
+              const roadS = isPathway(gx, gy + 1);
+              const roadW = isPathway(gx - 1, gy);
+              const roadE = isPathway(gx + 1, gy);
+
+              if (roadN) {
+                drawTidyFlower(gx - 0.2, gy - 0.34, tileColorSeed, 0.92);
+                drawTidyFlower(gx + 0.2, gy - 0.34, tileColorSeed + 1, 0.92);
+              }
+              if (roadS) {
+                drawTidyFlower(gx - 0.2, gy + 0.34, tileColorSeed + 2, 0.92);
+                drawTidyFlower(gx + 0.2, gy + 0.34, tileColorSeed + 3, 0.92);
+              }
+              if (!roadN && !roadS && roadW) {
+                drawTidyFlower(gx - 0.34, gy - 0.18, tileColorSeed + 1, 0.92);
+                drawTidyFlower(gx - 0.34, gy + 0.18, tileColorSeed + 4, 0.92);
+              }
+              if (!roadN && !roadS && roadE) {
+                drawTidyFlower(gx + 0.34, gy - 0.18, tileColorSeed + 2, 0.92);
+                drawTidyFlower(gx + 0.34, gy + 0.18, tileColorSeed + 5, 0.92);
+              }
+
+              // Neat center floral rosette on open lawn tiles so the entire map has tidy blooms
+              if ((gx + gy) % 2 === 0) {
+                drawTidyFlower(gx - 0.11, gy, tileColorSeed + 3, 0.88);
+                drawTidyFlower(gx + 0.11, gy, tileColorSeed + 5, 0.88);
+              } else {
+                drawTidyFlower(gx, gy, tileColorSeed, 0.95);
+              }
+            }
+          }
         }
       }
 
@@ -4876,139 +5227,119 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillRect(pt.x - 12 * z, pt.y - 7 * z, 24 * z, 2.5 * z);
           }
         } else if (item.type === 'swings_structure') {
-          // 2 TEMPAT AYUNAN KOTA REFLEKSIA (Masing-Masing 2 Kursi Ayunan, Naik Bayar 1 XP)
+          // 2 TEMPAT AYUNAN MINIMALIS KOTA REFLEKSIA (Modern Architectural Minimalist Park Swing)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
           const st = item.struct;
 
-          // Ground shadow for A-frame structure and floor patch
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+          // Subtle elliptical ground shadow
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.18)';
           ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y + 4 * z, 32 * z, 11 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x, pt.y + 3 * z, 25 * z, 7.5 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // Left A-Frame timber support legs (angled front-to-back for stability)
-          ctx.strokeStyle = '#572506';
-          ctx.lineWidth = 3.2 * z;
+          // Minimalist stone/rubber safety pad strips under left & right swing posts
+          ctx.fillStyle = isNight ? '#1e293b' : '#cbd5e1';
           ctx.beginPath();
-          ctx.moveTo(pt.x - 24 * z, pt.y + 2 * z);
-          ctx.lineTo(pt.x - 20 * z, pt.y - 30 * z);
-          ctx.lineTo(pt.x - 15 * z, pt.y + 8 * z);
-          ctx.stroke();
-
-          // Left A-frame cross brace
-          ctx.lineWidth = 2 * z;
-          ctx.beginPath();
-          ctx.moveTo(pt.x - 22.2 * z, pt.y - 11 * z);
-          ctx.lineTo(pt.x - 17.5 * z, pt.y - 9 * z);
-          ctx.stroke();
-
-          // Right A-Frame timber support legs (angled front-to-back)
-          ctx.lineWidth = 3.2 * z;
-          ctx.beginPath();
-          ctx.moveTo(pt.x + 15 * z, pt.y - 1 * z);
-          ctx.lineTo(pt.x + 20 * z, pt.y - 30 * z);
-          ctx.lineTo(pt.x + 24 * z, pt.y + 7 * z);
-          ctx.stroke();
-
-          // Right A-frame cross brace
-          ctx.lineWidth = 2 * z;
-          ctx.beginPath();
-          ctx.moveTo(pt.x + 17.5 * z, pt.y - 13 * z);
-          ctx.lineTo(pt.x + 22.2 * z, pt.y - 10 * z);
-          ctx.stroke();
-
-          // Top horizontal timber crossbeam with beveled ends
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(pt.x - 25 * z, pt.y - 32 * z, 50 * z, 4.5 * z);
-          ctx.strokeStyle = '#451a03';
-          ctx.lineWidth = 1 * z;
-          ctx.strokeRect(pt.x - 25 * z, pt.y - 32 * z, 50 * z, 4.5 * z);
-
-          // Iron bolt plates & suspension rings at crossbeam
-          ctx.fillStyle = '#0f172a';
-          ctx.beginPath();
-          ctx.arc(pt.x - 20 * z, pt.y - 30 * z, 2 * z, 0, Math.PI * 2);
-          ctx.arc(pt.x + 20 * z, pt.y - 30 * z, 2 * z, 0, Math.PI * 2);
+          ctx.ellipse(pt.x - 19 * z, pt.y + 2.5 * z, 4.2 * z, 2.0 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x + 19 * z, pt.y + 2.5 * z, 4.2 * z, 2.0 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // Hanging Swings for this Swing Structure
+          // Sleek Minimalist Matte-Charcoal Portal Frame Legs (Slender & clean, no bulky crossbars)
+          ctx.strokeStyle = isNight ? '#334155' : '#1e293b';
+          ctx.lineWidth = 2.1 * z;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          // Left minimalist inverted-V leg
+          ctx.moveTo(pt.x - 21.5 * z, pt.y + 1.5 * z);
+          ctx.lineTo(pt.x - 19 * z, pt.y - 29.5 * z);
+          ctx.lineTo(pt.x - 16.5 * z, pt.y + 4.5 * z);
+          // Right minimalist inverted-V leg
+          ctx.moveTo(pt.x + 16.5 * z, pt.y + 0.5 * z);
+          ctx.lineTo(pt.x + 19 * z, pt.y - 29.5 * z);
+          ctx.lineTo(pt.x + 21.5 * z, pt.y + 4.5 * z);
+          ctx.stroke();
+
+          // Slim Minimalist Nordic Teak & Matte-Slate Top Beam
+          ctx.fillStyle = isNight ? '#0f172a' : '#1e293b';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 21.5 * z, pt.y - 31 * z, 43 * z, 2.6 * z, 1.3 * z);
+          ctx.fill();
+
+          // Warm amber/teak accent strip along top edge of minimalist beam
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 19.5 * z, pt.y - 30.8 * z, 39 * z, 1.0 * z, 0.5 * z);
+          ctx.fill();
+
+          // Hanging Minimalist Swings for this Swing Structure
           const swingIds: Array<SwingSeatDef['id']> = [st.leftSeatId, st.rightSeatId];
 
           swingIds.forEach((swId) => {
             const m = getSwingSeatMetrics(swId);
 
-            // Ground shadow moving forward and backward directly beneath the swinging seat
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+            // Soft ground shadow directly beneath the swinging seat
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
             ctx.beginPath();
             ctx.ellipse(
               m.shadowX,
               m.shadowY,
-              6.5 * m.shadowScale * z,
-              3.2 * m.shadowScale * z,
+              5.5 * m.shadowScale * z,
+              2.5 * m.shadowScale * z,
               0,
               0,
               Math.PI * 2
             );
             ctx.fill();
 
-            // Iron hook brackets on top crossbeam
-            ctx.fillStyle = '#334155';
-            ctx.fillRect(m.anchorX - 5 * z, m.anchorY - 1 * z, 2 * z, 2.2 * z);
-            ctx.fillRect(m.anchorX + 3 * z, m.anchorY - 1 * z, 2 * z, 2.2 * z);
-
-            // Dual hanging iron chains / ropes from crossbeam to seat (swinging forward & backward)
-            ctx.strokeStyle = isNight ? '#cbd5e1' : '#57534e';
-            ctx.lineWidth = 1.3 * z;
+            // Discreet minimalist stainless ring mounts on top beam
+            ctx.fillStyle = '#94a3b8';
             ctx.beginPath();
-            ctx.moveTo(m.anchorX - 4.2 * z, m.anchorY);
-            ctx.lineTo(m.seatX - 4.5 * z, m.seatY);
-            ctx.moveTo(m.anchorX + 4.2 * z, m.anchorY);
-            ctx.lineTo(m.seatX + 4.5 * z, m.seatY);
+            ctx.arc(m.anchorX - 3.8 * z, m.anchorY, 1.0 * z, 0, Math.PI * 2);
+            ctx.arc(m.anchorX + 3.8 * z, m.anchorY, 1.0 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Thin, taut minimalist steel suspension cables
+            ctx.strokeStyle = isNight ? 'rgba(203, 213, 225, 0.8)' : 'rgba(71, 85, 105, 0.85)';
+            ctx.lineWidth = 0.85 * z;
+            ctx.beginPath();
+            ctx.moveTo(m.anchorX - 3.8 * z, m.anchorY);
+            ctx.lineTo(m.seatX - 4.0 * z, m.seatY);
+            ctx.moveTo(m.anchorX + 3.8 * z, m.anchorY);
+            ctx.lineTo(m.seatX + 4.0 * z, m.seatY);
             ctx.stroke();
 
-            // 3D Isometric Wooden Swing Seat Board
-            const seatTilt = m.sway * 1.2 * z;
+            // Sleek Floating Minimalist Rounded Teak Seat Board
             ctx.fillStyle = '#d97706';
             ctx.beginPath();
-            ctx.moveTo(m.seatX - 6 * z, m.seatY - 1.5 * z - seatTilt * 0.4);
-            ctx.lineTo(m.seatX + 6 * z, m.seatY - 1.5 * z - seatTilt * 0.4);
-            ctx.lineTo(m.seatX + 5.2 * z, m.seatY + 1.8 * z + seatTilt * 0.4);
-            ctx.lineTo(m.seatX - 6.8 * z, m.seatY + 1.8 * z + seatTilt * 0.4);
-            ctx.closePath();
+            ctx.roundRect(m.seatX - 5.4 * z, m.seatY - 1.1 * z, 10.8 * z, 2.4 * z, 1.2 * z);
             ctx.fill();
-            ctx.strokeStyle = '#78350f';
-            ctx.lineWidth = 0.9 * z;
+            ctx.strokeStyle = '#92400e';
+            ctx.lineWidth = 0.65 * z;
             ctx.stroke();
 
-            // Front thickness edge of wooden seat plank
-            ctx.fillStyle = '#92400e';
-            ctx.fillRect(m.seatX - 6.2 * z, m.seatY + 1.2 * z, 11.4 * z, 1.5 * z);
+            // Minimalist warm seat pad highlight
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.roundRect(m.seatX - 4.4 * z, m.seatY - 0.7 * z, 8.8 * z, 1.1 * z, 0.5 * z);
+            ctx.fill();
           });
-
-          // Brass plaque on top beam
-          ctx.fillStyle = '#fbbf24';
-          ctx.fillRect(pt.x - 13 * z, pt.y - 34.5 * z, 26 * z, 3.5 * z);
-          ctx.fillStyle = '#451a03';
-          ctx.font = `bold ${Math.round(2.7 * z)}px sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(st.title, pt.x, pt.y - 32.8 * z);
 
           // Floating Badge above Swing Structure ONLY when player approaches
           const distToSwing = Math.hypot(player.wx - item.wx, player.wy - item.wy);
           if (distToSwing < 2.15) {
-            const swBadgeY = pt.y - 44 * z;
-            ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
+            const swBadgeY = pt.y - 39 * z;
+            ctx.font = `bold ${Math.round(7.6 * z)}px sans-serif`;
             const swM = ctx.measureText(st.badgeText);
-            const swW = swM.width + 12 * z;
-            const swH = 16 * z;
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+            const swW = swM.width + 10 * z;
+            const swH = 14.5 * z;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.68)';
             ctx.beginPath();
-            ctx.roundRect(pt.x - swW / 2, swBadgeY - swH / 2, swW, swH, 8 * z);
+            ctx.roundRect(pt.x - swW / 2, swBadgeY - swH / 2, swW, swH, 7 * z);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
-            ctx.lineWidth = 1.1 * z;
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.75)';
+            ctx.lineWidth = 1.0 * z;
             ctx.stroke();
             ctx.fillStyle = '#fde047';
             ctx.textAlign = 'center';
@@ -5263,12 +5594,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fillRect(-52 * z, 6 * z, 4 * z, 10 * z);
           ctx.fillRect(48 * z, 6 * z, 4 * z, 10 * z);
 
-          // Traditional/Modern Crown Roof Peak above the Signboard (following Gapura angle)
+          // Wide Illuminated Signboard Plaque aligned with Gapura angle (Text strictly fitted inside Frame)
+          const titleText = '🏛️ SELAMAT DATANG DI REFLEKSIA CITY ✨';
+          ctx.font = `900 ${Math.max(7, Math.round(8.2 * z))}px sans-serif`;
+          const tm = ctx.measureText(titleText);
+          const boardW = Math.max(178 * z, tm.width + 32 * z);
+          const boardH = 23 * z;
+          const roofHalfW = boardW / 2 + 6 * z;
+
+          // Traditional/Modern Crown Roof Peak above the Signboard (scaled to match boardW)
           ctx.fillStyle = '#b45309';
           ctx.beginPath();
-          ctx.moveTo(-92 * z, -8 * z);
-          ctx.lineTo(0, -24 * z);
-          ctx.lineTo(92 * z, -8 * z);
+          ctx.moveTo(-roofHalfW, -boardH / 2 + 2 * z);
+          ctx.lineTo(0, -boardH / 2 - 14 * z);
+          ctx.lineTo(roofHalfW, -boardH / 2 + 2 * z);
           ctx.closePath();
           ctx.fill();
           ctx.strokeStyle = '#fde047';
@@ -5278,15 +5617,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Golden Spire Finial at Apex of Gapura
           ctx.fillStyle = '#fde047';
           ctx.beginPath();
-          ctx.arc(0, -26 * z, 3.2 * z, 0, Math.PI * 2);
+          ctx.arc(0, -boardH / 2 - 16 * z, 3.2 * z, 0, Math.PI * 2);
           ctx.fill();
-
-          // Wide Illuminated Signboard Plaque aligned with Gapura angle
-          const titleText = '🏛️ SELAMAT DATANG DI REFLEKSIA CITY ✨';
-          ctx.font = `900 ${Math.round(8.8 * z)}px sans-serif`;
-          const tm = ctx.measureText(titleText);
-          const boardW = Math.max(168 * z, tm.width + 22 * z);
-          const boardH = 22 * z;
 
           // 3D Isometric Extrusion / Back Depth of the Signboard
           ctx.fillStyle = '#451a03';
@@ -5320,23 +5652,35 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineWidth = 2.0 * z;
           ctx.stroke();
 
-          ctx.strokeStyle = 'rgba(254, 240, 138, 0.55)';
-          ctx.lineWidth = 0.8 * z;
+          const innerPad = 3.2 * z;
+          ctx.strokeStyle = 'rgba(254, 240, 138, 0.65)';
+          ctx.lineWidth = 0.9 * z;
           ctx.beginPath();
           ctx.roundRect(
-            -boardW / 2 + 2.5 * z,
-            -boardH / 2 + 2.5 * z,
-            boardW - 5 * z,
-            boardH - 5 * z,
-            4.5 * z
+            -boardW / 2 + innerPad,
+            -boardH / 2 + innerPad,
+            boardW - innerPad * 2,
+            boardH - innerPad * 2,
+            4 * z
           );
           ctx.stroke();
 
-          // Crisp Glowing Gold & White Welcome Text following Gapura angle
+          // Clip to the inner frame and pass maxWidth so the welcome text is 100% guaranteed inside the frame
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(
+            -boardW / 2 + innerPad + 2 * z,
+            -boardH / 2 + innerPad + 1 * z,
+            boardW - (innerPad + 2 * z) * 2,
+            boardH - (innerPad + 1 * z) * 2,
+            3 * z
+          );
+          ctx.clip();
           ctx.fillStyle = '#fef08a';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(titleText, 0, 0.5 * z);
+          ctx.fillText(titleText, 0, 0, boardW - 20 * z);
+          ctx.restore();
 
           ctx.restore();
         } else if (item.type === 'town_rules_board') {
@@ -6494,32 +6838,75 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fillStyle = isNight ? '#240e01' : '#451a03';
           ctx.fillRect(pt.x + 0.5 * z, pt.y - 24 * z, 3 * z, 24 * z);
 
-          // Lower large sphere (Teal/Emerald green with isometric shading)
-          ctx.fillStyle = isLush ? '#047857' : (isNight ? '#064e3b' : '#059669');
+          const isAutumnTree = Boolean(cycle?.isAutumn);
+
+          // Fallen autumn leaves scattered neatly around the base of the trunk when tree is in autumn/fallen-leaf state
+          if (isAutumnTree) {
+            const fallenLeafOffsets: Array<[number, number, string, number]> = [
+              [-11, 2.5, '#ea580c', 0.3],
+              [-5, 4.8, '#f59e0b', -0.4],
+              [4, 4.2, '#d97706', 0.5],
+              [10, 2.0, '#c2410c', -0.2],
+              [-2, 1.5, '#fbbf24', 0.1],
+            ];
+            fallenLeafOffsets.forEach(([lx, ly, lCol, lRot]) => {
+              ctx.save();
+              ctx.translate(pt.x + lx * z, pt.y + ly * z);
+              ctx.rotate(lRot);
+              ctx.fillStyle = lCol;
+              ctx.beginPath();
+              ctx.ellipse(0, 0, 2.8 * z, 1.5 * z, 0, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            });
+          }
+
+          // Lower large sphere (Emerald green OR Warm Autumn Fallen-Leaf Orange/Terracotta)
+          ctx.fillStyle = isAutumnTree
+            ? (isNight ? '#9a3412' : '#c2410c')
+            : isLush
+            ? '#047857'
+            : (isNight ? '#064e3b' : '#059669');
           ctx.beginPath();
           ctx.arc(pt.x, pt.y - 32 * z, 22 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Lower sphere highlight
-          ctx.fillStyle = isLush ? '#10b981' : (isNight ? '#047857' : '#10b981');
+          ctx.fillStyle = isAutumnTree
+            ? (isNight ? '#c2410c' : '#ea580c')
+            : isLush
+            ? '#10b981'
+            : (isNight ? '#047857' : '#10b981');
           ctx.beginPath();
           ctx.arc(pt.x - 4 * z, pt.y - 36 * z, 16 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Upper overlapping bright mint/lime sphere
-          ctx.fillStyle = isLush ? '#10b981' : (isNight ? '#047857' : '#10b981');
+          // Upper overlapping sphere
+          ctx.fillStyle = isAutumnTree
+            ? (isNight ? '#d97706' : '#f59e0b')
+            : isLush
+            ? '#10b981'
+            : (isNight ? '#047857' : '#10b981');
           ctx.beginPath();
           ctx.arc(pt.x + 1 * z, pt.y - 48 * z, 16 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Upper sphere soft top highlight
-          ctx.fillStyle = isLush ? '#34d399' : (isNight ? '#059669' : '#34d399');
+          ctx.fillStyle = isAutumnTree
+            ? (isNight ? '#f59e0b' : '#fbbf24')
+            : isLush
+            ? '#34d399'
+            : (isNight ? '#059669' : '#34d399');
           ctx.beginPath();
           ctx.arc(pt.x - 2 * z, pt.y - 52 * z, 11 * z, 0, Math.PI * 2);
           ctx.fill();
 
           // Top foliage bud
-          ctx.fillStyle = isLush ? '#6ee7b7' : (isNight ? '#10b981' : '#6ee7b7');
+          ctx.fillStyle = isAutumnTree
+            ? (isNight ? '#fbbf24' : '#fde047')
+            : isLush
+            ? '#6ee7b7'
+            : (isNight ? '#10b981' : '#6ee7b7');
           ctx.beginPath();
           ctx.arc(pt.x, pt.y - 59 * z, 6 * z, 0, Math.PI * 2);
           ctx.fill();
@@ -6624,12 +7011,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
-          // Minimalist status pill above tree when near or when ripe apples are ready
+          // Minimalist status pill above tree when near, when autumn leaves need watering, or when ripe apples are ready
           const distPlayerToThisTree = Math.hypot(player.wx - item.wx, player.wy - item.wy);
           const activeCount = cycle ? cycle.count : 0;
-          if ((distPlayerToThisTree < 1.65 && (activeCount > 0 || hasRipeApples)) || isRecentlyWatered) {
+          if ((distPlayerToThisTree < 1.65 && (activeCount > 0 || hasRipeApples || isAutumnTree)) || isRecentlyWatered) {
             const badgeText = hasRipeApples
               ? '🍎 Petik Apel (+2 XP)'
+              : isAutumnTree
+              ? '🍂 Siram agar Hijau'
               : `💧 ${activeCount}/3`;
             const badgeY = pt.y - 68 * z;
             ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
@@ -6640,7 +7029,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.beginPath();
             ctx.roundRect(pt.x - bw / 2, badgeY - bh / 2, bw, bh, 6 * z);
             ctx.fill();
-            ctx.strokeStyle = hasRipeApples ? '#ef4444' : '#38bdf8';
+            ctx.strokeStyle = hasRipeApples ? '#ef4444' : isAutumnTree ? '#f59e0b' : '#38bdf8';
             ctx.lineWidth = 1 * z;
             ctx.stroke();
             ctx.fillStyle = '#ffffff';
@@ -8634,6 +9023,154 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 1.2 * z;
             ctx.stroke();
 
+            // 6b) 4 Horn Loudspeakers (TOA Menara Masjid) on the Minaret Balcony
+            const spkBase = toScreen(minX, minY, 63, camera.x, camera.y);
+            const spkDirs = [
+              { dx: -7.5 * z, dy: -2.2 * z },
+              { dx: 7.5 * z, dy: -2.2 * z },
+              { dx: -5.5 * z, dy: 2.2 * z },
+              { dx: 5.5 * z, dy: 2.2 * z },
+            ];
+            spkDirs.forEach((sd) => {
+              ctx.fillStyle = '#e2e8f0';
+              ctx.strokeStyle = '#fbbf24';
+              ctx.lineWidth = 0.8 * z;
+              ctx.beginPath();
+              ctx.moveTo(spkBase.x, spkBase.y);
+              ctx.lineTo(spkBase.x + sd.dx, spkBase.y + sd.dy - 2.1 * z);
+              ctx.lineTo(spkBase.x + sd.dx, spkBase.y + sd.dy + 2.1 * z);
+              ctx.closePath();
+              ctx.fill();
+              ctx.stroke();
+            });
+
+            // 6c) LIVE AZAN 5 WAKTU VISUAL BROADCAST ON THE MAP
+            // (Hanya tampil 10 menit setelah waktu sholat per 5 waktunya)
+            const curWaktu = getActiveAzanWithin10MinWita();
+            if (curWaktu) {
+              const waktuMeta =
+                AZAN_5_WAKTU_LIST.find((w) => w.id === curWaktu) || AZAN_5_WAKTU_LIST[0];
+
+              // Concentric Expanding Emerald-Gold Acoustic Ripples from Minaret Balcony
+              for (let rw = 0; rw < 3; rw++) {
+                const waveProg = ((elapsed * 0.68 + rw * 0.33) % 1);
+                const waveRx = (12 + waveProg * 46) * z;
+                const waveRy = (7 + waveProg * 25) * z;
+                const waveAlpha = Math.max(0, (1 - waveProg) * 0.72);
+
+                ctx.save();
+                ctx.strokeStyle =
+                  rw % 2 === 0
+                    ? `rgba(251, 191, 36, ${waveAlpha})`
+                    : `rgba(52, 211, 153, ${waveAlpha})`;
+                ctx.lineWidth = (2.0 - waveProg * 1.1) * z;
+                ctx.beginPath();
+                ctx.ellipse(
+                  minTop.x,
+                  minTop.y - 5 * z,
+                  waveRx,
+                  waveRy,
+                  0,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.stroke();
+                ctx.restore();
+              }
+
+              // Cycling Lafadz Azan phrases (including special Subuh phrase)
+              const azanPhrases =
+                curWaktu === 'Subuh'
+                  ? [
+                      { ar: 'اللّٰهُ أَكْبَرُ ، اللّٰهُ أَكْبَرُ', id: 'Allaahu Akbar, Allaahu Akbar' },
+                      { ar: 'أَشْهَدُ أَنْ لَا إِلٰهَ إِلَّا اللّٰهُ', id: 'Asyhadu allaa ilaaha illallaah' },
+                      { ar: 'أَشْهَدُ أَنَّ مُحَمَّدًا رَسُوْلُ اللّٰهِ', id: 'Asyhadu anna Muhammadar Rasuulullaah' },
+                      { ar: 'حَيَّ عَلَى الصَّلَاةِ', id: "Hayya 'alash-shalaah" },
+                      { ar: 'حَيَّ عَلَى الْفَلَاحِ', id: "Hayya 'alal-falaah" },
+                      { ar: 'الصَّلَاةُ خَيْرٌ مِنَ النَّوْمِ', id: 'Ash-shalaatu khairum minan-naum' },
+                      { ar: 'لَا إِلٰهَ إِلَّا اللّٰهُ', id: 'Laa ilaaha illallaah' },
+                    ]
+                  : [
+                      { ar: 'اللّٰهُ أَكْبَرُ ، اللّٰهُ أَكْبَرُ', id: 'Allaahu Akbar, Allaahu Akbar' },
+                      { ar: 'أَشْهَدُ أَنْ لَا إِلٰهَ إِلَّا اللّٰهُ', id: 'Asyhadu allaa ilaaha illallaah' },
+                      { ar: 'أَشْهَدُ أَنَّ مُحَمَّدًا رَسُوْلُ اللّٰهِ', id: 'Asyhadu anna Muhammadar Rasuulullaah' },
+                      { ar: 'حَيَّ عَلَى الصَّلَاةِ', id: "Hayya 'alash-shalaah" },
+                      { ar: 'حَيَّ عَلَى الْفَلَاحِ', id: "Hayya 'alal-falaah" },
+                      { ar: 'لَا إِلٰهَ إِلَّا اللّٰهُ', id: 'Laa ilaaha illallaah' },
+                    ];
+
+              const phraseIdx = Math.floor(elapsed * 0.28) % azanPhrases.length;
+              const currentPhrase = azanPhrases[phraseIdx];
+
+              // Floating Azan 5 Waktu Callout Card above the Minaret
+              const azanBob = Math.sin(elapsed * 2.4) * 2.2 * z;
+              const cardCx = minTop.x + 6 * z;
+              const cardCy = minTop.y - 34 * z + azanBob;
+              const cardW = 132 * z;
+              const cardH = 34 * z;
+
+              ctx.save();
+              // Glowing emerald-slate background
+              ctx.fillStyle = 'rgba(6, 78, 59, 0.90)';
+              ctx.beginPath();
+              ctx.roundRect(cardCx - cardW / 2, cardCy - cardH / 2, cardW, cardH, 6 * z);
+              ctx.fill();
+
+              ctx.strokeStyle = '#fbbf24';
+              ctx.lineWidth = 1.25 * z;
+              ctx.stroke();
+
+              // Pointer stem down to Minaret cupola
+              ctx.fillStyle = '#fbbf24';
+              ctx.beginPath();
+              ctx.moveTo(cardCx - 8 * z, cardCy + cardH / 2);
+              ctx.lineTo(minTop.x, minTop.y - 11 * z);
+              ctx.lineTo(cardCx - 2 * z, cardCy + cardH / 2);
+              ctx.closePath();
+              ctx.fill();
+
+              // Row 1: Active Prayer Time Header + Animated Sound Equalizer Bars
+              ctx.fillStyle = '#fde047';
+              ctx.font = `bold ${Math.round(5.8 * z)}px sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(
+                `🔊 ADZAN ${waktuMeta.id.toUpperCase()} (${waktuMeta.time} WITA)`,
+                cardCx,
+                cardCy - 10.5 * z
+              );
+
+              // Row 2: Live Arabic & Latin Azan Call
+              ctx.fillStyle = '#ffffff';
+              ctx.font = `bold ${Math.round(6.6 * z)}px sans-serif`;
+              ctx.fillText(currentPhrase.ar, cardCx, cardCy - 2.2 * z);
+
+              ctx.fillStyle = '#a7f3d0';
+              ctx.font = `italic ${Math.round(4.9 * z)}px sans-serif`;
+              ctx.fillText(currentPhrase.id, cardCx, cardCy + 4.8 * z);
+
+              // Row 3: 5-Waktu Schedule Strip (Subuh | Dzuhur | Ashar | Maghrib | Isya)
+              const stripY = cardCy + 12.2 * z;
+              const slotW = (cardW - 8 * z) / 5;
+              AZAN_5_WAKTU_LIST.forEach((wk, wIdx) => {
+                const slotX = cardCx - cardW / 2 + 4 * z + wIdx * slotW + slotW / 2;
+                const isAct = wk.id === curWaktu;
+                if (isAct) {
+                  ctx.fillStyle = '#fbbf24';
+                  ctx.beginPath();
+                  ctx.roundRect(slotX - slotW * 0.46, stripY - 3.3 * z, slotW * 0.92, 6.6 * z, 2.2 * z);
+                  ctx.fill();
+                  ctx.fillStyle = '#064e3b';
+                } else {
+                  ctx.fillStyle = '#d1fae5';
+                }
+                ctx.font = `bold ${Math.round(4.3 * z)}px sans-serif`;
+                ctx.fillText(wk.id, slotX, stripY);
+              });
+
+              ctx.restore();
+            }
+
             // 7) Illuminated Mosque Name Signboard ("🕌 MASJID AL-HIKMAH • IQRO & SHOLAT")
             const signM = toScreen(bx - 0.42, by + 0.42, 39.5, camera.x, camera.y);
             ctx.fillStyle = '#064e3b';
@@ -8648,12 +9185,200 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('🕌 MASJID AL-HIKMAH', signM.x, signM.y - 0.5 * z);
+          } else if (b.id === 'bank_materi') {
+            // =========================================================================
+            // 10. GEDUNG BANK MATERI GURU (Di Sisi Barat Laut [-5.35, 0, -4.85])
+            //     Khusus Guru • Input Mapel, Elemen, TP, Materi Esensial & Generate AI
+            // =========================================================================
+            const drawIsoBoxBM = (
+              c: CanvasRenderingContext2D,
+              cx: number,
+              cy: number,
+              zBase: number,
+              w: number,
+              d: number,
+              h: number,
+              topCol: string,
+              leftCol: string,
+              rightCol: string,
+              camX: number,
+              camY: number,
+              strokeCol?: string
+            ) => {
+              const hw = w / 2;
+              const hd = d / 2;
+              const bW = toScreen(cx - hw, cy + hd, zBase, camX, camY);
+              const bS = toScreen(cx + hw, cy + hd, zBase, camX, camY);
+              const bE = toScreen(cx + hw, cy - hd, zBase, camX, camY);
+              const tN = toScreen(cx - hw, cy - hd, zBase + h, camX, camY);
+              const tW = toScreen(cx - hw, cy + hd, zBase + h, camX, camY);
+              const tS = toScreen(cx + hw, cy + hd, zBase + h, camX, camY);
+              const tE = toScreen(cx + hw, cy - hd, zBase + h, camX, camY);
+
+              c.fillStyle = leftCol;
+              c.beginPath();
+              c.moveTo(tW.x, tW.y);
+              c.lineTo(tS.x, tS.y);
+              c.lineTo(bS.x, bS.y);
+              c.lineTo(bW.x, bW.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.7 * z;
+                c.stroke();
+              }
+
+              c.fillStyle = rightCol;
+              c.beginPath();
+              c.moveTo(tS.x, tS.y);
+              c.lineTo(tE.x, tE.y);
+              c.lineTo(bE.x, bE.y);
+              c.lineTo(bS.x, bS.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.7 * z;
+                c.stroke();
+              }
+
+              c.fillStyle = topCol;
+              c.beginPath();
+              c.moveTo(tN.x, tN.y);
+              c.lineTo(tE.x, tE.y);
+              c.lineTo(tS.x, tS.y);
+              c.lineTo(tW.x, tW.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.7 * z;
+                c.stroke();
+              }
+            };
+
+            // 1) Stepped Indigo-Slate & Gold Marble Plinth
+            drawIsoBoxBM(ctx, bx, by, 0, 1.54, 1.54, 4.5, '#e0e7ff', '#94a3b8', '#cbd5e1', camera.x, camera.y, '#64748b');
+            drawIsoBoxBM(ctx, bx, by, 4.5, 1.40, 1.40, 3.0, '#6366f1', '#3730a3', '#4f46e5', camera.x, camera.y, '#312e81');
+            drawIsoBoxBM(ctx, bx, by, 7.5, 1.28, 1.28, 2.5, '#f8fafc', '#cbd5e1', '#e2e8f0', camera.x, camera.y, '#94a3b8');
+
+            // Front-East Welcoming Steps toward the central promenade
+            drawIsoBoxBM(ctx, bx + 0.54, by + 0.54, 0, 0.50, 0.50, 2.6, '#fef3c7', '#fde68a', '#f59e0b', camera.x, camera.y);
+            drawIsoBoxBM(ctx, bx + 0.44, by + 0.44, 2.6, 0.40, 0.40, 2.6, '#fffbeb', '#fef3c7', '#fbbf24', camera.x, camera.y);
+
+            // 2) Main Neo-Classical Digital Knowledge Vault Hall
+            drawIsoBoxBM(ctx, bx, by, 10, 1.12, 1.12, 33, '#eef2ff', '#c7d2fe', '#e0e7ff', camera.x, camera.y, '#818cf8');
+
+            // Royal Indigo & Gold Crown Cornice Band
+            drawIsoBoxBM(ctx, bx, by, 36, 1.16, 1.16, 4.5, '#4f46e5', '#312e81', '#3730a3', camera.x, camera.y);
+            drawIsoBoxBM(ctx, bx, by, 40.5, 1.18, 1.18, 2.8, '#fbbf24', '#b45309', '#d97706', camera.x, camera.y);
+
+            // 3) 4 Classical Marble Columns with Golden Capitals
+            for (const [px, py] of [
+              [-0.52, -0.52],
+              [0.52, -0.52],
+              [-0.52, 0.52],
+              [0.52, 0.52],
+            ]) {
+              drawIsoBoxBM(ctx, bx + px, by + py, 10, 0.15, 0.15, 31, '#ffffff', '#cbd5e1', '#e2e8f0', camera.x, camera.y);
+              drawIsoBoxBM(ctx, bx + px, by + py, 41, 0.18, 0.18, 3.0, '#fde047', '#ca8a04', '#eab308', camera.x, camera.y);
+            }
+
+            // 4) Grand Vault Entrance Portal & Glowing AI Data Windows
+            const doorBM = toScreen(bx + 0.46, by + 0.46, 10, camera.x, camera.y);
+            ctx.save();
+            ctx.fillStyle = '#1e1b4b';
+            ctx.beginPath();
+            ctx.roundRect(doorBM.x - 8 * z, doorBM.y - 20 * z, 16 * z, 20 * z, [6 * z, 6 * z, 0, 0]);
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.6 * z;
+            ctx.stroke();
+
+            // Golden Vault Wheel / Key Emblem on Door
+            ctx.strokeStyle = '#fde047';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.arc(doorBM.x, doorBM.y - 10 * z, 4.2 * z, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+
+            // Illuminated Indigo-Cyan Smart Windows on Left & Right Facades
+            for (const wOff of [-0.26, 0.22]) {
+              const wLeft = toScreen(bx + wOff, by + 0.54, 21, camera.x, camera.y);
+              const wRight = toScreen(bx + 0.54, by + wOff, 21, camera.x, camera.y);
+              for (const wPt of [wLeft, wRight]) {
+                ctx.fillStyle = isNight ? '#fde047' : '#38bdf8';
+                ctx.beginPath();
+                ctx.roundRect(wPt.x - 3.5 * z, wPt.y - 6 * z, 7 * z, 10 * z, 2 * z);
+                ctx.fill();
+                ctx.strokeStyle = '#fbbf24';
+                ctx.lineWidth = 0.9 * z;
+                ctx.stroke();
+              }
+            }
+
+            // 5) Stepped Roof Pedestal & Levitating AI Knowledge Crystal Beacon
+            drawIsoBoxBM(ctx, bx, by, 43.3, 0.84, 0.84, 5.2, '#4338ca', '#312e81', '#3730a3', camera.x, camera.y, '#6366f1');
+            drawIsoBoxBM(ctx, bx, by, 48.5, 0.58, 0.58, 3.2, '#fbbf24', '#b45309', '#d97706', camera.x, camera.y);
+
+            const crystalFloat = Math.sin(elapsed * 2.8) * 2.8 * z;
+            const crystalPt = toScreen(bx, by, 62, camera.x, camera.y);
+            const cY = crystalPt.y + crystalFloat;
+
+            // Expanding AI Distribution Rings around Roof Beacon (Symbolizing AI spreading materials to all buildings)
+            for (let ri = 0; ri < 2; ri++) {
+              const rProg = (elapsed * 0.55 + ri * 0.5) % 1;
+              const rx = (10 + rProg * 28) * z;
+              const ry = (5 + rProg * 14) * z;
+              ctx.strokeStyle = `rgba(99, 102, 241, ${(1 - rProg) * 0.65})`;
+              ctx.lineWidth = 1.3 * z;
+              ctx.beginPath();
+              ctx.ellipse(crystalPt.x, cY, rx, ry, 0, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+
+            // Glowing Diamond AI Crystal
+            ctx.save();
+            ctx.fillStyle = '#38bdf8';
+            ctx.strokeStyle = '#fde047';
+            ctx.lineWidth = 1.3 * z;
+            ctx.beginPath();
+            ctx.moveTo(crystalPt.x, cY - 11 * z);
+            ctx.lineTo(crystalPt.x + 7.5 * z, cY);
+            ctx.lineTo(crystalPt.x, cY + 9 * z);
+            ctx.lineTo(crystalPt.x - 7.5 * z, cY);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            // 6) Signboard "🏦 BANK MATERI GURU" + "🔒 KHUSUS GURU • AI"
+            const signBM = toScreen(bx + 0.36, by + 0.36, 40.5, camera.x, camera.y);
+            ctx.fillStyle = '#1e1b4b';
+            ctx.beginPath();
+            ctx.roundRect(signBM.x - 42 * z, signBM.y - 8 * z, 84 * z, 15 * z, 3.8 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.25 * z;
+            ctx.stroke();
+
+            ctx.fillStyle = '#fef08a';
+            ctx.font = `bold ${Math.round(5.4 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🏦 BANK MATERI GURU', signBM.x, signBM.y - 2.4 * z);
+
+            ctx.fillStyle = '#a5b4fc';
+            ctx.font = `bold ${Math.round(3.8 * z)}px sans-serif`;
+            ctx.fillText('🔒 KHUSUS GURU • GENERATE AI', signBM.x, signBM.y + 3.4 * z);
           }
 
           // Floating Building Label ONLY when touched, hovered or active (compact & semi-transparent)
           const shouldShowLabel = isHovered || activeBuilding === b.id || lastTouchedIdRef.current === b.id;
           if (shouldShowLabel) {
-            const tagY = pt.y - (b.id === 'balai_kota' ? 86 : b.id === 'masjid' ? 78 : b.id === 'menara_mentor' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
+            const tagY = pt.y - (b.id === 'balai_kota' ? 86 : b.id === 'masjid' || b.id === 'bank_materi' ? 78 : b.id === 'menara_mentor' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
             const labelText = `${b.icon} ${b.name}`;
             ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
             const tMetrics = ctx.measureText(labelText);
@@ -8882,19 +9607,27 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fillText('FLOUR', barrelX + 11 * z, barrelY + 2.5 * z);
           ctx.restore();
         } else if (item.type === 'housing_gate') {
-          // GERBANG & PAPAN KOMPLEKS PERUMAHAN GURU & SISWA (Di Belakang Perpustakaan Kampus [-6.55, 0])
+          // GERBANG & PAPAN KOMPLEKS PERUMAHAN GURU & WISMA DKV (Di Belakang Perpustakaan Kampus [-6.55, 0])
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current * 1.12;
           ctx.save();
 
+          const gateTitle = '🏡 PERUMAHAN GURU & WISMA DKV';
+          ctx.font = `bold ${Math.max(4, Math.round(4.5 * z))}px sans-serif`;
+          const gateTm = ctx.measureText(gateTitle);
+          const signW = Math.max(76 * z, gateTm.width + 14 * z);
+          const signH = 13 * z;
+          const signY = pt.y - 25 * z;
+          const pillarSpan = Math.min(24, Math.max(14, (signW / z) * 0.34));
+
           // Soft shadow
           ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
           ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y + 2 * z, 18 * z, 7 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x, pt.y + 2 * z, (pillarSpan + 6) * z, 7 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
           // Ornamental stone & flower planter base on both sides of the boulevard sign
-          [-12, 12].forEach((ox) => {
+          [-pillarSpan, pillarSpan].forEach((ox) => {
             ctx.fillStyle = '#475569';
             ctx.fillRect(pt.x + (ox - 2.5) * z, pt.y - 18 * z, 5 * z, 19 * z);
             ctx.fillStyle = '#f59e0b';
@@ -8906,23 +9639,31 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           });
 
-          // Overhead Neighborhood Arch Signboard
-          const signW = 46 * z;
-          const signH = 11.5 * z;
-          const signY = pt.y - 25 * z;
+          // Overhead Neighborhood Arch Signboard (Text strictly fitted inside Frame)
           ctx.fillStyle = '#0f172a';
           ctx.beginPath();
           ctx.roundRect(pt.x - signW / 2, signY, signW, signH, 4 * z);
           ctx.fill();
           ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 1.2 * z;
+          ctx.lineWidth = 1.3 * z;
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(254, 240, 138, 0.45)';
+          ctx.lineWidth = 0.65 * z;
+          ctx.beginPath();
+          ctx.roundRect(
+            pt.x - signW / 2 + 1.8 * z,
+            signY + 1.8 * z,
+            signW - 3.6 * z,
+            signH - 3.6 * z,
+            2.8 * z
+          );
           ctx.stroke();
 
           ctx.fillStyle = '#fef08a';
-          ctx.font = `bold ${Math.max(4, Math.round(4.6 * z))}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('🏡 PERUMAHAN GURU & SISWA', pt.x, signY + signH / 2);
+          ctx.fillText(gateTitle, pt.x, signY + signH / 2, signW - 10 * z);
 
           ctx.restore();
         } else if (item.type === 'housing_unit') {
@@ -9095,19 +9836,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           }
 
-          // House Badge Plate on Gable ("GURU" / "SISWA")
+          // House Badge Plate on Gable ("🏡 GURU 1/2" / "🏘️ X DKV", "🏘️ XI DKV", "🏘️ XII DKV")
+          ctx.font = `bold ${Math.max(3, Math.round(3.3 * z))}px sans-serif`;
+          const gableLabel = u.shortBadge || (u.kind === 'guru' ? '🏡 GURU' : '🏘️ SISWA');
+          const gableW = Math.max(20 * z, ctx.measureText(gableLabel).width + 6 * z);
           ctx.fillStyle = '#0f172a';
           ctx.beginPath();
-          ctx.roundRect(pt.x - 8.5 * z, pt.y - 7.5 * z, 17 * z, 5.2 * z, 2 * z);
+          ctx.roundRect(pt.x - gableW / 2, pt.y - 7.8 * z, gableW, 5.6 * z, 2 * z);
           ctx.fill();
           ctx.strokeStyle = u.accentColor;
           ctx.lineWidth = 0.8 * z;
           ctx.stroke();
           ctx.fillStyle = '#ffffff';
-          ctx.font = `bold ${Math.max(3, Math.round(3.3 * z))}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(u.kind === 'guru' ? '🏡 GURU' : '🏘️ SISWA', pt.x, pt.y - 4.8 * z);
+          ctx.fillText(gableLabel, pt.x, pt.y - 5.0 * z, gableW - 3 * z);
 
           // Floating Hover / Proximity Label when Player is Nearby
           if (distToPlayer < 2.35) {
@@ -9278,17 +10021,25 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             (item.isPlayer && isTimeTravelerAccount(studentName, studentId)) ||
               isTimeTravelerAccount(av.name, av.handle)
           );
+          const isJournalistAvatar = Boolean(
+            (item.isPlayer && isGuest) ||
+              av.role === 'wartawan' ||
+              String(av.handle || '').toLowerCase() === 'tamu_kota' ||
+              String(av.name || '').toLowerCase() === 'tamu kota'
+          );
           const avatarDistinctOutfit = getDistinctAvatarOutfit(
             item.isPlayer ? `${studentId || ''}_${studentName}` : `${av.id || ''}_${av.name || av.handle || ''}`
           );
-          const resolvedShirtColor =
-            av.shirtColor && av.shirtColor !== '#ec4899' && av.shirtColor !== '#2563eb'
-              ? av.shirtColor
-              : avatarDistinctOutfit.shirt;
-          const resolvedPantsColor =
-            av.pantsColor && av.pantsColor !== '#be185d' && av.pantsColor !== '#1e293b'
-              ? av.pantsColor
-              : avatarDistinctOutfit.pants;
+          const resolvedShirtColor = isJournalistAvatar
+            ? '#d97706'
+            : av.shirtColor && av.shirtColor !== '#ec4899' && av.shirtColor !== '#2563eb'
+            ? av.shirtColor
+            : avatarDistinctOutfit.shirt;
+          const resolvedPantsColor = isJournalistAvatar
+            ? '#334155'
+            : av.pantsColor && av.pantsColor !== '#be185d' && av.pantsColor !== '#1e293b'
+            ? av.pantsColor
+            : avatarDistinctOutfit.pants;
           const resolvedHijabColor = avatarDistinctOutfit.hijab;
           const resolvedHijabEdge = avatarDistinctOutfit.hijabEdge;
 
@@ -9737,6 +10488,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x - 2.2 * z, avY - 12.0 * z);
             ctx.closePath();
             ctx.fill();
+          } else if (isJournalistAvatar) {
+            // TAMU KOTA (WARTAWAN / REPORTER): Light-Blue Press Shirt + Khaki Multi-Pocket Journalist Vest + Hanging "PRESS" ID Card Lanyard
+            ctx.fillStyle = '#bae6fd';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.4 * z, avY - 14.2 * z, 10.8 * z, 8.8 * z, 2.2 * z);
+            ctx.fill();
+            // Khaki/Tan Journalist Safari Press Vest panels (Left & Right)
+            ctx.fillStyle = '#b45309';
+            ctx.fillRect(pt.x - 5.2 * z, avY - 14.0 * z, 3.8 * z, 8.4 * z);
+            ctx.fillRect(pt.x + 1.4 * z, avY - 14.0 * z, 3.8 * z, 8.4 * z);
+            // Utility Press Pockets on Vest
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(pt.x - 4.7 * z, avY - 9.2 * z, 2.8 * z, 2.5 * z);
+            ctx.fillRect(pt.x + 1.9 * z, avY - 9.2 * z, 2.8 * z, 2.5 * z);
+            // Red Lanyard Strap around neck holding "PRESS" ID Badge
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 0.9 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 1.8 * z, avY - 14.0 * z);
+            ctx.lineTo(pt.x, avY - 10.2 * z);
+            ctx.lineTo(pt.x + 1.8 * z, avY - 14.0 * z);
+            ctx.stroke();
+            // White & Cyan "PRESS" ID Badge Card on chest
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 1.7 * z, avY - 10.5 * z, 3.4 * z, 3.8 * z);
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(pt.x - 1.7 * z, avY - 10.5 * z, 3.4 * z, 1.3 * z);
           } else {
             // Student Torso with distinct unique shirt color per student
             ctx.fillStyle = resolvedShirtColor;
@@ -9986,6 +10764,63 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.beginPath();
             ctx.arc(pt.x + 6.3 * z + waveCycle, avY - 19.5 * z, 1.6 * z, 0, Math.PI * 2);
             ctx.fill();
+          } else if (isJournalistAvatar) {
+            // TAMU KOTA (WARTAWAN / REPORTER): Left hand holds DSLR Camera with Telephoto Lens & Flash, Right hand holds Reporter Microphone
+            const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.0 * z : 0;
+            ctx.fillStyle = '#bae6fd';
+            ctx.fillRect(pt.x - 7.2 * z, avY - 13 * z - armSwing * 0.5, 2.2 * z, 6.2 * z);
+            ctx.fillRect(pt.x + 5.0 * z, avY - 13 * z + armSwing * 0.5, 2.2 * z, 6.2 * z);
+            // Hands
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x - 6.1 * z, avY - 6.8 * z - armSwing * 0.5, 1.3 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 6.1 * z, avY - 6.8 * z + armSwing * 0.5, 1.3 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Professional DSLR Camera held at left/front chest
+            const camX = pt.x - 5.8 * z;
+            const camY = avY - 8.2 * z - armSwing * 0.4;
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(camX - 2.6 * z, camY - 2.2 * z, 5.4 * z, 4.0 * z, 0.8 * z);
+            ctx.fill();
+            // Camera flash unit on top
+            ctx.fillStyle = '#e2e8f0';
+            ctx.fillRect(camX - 1.2 * z, camY - 3.4 * z, 2.4 * z, 1.2 * z);
+            // Silver & Cyan Telephoto Camera Lens
+            ctx.fillStyle = '#94a3b8';
+            ctx.beginPath();
+            ctx.arc(camX + 0.2 * z, camY - 0.2 * z, 1.9 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.arc(camX + 0.2 * z, camY - 0.2 * z, 1.2 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Occasional camera shutter flash sparkle
+            if (Math.sin(elapsed * 3.2) > 0.92) {
+              ctx.fillStyle = 'rgba(254, 240, 138, 0.9)';
+              ctx.beginPath();
+              ctx.arc(camX, camY - 3.4 * z, 4.2 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            // Reporter Broadcast Microphone in Right Hand
+            const micX = pt.x + 7.2 * z;
+            const micY = avY - 8.2 * z + armSwing * 0.5;
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1.5 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 6.1 * z, avY - 6.5 * z + armSwing * 0.5);
+            ctx.lineTo(micX + 1.4 * z, micY - 2.6 * z);
+            ctx.stroke();
+            // Red/Blue Press Flag cube on mic shaft
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(micX + 0.1 * z, micY - 2.4 * z, 2.2 * z, 1.6 * z);
+            // Foam windscreen ball on top of microphone
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(micX + 1.5 * z, micY - 3.3 * z, 1.5 * z, 0, Math.PI * 2);
+            ctx.fill();
           } else {
             const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.8 * z : 0;
             ctx.fillStyle = sleeveColor;
@@ -10200,6 +11035,44 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(pt.x - 3.3 * z, avY - 19.2 * z, 0.9 * z, 0.9 * z);
             ctx.fillRect(pt.x + 1.5 * z, avY - 19.2 * z, 0.9 * z, 0.9 * z);
+          } else if (isJournalistAvatar) {
+            // TAMU KOTA (WARTAWAN / REPORTER): Classic Brown Reporter Fedora Hat with Dark Hatband, White "PRESS" Ticket Card & Journalist Glasses
+            // Hair under fedora
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 20.5 * z, 5.1 * z, Math.PI, 0);
+            ctx.fill();
+            // Reporter Fedora Brim
+            ctx.fillStyle = '#78350f';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 21.2 * z, 7.6 * z, 2.1 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Reporter Fedora Crown
+            ctx.fillStyle = '#92400e';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 4.8 * z, avY - 25.8 * z, 9.6 * z, 4.8 * z, 1.8 * z);
+            ctx.fill();
+            // Dark Hatband Ribbon
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 4.8 * z, avY - 22.4 * z, 9.6 * z, 1.4 * z);
+            // Iconic White "PRESS" Ticket Card tucked into the Fedora Hatband!
+            ctx.save();
+            ctx.translate(pt.x + 2.8 * z, avY - 23.6 * z);
+            ctx.rotate(0.18);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-1.8 * z, -1.8 * z, 3.6 * z, 2.6 * z);
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(-1.4 * z, -1.1 * z, 2.8 * z, 0.8 * z);
+            ctx.restore();
+            // Journalist Glasses
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 0.9 * z;
+            ctx.strokeRect(pt.x - 4.0 * z, avY - 19.4 * z, 3.1 * z, 2.1 * z);
+            ctx.strokeRect(pt.x + 0.9 * z, avY - 19.4 * z, 3.1 * z, 2.1 * z);
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 0.9 * z, avY - 18.4 * z);
+            ctx.lineTo(pt.x + 0.9 * z, avY - 18.4 * z);
+            ctx.stroke();
           } else if (isTeacherAvatar) {
             // Male Teacher: Smart side-parted hairstyle with glasses
             ctx.fillStyle = '#0f172a';
@@ -10591,10 +11464,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           // 6. TRANSPARENT USERNAME TAG PILL
-          const tagPosY = avY - (isKikyTimeTraveler ? 30 : 28) * z;
+          const tagPosY = avY - (isKikyTimeTraveler || isJournalistAvatar ? 30 : 28) * z;
           let labelText = `@${av.handle}`;
           if (isKikyTimeTraveler) {
             labelText = `⏳ @${av.handle}`;
+          } else if (isJournalistAvatar) {
+            labelText = `📸 @${av.handle} • WARTAWAN`;
           } else if (isTeacherAvatar) {
             labelText = `@${av.handle}`;
           } else if (item.isPlayer) {
@@ -10615,7 +11490,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             labelText = `@sony`;
           }
 
-          ctx.font = `${isTeacherAvatar || isKikyTimeTraveler ? 'bold' : '600'} ${Math.round((isTeacherAvatar || isKikyTimeTraveler ? 8.5 : 7.8) * z)}px sans-serif`;
+          ctx.font = `${isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar ? 'bold' : '600'} ${Math.round((isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar ? 8.5 : 7.8) * z)}px sans-serif`;
           const tM = ctx.measureText(labelText);
           const tW = tM.width + 9 * z;
           const tH = 13.5 * z;
@@ -10623,6 +11498,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Lightweight Transparent Pill Background so it never clutters the city view
           ctx.fillStyle = isKikyTimeTraveler
             ? 'rgba(15, 23, 42, 0.78)'
+            : isJournalistAvatar
+            ? 'rgba(12, 74, 110, 0.72)'
             : isTeacherAvatar
             ? 'rgba(120, 53, 15, 0.45)'
             : 'rgba(15, 23, 42, 0.28)';
@@ -10635,6 +11512,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 1.3 * z;
             ctx.stroke();
             ctx.fillStyle = '#67e8f9';
+          } else if (isJournalistAvatar) {
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#fde047';
           } else if (isTeacherAvatar) {
             ctx.strokeStyle = 'rgba(251, 191, 36, 0.75)';
             ctx.lineWidth = 1.2 * z;
@@ -10918,99 +11800,93 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             });
           }
         } else if (item.type === 'lamp') {
-          // STREET LAMP POST (Cast Iron Classical Lamppost with Warm Glowing Lantern)
+          // MINIMALIST ARCHITECTURAL PARK LAMP POST (Slender Nordic LED Luminaire on Grass Verge)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
-          const lampHeight = 35 * z;
+          const lampHeight = 23 * z;
 
           const distToPlayer = Math.hypot(player.wx - item.wx, player.wy - item.wy);
-          const isLampTransparent = distToPlayer < 1.2;
+          const isLampTransparent = distToPlayer < 1.15;
           ctx.save();
           if (isLampTransparent) {
             ctx.globalAlpha = 0.45;
           }
 
-          // Small circular cast-iron base plate
-          ctx.fillStyle = isNight ? '#1e293b' : '#475569';
+          // Subtle ground shadow
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.18)';
           ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y, 4 * z, 2.2 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x + 1 * z, pt.y + 0.8 * z, 3.8 * z, 1.9 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // Dark cast iron pole
-          ctx.strokeStyle = isNight ? '#0f172a' : '#334155';
-          ctx.lineWidth = 2.4 * z;
+          // Neat circular garden stone pad & matte charcoal base ring
+          ctx.fillStyle = isNight ? '#334155' : '#cbd5e1';
           ctx.beginPath();
-          ctx.moveTo(pt.x, pt.y);
+          ctx.ellipse(pt.x, pt.y, 3.3 * z, 1.65 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = isNight ? '#0f172a' : '#1e293b';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y - 0.3 * z, 2.1 * z, 1.05 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Slender matte-anthracite cylindrical shaft
+          ctx.strokeStyle = isNight ? '#1e293b' : '#334155';
+          ctx.lineWidth = 1.55 * z;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(pt.x, pt.y - 0.5 * z);
           ctx.lineTo(pt.x, pt.y - lampHeight);
           ctx.stroke();
 
-          // Decorative iron collar ring
-          ctx.fillStyle = isNight ? '#334155' : '#64748b';
-          ctx.fillRect(pt.x - 2.2 * z, pt.y - lampHeight * 0.42, 4.4 * z, 2.2 * z);
-
-          // Horizontal iron bracket
-          ctx.lineWidth = 1.8 * z;
+          // Subtle brushed-steel lower accent sleeve
+          ctx.strokeStyle = isNight ? '#475569' : '#94a3b8';
+          ctx.lineWidth = 1.75 * z;
           ctx.beginPath();
-          ctx.moveTo(pt.x - 4 * z, pt.y - lampHeight);
-          ctx.lineTo(pt.x + 4 * z, pt.y - lampHeight);
+          ctx.moveTo(pt.x, pt.y - 0.8 * z);
+          ctx.lineTo(pt.x, pt.y - 4.8 * z);
           ctx.stroke();
 
-          // Lantern housing
-          const lanternY = pt.y - lampHeight - 3 * z;
-          const lanternW = 7.5 * z;
-          const lanternH = 9.5 * z;
-
+          const orbY = pt.y - lampHeight - 1.8 * z;
           const isLampLit = currentPeriod === 'malam' || currentPeriod === 'subuh' || currentPeriod === 'sore';
 
           if (isLampLit) {
-            // Bright radiating lantern halo
-            const lanternGlow = ctx.createRadialGradient(pt.x, lanternY, 2 * z, pt.x, lanternY, 26 * z);
-            lanternGlow.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-            lanternGlow.addColorStop(0.25, 'rgba(254, 240, 138, 0.85)');
-            lanternGlow.addColorStop(0.55, 'rgba(250, 204, 21, 0.42)');
+            // Soft warm ambient halo around minimalist LED head
+            const lanternGlow = ctx.createRadialGradient(pt.x, orbY, 1 * z, pt.x, orbY, 19 * z);
+            lanternGlow.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
+            lanternGlow.addColorStop(0.28, 'rgba(254, 240, 138, 0.72)');
+            lanternGlow.addColorStop(0.62, 'rgba(250, 204, 21, 0.25)');
             lanternGlow.addColorStop(1, 'rgba(234, 179, 8, 0)');
 
             ctx.fillStyle = lanternGlow;
             ctx.beginPath();
-            ctx.arc(pt.x, lanternY, 26 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x, orbY, 19 * z, 0, Math.PI * 2);
             ctx.fill();
 
-            // Glowing warm yellow glass chamber
+            // Glowing warm-white minimalist frosted orb diffuser
             ctx.fillStyle = '#fef08a';
             ctx.beginPath();
-            ctx.roundRect(pt.x - lanternW / 2, lanternY - lanternH / 2, lanternW, lanternH, 2 * z);
+            ctx.arc(pt.x, orbY, 2.5 * z, 0, Math.PI * 2);
             ctx.fill();
 
-            // White hot incandescent filament dot
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.arc(pt.x, lanternY, 1.8 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x - 0.4 * z, orbY - 0.4 * z, 1.1 * z, 0, Math.PI * 2);
             ctx.fill();
           } else {
-            // Daytime frosted glass
-            ctx.fillStyle = 'rgba(241, 245, 249, 0.85)';
+            // Daytime clean frosted glass diffuser orb
+            ctx.fillStyle = 'rgba(248, 250, 252, 0.92)';
             ctx.beginPath();
-            ctx.roundRect(pt.x - lanternW / 2, lanternY - lanternH / 2, lanternW, lanternH, 2 * z);
+            ctx.arc(pt.x, orbY, 2.4 * z, 0, Math.PI * 2);
             ctx.fill();
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 0.6 * z;
+            ctx.stroke();
           }
 
-          // Iron frame outline
-          ctx.strokeStyle = isNight ? '#0a0f18' : '#1e293b';
-          ctx.lineWidth = 1 * z;
-          ctx.strokeRect(pt.x - lanternW / 2, lanternY - lanternH / 2, lanternW, lanternH);
-
-          // Pyramid roof cap
-          ctx.fillStyle = isNight ? '#0a0f18' : '#1e293b';
+          // Sleek minimalist horizontal disc cap atop the orb
+          ctx.fillStyle = isNight ? '#0f172a' : '#1e293b';
           ctx.beginPath();
-          ctx.moveTo(pt.x - lanternW / 2 - 1.5 * z, lanternY - lanternH / 2);
-          ctx.lineTo(pt.x, lanternY - lanternH / 2 - 4.5 * z);
-          ctx.lineTo(pt.x + lanternW / 2 + 1.5 * z, lanternY - lanternH / 2);
-          ctx.closePath();
-          ctx.fill();
-
-          // Finial tip
-          ctx.beginPath();
-          ctx.arc(pt.x, lanternY - lanternH / 2 - 5 * z, 1.2 * z, 0, Math.PI * 2);
+          ctx.ellipse(pt.x, orbY - 2.1 * z, 3.6 * z, 1.15 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.restore();
@@ -11156,6 +12032,273 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             drawMinimalistBirdShape(airPt.x, airPt.y, b.wingSpan * z, flap, bankTilt, 0.65);
           }
         });
+      }
+
+      // ---------------------------------------------------------
+      // 6B. AESTHETIC ROYAL ZEPPELIN CRUISING ABOVE THE CITY (ENLARGED & CRISP "KOTA REFLEKSIA" TEXT)
+      // (Purely atmospheric in the upper sky canopy — zero click/collision interference)
+      // ---------------------------------------------------------
+      {
+        const z = zoomLevelRef.current * 1.32;
+        // Slow, majestic high-altitude figure-8 / elliptical cruise path high above the north-central skyline
+        const zepAngle = elapsed * 0.085;
+        const zepWx = Math.cos(zepAngle) * 5.6;
+        const zepWy = -5.2 + Math.sin(zepAngle * 2) * 1.9;
+        const zepAlt = 154 + Math.sin(elapsed * 0.95) * 4.5;
+
+        const nextZepAngle = zepAngle + 0.02;
+        const nextZepWx = Math.cos(nextZepAngle) * 5.6;
+        const nextZepWy = -5.2 + Math.sin(nextZepAngle * 2) * 1.9;
+
+        const zepPt = toScreen(zepWx, zepWy, zepAlt, camera.x, camera.y);
+        const nextZepPt = toScreen(nextZepWx, nextZepWy, zepAlt, camera.x, camera.y);
+        const groundShadowPt = toScreen(zepWx, zepWy, 0, camera.x, camera.y);
+
+        const dxZep = nextZepPt.x - zepPt.x;
+        const dyZep = nextZepPt.y - zepPt.y;
+        const facingRight = dxZep >= 0;
+        const dirSign = facingRight ? 1 : -1;
+        const pitchTilt = Math.max(-0.08, Math.min(0.08, (dyZep / (Math.abs(dxZep) + 0.1)) * 0.18 * dirSign));
+
+        ctx.save();
+        // 1) Very faint, soft ground shadow so the Zeppelin feels grounded in 3D space without distracting
+        ctx.fillStyle = isNight ? 'rgba(2, 6, 23, 0.12)' : 'rgba(15, 23, 42, 0.075)';
+        ctx.beginPath();
+        ctx.ellipse(groundShadowPt.x, groundShadowPt.y, 30 * z, 12 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2) Position & orient high-altitude Zeppelin hull
+        ctx.translate(zepPt.x, zepPt.y);
+        ctx.scale(dirSign, 1);
+        ctx.rotate(pitchTilt);
+
+        const hullRx = 52 * z;
+        const hullRy = 21 * z;
+
+        // Soft nighttime ambient sky halo around the airship
+        if (isNight) {
+          const nightHalo = ctx.createRadialGradient(0, 4 * z, 4 * z, 0, 4 * z, 65 * z);
+          nightHalo.addColorStop(0, 'rgba(251, 191, 36, 0.24)');
+          nightHalo.addColorStop(0.6, 'rgba(16, 185, 129, 0.10)');
+          nightHalo.addColorStop(1, 'rgba(15, 23, 42, 0)');
+          ctx.fillStyle = nightHalo;
+          ctx.beginPath();
+          ctx.arc(0, 4 * z, 65 * z, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 3) Fluttering Trailing Aerial Streamer / Banner behind the tailfin (at x < -hullRx)
+        ctx.save();
+        const bannerStartX = -hullRx - 7 * z;
+        const bannerLen = 58 * z;
+        const bannerHalfH = 7.2 * z;
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+        ctx.lineWidth = 1.0 * z;
+        ctx.beginPath();
+        ctx.moveTo(-hullRx + 2 * z, 0);
+        ctx.lineTo(bannerStartX, Math.sin(elapsed * 4.2) * 1.4 * z);
+        ctx.stroke();
+
+        // Waving ribbon polygon with generous height & width for text
+        ctx.fillStyle = isNight ? 'rgba(6, 78, 59, 0.94)' : 'rgba(15, 23, 42, 0.90)';
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.15 * z;
+        ctx.beginPath();
+        const wave1 = Math.sin(elapsed * 4.2) * 1.5 * z;
+        const wave2 = Math.sin(elapsed * 4.2 + 1.2) * 1.8 * z;
+        ctx.moveTo(bannerStartX, -bannerHalfH + wave1);
+        ctx.quadraticCurveTo(
+          bannerStartX - bannerLen * 0.5,
+          -bannerHalfH + wave2,
+          bannerStartX - bannerLen,
+          -bannerHalfH * 0.92 - wave1 * 0.5
+        );
+        ctx.lineTo(bannerStartX - bannerLen + 5.5 * z, wave2 * 0.25);
+        ctx.lineTo(bannerStartX - bannerLen, bannerHalfH * 0.92 - wave1 * 0.5);
+        ctx.quadraticCurveTo(
+          bannerStartX - bannerLen * 0.5,
+          bannerHalfH + wave2,
+          bannerStartX,
+          bannerHalfH + wave1
+        );
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Unflip text inside the trailing banner so it is always readable left-to-right & fits cleanly
+        ctx.save();
+        ctx.translate(bannerStartX - bannerLen * 0.46, wave2 * 0.45);
+        ctx.scale(dirSign, 1);
+        ctx.fillStyle = '#fde047';
+        ctx.font = `900 ${Math.max(5, Math.round(5.4 * z))}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('✨ KOTA REFLEKSIA ✨', 0, 0, bannerLen - 14 * z);
+        ctx.restore();
+        ctx.restore();
+
+        // 4) Cruciform Tail Stabilizer Fins (Upper, Lower, and Side Fin)
+        // Upper vertical fin
+        ctx.fillStyle = '#dc2626';
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.0 * z;
+        ctx.beginPath();
+        ctx.moveTo(-hullRx * 0.58, -hullRy * 0.72);
+        ctx.lineTo(-hullRx * 0.98, -hullRy * 1.42);
+        ctx.lineTo(-hullRx * 1.04, -hullRy * 0.35);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Lower vertical fin
+        ctx.fillStyle = '#b91c1c';
+        ctx.beginPath();
+        ctx.moveTo(-hullRx * 0.58, hullRy * 0.72);
+        ctx.lineTo(-hullRx * 0.98, hullRy * 1.38);
+        ctx.lineTo(-hullRx * 1.04, hullRy * 0.35);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 5) Suspended Passenger Gondola / Sky Cabin underneath the envelope
+        const gondW = 34 * z;
+        const gondH = 9.5 * z;
+        const gondY = hullRy * 0.88;
+
+        // Suspension rigging struts
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 0.95 * z;
+        ctx.beginPath();
+        ctx.moveTo(-gondW * 0.38, hullRy * 0.65);
+        ctx.lineTo(-gondW * 0.32, gondY);
+        ctx.moveTo(gondW * 0.38, hullRy * 0.65);
+        ctx.lineTo(gondW * 0.32, gondY);
+        ctx.stroke();
+
+        // Gondola cabin hull (Royal Mahogany & Brass)
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.15 * z;
+        ctx.beginPath();
+        ctx.roundRect(-gondW / 2, gondY, gondW, gondH, [2 * z, 2 * z, 5 * z, 5 * z]);
+        ctx.fill();
+        ctx.stroke();
+
+        // Illuminated Gondola Panoramic Windows
+        for (let gw = -3; gw <= 3; gw++) {
+          ctx.fillStyle = isNight ? '#fef08a' : '#bae6fd';
+          ctx.beginPath();
+          ctx.roundRect(gw * 4.0 * z - 1.35 * z, gondY + 2.4 * z, 2.7 * z, 4.0 * z, 0.8 * z);
+          ctx.fill();
+        }
+
+        // Spinning Rear Gondola Propeller + Subtle Slipstream Puff
+        const propX = -gondW / 2 - 2.4 * z;
+        const propY = gondY + gondH * 0.5;
+        const bladeLen = Math.sin(elapsed * 18) * 5.8 * z;
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1.35 * z;
+        ctx.beginPath();
+        ctx.moveTo(propX, propY - bladeLen);
+        ctx.lineTo(propX, propY + bladeLen);
+        ctx.stroke();
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(propX, propY, 1.6 * z, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 6) Main Aerodynamic Ribbed Zeppelin Envelope (3D Cylindrical Shaded Hull)
+        const hullGrad = ctx.createLinearGradient(0, -hullRy, 0, hullRy);
+        if (isNight) {
+          hullGrad.addColorStop(0, '#fef9c3');
+          hullGrad.addColorStop(0.35, '#fde68a');
+          hullGrad.addColorStop(0.75, '#0f766e');
+          hullGrad.addColorStop(1, '#064e3b');
+        } else {
+          hullGrad.addColorStop(0, '#ffffff');
+          hullGrad.addColorStop(0.38, '#fef3c7');
+          hullGrad.addColorStop(0.78, '#10b981');
+          hullGrad.addColorStop(1, '#047857');
+        }
+
+        ctx.fillStyle = hullGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, hullRx, hullRy, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Clip inside envelope for longitudinal ribs & equatorial stripe
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(0, 0, hullRx, hullRy, 0, 0, Math.PI * 2);
+        ctx.clip();
+
+        // Longitudinal rib seams
+        ctx.strokeStyle = isNight ? 'rgba(245, 158, 11, 0.32)' : 'rgba(5, 150, 105, 0.28)';
+        ctx.lineWidth = 0.9 * z;
+        for (const ribFactor of [-0.65, -0.32, 0.32, 0.65]) {
+          ctx.beginPath();
+          ctx.ellipse(0, ribFactor * hullRy * 0.2, hullRx, Math.abs(ribFactor) * hullRy, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Royal Gold & Emerald Equatorial Ribbon Belt across Zeppelin Hull
+        const bandHalfH = 5.4 * z;
+        ctx.fillStyle = 'rgba(6, 78, 59, 0.92)';
+        ctx.fillRect(-hullRx, -bandHalfH, hullRx * 2, bandHalfH * 2);
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.15 * z;
+        ctx.beginPath();
+        ctx.moveTo(-hullRx, -bandHalfH);
+        ctx.lineTo(hullRx, -bandHalfH);
+        ctx.moveTo(-hullRx, bandHalfH);
+        ctx.lineTo(hullRx, bandHalfH);
+        ctx.stroke();
+
+        // Crisp "KOTA REFLEKSIA" Emblem Text on the Zeppelin Body (unflipped so it always reads left-to-right)
+        ctx.save();
+        ctx.scale(dirSign, 1);
+        ctx.fillStyle = '#fef08a';
+        ctx.font = `900 ${Math.max(6, Math.round(6.2 * z))}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('KOTA REFLEKSIA', 0, 0, hullRx * 1.55);
+        ctx.restore();
+
+        ctx.restore();
+
+        // Outer golden rim of envelope
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.3 * z;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, hullRx, hullRy, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Golden Nose Cone & Mooring Spire at the Bow (x = +hullRx)
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(hullRx - 1.5 * z, 0, 4.2 * z, -Math.PI / 2, Math.PI / 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 1.15 * z;
+        ctx.beginPath();
+        ctx.moveTo(hullRx + 2.2 * z, 0);
+        ctx.lineTo(hullRx + 8.2 * z, 0);
+        ctx.stroke();
+
+        // Blinking Aviation Navigation Beacon on Top & Tail
+        const navBlink = Math.sin(elapsed * 6) > 0.2;
+        if (navBlink) {
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(-hullRx * 0.98, -hullRy * 1.42, 2.2 * z, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#34d399';
+          ctx.beginPath();
+          ctx.arc(0, -hullRy - 1.6 * z, 2.0 * z, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
       }
 
       // ---------------------------------------------------------
@@ -11471,6 +12614,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       return;
     }
 
+    const wasAutumnTree = Boolean(existingCycle?.isAutumn);
     const cost = 1;
     if (studentPoints < cost) {
       sounds.playClick();
@@ -11495,6 +12639,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         appleStartTime: isThirdWatering ? nowPerf : null,
         hasRipeApples: isThirdWatering ? true : false,
         harvestFadeStartTime: null,
+        isAutumn: false, // Pohon dengan daun gugur yang disiram langsung hijau kembali!
       };
 
       treeCyclesRef.current[treeIdx] = updatedCycle;
@@ -11510,7 +12655,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         treeWy: treePos[1],
       };
 
-      if (isThirdWatering) {
+      if (wasAutumnTree) {
+        showToast(
+          `🌿 Pohon daun gugur berhasil disiram dan kini telah HIJAU RIMBUN kembali! (${nextCount}/3 menuju berbuah apel • -1 XP • Sisa: ${remaining} XP)`,
+          4000
+        );
+        playerSpeechRef.current = {
+          text: 'Alhamdulillah! Pohon daun gugur yang disiram langsung hijau segar kembali! 🌿💧✨',
+          expiresAt: Date.now() + 4500,
+        };
+      } else if (isThirdWatering) {
         showToast(`🍎 Pohon telah disiram (3/3) dan langsung mengeluarkan buah apel merah segar! Klik "Petik Apel" untuk +2 XP!`, 3800);
         playerSpeechRef.current = {
           text: 'Wah pohonnya sudah disiram dan berbuah apel! Ayo kita petik (+2 XP)! 🍎✨',
@@ -11636,108 +12790,220 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       <div className="absolute top-12 sm:top-14 left-2.5 right-2.5 sm:left-4 sm:right-4 z-30 pointer-events-none flex flex-col gap-2">
         {/* ROW 1: STATUS PILLS (Left: Warga Online & Radar | Right: Active Held Item + Countdown) */}
         <div className="w-full flex flex-wrap items-start justify-between gap-1.5">
-          {/* Left: Online Citizens Badge, Dry Leaf Counter & Quick Teleport Chips */}
-          <div className="flex flex-col items-start gap-1 max-w-[68vw] sm:max-w-[430px] pointer-events-auto">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <div className="bg-[#121e2c]/68 backdrop-blur-md border border-emerald-500/45 rounded-full px-2.5 sm:px-3 py-0.5 sm:py-1 text-white text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="text-emerald-300 font-mono">{onlineCount}</span>
-                <span className="text-slate-100">Warga Online</span>
-              </div>
+          {/* Left: Header Jumlah Warga Online (Hanya menampilkan Icon Online + Angka Jumlah + "Warga Online", diklik baru muncul daftar warga online tanpa NPC) & Dry Leaf Counter */}
+          <div className="flex flex-col items-start gap-1 max-w-[78vw] sm:max-w-[420px] pointer-events-auto relative">
+            {(() => {
+              const myHandle =
+                studentName
+                  .split(' ')
+                  .slice(0, 2)
+                  .join('_')
+                  .toLowerCase()
+                  .replace(/[^a-z0-9_]/g, '') || (isTeacher ? 'guru_dkv' : isGuest ? 'tamu_kota' : 'siswa');
 
-              <div
-                className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-500/45 rounded-full px-2.5 py-0.5 sm:py-1 text-amber-200 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1"
-                title="10 Daun Kering tersebar di kota • Pungut setiap 5 daun kering untuk mendapatkan +1 XP"
-              >
-                <span>🍂</span>
-                <span className="font-mono text-amber-300">{pickedDryLeavesCount}/5</span>
-                <span className="text-[9px] text-emerald-300 font-mono">(+1 XP)</span>
-              </div>
+              // Hanya Warga yang benar-benar Online (Tanpa NPC!)
+              const realOnlineCitizens = onlineRemoteList.map((rem) => ({
+                id: rem.id,
+                handle: rem.handle,
+                name: rem.name,
+                role: rem.role,
+                icon: rem.role === 'guru' ? '👨‍🏫' : rem.role === 'wartawan' ? '📸' : '👦',
+                getCoords: () => {
+                  const r = remotePlayersRef.current.get(rem.id);
+                  return r ? { wx: r.wx, wy: r.wy } : { wx: rem.wx, wy: rem.wy };
+                },
+              }));
 
-              {/* Exclusive Movement Mode Selector for Master kikybahsoan (Jalan Normal vs Teleportasi) */}
-              {isMasterKiky && (
-                <div
-                  className="bg-[#0f172a]/85 backdrop-blur-md border border-cyan-400/60 rounded-full p-0.5 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-0.5"
-                  title="Mode Pergerakan Khusus Master kikybahsoan: Pilih Jalan Normal atau Teleportasi Instan"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sounds.playClick();
-                      setMasterMoveMode('walk');
-                      showToast('🚶 Mode Pergerakan Master: Jalan Normal Aktif', 2000);
-                    }}
-                    className={`px-2 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ${
-                      masterMoveMode === 'walk'
-                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                        : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    <span>🚶</span>
-                    <span>Jalan</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sounds.playClick();
-                      setMasterMoveMode('teleport');
-                      showToast('⚡ Mode Pergerakan Master: Teleportasi Chrono Aktif', 2000);
-                    }}
-                    className={`px-2 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ${
-                      masterMoveMode === 'teleport'
-                        ? 'bg-gradient-to-r from-cyan-400 to-amber-300 text-slate-950 shadow-sm'
-                        : 'text-cyan-200 hover:text-white'
-                    }`}
-                  >
-                    <span>⚡</span>
-                    <span>Teleport</span>
-                  </button>
-                </div>
-              )}
-            </div>
+              const totalOnlineWarga = 1 + realOnlineCitizens.length;
 
-            {onlineRemoteList.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1">
-                {onlineRemoteList.slice(0, 6).map((cit) => (
-                  <button
-                    key={cit.id}
-                    type="button"
-                    onClick={() => {
-                      sounds.playClick();
-                      const rem = remotePlayersRef.current.get(cit.id);
-                      if (rem && playerRef.current) {
-                        if (isSittingRef.current) {
-                          setIsSitting(false);
-                          setSittingSeat(null);
-                        }
-                        playerRef.current.targetWx = Math.max(-6.5, Math.min(6.5, rem.wx + 0.55));
-                        playerRef.current.targetWy = Math.max(-6.5, Math.min(6.5, rem.wy + 0.35));
-                        playerRef.current.isMoving = true;
-                        clickRippleRef.current = {
-                          wx: playerRef.current.targetWx,
-                          wy: playerRef.current.targetWy,
-                          time: performance.now(),
-                        };
-                        sendHeartbeatRef.current?.();
-                        showToast(`🧭 Menuju lokasi ${cit.role === 'guru' ? 'Guru' : 'Siswa'} @${cit.handle}`, 2500);
-                      }
-                    }}
-                    className={`px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-bold border shadow-md backdrop-blur-md flex items-center gap-1 transition active:scale-95 cursor-pointer ${
-                      cit.role === 'guru'
-                        ? 'bg-amber-950/68 border-amber-400/60 text-amber-200 hover:bg-amber-900/80'
-                        : 'bg-[#121e2c]/68 border-emerald-400/50 text-emerald-200 hover:bg-slate-800/80'
-                    }`}
-                    title={`Klik untuk menghampiri ${cit.name} (@${cit.handle})`}
-                  >
-                    <span>{cit.role === 'guru' ? '👨‍🏫' : '👦'}</span>
-                    <span className="truncate max-w-[75px] sm:max-w-[90px]">@{cit.handle}</span>
-                    <span className="text-[8.5px] opacity-85">
-                      {cit.isSitting ? '🪑' : cit.isMoving ? '🚶' : '🟢'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+              return (
+                <>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {/* Tombol Header Jumlah Warga Online: Hanya menampilkan "Icon Online (Jumlah dalam bentuk angka) Warga Online" */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        setIsOnlineListOpen((prev) => !prev);
+                        setOnlineListInteractionTick((t) => t + 1);
+                      }}
+                      className="bg-[#121e2c]/78 hover:bg-[#1a293b]/90 backdrop-blur-md border border-emerald-500/55 hover:border-emerald-400 rounded-full px-3 py-1 sm:py-1.5 text-white shadow-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                      title="Klik untuk melihat daftar nama Warga Online & menuju ke lokasinya"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                      <span className="text-emerald-300 font-mono font-extrabold text-[10.5px] sm:text-xs">
+                        {totalOnlineWarga}
+                      </span>
+                      <span className="text-slate-100 font-bold text-[10.5px] sm:text-xs">
+                        Warga Online
+                      </span>
+                    </button>
+
+                    {/* Daun Kering Counter */}
+                    <div
+                      className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-500/45 rounded-full px-2.5 py-1 sm:py-1.5 text-amber-200 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1"
+                      title="10 Daun Kering tersebar di kota • Pungut setiap 5 daun kering untuk mendapatkan +1 XP"
+                    >
+                      <span>🍂</span>
+                      <span className="font-mono text-amber-300">{pickedDryLeavesCount}/5</span>
+                      <span className="text-[9px] text-emerald-300 font-mono">(+1 XP)</span>
+                    </div>
+
+                    {/* Exclusive Movement Mode Selector for Master kikybahsoan (Jalan Normal vs Teleportasi) */}
+                    {isMasterKiky && (
+                      <div
+                        className="bg-[#0f172a]/85 backdrop-blur-md border border-cyan-400/60 rounded-full p-0.5 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-0.5"
+                        title="Mode Pergerakan Khusus Master kikybahsoan: Pilih Jalan Normal atau Teleportasi Instan"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            setMasterMoveMode('walk');
+                            showToast('🚶 Mode Pergerakan Master: Jalan Normal Aktif', 2000);
+                          }}
+                          className={`px-2 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ${
+                            masterMoveMode === 'walk'
+                              ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                              : 'text-slate-300 hover:text-white'
+                          }`}
+                        >
+                          <span>🚶</span>
+                          <span>Jalan</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            setMasterMoveMode('teleport');
+                            showToast('⚡ Mode Pergerakan Master: Teleportasi Chrono Aktif', 2000);
+                          }}
+                          className={`px-2 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ${
+                            masterMoveMode === 'teleport'
+                              ? 'bg-gradient-to-r from-cyan-400 to-amber-300 text-slate-950 shadow-sm'
+                              : 'text-cyan-200 hover:text-white'
+                          }`}
+                        >
+                          <span>⚡</span>
+                          <span>Teleport</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Popover Daftar Nama Warga Online (Muncul saat Header Warga Online diklik, Tanpa NPC, & Hilang Otomatis dengan Soft setelah 10 detik) */}
+                  {isOnlineListOpen && (
+                    <div
+                      onPointerDown={() => setOnlineListInteractionTick((t) => t + 1)}
+                      className={`mt-1 bg-[#121e2c]/90 backdrop-blur-md border border-emerald-500/50 rounded-2xl p-2.5 text-white shadow-2xl w-60 sm:w-68 transition-all duration-700 ease-in-out origin-top-left ${
+                        isOnlineListSoftFading
+                          ? 'opacity-0 -translate-y-1.5 scale-95 pointer-events-none'
+                          : 'opacity-100 translate-y-0 scale-100 animate-fade-in-down'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-700/70">
+                        <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold text-emerald-300">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span>Daftar Warga Online ({totalOnlineWarga})</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsOnlineListOpen(false)}
+                          className="w-5 h-5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                          title="Tutup daftar warga online"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5">
+                        {/* Pengguna Sendiri */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleCenterOnPlayer();
+                            setIsOnlineListOpen(false);
+                            showToast(`📍 Kamera diarahkan ke avatarmu (${studentName})`, 2200);
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-xl text-left text-[10.5px] sm:text-xs font-bold bg-sky-500/15 hover:bg-sky-500/30 border border-sky-400/40 text-sky-100 flex items-center justify-between gap-2 transition active:scale-98 cursor-pointer"
+                          title="Klik untuk memusatkan kamera ke avatarmu"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span>{isGuest ? '📸' : isTeacher ? '👨‍🏫' : '🟢'}</span>
+                            <span className="truncate">{studentName}</span>
+                            <span className="text-[9.5px] text-sky-300 font-normal shrink-0">(Kamu)</span>
+                          </div>
+                          <span className="text-[9px] font-mono text-sky-300 shrink-0">@{myHandle}</span>
+                        </button>
+
+                        {/* Daftar Warga Online Lainnya (Tanpa NPC) */}
+                        {realOnlineCitizens.map((cit) => (
+                          <button
+                            key={cit.id}
+                            type="button"
+                            onClick={() => {
+                              sounds.playClick();
+                              const coords = cit.getCoords();
+                              if (coords && playerRef.current) {
+                                if (isSittingRef.current) {
+                                  setIsSitting(false);
+                                  setSittingSeat(null);
+                                }
+                                const destWx = Math.max(-6.8, Math.min(6.8, coords.wx + 0.42));
+                                const destWy = Math.max(-6.8, Math.min(6.8, coords.wy + 0.35));
+                                if (isMasterKikyRef.current && masterMoveModeRef.current === 'teleport') {
+                                  teleportFlashRef.current = {
+                                    fromWx: playerRef.current.wx,
+                                    fromWy: playerRef.current.wy,
+                                    toWx: destWx,
+                                    toWy: destWy,
+                                    startTime: performance.now(),
+                                  };
+                                  playerRef.current.wx = destWx;
+                                  playerRef.current.wy = destWy;
+                                  playerRef.current.targetWx = destWx;
+                                  playerRef.current.targetWy = destWy;
+                                  playerRef.current.isMoving = false;
+                                } else {
+                                  playerRef.current.targetWx = destWx;
+                                  playerRef.current.targetWy = destWy;
+                                  playerRef.current.isMoving = true;
+                                }
+                                clickRippleRef.current = {
+                                  wx: destWx,
+                                  wy: destWy,
+                                  time: performance.now(),
+                                };
+                                resetCameraRequestedRef.current = true;
+                                sendHeartbeatRef.current?.();
+                                setIsOnlineListOpen(false);
+                                showToast(`🧭 Avatar menuju ke warga ${cit.name} (@${cit.handle})`, 2800);
+                              }
+                            }}
+                            className={`w-full px-2.5 py-1.5 rounded-xl text-left text-[10.5px] sm:text-xs font-bold border flex items-center justify-between gap-2 transition active:scale-98 cursor-pointer ${
+                              cit.role === 'guru'
+                                ? 'bg-amber-950/60 hover:bg-amber-900/80 border-amber-400/50 text-amber-100'
+                                : cit.role === 'wartawan'
+                                ? 'bg-sky-950/60 hover:bg-sky-900/80 border-sky-400/50 text-sky-100'
+                                : 'bg-emerald-950/60 hover:bg-emerald-900/80 border-emerald-400/50 text-emerald-100'
+                            }`}
+                            title={`Klik untuk menggerakkan avatarmu menuju ${cit.name} (@${cit.handle})`}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span>{cit.icon}</span>
+                              <span className="truncate">{cit.name}</span>
+                            </div>
+                            <span className="text-[9px] font-mono text-emerald-300 shrink-0">
+                              🧭 @{cit.handle}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Right: Held Item Badge with Live Auto-Disappear Countdown (90s Kopi, 60s Roti, 30s Eskrim) */}
@@ -11766,8 +13032,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           )}
         </div>
 
-        {/* ROW 2: SINGLE MUTUALLY-EXCLUSIVE POPUP SLOT (Smaller & Slightly Transparent so it never blocks the map) */}
-        <div className="w-full flex justify-center">
+        {/* ROW 2: SINGLE MUTUALLY-EXCLUSIVE POPUP SLOT (Auto-hilang dengan soft setelah 10 detik jika tidak diklik) */}
+        <div
+          onPointerDown={() => setPopupInteractionTick((t) => t + 1)}
+          className={`w-full flex justify-center transition-all duration-700 ease-in-out ${
+            isInfoPopupSoftFading
+              ? 'opacity-0 -translate-y-1.5 scale-95 pointer-events-none'
+              : 'opacity-100 translate-y-0 scale-100'
+          }`}
+        >
           {isCafeMenuOpen ? (
             /* 1. MENU TOKO ROTI & KAFE (Compact & Semi-Transparent) */
             <aside
@@ -11871,8 +13144,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => {
-                      sounds.playOpenModal();
                       const target = pendingConfirmation;
+                      if (target.id === 'bank_materi' && !isTeacher) {
+                        sounds.playClick();
+                        setPendingConfirmation(null);
+                        showToast(
+                          '🔒 Gedung Bank Materi khusus untuk Bapak/Ibu Guru! Materi hasil Generate AI Guru sudah tersebar di Perpustakaan, Pusat Refleksi, Studio ON AIR & Lab DKV.',
+                          4500
+                        );
+                        onSelectBuildingRef.current('bank_materi');
+                        return;
+                      }
+                      sounds.playOpenModal();
                       setPendingConfirmation(null);
                       if (target.type === 'cafe') {
                         setIsCafeMenuOpen(true);
@@ -11882,7 +13165,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     }}
                     className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] sm:text-[11px] font-bold shadow-sm border border-emerald-400/40 transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
                   >
-                    <span>🚪 Masuk</span>
+                    <span>{pendingConfirmation.id === 'bank_materi' && !isTeacher ? '🔒 Khusus Guru' : '🚪 Masuk'}</span>
                   </button>
                   <button
                     onClick={() => {
@@ -11935,23 +13218,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-emerald-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
-                      {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples ? '🍎' : '🌳'}
+                      {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
+                        ? '🍎'
+                        : treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
+                        ? '🍂'
+                        : '🌳'}
                     </div>
                     <div className="min-w-0">
                       <div className="text-[8.5px] font-bold tracking-wider uppercase text-emerald-300 leading-none">
                         {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
                           ? 'Pohon Berbuah Apel • Siap Dipetik!'
+                          : treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
+                          ? 'Pohon Daun Gugur • Siram agar Hijau Kembali!'
                           : `Pohon Kota • Disiram ${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3`}
                       </div>
                       <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
                         {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
                           ? 'Petik Buah Apel Merah (+2 XP)'
+                          : treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
+                          ? 'Siram Pohon agar Hijau Kembali'
                           : `Siram Pohon (${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3)`}
                       </h4>
                       <p className={`text-[9.5px] truncate leading-tight ${cafeToast ? 'text-emerald-200 font-semibold' : 'text-slate-200/90'}`}>
                         {cafeToast ||
                           (treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
                             ? 'Buah apel segar siap dipetik (+2 XP)'
+                            : treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
+                            ? 'Siram pohon daun gugur ini agar rimbun & hijau kembali'
                             : 'Siram pohon 3x agar berbuah apel (+2 XP)')}
                       </p>
                     </div>
@@ -11971,7 +13264,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
                       className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] font-bold border border-emerald-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
                     >
-                      <span>💧 Siram ({Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)</span>
+                      <span>
+                        {treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
+                          ? '💧 Siram Hijaukan'
+                          : `💧 Siram (${Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)`}
+                      </span>
                       <span className="text-[9px] font-mono text-amber-300 bg-emerald-950/75 px-1 py-0.5 rounded border border-emerald-500/30">
                         -1 XP
                       </span>

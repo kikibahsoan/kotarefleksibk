@@ -14,6 +14,7 @@ import {
   QuizQuestion,
   TownSettings,
   BuildingId,
+  BankMateriEntry,
 } from './types/index.ts';
 import { StorageService } from './utils/storage.ts';
 import { evaluateBadges, calculateStudentLevel } from './utils/rules.ts';
@@ -37,6 +38,7 @@ import { PasarPrestasiModal } from './components/modals/PasarPrestasiModal.tsx';
 import { RuangGuruModal } from './components/modals/RuangGuruModal.tsx';
 import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal.tsx';
 import { MasjidModal } from './components/modals/MasjidModal.tsx';
+import { BankMateriModal } from './components/modals/BankMateriModal.tsx';
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
 import { LofiAudioControl } from './components/LofiAudioControl.tsx';
 import { getTimePeriodWita, TimePeriod } from './utils/lofiAudio.ts';
@@ -81,6 +83,11 @@ export default function App() {
   const studentRef = useRef<Student | null>(student);
   studentRef.current = student;
 
+  const [bankMateriList, setBankMateriList] = useState<BankMateriEntry[]>(() => {
+    const initialList = StorageService.getBankMateri();
+    StorageService.applyBankMateriToCityState(initialList);
+    return initialList;
+  });
   const [materis, setMateris] = useState<Materi[]>(() => StorageService.getMateri());
   const [objectives, setObjectives] = useState<LearningObjective[]>(() => StorageService.getObjectives());
   const [reflections, setReflections] = useState<Reflection[]>(() => StorageService.getReflections());
@@ -207,6 +214,25 @@ export default function App() {
       clearInterval(interval);
     };
   }, []);
+
+  // Sync Bank Materi from Server & Google Spreadsheet and distribute to all buildings for Students & Teachers
+  const refreshBankMateriState = useCallback(async () => {
+    try {
+      const merged = await StorageService.fetchBankMateriFromAllSources();
+      setBankMateriList(merged);
+      setMateris(StorageService.getMateri());
+      setObjectives(StorageService.getObjectives());
+      setQuizQuestions(StorageService.getQuizQuestions());
+    } catch {
+      // Safe fallback
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshBankMateriState();
+    const interval = setInterval(refreshBankMateriState, 15000);
+    return () => clearInterval(interval);
+  }, [refreshBankMateriState]);
 
   const currentWeatherInfo = useMemo(
     () => getWeatherMeta(weatherType, liveGorontaloTemp, liveGorontaloHumidity),
@@ -387,6 +413,21 @@ export default function App() {
 
   const handleSelectBuilding = useCallback(
     (buildingId: BuildingId) => {
+      if (buildingId === 'bank_materi' && !studentRef.current?.isTeacher) {
+        sounds.playClick();
+        if (missionToastTimerRef.current) {
+          window.clearTimeout(missionToastTimerRef.current);
+        }
+        setMissionToast(
+          '🔒 Gedung Bank Materi khusus untuk Bapak/Ibu Guru! Materi hasil Generate AI Guru sudah tersebar di Perpustakaan, Pusat Refleksi, Studio ON AIR, Lab DKV & Tefa, serta Balai Kota.'
+        );
+        missionToastTimerRef.current = window.setTimeout(() => {
+          setMissionToast(null);
+          missionToastTimerRef.current = null;
+        }, 4800);
+        return;
+      }
+
       setActiveBuilding(buildingId);
       if (buildingId === 'perpustakaan') {
         completeMissionIfActive('m_perpustakaan');
@@ -506,17 +547,20 @@ export default function App() {
     }
   }, [student]);
 
-  // Handle Student Login (Students get 5 XP on login, Teachers get 10 XP)
+  // Handle Student / Guest Login (Students & Guests get 5 XP on login, Teachers get 10 XP)
   const handleLoginStudent = (newStudent: Student) => {
     const loginXp = newStudent.isTeacher ? 10 : 5;
     const studentWithLoginXp: Student = {
       ...newStudent,
       points: loginXp,
+      isGuest: Boolean(newStudent.isGuest),
     };
     studentRef.current = studentWithLoginXp;
     setStudent(studentWithLoginXp);
     StorageService.setCurrentStudent(studentWithLoginXp);
-    StorageService.saveOrUpdateStudent(studentWithLoginXp);
+    if (!studentWithLoginXp.isGuest) {
+      StorageService.saveOrUpdateStudent(studentWithLoginXp);
+    }
 
     // Randomize missions on login
     const randomMissions = getOrInitUserRandomMissions(studentWithLoginXp.id, true);
@@ -527,7 +571,9 @@ export default function App() {
     saveCompletedMissionIds(studentWithLoginXp.id, []);
 
     // Record login town activity
-    StorageService.recordStudentActivity(studentWithLoginXp.id, 'login', 1);
+    if (!studentWithLoginXp.isGuest) {
+      StorageService.recordStudentActivity(studentWithLoginXp.id, 'login', 1);
+    }
   };
 
   // Handle Logout
@@ -540,6 +586,18 @@ export default function App() {
 
   // Submit Reflection
   const handleSubmitReflection = (newReflection: Reflection, newFeedback: MentorFeedback) => {
+    if (studentRef.current?.isGuest) {
+      sounds.playClick();
+      if (missionToastTimerRef.current) {
+        window.clearTimeout(missionToastTimerRef.current);
+      }
+      setMissionToast('📸 Mode Tamu Kota (Wartawan): Akses Anda hanya melihat-lihat (View Only).');
+      missionToastTimerRef.current = window.setTimeout(() => {
+        setMissionToast(null);
+        missionToastTimerRef.current = null;
+      }, 3600);
+      return;
+    }
     const updatedReflections = [newReflection, ...reflections];
     const updatedFeedbacks = [newFeedback, ...feedbacks];
 
@@ -637,6 +695,18 @@ export default function App() {
   const handleSendMessage = (content: string) => {
     const current = studentRef.current;
     if (!current) return;
+    if (current.isGuest) {
+      sounds.playClick();
+      if (missionToastTimerRef.current) {
+        window.clearTimeout(missionToastTimerRef.current);
+      }
+      setMissionToast('📸 Mode Tamu Kota (Wartawan): Akses Anda hanya melihat-lihat (View Only).');
+      missionToastTimerRef.current = window.setTimeout(() => {
+        setMissionToast(null);
+        missionToastTimerRef.current = null;
+      }, 3600);
+      return;
+    }
     const newMsg: Message = {
       id: `msg-${Date.now().toString(36)}`,
       studentId: current.id,
@@ -908,6 +978,7 @@ export default function App() {
         studentName={student.name}
         studentGender={student.gender}
         isTeacher={student.isTeacher}
+        isGuest={student.isGuest}
         timePeriod={timePeriod}
         weatherType={weatherType}
         weatherTempCelsius={currentWeatherInfo.tempCelsius}
@@ -993,6 +1064,8 @@ export default function App() {
               <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 border-2 border-amber-400 flex items-center justify-center text-slate-950 font-black text-[10px] sm:text-[11px] shadow-sm shrink-0">
                 {isMaster
                   ? '⏳'
+                  : student.isGuest
+                  ? '📸'
                   : student.isTeacher
                   ? (student.gender === 'P' ? '👩‍🏫' : '👨‍🏫')
                   : student.gender === 'P'
@@ -1005,10 +1078,15 @@ export default function App() {
                 {studentHandle}
               </span>
 
-              {/* Teacher/Master Badge - shown only on sm+ to prevent cramping on mobile */}
+              {/* Teacher/Master/Guest Badge - shown only on sm+ to prevent cramping on mobile */}
               {student.isTeacher && (
                 <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[8.5px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-400/40 shrink-0">
                   {isMaster ? 'MASTER' : 'GURU'}
+                </span>
+              )}
+              {student.isGuest && (
+                <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[8.5px] font-extrabold bg-sky-500/25 text-sky-300 border border-sky-400/40 shrink-0">
+                  WARTAWAN • VIEW ONLY
                 </span>
               )}
 
@@ -1245,6 +1323,32 @@ export default function App() {
           student={student}
           onAddXp={handleAddPoints}
           onCompleteMasjidMission={() => completeMissionIfActive('m_masjid')}
+        />
+      )}
+
+      {activeBuilding === 'bank_materi' && student.isTeacher && (
+        <BankMateriModal
+          onClose={() => setActiveBuilding(null)}
+          teacher={student}
+          bankMateriList={bankMateriList}
+          settings={settings}
+          onSaveBankMateri={async (entry: BankMateriEntry) => {
+            await StorageService.saveAndDistributeBankMateri(entry);
+            setBankMateriList(StorageService.getBankMateri());
+            setMateris(StorageService.getMateri());
+            setObjectives(StorageService.getObjectives());
+            setQuizQuestions(StorageService.getQuizQuestions());
+            handleAddPoints(5, `Sebarkan Bank Materi AI: ${entry.mataPelajaran}`);
+          }}
+          onDeleteBankMateri={async (id: string) => {
+            await StorageService.deleteBankMateriEntry(id);
+            setBankMateriList(StorageService.getBankMateri());
+            setMateris(StorageService.getMateri());
+            setObjectives(StorageService.getObjectives());
+            setQuizQuestions(StorageService.getQuizQuestions());
+          }}
+          onRefreshBankMateri={refreshBankMateriState}
+          onSelectBuilding={(id: BuildingId) => handleSelectBuilding(id)}
         />
       )}
 
