@@ -1972,4 +1972,10 @@ async function startServer() {
   });
 }
 
-startServer();
+// Export Express app for Vercel Serverless deployment
+export default app;
+
+// Only bind port when running standalone server (not on Vercel serverless)
+if (!process.env.VERCEL) {
+  startServer();
+}
