@@ -87,7 +87,7 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // 3. Aksi Lengkap Semua Data v2.7 (Refleksi, Feedback, Pesan, Obrolan Warga, Jurnal Pohon Beringin, Studio ON AIR Podcast, Pasar Prestasi & Bank Materi Guru AI)
+  // 3. Aksi Lengkap Semua Data v2.8 (Refleksi, Feedback, Pesan, Obrolan Warga, Jurnal Pohon Beringin, Studio ON AIR Podcast, Pasar Prestasi, Bank Materi Guru AI & Kotak Saran Wisma)
   var reflections = getReflections(ss);
   var feedbacks = getFeedbacks(ss);
   var messages = getMessages(ss);
@@ -96,10 +96,11 @@ function doGet(e) {
   var podcasts = getPodcasts(ss);
   var pasarPrestasi = getPasarPrestasi(ss);
   var bankMateri = getBankMateri(ss);
+  var wismaSuggestions = getWismaSuggestions(ss);
 
   return ContentService.createTextOutput(JSON.stringify({
     success: true,
-    version: "2.7",
+    version: "2.8",
     spreadsheet: ss.getName(),
     reflections: reflections,
     feedbacks: feedbacks,
@@ -109,6 +110,7 @@ function doGet(e) {
     podcasts: podcasts,
     pasarPrestasi: pasarPrestasi,
     bankMateri: bankMateri,
+    wismaSuggestions: wismaSuggestions,
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
 }
@@ -154,6 +156,10 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "delete_bank_materi") {
       deleteBankMateri(ss, data.id);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_wisma_suggestion") {
+      saveWismaSuggestion(ss, data.suggestion);
       return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "send_message") {
@@ -840,6 +846,67 @@ function getBankMateri(ss) {
       kuisBengkel: Array.isArray(kuisBengkel) ? kuisBengkel : [],
       createdAt: String(r[18] || ""),
       timestamp: Number(r[19]) || Date.now()
+    });
+  }
+  return list;
+}
+
+// -------------------------------------------------------------
+// MANAJEMEN KOTAK SURAT MASUKAN & SARAN WISMA SISWA & GURU (v2.8)
+// -------------------------------------------------------------
+function getOrCreateWismaSuggestionSheet(ss) {
+  var sheet = ss.getSheetByName("Kotak_Saran_Wisma");
+  if (!sheet) {
+    sheet = ss.insertSheet("Kotak_Saran_Wisma");
+    sheet.appendRow([
+      "ID Masukan", "ID Wisma", "Nama Wisma / Rumah Dinas", "ID Pengirim",
+      "Nama Pengirim", "Peran (Siswa/Guru)", "Kelas / Jabatan",
+      "Kategori Saran", "Isi Masukan & Saran", "Tanggal Kirim", "Timestamp"
+    ]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function saveWismaSuggestion(ss, sug) {
+  if (!sug || !sug.id) return;
+  var sheet = getOrCreateWismaSuggestionSheet(ss);
+  sheet.appendRow([
+    sug.id,
+    sug.wismaId || "",
+    sug.wismaName || "Wisma Refleksia",
+    sug.senderId || "",
+    sug.senderName || "Warga Kota",
+    sug.senderRole || "siswa",
+    sug.className || "X DKV",
+    sug.category || "Ide & Apresiasi",
+    sug.content || "",
+    sug.createdAt || new Date().toLocaleString("id-ID"),
+    sug.timestamp || Date.now()
+  ]);
+}
+
+function getWismaSuggestions(ss) {
+  var sheet = ss.getSheetByName("Kotak_Saran_Wisma");
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0] || !r[8]) continue;
+    list.push({
+      id: String(r[0]),
+      wismaId: String(r[1] || ""),
+      wismaName: String(r[2] || "Wisma Refleksia"),
+      senderId: String(r[3] || ""),
+      senderName: String(r[4] || "Warga Kota"),
+      senderRole: String(r[5] || "siswa") === "guru" ? "guru" : "siswa",
+      className: String(r[6] || "X DKV"),
+      category: String(r[7] || "Ide & Apresiasi"),
+      content: String(r[8] || ""),
+      createdAt: String(r[9] || ""),
+      timestamp: Number(r[10]) || Date.now()
     });
   }
   return list;

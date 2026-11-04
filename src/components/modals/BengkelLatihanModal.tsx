@@ -299,28 +299,28 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-md animate-backdrop-fade">
       <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100 animate-fade-in-up">
         {/* Header */}
-        <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 px-5 sm:px-6 py-4 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-r from-cyan-600 via-sky-600 to-indigo-700 px-5 sm:px-6 py-4 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-2xl shadow-inner">
-              🛠️
+              ⚛️
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg sm:text-xl font-extrabold font-display leading-tight">
-                  Lab DKV & Tefa • 5 Soal Acak
+                  Lab DKV • 5 Soal Acak
                 </h2>
-                <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-black/30 text-amber-200 border border-white/20 flex items-center gap-1">
+                <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-black/30 text-cyan-200 border border-white/20 flex items-center gap-1">
                   <Shuffle className="w-3 h-3" /> Paket Acak #{roundNumber}
                 </span>
               </div>
-              <p className="text-xs text-amber-100 font-medium">
+              <p className="text-xs text-cyan-100 font-medium">
                 Waktu 5 Detik / Nomor • Benar +1 XP per Soal • Saldo: 🪙 {student.points} XP
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            aria-label="Tutup Lab DKV & Tefa"
+            aria-label="Tutup Lab DKV"
             className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition cursor-pointer"
           >
             <X className="w-5 h-5 text-white" />

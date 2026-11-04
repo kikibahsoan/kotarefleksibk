@@ -24,11 +24,11 @@ export const TOWN_MISSION_POOL: TownMissionDef[] = [
   },
   {
     id: 'm_bengkel',
-    title: 'Tuntaskan 5 Soal Berjenjang di Bengkel Latihan',
-    desc: 'Jawab soal kuis berjenjang (5 detik/soal) di Bengkel Latihan',
+    title: 'Tuntaskan 5 Soal Berjenjang di Lab DKV',
+    desc: 'Jawab soal kuis berjenjang (5 detik/soal) di Lab DKV',
     xp: 1,
     targetId: 'bengkel_latihan',
-    icon: '🛠️',
+    icon: '⚛️',
   },
   {
     id: 'm_perpustakaan',

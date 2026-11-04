@@ -15,7 +15,7 @@ const BUILDING_ICONS: Record<BuildingId, string> = {
   perpustakaan: '📚',
   taman_refleksi: '🌍',
   menara_mentor: '📡',
-  bengkel_latihan: '🛠️',
+  bengkel_latihan: '⚛️',
   kantor_pos: '📮',
   pasar_prestasi: '🏆',
   masjid: '🕌',

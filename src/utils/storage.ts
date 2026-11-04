@@ -10,6 +10,8 @@ import {
   TownSettings,
   PublicChatMessage,
   BankMateriEntry,
+  WismaSuggestion,
+  TeacherAnnouncement,
 } from '../types/index.ts';
 import {
   INITIAL_MATERI,
@@ -37,6 +39,7 @@ const STORAGE_KEYS = {
   DELETED_REFLECTIONS: 'kota_refleksi_deleted_reflections',
   BANK_MATERI: 'kota_refleksi_bank_materi',
   DELETED_BANK_MATERI: 'kota_refleksi_deleted_bank_materi',
+  WISMA_SUGGESTIONS: 'kota_refleksi_wisma_suggestions',
 };
 
 const INITIAL_BANK_MATERI: BankMateriEntry[] = [
@@ -1556,5 +1559,283 @@ export const StorageService = {
     this.setBankMateri(merged);
     return merged;
   },
+
+  // ==========================================================================
+  // PAPAN PENGUMUMAN BALAI KOTA (DARI DATA PESAN SISTEM & PENGUMUMAN GURU)
+  // ==========================================================================
+  getTeacherAnnouncements(): TeacherAnnouncement[] {
+    const announcements: TeacherAnnouncement[] = [];
+    const seenIds = new Set<string>();
+
+    // 1. Ambil dari data pesan sistem (StorageService.getMessages()) yang dikirim oleh Guru atau memiliki balasan/arahan Guru
+    const sysMessages = this.getMessages();
+    sysMessages.forEach((msg) => {
+      const isDirectAnnouncement =
+        (msg.studentId && msg.studentId.startsWith('teacher-')) ||
+        (msg.className && (msg.className.toLowerCase().includes('guru') || msg.className.toLowerCase().includes('pengumuman'))) ||
+        (msg.content && msg.content.includes('[PENGUMUMAN]'));
+
+      if (isDirectAnnouncement) {
+        const cleanText = msg.content.replace(/^\[PENGUMUMAN\]\s*/i, '').trim();
+        const item: TeacherAnnouncement = {
+          id: `ann-msg-${msg.id}`,
+          teacherId: msg.studentId || 'teacher-dkv',
+          teacherName: msg.studentName || 'Dewan Guru DKV',
+          subject: msg.className || 'Pengumuman Resmi Guru',
+          title: 'Pengumuman Guru Kota Refleksia',
+          content: cleanText,
+          priority: 'penting',
+          createdAt: msg.createdAt || 'Hari ini',
+          timestamp: parseChatTimestamp(msg.createdAt),
+        };
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          announcements.push(item);
+        }
+      } else if (msg.teacherReply && msg.teacherReply.trim().length > 0) {
+        const item: TeacherAnnouncement = {
+          id: `ann-reply-${msg.id}`,
+          teacherId: 'teacher-mentor',
+          teacherName: 'Bapak/Ibu Guru Pembimbing DKV',
+          subject: `Arahan Guru (Tanggapan untuk ${msg.studentName})`,
+          title: 'Arahan & Pengumuman Pembelajaran',
+          content: msg.teacherReply.trim(),
+          priority: 'info',
+          createdAt: msg.repliedAt || msg.createdAt || 'Terbaru',
+          timestamp: parseChatTimestamp(msg.repliedAt || msg.createdAt),
+        };
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          announcements.push(item);
+        }
+      }
+    });
+
+    // 2. Ambil dari pesan Obrolan Warga yang dikirim oleh akun Guru
+    const publicChats = this.getPublicChatMessages();
+    publicChats.forEach((chat) => {
+      if (chat.isTeacher || (chat.senderId && chat.senderId.startsWith('teacher-'))) {
+        const item: TeacherAnnouncement = {
+          id: `ann-chat-${chat.id}`,
+          teacherId: chat.senderId,
+          teacherName: chat.senderName,
+          subject: chat.className || 'Guru DKV',
+          title: 'Sapaan & Informasi Guru',
+          content: chat.content,
+          priority: 'info',
+          createdAt: chat.timestamp || 'Hari ini',
+          timestamp: parseChatTimestamp(chat.createdAt || chat.timestamp),
+        };
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          announcements.push(item);
+        }
+      }
+    });
+
+    // 3. Ambil Misi Balai Kota dari Bank Materi Guru terbaru
+    const bankMateris = this.getBankMateri();
+    bankMateris.slice(0, 3).forEach((bm) => {
+      if (bm.misiBalaiKota) {
+        const item: TeacherAnnouncement = {
+          id: `ann-bm-${bm.id}`,
+          teacherId: bm.teacherId || 'teacher-bm',
+          teacherName: bm.teacherName || 'Guru Pengampu DKV',
+          subject: `${bm.mataPelajaran} (${bm.kelasTarget})`,
+          title: `Misi & Materi Baru: ${bm.elemen}`,
+          content: `${bm.misiBalaiKota} — Silakan kunjungi Perpustakaan, Pusat Refleksi, Studio ON AIR, dan Lab DKV & Tefa.`,
+          priority: 'misi',
+          createdAt: bm.createdAt || 'Terbaru',
+          timestamp: bm.timestamp || Date.now() - 3600000,
+        };
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          announcements.push(item);
+        }
+      }
+    });
+
+    // 4. Pastikan selalu ada pengumuman sistem default jika belum ada pesan
+    if (announcements.length === 0) {
+      announcements.push({
+        id: 'ann-default-1',
+        teacherId: 'teacher-1',
+        teacherName: 'Mohamad Rizki Bahsoan, S.Kom',
+        subject: 'Komputer Grafis & Berpikir Komputasional',
+        title: 'Pengumuman Pembelajaran & Misi Harian Warga',
+        content:
+          'Selamat datang di Kota Refleksia SMKN 2 Gorontalo! Jangan lupa membaca materi terbaru di Perpustakaan Kampus, mengerjakan kuis di Lab DKV & Tefa, serta menuliskan Jurnal Refleksi 4F hari ini.',
+        priority: 'penting',
+        createdAt: 'Hari ini',
+        timestamp: Date.now(),
+      });
+    }
+
+    return announcements.sort((a, b) => b.timestamp - a.timestamp);
+  },
+
+  async postTeacherAnnouncement(params: {
+    teacherId: string;
+    teacherName: string;
+    subject?: string;
+    content: string;
+  }): Promise<Message> {
+    const nowStr = new Date().toLocaleString('id-ID', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+    const newMsg: Message = {
+      id: `msg-ann-${Date.now().toString(36)}`,
+      studentId: params.teacherId.startsWith('teacher-') ? params.teacherId : `teacher-${params.teacherId}`,
+      studentName: params.teacherName,
+      className: params.subject || 'Pengumuman Guru DKV',
+      content: `[PENGUMUMAN] ${params.content.trim()}`,
+      teacherReply: params.content.trim(),
+      status: 'replied',
+      createdAt: nowStr,
+      repliedAt: nowStr,
+    };
+    this.addMessage(newMsg);
+    await this.syncWithGAS('send_message', { message: newMsg });
+    try {
+      window.dispatchEvent(new CustomEvent('kota_refleksi_announcement_updated', { detail: newMsg }));
+    } catch {}
+    return newMsg;
+  },
+
+  // ==========================================================================
+  // KOTAK SURAT KECIL MASUKAN & SARAN DI SETIAP WISMA SISWA & GURU
+  // ==========================================================================
+  getWismaSuggestions(): WismaSuggestion[] {
+    const initialSuggestions: WismaSuggestion[] = [
+      {
+        id: 'wsug-seed-1',
+        wismaId: 'siswa_1',
+        wismaName: '🏘️ Wisma X DKV',
+        senderId: 'std-dkv2-01',
+        senderName: 'Abdul Razak Samauna',
+        senderRole: 'siswa',
+        className: 'X DKV 2',
+        category: 'Fitur Kota Refleksia',
+        content: 'Semoga sudut literasi di samping Balai Kota semakin banyak koleksi komik desain grafis dan tipografinya!',
+        createdAt: 'Hari ini',
+        timestamp: Date.now() - 3600 * 1000 * 2,
+      },
+      {
+        id: 'wsug-seed-2',
+        wismaId: 'guru_1',
+        wismaName: '🏡 Rumah Dinas Guru 1',
+        senderId: 'teacher-1',
+        senderName: 'Mohamad Rizki Bahsoan, S.Kom',
+        senderRole: 'guru',
+        className: 'Guru DKV',
+        category: 'Pembelajaran & Materi',
+        content: 'Mari manfaatkan Kotak Surat Kecil di setiap Wisma ini untuk menyampaikan ide praktik Tefa DKV dan masukan pembelajaran.',
+        createdAt: 'Hari ini',
+        timestamp: Date.now() - 3600 * 1000 * 4,
+      },
+    ];
+    const items = safeGet<WismaSuggestion[]>(STORAGE_KEYS.WISMA_SUGGESTIONS, initialSuggestions);
+    return Array.isArray(items) && items.length > 0 ? items : initialSuggestions;
+  },
+
+  setWismaSuggestions(items: WismaSuggestion[]): void {
+    const map = new Map<string, WismaSuggestion>();
+    (items || []).forEach((it) => {
+      if (it && it.id) map.set(it.id, it);
+    });
+    const sorted = Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    safeSet(STORAGE_KEYS.WISMA_SUGGESTIONS, sorted);
+  },
+
+  async saveWismaSuggestion(suggestion: WismaSuggestion): Promise<void> {
+    const current = this.getWismaSuggestions();
+    const updated = [suggestion, ...current.filter((s) => s.id !== suggestion.id)];
+    this.setWismaSuggestions(updated);
+
+    // 1. Simpan ke Server API (/api/wisma-suggestions)
+    try {
+      fetch('/api/wisma-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(suggestion),
+      }).catch(() => {});
+    } catch {}
+
+    // 2. Simpan ke Google Spreadsheet melalui action khusus 'save_wisma_suggestion' (Sheet: Kotak_Saran_Wisma)
+    await this.syncWithGAS('save_wisma_suggestion', {
+      suggestion,
+    });
+
+    // 3. Simpan juga sebagai Pesan Sistem (Sheet: Pesan_Guru) agar langsung tercatat di Google Spreadsheet
+    //    meskipun pengguna belum memperbarui ulang deployment Apps Script ke versi terbaru
+    const asMessage: Message = {
+      id: `kotaksaran-${suggestion.id}`,
+      studentId: suggestion.senderId,
+      studentName: `${suggestion.senderName} (${suggestion.senderRole === 'guru' ? 'Guru' : 'Siswa'})`,
+      className: `${suggestion.wismaName} • ${suggestion.category}`,
+      content: `[KOTAK SARAN ${suggestion.wismaName}] (${suggestion.category}): ${suggestion.content}`,
+      status: 'unread',
+      createdAt: suggestion.createdAt,
+    };
+    this.addMessage(asMessage);
+    await this.syncWithGAS('send_message', {
+      message: asMessage,
+    });
+
+    try {
+      window.dispatchEvent(new CustomEvent('kota_refleksi_wisma_suggestions_updated', { detail: updated }));
+    } catch {}
+  },
+
+  async fetchWismaSuggestionsFromAllSources(): Promise<WismaSuggestion[]> {
+    const map = new Map<string, WismaSuggestion>();
+    this.getWismaSuggestions().forEach((item) => {
+      if (item && item.id) map.set(item.id, item);
+    });
+
+    // 1. Tarik dari Server API (/api/wisma-suggestions)
+    try {
+      const res = await fetch('/api/wisma-suggestions');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          json.data.forEach((item: WismaSuggestion) => {
+            if (item && item.id) map.set(item.id, item);
+          });
+        }
+      }
+    } catch {}
+
+    // 2. Tarik dari Google Spreadsheet (Sheet 'Kotak_Saran_Wisma' & fallback 'Pesan_Guru')
+    const settings = this.getSettings();
+    if (settings.gasWebAppUrl && settings.gasWebAppUrl.startsWith('http')) {
+      try {
+        const url = new URL(settings.gasWebAppUrl);
+        url.searchParams.set('action', 'get_data');
+        url.searchParams.set('_t', String(Date.now()));
+        const gasRes = await fetch(url.toString(), {
+          method: 'GET',
+          redirect: 'follow',
+          cache: 'no-store',
+        });
+        if (gasRes.ok) {
+          const resData = await gasRes.json();
+          if (Array.isArray(resData.wismaSuggestions)) {
+            resData.wismaSuggestions.forEach((item: WismaSuggestion) => {
+              if (item && item.id && item.content) {
+                map.set(item.id, item);
+              }
+            });
+          }
+        }
+      } catch {}
+    }
+
+    const merged = Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    this.setWismaSuggestions(merged);
+    return merged;
+  },
 };
+
 

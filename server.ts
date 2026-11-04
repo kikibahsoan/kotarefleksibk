@@ -1951,6 +1951,53 @@ Tugas Anda adalah mengolah input Guru tersebut menjadi paket pembelajaran lengka
   }
 });
 
+// =========================================================================
+// KOTAK SURAT KECIL MASUKAN & SARAN DI SETIAP WISMA SISWA & GURU
+// =========================================================================
+const WISMA_SUGGESTIONS_FILE_PATH = path.join(__dirname, 'server_wisma_suggestions.json');
+
+function loadWismaSuggestionsFromFile(): any[] {
+  try {
+    if (fs.existsSync(WISMA_SUGGESTIONS_FILE_PATH)) {
+      const raw = fs.readFileSync(WISMA_SUGGESTIONS_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+let serverWismaSuggestions: any[] = loadWismaSuggestionsFromFile();
+
+function saveWismaSuggestionsToFile() {
+  try {
+    fs.writeFileSync(WISMA_SUGGESTIONS_FILE_PATH, JSON.stringify(serverWismaSuggestions, null, 2), 'utf-8');
+  } catch {}
+}
+
+app.get('/api/wisma-suggestions', (_req, res) => {
+  return res.json({
+    success: true,
+    data: serverWismaSuggestions,
+  });
+});
+
+app.post('/api/wisma-suggestions', (req, res) => {
+  const item = req.body;
+  if (!item || !item.id || !item.content) {
+    return res.status(400).json({ success: false, error: 'Data masukan/saran tidak lengkap.' });
+  }
+  serverWismaSuggestions = [
+    item,
+    ...serverWismaSuggestions.filter((s) => s && s.id !== item.id),
+  ].slice(0, 150);
+  saveWismaSuggestionsToFile();
+  return res.json({
+    success: true,
+    data: item,
+  });
+});
+
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {

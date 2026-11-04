@@ -107,9 +107,9 @@ export const TownRulesModal: React.FC<TownRulesModalProps> = ({ onClose, student
       badge: 'Refleksi • +1 XP',
     },
     {
-      title: 'Kuis & Tantangan di Lab DKV & Tefa',
-      desc: 'Masuk ke gedung Lab DKV & Tefa (Bengkel Latihan) untuk menguji pemahaman materi kejuruan dan berpikir komputasional melalui kuis interaktif (+1 XP tiap jawaban benar).',
-      icon: '🛠️',
+      title: 'Kuis & Tantangan di Lab DKV',
+      desc: 'Masuk ke gedung Lab DKV berlogo Atom bergerak untuk menguji pemahaman materi kejuruan dan berpikir komputasional melalui kuis interaktif (+1 XP tiap jawaban benar).',
+      icon: '⚛️',
       badge: 'Kuis • +1 XP/Soal',
     },
     {

@@ -297,3 +297,30 @@ export interface BankMateriEntry {
   timestamp: number;
 }
 
+export interface WismaSuggestion {
+  id: string;
+  wismaId: string;
+  wismaName: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'siswa' | 'guru';
+  className: string;
+  category: 'Pembelajaran & Materi' | 'Fasilitas Sekolah & Lab' | 'Fitur Kota Refleksia' | 'Ide & Apresiasi';
+  content: string;
+  createdAt: string;
+  timestamp: number;
+}
+
+export interface TeacherAnnouncement {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  subject?: string;
+  title: string;
+  content: string;
+  priority?: 'penting' | 'info' | 'misi';
+  createdAt: string;
+  timestamp: number;
+}
+
+

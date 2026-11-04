@@ -1,11 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BuildingId, PublicChatMessage, Student, DailyJournalStickyNote } from '../types/index.ts';
+import {
+  BuildingId,
+  PublicChatMessage,
+  Student,
+  DailyJournalStickyNote,
+  WismaSuggestion,
+  TeacherAnnouncement,
+} from '../types/index.ts';
+import { StorageService } from '../utils/storage.ts';
 import { sounds } from '../utils/audio.ts';
 import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
 import { WeatherType, getWeatherTypeWita } from '../utils/weather.ts';
 import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
-import { X, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin } from 'lucide-react';
+import { X, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin, Megaphone, Mail, Send, Shuffle, ChevronLeft } from 'lucide-react';
 import { TownRulesModal } from './modals/TownRulesModal.tsx';
+import {
+  INDONESIAN_FOLKLORE_COMICS,
+  ART_DESIGN_MAGAZINES,
+  renderFolkloreComicIllustration,
+  renderArtMagazineIllustration,
+} from '../data/literacyCornerData.tsx';
 import {
   JurnalHarianModal,
   getStoredStickyNotes,
@@ -60,7 +74,7 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'pasar_prestasi', name: 'Pasar Prestasi', tagline: 'Leaderboard & Dewan Guru', position: [-2.8, 0, 2.8], color: 0xf59e0b, icon: '🏆' },
   { id: 'kantor_pos', name: 'Kantor Pos Kilat', tagline: 'Kirim Pesan ke Guru', position: [2.8, 0, -2.8], color: 0xef4444, icon: '📮' },
   { id: 'taman_refleksi', name: 'Pusat Refleksi', tagline: 'Tulis Jurnal Refleksi (+3 Poin)', position: [-2.8, 0, -2.8], color: 0xd97706, icon: '🌍' },
-  { id: 'bengkel_latihan', name: 'Lab DKV & Tefa', tagline: 'Tower Kontrol & Kuis', position: [2.8, 0, 2.8], color: 0xf59e0b, icon: '🛠️' },
+  { id: 'bengkel_latihan', name: 'Lab DKV', tagline: 'Studio Desain Minimalis, Atom & Kuis', position: [2.8, 0, 2.8], color: 0x0ea5e9, icon: '⚛️' },
   { id: 'masjid', name: 'Masjid Al-Hikmah', tagline: 'Belajar Iqro (1-6) & Tuntunan Sholat', position: [5.45, 0, -4.85], color: 0x10b981, icon: '🕌' },
   { id: 'bank_materi', name: 'Bank Materi Guru', tagline: 'Khusus Guru • Input TP, Materi Esensial & Generate AI', position: [-5.35, 0, -4.85], color: 0x6366f1, icon: '🏦' },
   { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
@@ -71,6 +85,12 @@ export const TOWN_RULES_BOARD_COORDS = { wx: 1.45, wy: 5.95 };
 
 // Pohon Beringin Jurnal Harian di Belakang Balai Kota [wx: 0, wy: -5.8]
 export const BERINGIN_TREE_COORDS = { wx: 0, wy: -5.8 };
+
+// Papan Pengumuman Guru di Dekat Balai Kota [wx: -1.55, wy: -3.45] (Di atas rumput samping halaman depan Balai Kota)
+export const ANNOUNCEMENT_BOARD_COORDS = { wx: -1.55, wy: -3.45 };
+
+// Sudut Literasi Warga di Samping Balai Kota [wx: 2.35, wy: -6.15] (Di atas rumput hijau & agak jauh dari bangunan lainnya)
+export const LITERACY_CORNER_COORDS = { wx: 2.35, wy: -6.15 };
 
 export type EmoteType = 'love' | 'wave' | 'laugh' | 'dance';
 
@@ -222,7 +242,7 @@ export const TREES_LIST: [number, number][] = [
   // Mid-park groves (carefully placed on open lawns away from all buildings, roads, swings & lamps)
   [-5.2, -1.8],
   [5.2, 1.8],
-  [-3.8, 3.4],
+  [-4.15, 1.95],
   [-0.5, 2.4],
   [-4.15, -1.25],
   [4.15, -1.25],
@@ -685,60 +705,60 @@ export const FOUNTAIN_MINIMALIST_BENCHES: TwoPersonBenchGroup[] = [
   },
 ];
 
-// 2 Kursi Literasi Minimalis (Model Sama Seperti Kursi Samping Air Mancur, Masing-Masing Muat 2 Orang)
+// 2 Kursi Literasi Minimalis di Samping Balai Kota (Tetap di Atas Rumput Hijau & Jauh dari Bangunan Lain)
 export const LITERACY_BENCHES: TwoPersonBenchGroup[] = [
   {
     groupId: 'literacy_1',
-    name: 'Kursi Literasi 1 (Samping Sudut Literasi)',
+    name: 'Kursi Literasi 1 (Samping Sudut Literasi Balai Kota)',
     kind: 'fountain_minimalist',
-    wx: -3.65,
-    wy: 1.45,
+    wx: 1.72,
+    wy: -5.82,
     facing: 'down-right',
     seats: [
-      { id: 'literacy_1_a', label: 'Kursi Literasi 1 • Kiri (1/2)', wx: -3.72, wy: 1.52, screenOffsetX: -6.2 },
-      { id: 'literacy_1_b', label: 'Kursi Literasi 1 • Kanan (2/2)', wx: -3.58, wy: 1.38, screenOffsetX: 6.2 },
+      { id: 'literacy_1_a', label: 'Kursi Literasi 1 • Kiri (1/2)', wx: 1.65, wy: -5.75, screenOffsetX: -6.2 },
+      { id: 'literacy_1_b', label: 'Kursi Literasi 1 • Kanan (2/2)', wx: 1.79, wy: -5.89, screenOffsetX: 6.2 },
     ],
   },
   {
     groupId: 'literacy_2',
-    name: 'Kursi Literasi 2 (Depan Sudut Literasi)',
+    name: 'Kursi Literasi 2 (Depan Sudut Literasi Balai Kota)',
     kind: 'fountain_minimalist',
-    wx: -3.65,
-    wy: 2.15,
-    facing: 'down-right',
+    wx: 2.95,
+    wy: -5.82,
+    facing: 'down-left',
     seats: [
-      { id: 'literacy_2_a', label: 'Kursi Literasi 2 • Kiri (1/2)', wx: -3.72, wy: 2.22, screenOffsetX: -6.2 },
-      { id: 'literacy_2_b', label: 'Kursi Literasi 2 • Kanan (2/2)', wx: -3.58, wy: 2.08, screenOffsetX: 6.2 },
+      { id: 'literacy_2_a', label: 'Kursi Literasi 2 • Kiri (1/2)', wx: 2.88, wy: -5.89, screenOffsetX: -6.2 },
+      { id: 'literacy_2_b', label: 'Kursi Literasi 2 • Kanan (2/2)', wx: 3.02, wy: -5.75, screenOffsetX: 6.2 },
     ],
   },
 ];
 
-// Api Unggun di Sudut Kota (Sudut Barat Daya [-4.65, 4.65]) & 2 Bangku Penghangat Tubuh di Sampingnya
-export const CAMPFIRE_COORDS = { wx: -4.65, wy: 4.65 };
+// Api Unggun & 2 Bangku Hangat di Atas Rumput Hijau (Taman Barat Daya [-4.05, 4.15])
+export const CAMPFIRE_COORDS = { wx: -4.05, wy: 4.15 };
 
 export const CAMPFIRE_BENCHES: TwoPersonBenchGroup[] = [
   {
     groupId: 'campfire_1',
-    name: 'Bangku Api Unggun Kiri (Penghangat Tubuh)',
+    name: 'Bangku Api Unggun Kiri (Penghangat Tubuh di Atas Rumput)',
     kind: 'campfire',
-    wx: -5.32,
-    wy: 4.72,
+    wx: -4.52,
+    wy: 4.18,
     facing: 'down-right',
     seats: [
-      { id: 'campfire_1_a', label: 'Bangku Api Unggun Kiri • Kursi 1', wx: -5.38, wy: 4.78, screenOffsetX: -5.8 },
-      { id: 'campfire_1_b', label: 'Bangku Api Unggun Kiri • Kursi 2', wx: -5.26, wy: 4.66, screenOffsetX: 5.8 },
+      { id: 'campfire_1_a', label: 'Bangku Api Unggun Kiri • Kursi 1', wx: -4.58, wy: 4.24, screenOffsetX: -5.8 },
+      { id: 'campfire_1_b', label: 'Bangku Api Unggun Kiri • Kursi 2', wx: -4.46, wy: 4.12, screenOffsetX: 5.8 },
     ],
   },
   {
     groupId: 'campfire_2',
-    name: 'Bangku Api Unggun Kanan (Penghangat Tubuh)',
+    name: 'Bangku Api Unggun Kanan (Penghangat Tubuh di Atas Rumput)',
     kind: 'campfire',
-    wx: -3.98,
-    wy: 4.72,
+    wx: -3.58,
+    wy: 4.18,
     facing: 'down-left',
     seats: [
-      { id: 'campfire_2_a', label: 'Bangku Api Unggun Kanan • Kursi 1', wx: -4.04, wy: 4.66, screenOffsetX: -5.8 },
-      { id: 'campfire_2_b', label: 'Bangku Api Unggun Kanan • Kursi 2', wx: -3.92, wy: 4.78, screenOffsetX: 5.8 },
+      { id: 'campfire_2_a', label: 'Bangku Api Unggun Kanan • Kursi 1', wx: -3.64, wy: 4.12, screenOffsetX: -5.8 },
+      { id: 'campfire_2_b', label: 'Bangku Api Unggun Kanan • Kursi 2', wx: -3.52, wy: 4.24, screenOffsetX: 5.8 },
     ],
   },
 ];
@@ -1382,21 +1402,95 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   // Literacy corner reading modal
   const [isLiteracyModalOpen, setIsLiteracyModalOpen] = useState(false);
   const [activeLiteracyDoc, setActiveLiteracyDoc] = useState<'komik' | 'majalah' | 'koran' | null>(null);
+  const [selectedFolkloreComicId, setSelectedFolkloreComicId] = useState<string | null>(null);
+  const [randomMagazineIndex, setRandomMagazineIndex] = useState<number>(() =>
+    Math.floor(Math.random() * ART_DESIGN_MAGAZINES.length)
+  );
 
-  // Nearby interaction (tree watering/apple harvesting, dry leaf pickup, fishing spot, literacy corner, bench, town rules board, or beringin tree journal)
+  // Papan Pengumuman Guru near Balai Kota state
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [teacherAnnouncements, setTeacherAnnouncements] = useState<TeacherAnnouncement[]>(() =>
+    StorageService.getTeacherAnnouncements()
+  );
+  const [newAnnouncementText, setNewAnnouncementText] = useState('');
+  const [isPostingAnnouncement, setIsPostingAnnouncement] = useState(false);
+
+  // Kotak Surat Kecil Masukan & Saran at every Wisma Siswa & Guru state
+  const [activeWismaMailbox, setActiveWismaMailbox] = useState<HousingUnitDef | null>(null);
+  const [wismaSuggestions, setWismaSuggestions] = useState<WismaSuggestion[]>(() =>
+    StorageService.getWismaSuggestions()
+  );
+  const [suggestionCategory, setSuggestionCategory] = useState<WismaSuggestion['category']>('Pembelajaran & Materi');
+  const [suggestionText, setSuggestionText] = useState('');
+  const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const refreshAnnouncementsAndSuggestions = async () => {
+      if (mounted) {
+        setTeacherAnnouncements(StorageService.getTeacherAnnouncements());
+      }
+      try {
+        const synced = await StorageService.fetchWismaSuggestionsFromAllSources();
+        if (mounted && Array.isArray(synced)) {
+          setWismaSuggestions(synced);
+        }
+      } catch {}
+    };
+    refreshAnnouncementsAndSuggestions();
+    const timer = window.setInterval(refreshAnnouncementsAndSuggestions, 20000);
+    const onAnnUpdate = () => {
+      if (mounted) setTeacherAnnouncements(StorageService.getTeacherAnnouncements());
+    };
+    const onSugUpdate = () => {
+      if (mounted) setWismaSuggestions(StorageService.getWismaSuggestions());
+    };
+    window.addEventListener('kota_refleksi_announcement_updated', onAnnUpdate);
+    window.addEventListener('kota_refleksi_wisma_suggestions_updated', onSugUpdate);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+      window.removeEventListener('kota_refleksi_announcement_updated', onAnnUpdate);
+      window.removeEventListener('kota_refleksi_wisma_suggestions_updated', onSugUpdate);
+    };
+  }, []);
+
+  // Nearby interaction (tree watering/apple harvesting, dry leaf pickup, fishing spot, literacy corner, bench, town rules board, beringin tree journal, announcement board, or wisma mailbox)
   const [nearbyAction, setNearbyAction] = useState<{
-    type: 'tree' | 'dry_leaf' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
+    type:
+      | 'tree'
+      | 'dry_leaf'
+      | 'fishing'
+      | 'literacy'
+      | 'bench'
+      | 'town_rules'
+      | 'beringin'
+      | 'announcement_board'
+      | 'wisma_mailbox';
     treeIndex?: number;
     leafId?: number;
     benchId?: BenchId;
     benchName?: string;
+    wismaId?: HousingUnitDef['id'];
+    wismaName?: string;
   } | null>(null);
   const nearbyActionRef = useRef<{
-    type: 'tree' | 'dry_leaf' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
+    type:
+      | 'tree'
+      | 'dry_leaf'
+      | 'fishing'
+      | 'literacy'
+      | 'bench'
+      | 'town_rules'
+      | 'beringin'
+      | 'announcement_board'
+      | 'wisma_mailbox';
     treeIndex?: number;
     leafId?: number;
     benchId?: BenchId;
     benchName?: string;
+    wismaId?: HousingUnitDef['id'];
+    wismaName?: string;
   } | null>(null);
   nearbyActionRef.current = nearbyAction;
 
@@ -1404,14 +1498,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   // does not re-pop on the next animation frame while the avatar stands still at the same spot
   const getNearbyActionSignature = (
     act: {
-      type: 'tree' | 'dry_leaf' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
+      type:
+        | 'tree'
+        | 'dry_leaf'
+        | 'fishing'
+        | 'literacy'
+        | 'bench'
+        | 'town_rules'
+        | 'beringin'
+        | 'announcement_board'
+        | 'wisma_mailbox';
       treeIndex?: number;
       leafId?: number;
       benchId?: BenchId;
+      wismaId?: string;
     } | null
   ): string | null => {
     if (!act) return null;
-    return `${act.type}:${act.treeIndex ?? ''}:${act.leafId ?? ''}:${act.benchId ?? ''}`;
+    return `${act.type}:${act.treeIndex ?? ''}:${act.leafId ?? ''}:${act.benchId ?? ''}:${act.wismaId ?? ''}`;
   };
   const dismissedNearbySignatureRef = useRef<string | null>(null);
 
@@ -2359,20 +2463,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       facing: 'down-left',
     };
 
-    // 4. Ibu Muslim Sudut Literasi (Patra) - Selalu berada di Sudut Literasi mengajak orang membaca
+    // 4. Ibu Muslim Sudut Literasi (Patra) - Selalu berada di Sudut Literasi samping Balai Kota mengajak orang membaca
     const patra: AvatarData = {
       id: 'patra',
       role: 'penjaga_literasi',
       handle: 'patra',
       name: 'Patra',
       roleLabel: 'Ibu Literasi',
-      wx: -3.95,
-      wy: 1.78,
-      targetWx: -3.95,
-      targetWy: 1.78,
-      anchorX: -3.95,
-      anchorY: 1.78,
-      wanderRadius: 0.22, // Selalu berada di Sudut Literasi
+      wx: 2.35,
+      wy: -5.52,
+      targetWx: 2.35,
+      targetWy: -5.52,
+      anchorX: 2.35,
+      anchorY: -5.52,
+      wanderRadius: 0.22, // Selalu berada di Sudut Literasi samping Balai Kota
       speed: 0.42,
       shirtColor: '#0d9488', // Gamis & Hijab Syar'i Ibu Muslimah warna hijau zamrud/toska lembut
       pantsColor: '#115e59',
@@ -2381,7 +2485,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       isMoving: false,
       pauseTimer: 2.5,
       walkFrame: 0,
-      facing: 'down-right',
+      facing: 'down-left',
       speeches: [
         'Assalamualaikum, yuk mampir baca buku! 📖',
         'Mari duduk di Sudut Literasi & baca komik! 📚',
@@ -2675,8 +2779,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         y: 0,
         vx: 0,
         vyWave: 0,
-        centerWx: -4.2,
-        centerWy: 1.8, // High above West Sudut Literasi grove
+        centerWx: 2.35,
+        centerWy: -6.15, // High above Sudut Literasi beside Balai Kota
         orbitRx: 1.9,
         orbitRy: 1.25,
         angle: 4.2,
@@ -2687,6 +2791,34 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         phase: 3.8,
       },
     ];
+
+    // Occasional Airplane Contrail in Sky Background (Random Timing)
+    interface SkyContrailFlight {
+      active: boolean;
+      startX: number;
+      startY: number;
+      dirX: number;
+      dirY: number;
+      speed: number;
+      startTime: number;
+      flightDuration: number;
+      fadeDuration: number;
+      nextSpawnTime: number;
+    }
+
+    const skyContrail: SkyContrailFlight = {
+      active: false,
+      startX: -60,
+      startY: 55,
+      dirX: 1,
+      dirY: -0.08,
+      speed: 36,
+      startTime: 0,
+      flightDuration: 22,
+      fadeDuration: 14,
+      // First contrail appears after a random 4–10 seconds, then subsequent random intervals
+      nextSpawnTime: 4 + Math.random() * 6,
+    };
 
     let pendingBuildingId: BuildingId | null = null;
     let hoveredBuildingRef: BuildingInfo | null = null;
@@ -2825,6 +2957,36 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
+      // 1d. Check Click on Papan Pengumuman Guru di Dekat Balai Kota [-1.55, -3.45]
+      const annBoardDist = Math.hypot(wx - ANNOUNCEMENT_BOARD_COORDS.wx, wy - ANNOUNCEMENT_BOARD_COORDS.wy);
+      if (annBoardDist < 1.25) {
+        sounds.playClick();
+        if (isSittingRef.current) {
+          setIsSitting(false);
+          setSittingSeat(null);
+        }
+        pendingSeatRef.current = null;
+        const playerNearAnnBoard =
+          Math.hypot(player.wx - ANNOUNCEMENT_BOARD_COORDS.wx, player.wy - ANNOUNCEMENT_BOARD_COORDS.wy) < 1.65;
+        player.targetWx = -1.35;
+        player.targetWy = -3.15;
+        player.isMoving = !playerNearAnnBoard;
+        if (player.isMoving) {
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.28 : 0.88;
+        }
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
+        pendingBuildingId = null;
+        lastTouchedIdRef.current = null;
+        setPendingConfirmation(null);
+        setIsCafeMenuOpen(false);
+        setNearbyAction({ type: 'announcement_board' });
+        sounds.playOpenModal();
+        setTeacherAnnouncements(StorageService.getTeacherAnnouncements());
+        setIsAnnouncementModalOpen(true);
+        return;
+      }
+
       // 2. Check Click on Kolam Pemancingan Tepi Sungai [5.9, -2.2]
       const fishSpotDist = Math.hypot(wx - FISHING_SPOT_COORDS.wx, wy - FISHING_SPOT_COORDS.wy);
       if (fishSpotDist < 2.3) {
@@ -2887,9 +3049,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 3d. Check Click on Sudut Literasi [-4.3, 1.8]
-      const litSpotDist = Math.hypot(wx - (-4.3), wy - 1.8);
-      if (litSpotDist < 2.0) {
+      // 3d. Check Click on Sudut Literasi Warga di Samping Balai Kota [2.35, -6.15]
+      const litSpotDist = Math.hypot(wx - LITERACY_CORNER_COORDS.wx, wy - LITERACY_CORNER_COORDS.wy);
+      if (litSpotDist < 1.85) {
         sounds.playClick();
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
@@ -2975,16 +3137,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 4c. Check Click on Perumahan Guru & Siswa behind Perpustakaan Kampus
+      // 4c. Check Click on Perumahan Guru & Siswa + Kotak Surat Kecil (Masukan & Saran) behind Perpustakaan Kampus
       for (const h of HOUSING_UNITS) {
-        if (Math.hypot(wx - h.wx, wy - h.wy) < 1.35) {
+        const distToHouse = Math.hypot(wx - h.wx, wy - h.wy);
+        const distToMailbox = Math.hypot(wx - (h.wx + 0.75), wy - (h.wy + 0.25));
+        if (distToHouse < 1.35 || distToMailbox < 1.05) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
             setSittingSeat(null);
           }
           pendingSeatRef.current = null;
-          player.targetWx = -5.95;
+          player.targetWx = -6.05;
           player.targetWy = h.wy;
           player.isMoving = true;
           player.isRunning = isRun;
@@ -2992,12 +3156,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
           pendingBuildingId = null;
           lastTouchedIdRef.current = null;
-          showToast(
-            h.kind === 'guru'
-              ? `${h.name} • Kompleks Perumahan Guru di belakang Perpustakaan Kampus`
-              : `${h.name} • Kompleks Perumahan & Wisma Siswa di belakang Perpustakaan Kampus`,
-            3000
-          );
+          setNearbyAction({
+            type: 'wisma_mailbox',
+            wismaId: h.id,
+            wismaName: h.name,
+          });
+          sounds.playOpenModal();
+          setActiveWismaMailbox(h);
           return;
         }
       }
@@ -3535,10 +3700,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // Proximity checks: Riverside Fishing Dock & Kolam [5.9, -2.2], West Literacy Corner [-4.3, 1.8], 4 Minimalist Fountain Benches (2-seater), 2 Campfire Benches, 2 Swing Structures + Literacy Bench
+      // Proximity checks: Riverside Fishing Dock & Kolam [5.9, -2.2], Sudut Literasi Samping Balai Kota [2.35, -6.15], 8 Minimalist Fountain Benches (2-seater), 2 Campfire Benches, 2 Swing Structures + Literacy Bench
       const fishDist = Math.hypot(player.wx - FISHING_SPOT_COORDS.wx, player.wy - FISHING_SPOT_COORDS.wy);
-      const litDist = Math.hypot(player.wx - (-4.3), player.wy - 1.8);
-      const litBenchDist = Math.hypot(player.wx - (-3.7), player.wy - 1.8);
+      const litDist = Math.hypot(player.wx - LITERACY_CORNER_COORDS.wx, player.wy - LITERACY_CORNER_COORDS.wy);
+      const litBenchDist = Math.min(
+        Math.hypot(player.wx - LITERACY_BENCHES[0].wx, player.wy - LITERACY_BENCHES[0].wy),
+        Math.hypot(player.wx - LITERACY_BENCHES[1].wx, player.wy - LITERACY_BENCHES[1].wy)
+      );
 
       let nearBench: { id: BenchId; name: string } | null = null;
       for (const group of ALL_TWO_PERSON_BENCHES) {
@@ -3584,12 +3752,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
+      let nearWismaUnit: HousingUnitDef | null = null;
+      for (const h of HOUSING_UNITS) {
+        const dMailbox = Math.hypot(player.wx - (h.wx + 0.85), player.wy - h.wy);
+        const dHouse = Math.hypot(player.wx - h.wx, player.wy - h.wy);
+        if (dMailbox < 1.25 || dHouse < 1.55) {
+          nearWismaUnit = h;
+          break;
+        }
+      }
+
       let detectedNearby: {
-        type: 'tree' | 'dry_leaf' | 'fishing' | 'literacy' | 'bench' | 'town_rules' | 'beringin';
+        type:
+          | 'tree'
+          | 'dry_leaf'
+          | 'fishing'
+          | 'literacy'
+          | 'bench'
+          | 'town_rules'
+          | 'beringin'
+          | 'announcement_board'
+          | 'wisma_mailbox';
         treeIndex?: number;
         leafId?: number;
         benchId?: BenchId;
         benchName?: string;
+        wismaId?: HousingUnitDef['id'];
+        wismaName?: string;
       } | null = null;
 
       if (isSittingRef.current) {
@@ -3605,6 +3794,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         detectedNearby = { type: 'bench', benchId: currentSeat || undefined, benchName: seatName };
       } else if (nearLeafId !== -1) {
         detectedNearby = { type: 'dry_leaf', leafId: nearLeafId };
+      } else if (Math.hypot(player.wx - ANNOUNCEMENT_BOARD_COORDS.wx, player.wy - ANNOUNCEMENT_BOARD_COORDS.wy) < 1.45) {
+        detectedNearby = { type: 'announcement_board' };
+      } else if (nearWismaUnit) {
+        detectedNearby = {
+          type: 'wisma_mailbox',
+          wismaId: nearWismaUnit.id,
+          wismaName: nearWismaUnit.name,
+        };
       } else if (nearBench) {
         detectedNearby = { type: 'bench', benchId: nearBench.id, benchName: nearBench.name };
       } else if (Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 || Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55) {
@@ -3619,7 +3816,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           setPendingConfirmation(null);
         }
         detectedNearby = { type: 'beringin' };
-      } else if (litDist < 1.05) {
+      } else if (litDist < 1.25) {
         detectedNearby = { type: 'literacy' };
       } else if (fishDist < 1.0) {
         detectedNearby = { type: 'fishing' };
@@ -3980,6 +4177,138 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       if (weatherWeights['salju'] > 0.005) {
         ctx.fillStyle = `rgba(165, 180, 252, ${weatherWeights['salju'] * 0.16})`;
         ctx.fillRect(0, 0, width, height);
+      }
+
+      // ---------------------------------------------------------
+      // 1B. OCCASIONAL AIRPLANE CONTRAIL IN SKY BACKGROUND (RANDOM TIMING)
+      // ---------------------------------------------------------
+      if (!skyContrail.active && elapsed >= skyContrail.nextSpawnTime) {
+        const fromLeft = Math.random() > 0.42;
+        const rawDirX = fromLeft ? 1 : -1;
+        const rawDirY = (Math.random() - 0.5) * 0.22 - 0.04; // slight high-altitude angle
+        const mag = Math.hypot(rawDirX, rawDirY) || 1;
+        skyContrail.active = true;
+        skyContrail.dirX = rawDirX / mag;
+        skyContrail.dirY = rawDirY / mag;
+        skyContrail.startX = fromLeft ? -40 : width + 40;
+        skyContrail.startY = 26 + Math.random() * Math.max(45, height * 0.22);
+        skyContrail.speed = 32 + Math.random() * 16;
+        skyContrail.startTime = elapsed;
+        const diagDist = width + 140;
+        skyContrail.flightDuration = diagDist / skyContrail.speed;
+        skyContrail.fadeDuration = 12 + Math.random() * 6;
+      }
+
+      if (skyContrail.active) {
+        const flightElapsed = elapsed - skyContrail.startTime;
+        const totalDuration = skyContrail.flightDuration + skyContrail.fadeDuration;
+        if (flightElapsed >= totalDuration) {
+          skyContrail.active = false;
+          // Schedule next random airplane contrail between 18 and 45 seconds later
+          skyContrail.nextSpawnTime = elapsed + 18 + Math.random() * 27;
+        } else {
+          ctx.save();
+          const planeTravelTime = Math.min(flightElapsed, skyContrail.flightDuration);
+          const headX = skyContrail.startX + skyContrail.dirX * skyContrail.speed * planeTravelTime;
+          const headY = skyContrail.startY + skyContrail.dirY * skyContrail.speed * planeTravelTime;
+
+          // Tail of contrail slowly catches up / dissipates from the origin
+          const maxTrailLen = 240;
+          const currentDist = skyContrail.speed * planeTravelTime;
+          const fadeOutRatio =
+            flightElapsed > skyContrail.flightDuration
+              ? Math.max(0, 1 - (flightElapsed - skyContrail.flightDuration) / skyContrail.fadeDuration)
+              : 1.0;
+          const trailLen = Math.min(currentDist, maxTrailLen) * (0.55 + 0.45 * fadeOutRatio);
+          const tailX = headX - skyContrail.dirX * trailLen;
+          const tailY = headY - skyContrail.dirY * trailLen;
+
+          const contrailBaseAlpha = (isNight ? 0.36 : currentPeriod === 'sore' ? 0.58 : 0.65) * fadeOutRatio;
+          if (contrailBaseAlpha > 0.01 && trailLen > 2) {
+            const perpX = -skyContrail.dirY;
+            const perpY = skyContrail.dirX;
+
+            // Soft diffused outer contrail plume
+            const outerGrad = ctx.createLinearGradient(tailX, tailY, headX, headY);
+            outerGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            outerGrad.addColorStop(
+              0.45,
+              currentPeriod === 'sore'
+                ? `rgba(254, 215, 170, ${contrailBaseAlpha * 0.45})`
+                : `rgba(241, 245, 249, ${contrailBaseAlpha * 0.45})`
+            );
+            outerGrad.addColorStop(
+              1,
+              currentPeriod === 'sore'
+                ? `rgba(255, 237, 213, ${contrailBaseAlpha * 0.75})`
+                : `rgba(255, 255, 255, ${contrailBaseAlpha * 0.75})`
+            );
+
+            ctx.strokeStyle = outerGrad;
+            ctx.lineWidth = 4.2 + (1 - fadeOutRatio) * 3.5;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(tailX, tailY);
+            ctx.lineTo(headX, headY);
+            ctx.stroke();
+
+            // Twin crisp jet engine condensation cores right behind the aircraft
+            const coreGrad = ctx.createLinearGradient(tailX, tailY, headX, headY);
+            coreGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            coreGrad.addColorStop(0.3, `rgba(255, 255, 255, ${contrailBaseAlpha * 0.5})`);
+            coreGrad.addColorStop(1, `rgba(255, 255, 255, ${Math.min(0.95, contrailBaseAlpha * 1.25)})`);
+            ctx.strokeStyle = coreGrad;
+            ctx.lineWidth = 1.15;
+            [-1.3, 1.3].forEach((offset) => {
+              ctx.beginPath();
+              ctx.moveTo(tailX + perpX * offset * 1.6, tailY + perpY * offset * 1.6);
+              ctx.lineTo(headX + perpX * offset * 0.8, headY + perpY * offset * 0.8);
+              ctx.stroke();
+            });
+          }
+
+          // High-altitude miniature sleek jet silhouette while still in flight across the sky
+          if (flightElapsed <= skyContrail.flightDuration) {
+            const angle = Math.atan2(skyContrail.dirY, skyContrail.dirX);
+            ctx.translate(headX, headY);
+            ctx.rotate(angle);
+
+            ctx.fillStyle = isNight ? '#e2e8f0' : '#ffffff';
+            // Fuselage
+            ctx.beginPath();
+            ctx.ellipse(2.5, 0, 5.2, 1.1, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Swept main wings
+            ctx.beginPath();
+            ctx.moveTo(2.0, 0);
+            ctx.lineTo(-1.8, -5.2);
+            ctx.lineTo(-3.0, -5.2);
+            ctx.lineTo(-0.5, 0);
+            ctx.lineTo(-3.0, 5.2);
+            ctx.lineTo(-1.8, 5.2);
+            ctx.closePath();
+            ctx.fill();
+            // Tail stabilizer
+            ctx.beginPath();
+            ctx.moveTo(-2.2, 0);
+            ctx.lineTo(-4.2, -2.3);
+            ctx.lineTo(-4.8, -2.3);
+            ctx.lineTo(-3.4, 0);
+            ctx.lineTo(-4.8, 2.3);
+            ctx.lineTo(-4.2, 2.3);
+            ctx.closePath();
+            ctx.fill();
+
+            // Tiny blinking aviation strobe at night/subuh
+            if (isNight && Math.floor(elapsed * 4) % 2 === 0) {
+              ctx.fillStyle = '#ef4444';
+              ctx.beginPath();
+              ctx.arc(0, 0, 1.3, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          ctx.restore();
+        }
       }
 
       // ---------------------------------------------------------
@@ -4355,13 +4684,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if ((gx === 5 || gx === 6) && gy >= -6 && gy <= -2) return true;
         // Walkway spur to Gedung Bank Materi Guru Courtyard at [-5.35, -4.85]
         if ((gx === -5 || gx === -6) && gy >= -6 && gy <= -2) return true;
-        // Walkway spur to West Sudut Literasi at [-4.3, 1.8]
-        if (gx <= -3 && gx >= -5 && gy === 2) return true;
         // Garden paths to Tempat Ayunan 1 [-3..-2, -4] and Tempat Ayunan 2 [2..3, -4]
         if ((gx === -3 || gx === -2) && gy === -4) return true;
         if ((gx === 2 || gx === 3) && gy === -4) return true;
-        // Cozy corner stone patio for Api Unggun & Bangku Hangat at [-5..-4, 4..5]
-        if ((gx === -5 || gx === -4) && (gy === 4 || gy === 5)) return true;
         // Paved corner patio for relocated Toko Roti & Kafe behind Lab DKV at [4..5, 4..5]
         if ((gx === 4 || gx === 5) && (gy === 4 || gy === 5)) return true;
         return false;
@@ -5038,6 +5363,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'campfire_spot'; wx: number; wy: number; depth: number }
         | { type: 'welcome_gate'; wx: number; wy: number; depth: number }
         | { type: 'town_rules_board'; wx: number; wy: number; depth: number }
+        | { type: 'announcement_board'; wx: number; wy: number; depth: number }
         | { type: 'beringin_tree'; wx: number; wy: number; depth: number }
         | { type: 'housing_unit'; unit: HousingUnitDef; wx: number; wy: number; depth: number }
         | { type: 'housing_gate'; wx: number; wy: number; depth: number }
@@ -5142,8 +5468,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         depth: FISHING_SPOT_COORDS.wx + FISHING_SPOT_COORDS.wy,
       });
 
-      // 2. Sudut Literasi Siswa at West End at [-4.3, 1.8]
-      drawItems.push({ type: 'literacy_corner', wx: -4.3, wy: 1.8, depth: -4.3 + 1.8 });
+      // 2. Sudut Literasi Warga di Samping Balai Kota di Atas Rumput [2.35, -6.15]
+      drawItems.push({
+        type: 'literacy_corner',
+        wx: LITERACY_CORNER_COORDS.wx,
+        wy: LITERACY_CORNER_COORDS.wy,
+        depth: LITERACY_CORNER_COORDS.wx + LITERACY_CORNER_COORDS.wy,
+      });
 
       // 3. 8 Minimalist 2-Seater Benches around Central Fountain + 2 Literacy Benches + 2 Campfire Benches
       ALL_TWO_PERSON_BENCHES.forEach((group) => {
@@ -5168,7 +5499,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         });
       });
 
-      // 6. Api Unggun di Sudut Kota [-4.65, 4.65]
+      // 6. Api Unggun di Atas Rumput [-4.05, 4.15]
       drawItems.push({
         type: 'campfire_spot',
         wx: CAMPFIRE_COORDS.wx,
@@ -5198,6 +5529,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         wx: BERINGIN_TREE_COORDS.wx,
         wy: BERINGIN_TREE_COORDS.wy,
         depth: BERINGIN_TREE_COORDS.wx + BERINGIN_TREE_COORDS.wy - 0.05,
+      });
+
+      // 10. Papan Pengumuman Guru di Dekat Balai Kota [-1.55, -3.45]
+      drawItems.push({
+        type: 'announcement_board',
+        wx: ANNOUNCEMENT_BOARD_COORDS.wx,
+        wy: ANNOUNCEMENT_BOARD_COORDS.wy,
+        depth: ANNOUNCEMENT_BOARD_COORDS.wx + ANNOUNCEMENT_BOARD_COORDS.wy + 0.25,
       });
 
       drawItems.sort((a, b) => a.depth - b.depth);
@@ -6003,6 +6342,156 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           ctx.restore();
+        } else if (item.type === 'announcement_board') {
+          // PAPAN PENGUMUMAN GURU DI DEKAT BALAI KOTA [wx: -1.55, wy: -3.45]
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          ctx.save();
+
+          // 1. Soft Ground Shadow on Grass
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 2 * z, 15 * z, 6.5 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 2. Twin Royal Navy & Gold Pillars
+          const postH = 37 * z;
+          const postW = 3.6 * z;
+          const leftPostX = pt.x - 10.5 * z;
+          const rightPostX = pt.x + 10.5 * z;
+
+          [leftPostX, rightPostX].forEach((px) => {
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(px - 3.2 * z, pt.y - 3 * z, 6.4 * z, 4 * z);
+            ctx.fillStyle = '#1e3a8a';
+            ctx.fillRect(px - postW / 2, pt.y - postH, postW, postH - 2 * z);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(px - postW / 2 + 0.8 * z, pt.y - postH, postW * 0.4, postH - 2 * z);
+          });
+
+          // 3. Crossbars
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(leftPostX - 1 * z, pt.y - 12 * z, (rightPostX - leftPostX) + 2 * z, 3 * z);
+          ctx.fillRect(leftPostX - 1 * z, pt.y - postH + 6 * z, (rightPostX - leftPostX) + 2 * z, 3 * z);
+
+          // 4. Bulletin Board Frame (Royal Blue & Gold Trim)
+          const bW = 34 * z;
+          const bH = 24 * z;
+          const bY = pt.y - postH + 7.5 * z;
+
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - bW / 2 + 1.5 * z, bY + 1.5 * z, bW, bH, 4 * z);
+          ctx.fill();
+
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - bW / 2, bY, bW, bH, 4 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1.4 * z;
+          ctx.stroke();
+
+          // Inner cork / velvet board surface
+          const innerW = bW - 4.5 * z;
+          const innerH = bH - 4.5 * z;
+          const innerX = pt.x - innerW / 2;
+          const innerY = bY + 2.25 * z;
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(innerX, innerY, innerW, innerH);
+
+          // Pinned Teacher Announcement Cards
+          // Left Card (Gold/Amber urgent teacher notice)
+          ctx.fillStyle = '#fef3c7';
+          ctx.fillRect(innerX + 1.5 * z, innerY + 1.8 * z, innerW * 0.46, innerH - 3.6 * z);
+          ctx.fillStyle = '#d97706';
+          ctx.fillRect(innerX + 2.3 * z, innerY + 3.4 * z, innerW * 0.38, 1.4 * z);
+          ctx.fillStyle = '#475569';
+          for (let li = 0; li < 4; li++) {
+            ctx.fillRect(innerX + 2.3 * z, innerY + 6.4 * z + li * 2.2 * z, innerW * (0.38 - (li % 2) * 0.08), 0.9 * z);
+          }
+          // Red pushpin
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(innerX + 1.5 * z + innerW * 0.23, innerY + 2.4 * z, 1.2 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Right Card (Sky Blue teacher schedule/mission notice)
+          ctx.fillStyle = '#e0f2fe';
+          ctx.fillRect(innerX + innerW * 0.52, innerY + 1.8 * z, innerW * 0.44, innerH - 3.6 * z);
+          ctx.fillStyle = '#0284c7';
+          ctx.fillRect(innerX + innerW * 0.55, innerY + 3.4 * z, innerW * 0.35, 1.4 * z);
+          ctx.fillStyle = '#334155';
+          for (let li = 0; li < 4; li++) {
+            ctx.fillRect(innerX + innerW * 0.55, innerY + 6.4 * z + li * 2.2 * z, innerW * (0.35 - (li % 2) * 0.06), 0.9 * z);
+          }
+          // Gold pushpin
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.arc(innerX + innerW * 0.52 + innerW * 0.22, innerY + 2.4 * z, 1.2 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 5. Classical Balai Kota Style Blue-Gold Gabled Canopy
+          const roofW = bW + 8 * z;
+          const roofApexY = bY - 8.5 * z;
+          ctx.fillStyle = '#1e3a8a';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - roofW / 2, bY + 1 * z);
+          ctx.lineTo(pt.x, roofApexY);
+          ctx.lineTo(pt.x + roofW / 2, bY + 1 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1.5 * z;
+          ctx.stroke();
+
+          // Golden Megaphone / Bell Emblem at Roof Apex
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath();
+          ctx.arc(pt.x, roofApexY - 1.2 * z, 2.5 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 6. Warm Overhead Spotlight Glow
+          const lX = pt.x;
+          const lY = roofApexY + 4 * z;
+          const bGlow = ctx.createRadialGradient(lX, lY, 1 * z, lX, lY, 15 * z);
+          bGlow.addColorStop(0, 'rgba(254, 240, 138, 0.9)');
+          bGlow.addColorStop(0.5, 'rgba(56, 189, 248, 0.35)');
+          bGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+          ctx.fillStyle = bGlow;
+          ctx.beginPath();
+          ctx.arc(lX, lY, 15 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 7. Floating Hover Badge: "📢 Papan Pengumuman Guru" (obeys 5s stationary smooth fade-out)
+          const distToAnnBoard = Math.hypot(player.wx - item.wx, player.wy - item.wy);
+          if (distToAnnBoard < 2.65 && overheadTagAlpha > 0.005) {
+            ctx.save();
+            ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
+            const hoverBounce = Math.sin(elapsed * 4.2) * 1.8 * z;
+            const badgeY = roofApexY - 13 * z + hoverBounce;
+            const bText = '📢 Papan Pengumuman Guru';
+            ctx.font = `bold ${Math.round(7.4 * z)}px sans-serif`;
+            const tW = ctx.measureText(bText).width + 10 * z;
+            const tH = 13.5 * z;
+
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - tW / 2, badgeY - tH / 2, tW, tH, 6.5 * z);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.8)';
+            ctx.lineWidth = 1.0 * z;
+            ctx.stroke();
+
+            ctx.fillStyle = '#fde68a';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(bText, pt.x, badgeY);
+            ctx.restore();
+          }
+
+          ctx.restore();
         } else if (item.type === 'beringin_tree') {
           // =========================================================
           // POHON BERINGIN JURNAL HARIAN DI BELAKANG BALAI KOTA [wx: 0, wy: -5.8]
@@ -6196,19 +6685,40 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           });
 
-          // Wooden "JURNAL" Signboard nestled at the Crown Fork (pt.y - 47 * z)
+          // Wooden "POHON JURNAL" Signboard nestled at the Crown Fork — strictly fitted & clipped inside frame
+          const pohonJurnalFontPx = Math.max(3, Math.round(3.4 * z));
+          ctx.font = `bold ${pohonJurnalFontPx}px sans-serif`;
+          const pohonJurnalLabel = 'POHON JURNAL';
+          const pjMetrics = ctx.measureText(pohonJurnalLabel);
+          const pjBoardW = Math.max(30 * z, pjMetrics.width + 6 * z);
+          const pjBoardH = 7.2 * z;
+          const pjBoardX = pt.x - pjBoardW / 2;
+          const pjBoardY = pt.y - 50.4 * z;
+
           ctx.fillStyle = '#451a03';
           ctx.beginPath();
-          ctx.roundRect(pt.x - 13 * z, pt.y - 50 * z, 26 * z, 6.5 * z, 2 * z);
+          ctx.roundRect(pjBoardX, pjBoardY, pjBoardW, pjBoardH, 2 * z);
           ctx.fill();
           ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 0.85 * z;
+          ctx.lineWidth = 0.9 * z;
           ctx.stroke();
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(
+            pjBoardX + 1.1 * z,
+            pjBoardY + 0.8 * z,
+            pjBoardW - 2.2 * z,
+            pjBoardH - 1.6 * z,
+            1.4 * z
+          );
+          ctx.clip();
           ctx.fillStyle = '#fef08a';
-          ctx.font = `bold ${Math.max(3, Math.round(3.6 * z))}px sans-serif`;
+          ctx.font = `bold ${pohonJurnalFontPx}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('🌳 POHON JURNAL', pt.x, pt.y - 46.7 * z);
+          ctx.fillText(pohonJurnalLabel, pt.x, pjBoardY + pjBoardH / 2, pjBoardW - 3.6 * z);
+          ctx.restore();
 
           // 6. Hanging Warm Glowing Paper Lanterns
           const lanterns = [
@@ -7718,23 +8228,40 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.arc(pt.x - 14 * z, pt.y + 10.2 * z, 2.6 * z, 0, Math.PI);
             ctx.stroke();
 
-            // Illuminated Red "● ON AIR" Lightbox Sign on Right Facade
+            // Illuminated Red "● ON AIR" Lightbox Sign on Right Facade — strictly fitted & clipped inside frame
             const neonPulse = 0.82 + Math.sin(elapsed * 5) * 0.18;
+            const onAirBoxX = pt.x + 3.5 * z;
+            const onAirBoxY = pt.y - 8.2 * z;
+            const onAirBoxW = 23 * z;
+            const onAirBoxH = 8.6 * z;
+            const onAirInnerX = onAirBoxX + 0.9 * z;
+            const onAirInnerY = onAirBoxY + 0.9 * z;
+            const onAirInnerW = onAirBoxW - 1.8 * z;
+            const onAirInnerH = onAirBoxH - 1.8 * z;
+
             ctx.fillStyle = '#7f1d1d';
             ctx.beginPath();
-            ctx.roundRect(pt.x + 4 * z, pt.y - 8 * z, 22 * z, 8.5 * z, 2.5 * z);
+            ctx.roundRect(onAirBoxX, onAirBoxY, onAirBoxW, onAirBoxH, 2.4 * z);
             ctx.fill();
+
             ctx.fillStyle = '#dc2626';
             ctx.beginPath();
-            ctx.roundRect(pt.x + 4.8 * z, pt.y - 7.2 * z, 20.4 * z, 7 * z, 2 * z);
+            ctx.roundRect(onAirInnerX, onAirInnerY, onAirInnerW, onAirInnerH, 1.8 * z);
             ctx.fill();
             ctx.strokeStyle = `rgba(254, 202, 202, ${neonPulse})`;
-            ctx.lineWidth = 1.2 * z;
+            ctx.lineWidth = 1.1 * z;
             ctx.stroke();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(onAirInnerX + 0.6 * z, onAirInnerY + 0.5 * z, onAirInnerW - 1.2 * z, onAirInnerH - 1.0 * z, 1.4 * z);
+            ctx.clip();
             ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.round(5.2 * z)}px sans-serif`;
+            ctx.font = `bold ${Math.max(3, Math.round(3.7 * z))}px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText('● ON AIR', pt.x + 15 * z, pt.y - 2.1 * z);
+            ctx.textBaseline = 'middle';
+            ctx.fillText('● ON AIR', onAirBoxX + onAirBoxW / 2, onAirBoxY + onAirBoxH / 2, onAirInnerW - 2.6 * z);
+            ctx.restore();
 
             // Animated 8-Channel Audio Spectrum Equalizer Matrix on Right Facade
             ctx.fillStyle = '#090d16';
@@ -8222,95 +8749,278 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.fillText('★', pt.x, pt.y - 17 * z);
             }
           } else if (b.id === 'bengkel_latihan') {
-            // SOUTH-EAST: LAB DKV & TEFA (Modern Creative Design Studio, Sawtooth Skylight & Glass Control Tower)
-            // 1. Concrete Studio Base Plinth
-            ctx.fillStyle = '#64748b';
-            ctx.fillRect(pt.x - 31 * z, pt.y + 17 * z, 62 * z, 4 * z);
-
-            // 2. Main Creative Studio Body with Crisp Architectural Panels
-            ctx.fillStyle = '#f8fafc';
-            ctx.fillRect(pt.x - 30 * z, pt.y - 12 * z, 42 * z, 30 * z);
-            ctx.strokeStyle = '#cbd5e1';
-            ctx.lineWidth = 0.9 * z;
-            ctx.strokeRect(pt.x - 30 * z, pt.y - 12 * z, 42 * z, 30 * z);
-
-            // Blue top roof fascia & sawtooth North-Light studio skylights
-            ctx.fillStyle = '#1d4ed8';
-            ctx.fillRect(pt.x - 30 * z, pt.y - 18 * z, 42 * z, 6 * z);
-
-            for (let st = -28; st <= 2; st += 10) {
-              ctx.fillStyle = '#1e40af';
-              ctx.beginPath();
-              ctx.moveTo(pt.x + st * z, pt.y - 18 * z);
-              ctx.lineTo(pt.x + (st + 8) * z, pt.y - 25 * z);
-              ctx.lineTo(pt.x + (st + 8) * z, pt.y - 18 * z);
-              ctx.closePath();
-              ctx.fill();
-              ctx.strokeStyle = '#7dd3fc';
-              ctx.lineWidth = 1.2 * z;
-              ctx.beginPath();
-              ctx.moveTo(pt.x + (st + 2) * z, pt.y - 19.5 * z);
-              ctx.lineTo(pt.x + (st + 7.5) * z, pt.y - 24 * z);
-              ctx.stroke();
-            }
-
-            // Digital LED Studio Sign ("LAB DKV • TEFA")
-            ctx.fillStyle = '#0f172a';
+            // SOUTH-EAST: LAB DKV (Renovated Minimalist & Detailed Creative Design Studio + Moving 3D Atom Logo on Top)
+            // 1. Minimalist Isometric Architectural Plinth & Terrazzo Base
+            ctx.fillStyle = '#1e293b';
             ctx.beginPath();
-            ctx.roundRect(pt.x - 26 * z, pt.y - 10 * z, 28 * z, 6 * z, 2 * z);
+            ctx.moveTo(pt.x - 32 * z, pt.y + 15 * z);
+            ctx.lineTo(pt.x, pt.y + 31 * z);
+            ctx.lineTo(pt.x + 32 * z, pt.y + 15 * z);
+            ctx.lineTo(pt.x, pt.y + 1 * z);
+            ctx.closePath();
             ctx.fill();
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 0.8 * z;
+
+            ctx.fillStyle = isNight ? '#334155' : '#e2e8f0';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 30 * z, pt.y + 13.5 * z);
+            ctx.lineTo(pt.x, pt.y + 28.5 * z);
+            ctx.lineTo(pt.x + 30 * z, pt.y + 13.5 * z);
+            ctx.lineTo(pt.x, pt.y - 0.5 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = isNight ? '#38bdf8' : '#94a3b8';
+            ctx.lineWidth = 0.85 * z;
             ctx.stroke();
-            ctx.fillStyle = '#38bdf8';
-            ctx.font = `bold ${Math.max(4, Math.round(3.8 * z))}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('LAB DKV • TEFA', pt.x - 12 * z, pt.y - 7 * z);
 
-            // Industrial Roll-up Studio Bay Door & Glass Creative Window
-            ctx.fillStyle = '#f59e0b';
-            ctx.fillRect(pt.x - 26 * z, pt.y + 1 * z, 22 * z, 16 * z);
-            ctx.strokeStyle = '#1e293b';
-            ctx.lineWidth = 0.9 * z;
-            ctx.strokeRect(pt.x - 26 * z, pt.y + 1 * z, 22 * z, 16 * z);
-            for (let hz = 1; hz < 5; hz++) {
-              ctx.beginPath();
-              ctx.moveTo(pt.x - 26 * z, pt.y + (1 + hz * 3.2) * z);
-              ctx.lineTo(pt.x - 4 * z, pt.y + (1 + hz * 3.2) * z);
-              ctx.stroke();
-            }
-
-            // Cylindrical Glass Control & Render Tower with Blue Dome
-            ctx.fillStyle = '#e2e8f0';
-            ctx.fillRect(pt.x + 12 * z, pt.y - 24 * z, 17 * z, 42 * z);
+            // 2. Main Minimalist Isometric Studio Volumes (Left Alabaster Wing & Right Anthracite Wing)
+            // Left Wing (Matte Alabaster White Creative Wing)
+            ctx.fillStyle = isNight ? '#cbd5e1' : '#f8fafc';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 28 * z, pt.y + 13 * z);
+            ctx.lineTo(pt.x, pt.y + 27 * z);
+            ctx.lineTo(pt.x, pt.y - 8 * z);
+            ctx.lineTo(pt.x - 28 * z, pt.y - 22 * z);
+            ctx.closePath();
+            ctx.fill();
             ctx.strokeStyle = '#94a3b8';
             ctx.lineWidth = 0.8 * z;
-            ctx.strokeRect(pt.x + 12 * z, pt.y - 24 * z, 17 * z, 42 * z);
+            ctx.stroke();
 
+            // Right Wing (Sleek Anthracite Slate & Glass Atrium Wing)
+            ctx.fillStyle = isNight ? '#0f172a' : '#1e293b';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y + 27 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y + 13 * z);
+            ctx.lineTo(pt.x + 28 * z, pt.y - 22 * z);
+            ctx.lineTo(pt.x, pt.y - 8 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 0.8 * z;
+            ctx.stroke();
+
+            // 3. Cantilevered Minimalist Flat Roof Deck with Recessed Skylight Atrium
+            ctx.fillStyle = isNight ? '#e2e8f0' : '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 36 * z);
+            ctx.lineTo(pt.x + 30 * z, pt.y - 21 * z);
+            ctx.lineTo(pt.x, pt.y - 6 * z);
+            ctx.lineTo(pt.x - 30 * z, pt.y - 21 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.1 * z;
+            ctx.stroke();
+
+            // Inner Skylight Glass Atrium on Roof
+            ctx.fillStyle = isNight ? '#0284c7' : '#38bdf8';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 31 * z);
+            ctx.lineTo(pt.x + 18 * z, pt.y - 22 * z);
+            ctx.lineTo(pt.x, pt.y - 13 * z);
+            ctx.lineTo(pt.x - 18 * z, pt.y - 22 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#bae6fd';
+            ctx.lineWidth = 0.75 * z;
+            ctx.stroke();
+
+            // 4. Left Facade Details: Minimalist Curtain-Wall Studio Window + Creative Workstations & CMYK Swatch Bar
+            ctx.fillStyle = isNight ? '#082f49' : '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 24.5 * z, pt.y + 6.5 * z);
+            ctx.lineTo(pt.x - 3.5 * z, pt.y + 17 * z);
+            ctx.lineTo(pt.x - 3.5 * z, pt.y + 1 * z);
+            ctx.lineTo(pt.x - 24.5 * z, pt.y - 9.5 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+
+            // Glowing iMac / Pen-Display Screens visible inside Left Studio Window
             ctx.fillStyle = isNight ? '#fde047' : '#38bdf8';
-            ctx.fillRect(pt.x + 13.5 * z, pt.y - 19 * z, 14 * z, 7.5 * z);
-            ctx.fillRect(pt.x + 13.5 * z, pt.y - 8 * z, 14 * z, 7.5 * z);
-            ctx.fillRect(pt.x + 13.5 * z, pt.y + 3 * z, 14 * z, 7.5 * z);
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 21 * z, pt.y + 2 * z);
+            ctx.lineTo(pt.x - 15 * z, pt.y + 5 * z);
+            ctx.lineTo(pt.x - 15 * z, pt.y - 0.5 * z);
+            ctx.lineTo(pt.x - 21 * z, pt.y - 3.5 * z);
+            ctx.closePath();
+            ctx.fill();
 
+            ctx.fillStyle = isNight ? '#38bdf8' : '#a855f7';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 12.5 * z, pt.y + 6.2 * z);
+            ctx.lineTo(pt.x - 6.5 * z, pt.y + 9.2 * z);
+            ctx.lineTo(pt.x - 6.5 * z, pt.y + 3.7 * z);
+            ctx.lineTo(pt.x - 12.5 * z, pt.y + 0.7 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Minimalist CMYK / RGB Geometric Accent Dots on Left Facade Corner
+            const cmykColors = ['#06b6d4', '#ec4899', '#facc15'];
+            cmykColors.forEach((col, idx) => {
+              ctx.fillStyle = col;
+              ctx.beginPath();
+              ctx.arc(pt.x - (25 - idx * 3.2) * z, pt.y + (9.5 + idx * 1.6) * z, 1.2 * z, 0, Math.PI * 2);
+              ctx.fill();
+            });
+
+            // 5. Right Facade Details: Minimalist Timber Louvers, Recessed Neon Strips & Glass Entrance Door
+            for (let lv = 0; lv < 4; lv++) {
+              const lx = pt.x + (15 + lv * 3.2) * z;
+              const lyTop = pt.y - (13.5 + lv * 1.6) * z;
+              const lyBot = pt.y + (11.5 - lv * 1.6) * z;
+              ctx.strokeStyle = '#f59e0b';
+              ctx.lineWidth = 1.1 * z;
+              ctx.beginPath();
+              ctx.moveTo(lx, lyTop);
+              ctx.lineTo(lx, lyBot);
+              ctx.stroke();
+            }
+
+            // Glass Double Studio Entrance on Right Wing with Cantilevered Canopy
+            ctx.fillStyle = isNight ? '#38bdf8' : '#0ea5e9';
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 3 * z, pt.y + 24.5 * z);
+            ctx.lineTo(pt.x + 12.5 * z, pt.y + 19.8 * z);
+            ctx.lineTo(pt.x + 12.5 * z, pt.y + 4.5 * z);
+            ctx.lineTo(pt.x + 3 * z, pt.y + 9.2 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#e0f2fe';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+
+            // Center door divider & minimalist vertical handle
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 7.75 * z, pt.y + 22.15 * z);
+            ctx.lineTo(pt.x + 7.75 * z, pt.y + 6.85 * z);
+            ctx.stroke();
+
+            // 6. Framed "LAB DKV" Architectural Signboard — strictly fitted & clipped inside its frame
+            const dkvSignW = 24 * z;
+            const dkvSignH = 6.6 * z;
+            const dkvSignX = pt.x - 26.5 * z;
+            const dkvSignY = pt.y - 16.5 * z;
+
+            ctx.fillStyle = '#090d16';
+            ctx.beginPath();
+            ctx.roundRect(dkvSignX, dkvSignY, dkvSignW, dkvSignH, 2 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.0 * z;
+            ctx.stroke();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(
+              dkvSignX + 1.0 * z,
+              dkvSignY + 0.8 * z,
+              dkvSignW - 2.0 * z,
+              dkvSignH - 1.6 * z,
+              1.4 * z
+            );
+            ctx.clip();
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = `bold ${Math.max(3, Math.round(3.7 * z))}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('LAB DKV', dkvSignX + dkvSignW / 2, dkvSignY + dkvSignH / 2, dkvSignW - 3.6 * z);
+            ctx.restore();
+
+            // 7. Animated Moving 3D Atom Logo on Top of Lab DKV Roof
+            const atomCx = pt.x;
+            const atomCy = pt.y - 39 * z;
+
+            // Minimalist Roof Pedestal & Chrome Pylon supporting the Atom Logo
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, pt.y - 22 * z, 6.5 * z, 3.2 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 0.9 * z;
+            ctx.stroke();
+
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.6 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y - 22 * z);
+            ctx.lineTo(atomCx, atomCy + 8 * z);
+            ctx.stroke();
+
+            // Soft Glowing Cyan Energy Halo behind the Moving Atom Logo
+            const atomPulse = 0.78 + Math.sin(elapsed * 4) * 0.22;
+            const atomHalo = ctx.createRadialGradient(atomCx, atomCy, 1.5 * z, atomCx, atomCy, 15 * z);
+            atomHalo.addColorStop(0, `rgba(56, 189, 248, ${0.42 * atomPulse})`);
+            atomHalo.addColorStop(0.6, `rgba(14, 165, 233, ${0.15 * atomPulse})`);
+            atomHalo.addColorStop(1, 'rgba(14, 165, 233, 0)');
+            ctx.fillStyle = atomHalo;
+            ctx.beginPath();
+            ctx.arc(atomCx, atomCy, 15 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3 Rotating Elliptical Electron Orbital Rings + Orbiting Glowing Electrons
+            const orbitRx = 12.2 * z;
+            const orbitRy = 4.5 * z;
+            const baseAtomRotation = elapsed * 0.55;
+            const orbitAngles = [
+              baseAtomRotation,
+              baseAtomRotation + Math.PI / 3,
+              baseAtomRotation + (2 * Math.PI) / 3,
+            ];
+            const electronColors = ['#38bdf8', '#fde047', '#f472b6'];
+
+            orbitAngles.forEach((ringAngle, idx) => {
+              // Orbital ring ellipse
+              ctx.strokeStyle = idx === 0 ? 'rgba(56, 189, 248, 0.88)' : idx === 1 ? 'rgba(250, 204, 21, 0.82)' : 'rgba(244, 114, 182, 0.82)';
+              ctx.lineWidth = 1.15 * z;
+              ctx.beginPath();
+              ctx.ellipse(atomCx, atomCy, orbitRx, orbitRy, ringAngle, 0, Math.PI * 2);
+              ctx.stroke();
+
+              // Moving Electron position along the rotated ellipse
+              const ePhase = elapsed * (3.2 + idx * 0.45) + idx * ((2 * Math.PI) / 3);
+              const localX = orbitRx * Math.cos(ePhase);
+              const localY = orbitRy * Math.sin(ePhase);
+              const cosA = Math.cos(ringAngle);
+              const sinA = Math.sin(ringAngle);
+              const ex = atomCx + localX * cosA - localY * sinA;
+              const ey = atomCy + localX * sinA + localY * cosA;
+
+              // Electron outer glow
+              ctx.fillStyle = electronColors[idx];
+              ctx.beginPath();
+              ctx.arc(ex, ey, 2.3 * z, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Electron white hot core
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.arc(ex, ey, 1.1 * z, 0, Math.PI * 2);
+              ctx.fill();
+            });
+
+            // Pulsing Atom Nucleus at the center
             ctx.fillStyle = '#0284c7';
             ctx.beginPath();
-            ctx.arc(pt.x + 20.5 * z, pt.y - 24 * z, 8.5 * z, Math.PI, 0);
+            ctx.arc(atomCx, atomCy, 3.6 * z * atomPulse, 0, Math.PI * 2);
             ctx.fill();
 
-            // Rotating radar dish on tower
-            const dishAngle = elapsed * 2;
-            ctx.strokeStyle = '#64748b';
-            ctx.lineWidth = 1.8 * z;
+            ctx.fillStyle = '#fde047';
             ctx.beginPath();
-            ctx.moveTo(pt.x + 20.5 * z, pt.y - 32.5 * z);
-            ctx.lineTo(pt.x + 20.5 * z, pt.y - 41 * z);
-            ctx.stroke();
+            ctx.arc(atomCx - 0.9 * z, atomCy - 0.7 * z, 1.7 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.arc(atomCx + 1.0 * z, atomCy + 0.6 * z, 1.7 * z, 0, Math.PI * 2);
+            ctx.fill();
+
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.ellipse(pt.x + 20.5 * z, pt.y - 41 * z, 5.5 * z, 2.2 * z, dishAngle, 0, Math.PI * 2);
+            ctx.arc(atomCx, atomCy, 1.3 * z, 0, Math.PI * 2);
             ctx.fill();
-            ctx.stroke();
           } else if (b.id === 'kantor_pos') {
             // NORTH-EAST: KANTOR POS KILAT (Detailed Express Post Office, Clock Gable, Sorting Bay & Courier Hub)
             // 1. Stepped Stone Foundation Plinth
@@ -8527,18 +9237,35 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x, pt.y - 18.8 * z);
             ctx.stroke();
 
-            // Winged Envelope "POS KILAT" Sign Banner below Clock
+            // Winged Envelope "POS KILAT" Sign Banner below Clock — strictly fitted & clipped inside frame
+            const posSignW = 25 * z;
+            const posSignH = 6.2 * z;
+            const posSignX = pt.x - posSignW / 2;
+            const posSignY = pt.y - 8.4 * z;
+
+            ctx.fillStyle = '#9a3412';
+            ctx.beginPath();
+            ctx.roundRect(posSignX, posSignY, posSignW, posSignH, 1.8 * z);
+            ctx.fill();
+
             ctx.fillStyle = '#ea580c';
             ctx.beginPath();
-            ctx.roundRect(pt.x - 11.5 * z, pt.y - 8 * z, 23 * z, 5.2 * z, 1.5 * z);
+            ctx.roundRect(posSignX + 0.8 * z, posSignY + 0.7 * z, posSignW - 1.6 * z, posSignH - 1.4 * z, 1.3 * z);
             ctx.fill();
             ctx.strokeStyle = '#fef08a';
-            ctx.lineWidth = 0.8 * z;
+            ctx.lineWidth = 0.85 * z;
             ctx.stroke();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(posSignX + 1.2 * z, posSignY + 1.0 * z, posSignW - 2.4 * z, posSignH - 2.0 * z, 1.0 * z);
+            ctx.clip();
             ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.max(3.5, Math.round(3.6 * z))}px sans-serif`;
+            ctx.font = `bold ${Math.max(3, Math.round(3.3 * z))}px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText('✉ POS KILAT', pt.x, pt.y - 4.3 * z);
+            ctx.textBaseline = 'middle';
+            ctx.fillText('POS KILAT', pt.x, posSignY + posSignH / 2, posSignW - 3.6 * z);
+            ctx.restore();
 
             // Left Facade: Express Service Counter Window with Wooden Ledge
             ctx.fillStyle = isNight ? '#fef08a' : '#38bdf8';
@@ -9556,7 +10283,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (shouldShowLabel) {
             ctx.save();
             ctx.globalAlpha = (ctx.globalAlpha || 1.0) * tagAlpha;
-            const tagY = pt.y - (b.id === 'balai_kota' ? 86 : b.id === 'masjid' || b.id === 'bank_materi' ? 78 : b.id === 'menara_mentor' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
+            const tagY = pt.y - (b.id === 'balai_kota' ? 86 : b.id === 'masjid' || b.id === 'bank_materi' ? 78 : b.id === 'menara_mentor' || b.id === 'bengkel_latihan' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
             const labelText = `${b.icon} ${b.name}`;
             ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
             const tMetrics = ctx.measureText(labelText);
@@ -9982,7 +10709,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineWidth = 0.8 * z;
           ctx.strokeRect(pt.x + 12.5 * z, pt.y + 1.5 * z, 6.5 * z, 6.5 * z);
 
-          // Front Yard Garden Fence & Mailbox (Guru) or Study Bicycle (Siswa)
+          // Front Yard Garden Fence & Kotak Surat Kecil (Small Mailbox for Suggestions) at EVERY Wisma Siswa & Guru
           ctx.strokeStyle = '#e2e8f0';
           ctx.lineWidth = 1.1 * z;
           ctx.beginPath();
@@ -9990,31 +10717,45 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineTo(pt.x + 16 * z, pt.y + 17 * z);
           ctx.stroke();
 
-          if (u.kind === 'guru') {
-            // Red/Gold Mailbox in front of Teacher House
-            ctx.fillStyle = '#475569';
-            ctx.fillRect(pt.x + 16.5 * z, pt.y + 12 * z, 1.2 * z, 5 * z);
-            ctx.fillStyle = '#dc2626';
-            ctx.beginPath();
-            ctx.roundRect(pt.x + 15 * z, pt.y + 9.8 * z, 4.2 * z, 2.8 * z, 1.2 * z);
-            ctx.fill();
-          } else {
-            // Cute Parked Student Bicycle in front of Student Wisma
-            const bx = pt.x + 16.5 * z;
-            const by = pt.y + 15.5 * z;
+          if (u.kind === 'siswa') {
+            // Cute Parked Student Bicycle beside the porch of Student Wisma
+            const bx = pt.x + 11.2 * z;
+            const by = pt.y + 18.8 * z;
             ctx.strokeStyle = '#0f172a';
-            ctx.lineWidth = 0.9 * z;
+            ctx.lineWidth = 0.85 * z;
             ctx.beginPath();
-            ctx.arc(bx - 2.2 * z, by, 1.8 * z, 0, Math.PI * 2);
-            ctx.arc(bx + 2.2 * z, by, 1.8 * z, 0, Math.PI * 2);
+            ctx.arc(bx - 2.0 * z, by, 1.6 * z, 0, Math.PI * 2);
+            ctx.arc(bx + 2.0 * z, by, 1.6 * z, 0, Math.PI * 2);
             ctx.stroke();
             ctx.strokeStyle = u.accentColor;
             ctx.beginPath();
-            ctx.moveTo(bx - 2.2 * z, by);
-            ctx.lineTo(bx, by - 2.4 * z);
-            ctx.lineTo(bx + 2.2 * z, by);
+            ctx.moveTo(bx - 2.0 * z, by);
+            ctx.lineTo(bx, by - 2.2 * z);
+            ctx.lineTo(bx + 2.0 * z, by);
             ctx.stroke();
           }
+
+          // Kotak Surat Kecil (Small Mailbox for Masukan & Saran) at EVERY Wisma Siswa & Rumah Dinas Guru
+          const mbX = pt.x + 16.8 * z;
+          const mbY = pt.y + 12.2 * z;
+          // Mailbox Wooden/Steel Post
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(mbX - 0.7 * z, mbY, 1.4 * z, 5.5 * z);
+          // Mailbox Rounded Box Body
+          ctx.fillStyle = u.kind === 'guru' ? '#dc2626' : '#0284c7';
+          ctx.beginPath();
+          ctx.roundRect(mbX - 2.6 * z, mbY - 2.8 * z, 5.2 * z, 3.4 * z, 1.4 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#fde047';
+          ctx.lineWidth = 0.65 * z;
+          ctx.stroke();
+          // White Letter Slot / Envelope stripe inside Mailbox
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(mbX - 1.5 * z, mbY - 1.4 * z, 3.0 * z, 0.9 * z);
+          // Little Raised Red/Gold Signal Flag on Mailbox Side
+          ctx.fillStyle = u.kind === 'guru' ? '#fbbf24' : '#ef4444';
+          ctx.fillRect(mbX + 2.4 * z, mbY - 4.0 * z, 0.8 * z, 2.2 * z);
+          ctx.fillRect(mbX + 2.4 * z, mbY - 4.0 * z, 1.8 * z, 1.0 * z);
 
           // House Badge Plate on Gable ("🏡 GURU 1/2" / "🏘️ X DKV", "🏘️ XI DKV", "🏘️ XII DKV")
           ctx.font = `bold ${Math.max(3, Math.round(3.3 * z))}px sans-serif`;
@@ -10037,8 +10778,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.save();
             ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             const hTagY = pt.y - 34 * z;
+            const hLabel = `${u.name} • 📮 Kotak Saran`;
             ctx.font = `bold ${Math.round(6.8 * z)}px sans-serif`;
-            const tw = ctx.measureText(u.name).width + 10 * z;
+            const tw = ctx.measureText(hLabel).width + 10 * z;
             const th = 13 * z;
             ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
             ctx.beginPath();
@@ -10050,7 +10792,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(u.name, pt.x, hTagY);
+            ctx.fillText(hLabel, pt.x, hTagY);
             ctx.restore();
           }
 
@@ -13500,6 +14242,65 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     <span>📋 Baca</span>
                   </button>
                 </div>
+              ) : nearbyAction.type === 'announcement_board' ? (
+                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
+                      📢
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-amber-300 leading-none">
+                        Halaman Balai Kota • Info Guru
+                      </div>
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
+                        Papan Pengumuman Guru
+                      </h4>
+                      <p className="text-[9.5px] truncate text-amber-100/85 leading-tight">
+                        {teacherAnnouncements[0]?.content || 'Lihat pengumuman & arahan terbaru dari Bapak/Ibu Guru'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      sounds.playOpenModal();
+                      setTeacherAnnouncements(StorageService.getTeacherAnnouncements());
+                      setIsAnnouncementModalOpen(true);
+                    }}
+                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
+                  >
+                    <span>📢 Lihat</span>
+                  </button>
+                </div>
+              ) : nearbyAction.type === 'wisma_mailbox' ? (
+                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-sky-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
+                      📮
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-sky-300 leading-none">
+                        {nearbyAction.wismaName || 'Wisma Refleksia'}
+                      </div>
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
+                        Kotak Surat Masukan & Saran
+                      </h4>
+                      <p className="text-[9.5px] truncate text-sky-100/85 leading-tight">
+                        Kirim masukan & saran (Tersimpan ke Spreadsheet)
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      sounds.playOpenModal();
+                      const found =
+                        HOUSING_UNITS.find((h) => h.id === nearbyAction.wismaId) || HOUSING_UNITS[0];
+                      setActiveWismaMailbox(found);
+                    }}
+                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-sky-600/90 to-blue-600/90 hover:from-sky-500 hover:to-blue-500 text-white text-[10.5px] font-bold border border-sky-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
+                  >
+                    <span>📮 Kotak Saran</span>
+                  </button>
+                </div>
               ) : nearbyAction.type === 'beringin' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-emerald-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -13727,24 +14528,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         </div>
       </div>
 
-      {/* LITERACY READING CORNER MODAL (-1 XP for Komik, Majalah, Koran) */}
+      {/* LITERACY READING CORNER MODAL (-1 XP for Komik Cerita Rakyat 15 Pilihan, Majalah Seni Random, Koran Info Terbaru Refleksia City) */}
       {isLiteracyModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 animate-fade-in"
+          className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fade-in"
           onClick={() => setIsLiteracyModalOpen(false)}
         >
           <div
-            className="bg-[#121e2c] border border-cyan-500/50 rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9)] text-white relative overflow-hidden"
+            className="bg-[#0f172a] border border-cyan-500/50 rounded-3xl w-full max-w-3xl p-4 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.92)] text-white relative overflow-hidden flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800 mb-4">
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800 mb-3.5 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/40 text-xl font-black">
                   📖
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-black text-white">Sudut Literasi Warga</h3>
-                  <p className="text-[11px] text-slate-400">Pilih bahan bacaan kreatif DKV • Biaya: 1 XP</p>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    Sudut Literasi Warga • Samping Balai Kota
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Pilih 15 Komik Cerita Rakyat Nusantara, Majalah Seni Random, atau Koran Refleksia City • Biaya: 1 XP
+                  </p>
                 </div>
               </div>
               <button
@@ -13755,163 +14560,526 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3.5 shrink-0">
               <button
                 type="button"
                 onClick={() => {
-                  const cost = 1;
-                  if (studentPoints < cost) {
-                    sounds.playClick();
-                    showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`, 3000);
-                    return;
-                  }
-                  const success = onDeductPoints ? onDeductPoints(cost, 'Baca Komik DKV') : true;
-                  if (success) {
-                    sounds.playRewardXp();
-                    setActiveLiteracyDoc('komik');
-                    setIsSitting(true);
-                    setSittingSeat('literacy_1_a');
-                    if (playerRef.current) {
-                      playerRef.current.wx = -3.72;
-                      playerRef.current.wy = 1.52;
-                      playerRef.current.targetWx = -3.72;
-                      playerRef.current.targetWy = 1.52;
-                      playerRef.current.isMoving = false;
+                  if (activeLiteracyDoc !== 'komik') {
+                    const cost = 1;
+                    if (studentPoints < cost) {
+                      sounds.playClick();
+                      showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`, 3000);
+                      return;
                     }
-                    showToast('📚 Membaca Komik Desain Kreatif (-1 XP)', 3000);
+                    const success = onDeductPoints ? onDeductPoints(cost, 'Baca Komik Cerita Rakyat') : true;
+                    if (!success) return;
+                    sounds.playRewardXp();
+                    showToast('📚 Membuka 15 Komik Cerita Rakyat Indonesia (-1 XP)', 3000);
+                  } else {
+                    sounds.playClick();
+                  }
+                  setActiveLiteracyDoc('komik');
+                  setSelectedFolkloreComicId(null);
+                  setIsSitting(true);
+                  setSittingSeat('literacy_1_a');
+                  if (playerRef.current) {
+                    playerRef.current.wx = LITERACY_BENCHES[0].seats[0].wx;
+                    playerRef.current.wy = LITERACY_BENCHES[0].seats[0].wy;
+                    playerRef.current.targetWx = LITERACY_BENCHES[0].seats[0].wx;
+                    playerRef.current.targetWy = LITERACY_BENCHES[0].seats[0].wy;
+                    playerRef.current.isMoving = false;
                   }
                 }}
-                className={`p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                className={`p-2.5 sm:p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1 ${
                   activeLiteracyDoc === 'komik'
-                    ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-lg'
+                    ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-lg ring-2 ring-cyan-400/30'
                     : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
                 }`}
               >
-                <span className="text-2xl">📚</span>
-                <span className="text-xs font-extrabold">Komik DKV</span>
-                <span className="text-[9px] text-amber-300 font-mono">-1 XP</span>
+                <span className="text-xl sm:text-2xl">📚</span>
+                <span className="text-[11px] sm:text-xs font-extrabold">15 Komik Rakyat</span>
+                <span className="text-[9px] text-amber-300 font-mono">-1 XP • Bergambar</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => {
-                  const cost = 1;
-                  if (studentPoints < cost) {
-                    sounds.playClick();
-                    showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`, 3000);
-                    return;
-                  }
-                  const success = onDeductPoints ? onDeductPoints(cost, 'Baca Majalah Desain') : true;
-                  if (success) {
-                    sounds.playRewardXp();
-                    setActiveLiteracyDoc('majalah');
-                    setIsSitting(true);
-                    setSittingSeat('literacy_1_a');
-                    if (playerRef.current) {
-                      playerRef.current.wx = -3.72;
-                      playerRef.current.wy = 1.52;
-                      playerRef.current.targetWx = -3.72;
-                      playerRef.current.targetWy = 1.52;
-                      playerRef.current.isMoving = false;
+                  if (activeLiteracyDoc !== 'majalah') {
+                    const cost = 1;
+                    if (studentPoints < cost) {
+                      sounds.playClick();
+                      showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`, 3000);
+                      return;
                     }
-                    showToast('📰 Membaca Majalah Seni Rupa (-1 XP)', 3000);
+                    const success = onDeductPoints ? onDeductPoints(cost, 'Baca Majalah Seni Random') : true;
+                    if (!success) return;
+                    sounds.playRewardXp();
+                    showToast('🎨 Membaca Edisi Random Majalah Seni & Desain (-1 XP)', 3000);
+                  } else {
+                    sounds.playClick();
+                  }
+                  // Pick a random magazine different from current if possible
+                  setRandomMagazineIndex((prev) => {
+                    if (ART_DESIGN_MAGAZINES.length <= 1) return 0;
+                    let next = Math.floor(Math.random() * ART_DESIGN_MAGAZINES.length);
+                    if (next === prev) next = (prev + 1) % ART_DESIGN_MAGAZINES.length;
+                    return next;
+                  });
+                  setActiveLiteracyDoc('majalah');
+                  setIsSitting(true);
+                  setSittingSeat('literacy_1_a');
+                  if (playerRef.current) {
+                    playerRef.current.wx = LITERACY_BENCHES[0].seats[0].wx;
+                    playerRef.current.wy = LITERACY_BENCHES[0].seats[0].wy;
+                    playerRef.current.targetWx = LITERACY_BENCHES[0].seats[0].wx;
+                    playerRef.current.targetWy = LITERACY_BENCHES[0].seats[0].wy;
+                    playerRef.current.isMoving = false;
                   }
                 }}
-                className={`p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                className={`p-2.5 sm:p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1 ${
                   activeLiteracyDoc === 'majalah'
-                    ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-lg'
+                    ? 'bg-pink-600/30 border-pink-400 text-white shadow-lg ring-2 ring-pink-400/30'
                     : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
                 }`}
               >
-                <span className="text-2xl">📰</span>
-                <span className="text-xs font-extrabold">Majalah Seni</span>
-                <span className="text-[9px] text-amber-300 font-mono">-1 XP</span>
+                <span className="text-xl sm:text-2xl">🎨</span>
+                <span className="text-[11px] sm:text-xs font-extrabold">Majalah Seni</span>
+                <span className="text-[9px] text-amber-300 font-mono">-1 XP • Random</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => {
-                  const cost = 1;
-                  if (studentPoints < cost) {
-                    sounds.playClick();
-                    showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`, 3000);
-                    return;
-                  }
-                  const success = onDeductPoints ? onDeductPoints(cost, 'Baca Koran Kora') : true;
-                  if (success) {
-                    sounds.playRewardXp();
-                    setActiveLiteracyDoc('koran');
-                    setIsSitting(true);
-                    setSittingSeat('literacy_1_a');
-                    if (playerRef.current) {
-                      playerRef.current.wx = -3.72;
-                      playerRef.current.wy = 1.52;
-                      playerRef.current.targetWx = -3.72;
-                      playerRef.current.targetWy = 1.52;
-                      playerRef.current.isMoving = false;
+                  if (activeLiteracyDoc !== 'koran') {
+                    const cost = 1;
+                    if (studentPoints < cost) {
+                      sounds.playClick();
+                      showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP.`, 3000);
+                      return;
                     }
-                    showToast('🗞️ Membaca Koran Warga Kora (-1 XP)', 3000);
+                    const success = onDeductPoints ? onDeductPoints(cost, 'Baca Koran Refleksia City') : true;
+                    if (!success) return;
+                    sounds.playRewardXp();
+                    showToast('🗞️ Membaca Koran Info Terbaru Refleksia City (-1 XP)', 3000);
+                  } else {
+                    sounds.playClick();
+                  }
+                  setActiveLiteracyDoc('koran');
+                  setIsSitting(true);
+                  setSittingSeat('literacy_1_a');
+                  if (playerRef.current) {
+                    playerRef.current.wx = LITERACY_BENCHES[0].seats[0].wx;
+                    playerRef.current.wy = LITERACY_BENCHES[0].seats[0].wy;
+                    playerRef.current.targetWx = LITERACY_BENCHES[0].seats[0].wx;
+                    playerRef.current.targetWy = LITERACY_BENCHES[0].seats[0].wy;
+                    playerRef.current.isMoving = false;
                   }
                 }}
-
-                className={`p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                className={`p-2.5 sm:p-3 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center gap-1 ${
                   activeLiteracyDoc === 'koran'
-                    ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-lg'
+                    ? 'bg-emerald-600/30 border-emerald-400 text-white shadow-lg ring-2 ring-emerald-400/30'
                     : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
                 }`}
               >
-                <span className="text-2xl">🗞️</span>
-                <span className="text-xs font-extrabold">Koran Kora</span>
-                <span className="text-[9px] text-amber-300 font-mono">-1 XP</span>
+                <span className="text-xl sm:text-2xl">🗞️</span>
+                <span className="text-[11px] sm:text-xs font-extrabold">Koran Refleksia</span>
+                <span className="text-[9px] text-amber-300 font-mono">-1 XP • Info Kota</span>
               </button>
             </div>
 
             {/* Reading Display Area */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 text-xs sm:text-sm text-slate-200 leading-relaxed max-h-56 overflow-y-auto">
+            <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-3.5 sm:p-4 text-xs sm:text-sm text-slate-200 leading-relaxed overflow-y-auto flex-1 min-h-[260px]">
               {!activeLiteracyDoc ? (
-                <div className="text-center py-8 text-slate-500 italic">
-                  Silakan pilih bahan bacaan Komik, Majalah, atau Koran di atas untuk mulai membaca.
+                <div className="text-center py-12 px-4 space-y-2">
+                  <div className="text-4xl">📚🎨🗞️</div>
+                  <div className="font-bold text-slate-200 text-sm">
+                    Selamat Datang di Sudut Literasi Warga Refleksia City!
+                  </div>
+                  <p className="text-slate-400 text-xs max-w-md mx-auto">
+                    Silakan klik salah satu tombol di atas: <strong>15 Komik Rakyat</strong> (pilihan komik cerita rakyat Nusantara bergambar), <strong>Majalah Seni</strong> (edisi majalah seni visual acak bergambar), atau <strong>Koran Refleksia</strong> (kabar terbaru seputar Refleksia City).
+                  </p>
                 </div>
               ) : activeLiteracyDoc === 'komik' ? (
-                <div className="space-y-2">
-                  <div className="font-bold text-cyan-300 flex items-center gap-1.5">
-                    <span>📚</span> <span>Komik Edukasi DKV: Petualangan Warna & Cahaya</span>
-                  </div>
-                  <p className="text-slate-300 text-xs">
-                    Episode 1: Rahasia Kombinasi Warna CMYK & RGB dalam Desain Poster Interaktif. Andi dan Siti belajar bahwa harmoni warna menentukan pesan emosional sebuah karya visual yang profesional di SMKN 2 Gorontalo.
-                  </p>
-                  <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[11px] text-cyan-200 italic">
-                    "Desain yang baik adalah desain yang dapat dipahami tanpa perlu banyak penjelasan."
-                  </div>
-                </div>
+                (() => {
+                  const selectedComic = INDONESIAN_FOLKLORE_COMICS.find((c) => c.id === selectedFolkloreComicId);
+                  if (!selectedComic) {
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                          <div>
+                            <h4 className="font-black text-cyan-300 text-sm sm:text-base flex items-center gap-1.5">
+                              <span>📚</span>
+                              <span>Koleksi 15 Komik Cerita Rakyat Indonesia</span>
+                            </h4>
+                            <p className="text-[11px] text-slate-400">
+                              Pilih salah satu dari 15 komik cerita rakyat Nusantara lengkap dengan ilustrasi gambar di bawah ini:
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-500/40">
+                            15 Judul Lengkap
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          {INDONESIAN_FOLKLORE_COMICS.map((comic) => (
+                            <button
+                              key={comic.id}
+                              type="button"
+                              onClick={() => {
+                                sounds.playClick();
+                                setSelectedFolkloreComicId(comic.id);
+                              }}
+                              className="group text-left rounded-2xl bg-slate-950/90 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-400/70 overflow-hidden transition-all flex flex-col shadow-md cursor-pointer"
+                            >
+                              <div className="relative h-28 w-full overflow-hidden bg-slate-900">
+                                {renderFolkloreComicIllustration(comic.id)}
+                                <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-slate-950/85 text-cyan-300 font-mono text-[10px] font-black border border-cyan-500/40">
+                                  Komik #{comic.number}
+                                </div>
+                                <div className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md bg-slate-950/85 text-amber-300 text-[9px] font-bold border border-amber-400/30">
+                                  📍 {comic.region}
+                                </div>
+                              </div>
+                              <div className="p-2.5 flex-1 flex flex-col justify-between gap-1.5">
+                                <div>
+                                  <div className="font-extrabold text-xs text-white group-hover:text-cyan-300 transition line-clamp-1">
+                                    {comic.title}
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 line-clamp-2 mt-0.5">
+                                    {comic.summary}
+                                  </p>
+                                </div>
+                                <div className="text-[10px] font-bold text-cyan-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
+                                  <span>Baca Komik Lengkap</span>
+                                  <span>→</span>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const curIdx = INDONESIAN_FOLKLORE_COMICS.findIndex((c) => c.id === selectedComic.id);
+                  const prevComic = INDONESIAN_FOLKLORE_COMICS[(curIdx - 1 + INDONESIAN_FOLKLORE_COMICS.length) % INDONESIAN_FOLKLORE_COMICS.length];
+                  const nextComic = INDONESIAN_FOLKLORE_COMICS[(curIdx + 1) % INDONESIAN_FOLKLORE_COMICS.length];
+
+                  return (
+                    <div className="space-y-3.5 animate-fade-in">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            setSelectedFolkloreComicId(null);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          <span>Daftar 15 Komik</span>
+                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playClick();
+                              setSelectedFolkloreComicId(prevComic.id);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold cursor-pointer"
+                          >
+                            ← #{prevComic.number}
+                          </button>
+                          <span className="text-[11px] font-mono font-black px-2.5 py-1 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-500/40">
+                            Komik #{selectedComic.number} / 15
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playClick();
+                              setSelectedFolkloreComicId(nextComic.id);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold cursor-pointer"
+                          >
+                            #{nextComic.number} →
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Main Comic Cover Banner with Illustration & Speech Bubble */}
+                      <div className="rounded-2xl overflow-hidden border border-cyan-500/40 bg-slate-950 shadow-xl">
+                        <div className="relative h-44 sm:h-52 w-full">
+                          {renderFolkloreComicIllustration(selectedComic.id)}
+                          <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5">
+                            <span className="px-2.5 py-1 rounded-full bg-slate-950/90 text-cyan-300 font-mono text-[10px] font-black border border-cyan-400/50">
+                              KOMIK NUSANTARA #{selectedComic.number}
+                            </span>
+                            <span className="px-2.5 py-1 rounded-full bg-amber-500/90 text-slate-950 font-extrabold text-[10px]">
+                              📍 {selectedComic.region}
+                            </span>
+                          </div>
+                          {/* Comic Speech Bubble */}
+                          <div className="absolute bottom-3 left-3 right-3 sm:left-auto sm:max-w-md bg-white/95 text-slate-900 px-3.5 py-2 rounded-2xl shadow-lg border-2 border-slate-900">
+                            <div className="text-[11px] sm:text-xs font-black italic leading-snug">
+                              💬 {selectedComic.speechBubble}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-t border-slate-800">
+                          <h4 className="text-base sm:text-lg font-black text-white">
+                            {selectedComic.title}
+                          </h4>
+                          <p className="text-xs text-slate-300 mt-1">{selectedComic.summary}</p>
+                        </div>
+                      </div>
+
+                      {/* 4 Comic Strip Story Panels */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {selectedComic.panels.map((p) => (
+                          <div
+                            key={p.panelNo}
+                            className="p-3 rounded-2xl bg-slate-950/90 border-2 border-slate-800 flex flex-col justify-between gap-2"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 font-mono text-[10px] font-black border border-cyan-500/30">
+                                  PANEL {p.panelNo}
+                                </span>
+                                <span className="text-[11px] font-extrabold text-amber-300">
+                                  {p.caption}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-300 leading-relaxed">
+                                {p.sceneDesc}
+                              </p>
+                            </div>
+                            <div className="p-2 rounded-xl bg-slate-900 border border-slate-700/80 text-[11px] font-bold text-cyan-200 italic">
+                              💬 {p.dialogue}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Moral Value & DKV Visual Note */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/40">
+                          <div className="text-[11px] font-black text-emerald-300 uppercase tracking-wider mb-1">
+                            🌟 Pesan Moral Cerita Rakyat
+                          </div>
+                          <p className="text-xs text-emerald-100/90">{selectedComic.moralValue}</p>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-amber-950/40 border border-amber-500/40">
+                          <div className="text-[11px] font-black text-amber-300 uppercase tracking-wider mb-1">
+                            🎨 Catatan Visual & DKV
+                          </div>
+                          <p className="text-xs text-amber-100/90">{selectedComic.dkvInsight}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
               ) : activeLiteracyDoc === 'majalah' ? (
-                <div className="space-y-2">
-                  <div className="font-bold text-amber-300 flex items-center gap-1.5">
-                    <span>📰</span> <span>Majalah Seni & Desain: Tren Tipografi 2026</span>
-                  </div>
-                  <p className="text-slate-300 text-xs">
-                    Ulasan mendalam mengenai tren Serif Modern dan Sans Serif Geometris dalam branding produk digital masa kini. Siswa DKV SMKN 2 Gorontalo memamerkan karya poster pameran budaya Gorontalo.
-                  </p>
-                  <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-[11px] text-amber-200 italic">
-                    "Tipografi adalah suara visual dari sebuah pesan."
-                  </div>
-                </div>
+                (() => {
+                  const mag = ART_DESIGN_MAGAZINES[randomMagazineIndex % ART_DESIGN_MAGAZINES.length] || ART_DESIGN_MAGAZINES[0];
+                  return (
+                    <div className="space-y-3.5 animate-fade-in">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                        <div>
+                          <span className="text-[10px] font-mono font-black px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-400/40">
+                            {mag.issueNumber} • {mag.category}
+                          </span>
+                          <h4 className="text-sm sm:text-base font-black text-white mt-1">
+                            {mag.title}
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            setRandomMagazineIndex((prev) => {
+                              let next = Math.floor(Math.random() * ART_DESIGN_MAGAZINES.length);
+                              if (next === prev) next = (prev + 1) % ART_DESIGN_MAGAZINES.length;
+                              return next;
+                            });
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-md cursor-pointer"
+                        >
+                          <Shuffle className="w-3.5 h-3.5" />
+                          <span>Acak Majalah Lainnya</span>
+                        </button>
+                      </div>
+
+                      {/* Visual Magazine Cover & Spread Illustration */}
+                      <div className="rounded-2xl overflow-hidden border border-pink-500/40 bg-slate-950 shadow-xl">
+                        <div className="relative h-44 sm:h-52 w-full">
+                          {renderArtMagazineIllustration(mag.id)}
+                          <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-slate-950/85 text-pink-300 font-mono text-[10px] font-black border border-pink-400/40">
+                            MAJALAH SENI VISUAL REFLEKSIA
+                          </div>
+                          <div className="absolute bottom-3 left-3 right-3 bg-slate-950/90 backdrop-blur-sm p-3 rounded-xl border border-white/15">
+                            <div className="text-xs sm:text-sm font-black text-white">
+                              {mag.subtitle}
+                            </div>
+                            <div className="text-[10px] text-pink-300 font-semibold mt-0.5">
+                              Oleh: {mag.editorName}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Color Palette Swatches */}
+                      <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                          🎨 Palet Warna Edisi Ini (Color Swatches)
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {mag.palette.map((sw, i) => (
+                            <div key={i} className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800">
+                              <span
+                                className="w-6 h-6 rounded-lg shrink-0 border border-white/20 shadow-inner"
+                                style={{ backgroundColor: sw.hex }}
+                              />
+                              <div className="min-w-0">
+                                <div className="text-[10px] font-bold text-white truncate">{sw.name}</div>
+                                <div className="text-[9px] font-mono text-slate-400">{sw.hex}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Magazine Articles */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {mag.highlights.map((hl, i) => (
+                          <div key={i} className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                            <span className="text-[9px] font-mono font-black text-pink-400 uppercase tracking-wider">
+                              {hl.rubric}
+                            </span>
+                            <h5 className="text-xs font-extrabold text-white">{hl.heading}</h5>
+                            <p className="text-[11px] text-slate-300 leading-relaxed">{hl.body}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-pink-950/30 border border-pink-500/30 text-xs text-pink-200 italic">
+                        {mag.leadQuote}
+                      </div>
+                    </div>
+                  );
+                })()
               ) : (
-                <div className="space-y-2">
-                  <div className="font-bold text-emerald-300 flex items-center gap-1.5">
-                    <span>🗞️</span> <span>Koran Kora Warga: Berita Harian Kota Refleksia</span>
+                /* KORAN REFLEKSIA CITY: INFO TERBARU TENTANG REFLEKSIA CITY */
+                <div className="space-y-3.5 animate-fade-in">
+                  {/* Newspaper Masthead */}
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 border-2 border-emerald-500/40 text-center space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-mono text-emerald-300 border-b border-emerald-500/30 pb-1">
+                      <span>EDISI TERBARU • KOTA REFLEKSIA</span>
+                      <span>HARIAN WARGA & PELAJAR DKV</span>
+                      <span>SMKN 2 GORONTALO</span>
+                    </div>
+                    <h4 className="text-lg sm:text-xl font-black tracking-tight text-white font-serif uppercase">
+                      🗞️ SUARA REFLEKSIA CITY
+                    </h4>
+                    <p className="text-[11px] text-emerald-200 font-medium">
+                      Informasi Terkini Pembangunan Kota, Aktivitas Literasi, Renovasi Lab DKV & Pengumuman Dewan Guru
+                    </p>
                   </div>
-                  <p className="text-slate-300 text-xs">
-                    Warga kota antusias menyiram pohon rindang dan berpartisipasi aktif dalam obrolan harian antarteman. Pameran karya Tefa DKV sukses menarik perhatian dewan mentor dan guru pembimbing.
-                  </p>
-                  <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-200 italic">
-                    "Gotong royong dan literasi adalah kunci kemajuan kota kita tercinta."
+
+                  {/* Visual Newspaper Headline Illustration + Lead Story */}
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 items-center">
+                    <div className="sm:col-span-2 h-36 rounded-xl overflow-hidden border border-emerald-500/30 bg-slate-900">
+                      <svg viewBox="0 0 280 170" className="w-full h-full">
+                        <rect width="280" height="170" fill="#0f172a" />
+                        {/* City Skyline & Lab DKV Atom Icon */}
+                        <rect x="24" y="68" width="52" height="82" rx="4" fill="#1e293b" stroke="#38bdf8" strokeWidth="1.5" />
+                        <rect x="88" y="52" width="64" height="98" rx="4" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
+                        <rect x="164" y="64" width="90" height="86" rx="4" fill="#1e293b" stroke="#10b981" strokeWidth="1.5" />
+                        {/* Moving Atom symbol above Lab DKV in illustration */}
+                        <ellipse cx="120" cy="28" rx="22" ry="8" fill="none" stroke="#38bdf8" strokeWidth="1.8" transform="rotate(-25 120 28)" />
+                        <ellipse cx="120" cy="28" rx="22" ry="8" fill="none" stroke="#fde047" strokeWidth="1.8" transform="rotate(25 120 28)" />
+                        <circle cx="120" cy="28" r="4" fill="#ffffff" />
+                        <rect x="98" y="64" width="44" height="12" rx="3" fill="#090d16" stroke="#38bdf8" strokeWidth="1" />
+                        <text x="120" y="73" fill="#38bdf8" fontSize="7" fontWeight="900" textAnchor="middle">LAB DKV</text>
+                        <rect x="0" y="148" width="280" height="22" fill="#065f46" />
+                      </svg>
+                    </div>
+                    <div className="sm:col-span-3 space-y-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-black border border-emerald-500/30">
+                        BERITA UTAMA REFLEKSIA CITY
+                      </span>
+                      <h5 className="text-sm sm:text-base font-black text-white leading-snug">
+                        Wajah Baru Gedung Lab DKV Minimalis Modern dengan Ikon Logo Atom Berputar di Puncak Atap!
+                      </h5>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Pemerintah Kota Refleksia resmi merampungkan renovasi gedung <strong>Lab DKV</strong> dengan gaya arsitektur studio kreatif minimalis modern berlapis kaca tirai dan instalasi <strong>Logo Atom Bergerak</strong> di bagian atas gedung. Seluruh papan nama utama kota—mulai dari <strong>ON AIR</strong> di Studio, <strong>POS KILAT</strong>, <strong>LAB DKV</strong>, hingga <strong>POHON JURNAL</strong>—kini tampil makin presisi dan rapi.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Latest Teacher Announcement Live Feed */}
+                  <div className="p-3 rounded-2xl bg-amber-950/35 border border-amber-500/40 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                        <Megaphone className="w-3.5 h-3.5" /> Kutipan Papan Pengumuman Balai Kota Terbaru
+                      </span>
+                      <span className="text-[10px] font-mono text-amber-200/80">
+                        {teacherAnnouncements[0]?.createdAt || 'Hari Ini'}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-amber-100">
+                      “{teacherAnnouncements[0]?.content || 'Selamat datang di Kota Refleksia! Mari aktif menulis refleksi, menjaga keasrian kota, dan berlatih kuis di Lab DKV.'}”
+                    </p>
+                    <div className="text-[10px] text-amber-300/90 font-bold">
+                      — {teacherAnnouncements[0]?.teacherName || 'Dewan Guru DKV'}
+                    </div>
+                  </div>
+
+                  {/* 4 Columns of Latest Refleksia City Updates */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                      <div className="text-xs font-extrabold text-cyan-300">
+                        🌳 Sudut Literasi & Taman Rumput Samping Balai Kota
+                      </div>
+                      <p className="text-[11px] text-slate-300">
+                        Sudut Literasi Warga bersama Ibu Patra kini hadir di hamparan rumput hijau sebelah timur Balai Kota, dilengkapi bangku taman yang nyaman serta koleksi 15 Komik Cerita Rakyat Nusantara.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                      <div className="text-xs font-extrabold text-rose-300">
+                        📮 Kotak Surat Kecil di Setiap Wisma Siswa & Guru
+                      </div>
+                      <p className="text-[11px] text-slate-300">
+                        Warga kini dapat mengirimkan masukan, ide kreatif, dan saran langsung melalui Kotak Surat Kecil di depan Wisma Siswa 1–4 maupun Wisma Guru 1–2 yang otomatis tersinkron ke Google Spreadsheet. ({wismaSuggestions.length} saran tercatat).
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                      <div className="text-xs font-extrabold text-amber-300">
+                        🔥 Kehangatan Api Unggun & Bangku Taman Rumput
+                      </div>
+                      <p className="text-[11px] text-slate-300">
+                        Area Api Unggun beserta bangku kayu hangat di atas hamparan rumput barat daya menjadi titik favorit siswa untuk duduk berdiskusi santai sambil menikmati suasana sore dan malam Kota Refleksia.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                      <div className="text-xs font-extrabold text-emerald-300">
+                        📌 Pohon Beringin Jurnal & Masjid Al-Hikmah
+                      </div>
+                      <p className="text-[11px] text-slate-300">
+                        Tercatat sudah <strong>{stickyNotes.length} catatan refleksi warga</strong> tertempel di Pohon Jurnal belakang Balai Kota, sementara Masjid Al-Hikmah di hulu sungai ramai dikunjungi untuk belajar Iqro (Jilid 1–6) dan Tuntunan Sholat.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-3.5 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-400">
+                💡 Klik tab bacaan di atas untuk berpindah antara Komik, Majalah Seni, dan Koran Kota.
+              </span>
               <button
                 type="button"
                 onClick={() => setIsLiteracyModalOpen(false)}
@@ -13974,6 +15142,319 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             setStickyNotes((prev) => [newNote, ...prev]);
           }}
         />
+      )}
+
+      {/* PAPAN PENGUMUMAN GURU MODAL (Di Dekat Balai Kota - Diambil dari Data Pesan Sistem) */}
+      {isAnnouncementModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 animate-fade-in"
+          onClick={() => setIsAnnouncementModalOpen(false)}
+        >
+          <div
+            className="bg-[#121e2c] border border-amber-400/50 rounded-3xl w-full max-w-xl p-5 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9)] text-white relative overflow-hidden max-h-[88dvh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800 mb-3.5 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center border border-amber-400/40 text-xl font-black">
+                  <Megaphone className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    <span>Papan Pengumuman Balai Kota</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                      Info Resmi Guru
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Menampilkan pengumuman & arahan terbaru dari Bapak/Ibu Guru (data pesan sistem)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAnnouncementModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form Tambah Pengumuman Baru (Khusus Guru) */}
+            {isTeacher && !isGuest && (
+              <div className="mb-4 p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/35 shrink-0">
+                <div className="text-xs font-extrabold text-amber-300 mb-2 flex items-center gap-1.5">
+                  <span>✍️</span>
+                  <span>Tulis Pengumuman Guru Baru (Tersimpan ke Pesan Sistem & Spreadsheet)</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={newAnnouncementText}
+                    onChange={(e) => setNewAnnouncementText(e.target.value)}
+                    placeholder="Tulis pengumuman untuk seluruh warga siswa DKV..."
+                    maxLength={260}
+                    className="flex-1 bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={isPostingAnnouncement || !newAnnouncementText.trim()}
+                    onClick={async () => {
+                      if (!newAnnouncementText.trim()) return;
+                      setIsPostingAnnouncement(true);
+                      try {
+                        await StorageService.postTeacherAnnouncement({
+                          teacherId: studentId || 'teacher-dkv',
+                          teacherName: studentName || 'Guru DKV',
+                          subject: 'Pengumuman Guru DKV',
+                          content: newAnnouncementText.trim(),
+                        });
+                        setNewAnnouncementText('');
+                        setTeacherAnnouncements(StorageService.getTeacherAnnouncements());
+                        sounds.playRewardXp();
+                        showToast('📢 Pengumuman Guru berhasil ditempel di Papan Pengumuman Balai Kota!', 3200);
+                      } finally {
+                        setIsPostingAnnouncement(false);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isPostingAnnouncement ? 'Menempel...' : 'Tempel Pengumuman'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Daftar Pengumuman Guru dari Data Pesan Sistem */}
+            <div className="space-y-2.5 overflow-y-auto pr-1 flex-1">
+              {teacherAnnouncements.map((ann, idx) => (
+                <div
+                  key={ann.id}
+                  className={`p-3.5 rounded-2xl border transition ${
+                    idx === 0
+                      ? 'bg-gradient-to-br from-amber-950/45 via-slate-900/95 to-slate-900 border-amber-400/50 shadow-md'
+                      : 'bg-slate-900/85 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-7 h-7 rounded-xl bg-amber-500/20 border border-amber-400/35 flex items-center justify-center text-sm shrink-0">
+                        {ann.priority === 'misi' ? '🎯' : ann.priority === 'penting' ? '📢' : '👨‍🏫'}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-extrabold text-amber-300 truncate">
+                            {ann.teacherName}
+                          </span>
+                          {idx === 0 && (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500 text-slate-950">
+                              TERBARU
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {ann.subject || 'Dewan Guru SMKN 2 Gorontalo'}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-lg border border-slate-700/60 shrink-0">
+                      {ann.createdAt}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-100 leading-relaxed pl-9">
+                    {ann.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between shrink-0">
+              <span className="text-[10px] text-slate-400">
+                📌 Sumber: Data Pesan Sistem & Arahan Guru Kota Refleksia
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsAnnouncementModalOpen(false)}
+                className="py-2 px-5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-md transition cursor-pointer"
+              >
+                Tutup Papan Pengumuman
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KOTAK SURAT KECIL MASUKAN & SARAN MODAL (Di Setiap Wisma Siswa & Rumah Dinas Guru - Tersimpan di Google Spreadsheet) */}
+      {activeWismaMailbox && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 animate-fade-in"
+          onClick={() => setActiveWismaMailbox(null)}
+        >
+          <div
+            className="bg-[#121e2c] border border-sky-400/50 rounded-3xl w-full max-w-xl p-5 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9)] text-white relative overflow-hidden max-h-[88dvh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800 mb-3.5 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-sky-500/20 text-sky-300 flex items-center justify-center border border-sky-400/40 text-xl font-black">
+                  <Mail className="w-5 h-5 text-sky-400" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2 flex-wrap">
+                    <span>📮 Kotak Surat Kecil • {activeWismaMailbox.name}</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Kotak masukan & saran Siswa/Guru • Otomatis tersimpan ke Google Spreadsheet
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveWismaMailbox(null)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Pilihan Cepat Pindah Kotak Surat Antar-Wisma */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 shrink-0">
+              {HOUSING_UNITS.map((unit) => (
+                <button
+                  key={unit.id}
+                  type="button"
+                  onClick={() => setActiveWismaMailbox(unit)}
+                  className={`px-2.5 py-1 rounded-xl text-[10.5px] font-bold border whitespace-nowrap transition cursor-pointer ${
+                    activeWismaMailbox.id === unit.id
+                      ? 'bg-sky-600/35 border-sky-400 text-white shadow'
+                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📮 {unit.shortBadge}
+                </button>
+              ))}
+            </div>
+
+            {/* Form Input Masukan & Saran Siswa / Guru */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 mb-3.5 shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                <span className="text-xs font-extrabold text-sky-300">
+                  ✍️ Kirim Masukan & Saran dari {isTeacher ? 'Guru' : 'Siswa'} ({studentName})
+                </span>
+                <select
+                  value={suggestionCategory}
+                  onChange={(e) => setSuggestionCategory(e.target.value as WismaSuggestion['category'])}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] font-bold text-amber-300 outline-none cursor-pointer"
+                >
+                  <option value="Pembelajaran & Materi">📚 Pembelajaran & Materi</option>
+                  <option value="Fasilitas Sekolah & Lab">🖥️ Fasilitas Sekolah & Lab</option>
+                  <option value="Fitur Kota Refleksia">🏛️ Fitur Kota Refleksia</option>
+                  <option value="Ide & Apresiasi">💡 Ide & Apresiasi</option>
+                </select>
+              </div>
+
+              <textarea
+                value={suggestionText}
+                onChange={(e) => setSuggestionText(e.target.value)}
+                rows={3}
+                maxLength={350}
+                placeholder={`Tulis masukan, ide, atau saran konstruktif di Kotak Surat ${activeWismaMailbox.name}...`}
+                className="w-full bg-slate-950/90 border border-slate-700/80 focus:border-sky-400 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none resize-none"
+              />
+
+              <div className="mt-2.5 flex items-center justify-between gap-2">
+                <span className="text-[10px] text-emerald-300/90 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Tersinkron ke Sheet Kotak_Saran_Wisma & Pesan_Guru di Spreadsheet</span>
+                </span>
+                <button
+                  type="button"
+                  disabled={isSubmittingSuggestion || !suggestionText.trim() || isGuest}
+                  onClick={async () => {
+                    if (!suggestionText.trim()) return;
+                    if (isGuest) {
+                      showToast('📸 Mode Tamu hanya melihat-lihat (View Only).', 3000);
+                      return;
+                    }
+                    setIsSubmittingSuggestion(true);
+                    try {
+                      const nowStr = new Date().toLocaleString('id-ID', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      });
+                      const newSug: WismaSuggestion = {
+                        id: `wsug-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+                        wismaId: activeWismaMailbox.id,
+                        wismaName: activeWismaMailbox.name,
+                        senderId: studentId || 'warga-dkv',
+                        senderName: studentName || 'Warga Refleksia',
+                        senderRole: isTeacher ? 'guru' : 'siswa',
+                        className: isTeacher ? 'Guru DKV' : 'Siswa DKV',
+                        category: suggestionCategory,
+                        content: suggestionText.trim(),
+                        createdAt: nowStr,
+                        timestamp: Date.now(),
+                      };
+                      await StorageService.saveWismaSuggestion(newSug);
+                      setWismaSuggestions(StorageService.getWismaSuggestions());
+                      setSuggestionText('');
+                      sounds.playRewardXp();
+                      if (onAddXp) {
+                        onAddXp(1, `Masukan Kotak Surat ${activeWismaMailbox.shortBadge}`);
+                      }
+                      showToast(
+                        `📮 Masukan & saran di ${activeWismaMailbox.name} terkirim ke Google Spreadsheet! (+1 XP)`,
+                        3600
+                      );
+                    } finally {
+                      setIsSubmittingSuggestion(false);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md transition cursor-pointer flex items-center gap-1.5 shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSubmittingSuggestion ? 'Mengirim...' : 'Kirim ke Spreadsheet (+1 XP)'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Riwayat Masukan & Saran Terbaru */}
+            <div className="text-[11px] font-bold text-slate-300 mb-2 flex items-center justify-between shrink-0">
+              <span>📬 Daftar Masukan & Saran Warga ({wismaSuggestions.length})</span>
+              <span className="text-[10px] text-sky-300 font-normal">Semua Wisma & Rumah Dinas</span>
+            </div>
+            <div className="space-y-2 overflow-y-auto pr-1 flex-1">
+              {wismaSuggestions.map((sug) => (
+                <div
+                  key={sug.id}
+                  className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/90 flex flex-col gap-1"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-400/30">
+                        {sug.wismaName}
+                      </span>
+                      <span className="text-xs font-extrabold text-white">{sug.senderName}</span>
+                      <span
+                        className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
+                          sug.senderRole === 'guru'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                        }`}
+                      >
+                        {sug.senderRole === 'guru' ? '👨‍🏫 Guru' : '🎒 Siswa'}
+                      </span>
+                      <span className="text-[9.5px] text-amber-200/90 bg-slate-800 px-1.5 py-0.5 rounded">
+                        {sug.category}
+                      </span>
+                    </div>
+                    <span className="text-[9.5px] font-mono text-slate-400 shrink-0">{sug.createdAt}</span>
+                  </div>
+                  <p className="text-xs text-slate-200 leading-relaxed mt-0.5">{sug.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ============================================================= */}
