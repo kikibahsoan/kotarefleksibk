@@ -132,3 +132,23 @@ Peningkatan fitur interaktif dan visual pada Kota Refleksia SMK Negeri 2 Goronta
   - Cuaca berganti secara acak otomatis setiap ~95 detik dengan notifikasi pop-up elegan.
   - Terdapat tombol pil cuaca interaktif di header atas (`bg-[#121e2c]/68 backdrop-blur-md`) dengan menu dropdown untuk memilih cuaca secara langsung atau menyalakan/mematikan pergantian otomatis (`Otomatis: ON/OFF`).
 
+---
+
+## 6. Ekosistem & Lanskap Alam Baru (Selesai Dikerjakan)
+- [x] **Gradasi Warna Tanah Maps & Kaki Gunung**:
+  - Interpolasi warna petak rumput utara (`gy <= -9.5`) secara bertahap menuju tanah lembap dan batuan kaki gunung (`#274426` / `#122316`).
+  - Apron kaki bukit menggunakan *multi-stop isometric linear gradient* (4 perhentian warna) dan batuan lereng (*scree boulders*) sehingga transisi gunung dan tanah menyatu alami tanpa pembatas kaku.
+- [x] **Perahu Kayu Tradisional & Pencari Ikan di Danau**:
+  - Sampan kayu jati tradisional mengapung di danau dengan fisika goyangan air (*bobbing* dan riak melingkar).
+  - Dilengkapi lentera kuningan haluan, dayung kayu, keranjang ikan anyaman, serta nelayan berpakaian indigo mengenakan caping bambu.
+  - Memegang joran bambu melengkung dengan senar pancing halus dan pelampung dwi-warna merah-putih yang berkedut saat ada tarikan ikan.
+- [x] **Burung Bangau & Ikan di Sungai**:
+  - Kawanan ikan air tawar (emas, perak, sian) berenang menyusuri aliran sungai dengan kibasan ekor dinamis dan kilau sisik.
+  - Burung bangau putih (*Ardea alba*) dengan siklus 20 detik: singgah di bebatuan dangkal mematuk ikan, kepakan sayap lepas landas menanjak, terbang melayang anggun menyusuri sungai, serta menukik mendarat kembali.
+- [x] **Satwa di Hutan Belantara**:
+  - 2 Rusa dewasa: Rusa jantan dewasa dengan tanduk bercabang megah (*stag*) dan rusa betina merumput tenang (*doe*).
+  - Tupai hutan berekor lebat melengkung yang duduk memakan biji pohon ek.
+  - Kelinci hutan (*cottontail*) dengan telinga panjang tegak yang melompat dan menggoyangkan hidung.
+  - Burung hutan yang berjalan acak (*ground bird*) di bawah pepohonan dengan langkah kaki bergantian dan anggukan kepala khas saat mematuk biji-bijian.
+
+
