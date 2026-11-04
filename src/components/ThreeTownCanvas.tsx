@@ -295,7 +295,6 @@ export const WILDERNESS_TREES_LIST: WildernessTreeDef[] = [
   { wx: 2.05, wy: -12.02, alt: 24, scale: 1.04, kind: 'pine', shade: 0 },
 
   // B. Pohon Beringin Raksasa Hutan Belantara (Giant Ancient Banyan Trees with Aerial Roots & Wide Canopies)
-  { wx: -6.65, wy: -10.65, alt: 0, scale: 1.32, kind: 'banyan', shade: 0 },
   { wx: -4.15, wy: -10.85, alt: 0, scale: 1.38, kind: 'banyan', shade: 1 },
   { wx: -1.75, wy: -10.70, alt: 0, scale: 1.34, kind: 'banyan', shade: 2 },
   { wx: 0.55, wy: -10.80, alt: 0, scale: 1.30, kind: 'banyan', shade: 0 },
@@ -306,8 +305,6 @@ export const WILDERNESS_TREES_LIST: WildernessTreeDef[] = [
 
   // C. Hutan Belantara Lebat Lembah Utara (Dense Multi-Layered Canopy & Pine Woodland, wy: -11.55 .. -7.55)
   { wx: -7.75, wy: -11.45, alt: 0, scale: 1.20, kind: 'pine', shade: 0 },
-  { wx: -7.05, wy: -11.35, alt: 0, scale: 1.22, kind: 'canopy', shade: 2 },
-  { wx: -6.15, wy: -11.48, alt: 0, scale: 1.26, kind: 'canopy', shade: 1 },
   { wx: -5.35, wy: -11.38, alt: 0, scale: 1.18, kind: 'pine', shade: 0 },
   { wx: -4.65, wy: -11.45, alt: 0, scale: 1.22, kind: 'canopy', shade: 2 },
   { wx: -3.55, wy: -11.42, alt: 0, scale: 1.24, kind: 'pine', shade: 0 },
@@ -319,7 +316,6 @@ export const WILDERNESS_TREES_LIST: WildernessTreeDef[] = [
   { wx: 1.55, wy: -11.32, alt: 0, scale: 1.16, kind: 'pine', shade: 0 },
 
   { wx: -7.65, wy: -10.35, alt: 0, scale: 1.24, kind: 'canopy', shade: 1 },
-  { wx: -5.85, wy: -10.42, alt: 0, scale: 1.20, kind: 'pine', shade: 0 },
   { wx: -4.95, wy: -10.25, alt: 0, scale: 1.26, kind: 'canopy', shade: 2 },
   { wx: -3.35, wy: -10.38, alt: 0, scale: 1.18, kind: 'pine', shade: 1 },
   { wx: -2.35, wy: -10.15, alt: 0, scale: 1.22, kind: 'canopy', shade: 0 },
@@ -508,6 +504,40 @@ export const WILDERNESS_FENCE_WY = -7.62;
 export const WILDERNESS_FENCE_MIN_WX = -8.15;
 export const WILDERNESS_FENCE_MAX_WX = 6.82;
 export const WILDERNESS_GATE_HALF_W = 0.56;
+
+// Rumah Pohon di Atas Pohon Beringin Raksasa (Ujung Kiri Hutan Kaki Gunung)
+export const BANYAN_TREEHOUSE_COORDS = { wx: -6.78, wy: -10.95 };
+export const BANYAN_BRANCH_FOOT_COORDS = { wx: -5.52, wy: -10.12 };
+export const BANYAN_TREEHOUSE_ALT = 38;
+
+export const getBanyanTreehouseElevation = (
+  wx: number,
+  wy: number
+): { elevation: number; progress: number; onBranchOrDeck: boolean } => {
+  const dx = BANYAN_TREEHOUSE_COORDS.wx - BANYAN_BRANCH_FOOT_COORDS.wx;
+  const dy = BANYAN_TREEHOUSE_COORDS.wy - BANYAN_BRANCH_FOOT_COORDS.wy;
+  const lenSq = dx * dx + dy * dy;
+  const rawT = ((wx - BANYAN_BRANCH_FOOT_COORDS.wx) * dx + (wy - BANYAN_BRANCH_FOOT_COORDS.wy) * dy) / lenSq;
+  const t = Math.max(0, Math.min(1, rawT));
+  const projX = BANYAN_BRANCH_FOOT_COORDS.wx + t * dx;
+  const projY = BANYAN_BRANCH_FOOT_COORDS.wy + t * dy;
+  const perpDist = Math.hypot(wx - projX, wy - projY);
+  const deckDist = Math.hypot(wx - BANYAN_TREEHOUSE_COORDS.wx, wy - BANYAN_TREEHOUSE_COORDS.wy);
+
+  if (deckDist < 0.52) {
+    return { elevation: BANYAN_TREEHOUSE_ALT, progress: 1, onBranchOrDeck: true };
+  }
+  if (perpDist < 0.48 && rawT >= -0.08 && rawT <= 1.12) {
+    const smoothT = t * t * (3 - 2 * t);
+    const arch = Math.sin(t * Math.PI) * 2.4;
+    return {
+      elevation: smoothT * BANYAN_TREEHOUSE_ALT + arch,
+      progress: t,
+      onBranchOrDeck: t > 0.03,
+    };
+  }
+  return { elevation: 0, progress: 0, onBranchOrDeck: false };
+};
 
 export const isSolidCollision = (
   wx: number,
@@ -1646,7 +1676,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     };
   }, []);
 
-  // Nearby interaction (tree watering/apple harvesting, dry leaf pickup, fishing spot, literacy corner, bench, town rules board, beringin tree journal, announcement board, or wisma mailbox)
+  // Rumah Pohon Beringin (Ujung Kiri Hutan Kaki Gunung) state & climbing stage ref
+  const [isTreehouseModalOpen, setIsTreehouseModalOpen] = useState(false);
+  const [selectedTreehouseTab, setSelectedTreehouseTab] = useState<'panorama' | 'ekologi' | 'istirahat'>('panorama');
+  const treehouseClimbStageRef = useRef<'to_foot' | 'climbing_up' | 'climbing_down' | null>(null);
+  const afterClimbDownTargetRef = useRef<{ wx: number; wy: number; isRun: boolean } | null>(null);
+
+  // Nearby interaction (tree watering/apple harvesting, dry leaf pickup, fishing spot, literacy corner, bench, town rules board, beringin tree journal, announcement board, wisma mailbox, or banyan treehouse)
   const [nearbyAction, setNearbyAction] = useState<{
     type:
       | 'tree'
@@ -1657,13 +1693,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       | 'town_rules'
       | 'beringin'
       | 'announcement_board'
-      | 'wisma_mailbox';
+      | 'wisma_mailbox'
+      | 'treehouse';
     treeIndex?: number;
     leafId?: number;
     benchId?: BenchId;
     benchName?: string;
     wismaId?: HousingUnitDef['id'];
     wismaName?: string;
+    isUpInTreehouse?: boolean;
   } | null>(null);
   const nearbyActionRef = useRef<{
     type:
@@ -1675,13 +1713,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       | 'town_rules'
       | 'beringin'
       | 'announcement_board'
-      | 'wisma_mailbox';
+      | 'wisma_mailbox'
+      | 'treehouse';
     treeIndex?: number;
     leafId?: number;
     benchId?: BenchId;
     benchName?: string;
     wismaId?: HousingUnitDef['id'];
     wismaName?: string;
+    isUpInTreehouse?: boolean;
   } | null>(null);
   nearbyActionRef.current = nearbyAction;
 
@@ -1698,15 +1738,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | 'town_rules'
         | 'beringin'
         | 'announcement_board'
-        | 'wisma_mailbox';
+        | 'wisma_mailbox'
+        | 'treehouse';
       treeIndex?: number;
       leafId?: number;
       benchId?: BenchId;
       wismaId?: string;
+      isUpInTreehouse?: boolean;
     } | null
   ): string | null => {
     if (!act) return null;
-    return `${act.type}:${act.treeIndex ?? ''}:${act.leafId ?? ''}:${act.benchId ?? ''}:${act.wismaId ?? ''}`;
+    return `${act.type}:${act.treeIndex ?? ''}:${act.leafId ?? ''}:${act.benchId ?? ''}:${act.wismaId ?? ''}:${act.isUpInTreehouse ? 'up' : 'ground'}`;
   };
   const dismissedNearbySignatureRef = useRef<string | null>(null);
 
@@ -2687,36 +2729,36 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       speechTimer: 5.5,
     };
 
-    // 5. Penjaga Gerbang Hutan Belantara & Danau Pusat (@tomi) - Menjaga pintu masuk di jalan belakang Pohon Refleksi (Khusus Guru)
+    // 5. Ahli Tanaman & Penjaga Gerbang Hutan Refleksia (@Sufri) - Berjaga di sisi KIRI pintu gerbang hutan (Khusus Guru)
     const tomi: AvatarData = {
-      id: 'tomi',
+      id: 'sufri',
       role: 'penjaga_kolam',
-      handle: 'tomi',
-      name: 'Tomi',
-      roleLabel: 'Penjaga Gerbang Hutan & Danau',
-      wx: 0.72,
+      handle: 'Sufri',
+      name: 'Pak Sufri',
+      roleLabel: 'Ahli Tanaman & Penjaga Hutan',
+      wx: -0.76,
       wy: -7.32,
-      targetWx: 0.72,
+      targetWx: -0.76,
       targetWy: -7.32,
-      anchorX: 0.72,
+      anchorX: -0.76,
       anchorY: -7.32,
       wanderRadius: 0,
       speed: 0,
-      shirtColor: '#0d9488',
-      pantsColor: '#334155',
-      hairColor: '#0f172a',
+      shirtColor: '#4d7c0f',
+      pantsColor: '#451a03',
+      hairColor: '#cbd5e1',
       gender: 'L',
       isMoving: false,
       pauseTimer: 2.5,
       walkFrame: 0,
-      facing: 'down-left',
+      facing: 'down-right',
       speeches: [
-        'Jalur belakang Pohon Refleksi menuju Hutan & Danau khusus Guru! 👨‍🏫🔒',
-        'Halo Bapak/Ibu Guru, silakan masuk lewat gerbang ini! 🌲✨',
-        'Area Hutan Belantara & Danau Pusat dijaga ketat khusus Guru! 🛡️',
-        'Siswa silakan menulis jurnal di Pohon Refleksi di depan ya! 🌳📖',
+        'Bibit tanaman langka di Hutan Refleksia tumbuh subur! 🌱🔍',
+        'Silakan masuk Bapak/Ibu Guru, mari amati flora Hutan Refleksia! 🌿👨‍🏫',
+        'Maaf Nak, area konservasi Hutan Refleksia khusus Guru ya! 🔒🌳',
+        'Jangan lupa menyiram pohon di kota agar berbuah apel segar! 🍎💧',
       ],
-      speechText: 'Jalur masuk Hutan & Danau ini khusus Guru ya! 👨‍🏫🔒',
+      speechText: 'Bibit tanaman langka di Hutan Refleksia tumbuh subur! 🌱🔍',
       speechTimer: 5.5,
     };
 
@@ -2989,6 +3031,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         flapSpeed: 5.7,
         phase: 3.8,
       },
+      {
+        id: 8,
+        mode: 'world',
+        x: 0,
+        y: 0,
+        vx: 0,
+        vyWave: 0,
+        centerWx: -3.45,
+        centerWy: -9.85, // Berputar-putar di atas Hutan Refleksia (Hutan Belantara)
+        orbitRx: 2.15,
+        orbitRy: 1.35,
+        angle: 1.1,
+        angularSpeed: 0.36,
+        altitude: 72,
+        wingSpan: 4.5,
+        flapSpeed: 4.6,
+        phase: 1.4,
+      },
     ];
 
     // Occasional Airplane Contrail in Sky Background (Random Timing)
@@ -3079,8 +3139,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           clickedNpc.speechText = clickedNpc.speeches[sIdx];
           clickedNpc.speechTimer = 5.0;
         }
-        if (clickedNpc.id === 'tomi' && !isTeacher) {
-          showToast('🔒 Gerbang Hutan & Danau dijaga ketat oleh @tomi khusus Guru!', 3200);
+        if ((clickedNpc.id === 'sufri' || clickedNpc.role === 'penjaga_kolam') && !isTeacher) {
+          showToast('🔒 Gerbang Hutan Refleksia dijaga oleh @Sufri (Ahli Tanaman) khusus Guru!', 3200);
         }
         return;
       }
@@ -3192,8 +3252,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       const canAccessWilderness = Boolean(isPlayerTeacher || isMasterKikyRef.current);
 
-      // 1f. Check Click directly on @tomi or Gerbang Hutan Refleksia [wx: -0.65..1.05, wy: -7.95..-7.05]
-      if (Math.hypot(wx - 0.25, wy - -7.48) < 1.05) {
+      // 1f. Check Click directly on @Sufri (gerbang kiri [-0.76, -7.32]) or Gerbang Hutan Refleksia [wx: -1.15..0.85, wy: -7.95..-7.05]
+      if (Math.hypot(wx - -0.25, wy - -7.45) < 1.15 || Math.hypot(wx - tomi.wx, wy - tomi.wy) < 0.85) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3205,15 +3265,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
         if (canAccessWilderness) {
-          tomi.speechText = 'Silakan masuk Bapak/Ibu Guru! Gerbang Hutan Refleksia terbuka 🌲🔓';
+          tomi.speechText = 'Silakan masuk Bapak/Ibu Guru! Mari amati flora di Hutan Refleksia 🌱🔓';
           tomi.speechTimer = 6.0;
           player.targetWx = 0.0;
           player.targetWy = player.wy > WILDERNESS_FENCE_WY ? -8.35 : -6.85;
         } else {
-          tomi.speechText = '⛔ Maaf, area Hutan Refleksia & Sungai Refleksia hanya untuk Guru! 👨‍🏫🔒';
+          tomi.speechText = '⛔ Maaf Nak, area konservasi Hutan Refleksia khusus untuk Guru! 🌱🔒';
           tomi.speechTimer = 6.5;
           playerSpeechRef.current = {
-            text: '🔒 Area Hutan Refleksia khusus Guru (dijaga @tomi)',
+            text: '🔒 Area Hutan Refleksia khusus Guru (dijaga @Sufri)',
             expiresAt: Date.now() + 4500,
           };
           player.targetWx = 0.0;
@@ -3241,10 +3301,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
         if (!canAccessWilderness) {
-          tomi.speechText = '⛔ Maaf, area Hutan Refleksia & Sungai Refleksia hanya untuk Guru! 👨‍🏫🔒';
+          tomi.speechText = '⛔ Maaf Nak, area Hutan Refleksia & Sungai Refleksia khusus Guru! 🌱🔒';
           tomi.speechTimer = 6.5;
           playerSpeechRef.current = {
-            text: '🔒 Hanya Guru yang bisa masuk ke Hutan Refleksia lewat gerbang @tomi!',
+            text: '🔒 Hanya Guru yang bisa masuk ke Hutan Refleksia lewat gerbang @Sufri!',
             expiresAt: Date.now() + 4500,
           };
           player.targetWx = 0.0;
@@ -3466,6 +3526,65 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
+      // 5b. Check Click on Rumah Pohon Beringin atau Ranting Pohon Beringin di Ujung Kiri Hutan Kaki Gunung
+      const distToTreehouseDeck = Math.hypot(wx - BANYAN_TREEHOUSE_COORDS.wx, wy - BANYAN_TREEHOUSE_COORDS.wy);
+      const distToBranchFoot = Math.hypot(wx - BANYAN_BRANCH_FOOT_COORDS.wx, wy - BANYAN_BRANCH_FOOT_COORDS.wy);
+      const clickBranchInfo = getBanyanTreehouseElevation(wx, wy);
+      if (distToTreehouseDeck < 1.35 || distToBranchFoot < 0.95 || clickBranchInfo.onBranchOrDeck) {
+        sounds.playClick();
+        if (isSittingRef.current) {
+          setIsSitting(false);
+          setSittingSeat(null);
+        }
+        pendingSeatRef.current = null;
+        if (!canAccessWilderness) {
+          player.targetWx = 0.0;
+          player.targetWy = -7.08;
+          player.isMoving = Math.hypot(player.wx - 0.0, player.wy - -7.08) > 0.08;
+          tomi.speechText = '⛔ Maaf Nak, Rumah Pohon di Hutan Refleksia khusus Guru! 🌱🔒';
+          tomi.speechTimer = 6.5;
+          playerSpeechRef.current = {
+            text: '🔒 Hanya Guru yang bisa naik ke Rumah Pohon Hutan Refleksia!',
+            expiresAt: Date.now() + 4500,
+          };
+          clickRippleRef.current = { wx: 0.0, wy: -7.08, time: performance.now(), isRun };
+          return;
+        }
+        const playerBranchState = getBanyanTreehouseElevation(player.wx, player.wy);
+        if (playerBranchState.progress > 0.72 && distToBranchFoot < 0.95) {
+          // Clicking the foot of the branch while up in the treehouse climbs down the branch
+          treehouseClimbStageRef.current = 'climbing_down';
+          afterClimbDownTargetRef.current = null;
+          player.targetWx = BANYAN_BRANCH_FOOT_COORDS.wx;
+          player.targetWy = BANYAN_BRANCH_FOOT_COORDS.wy;
+        } else if (
+          Math.hypot(player.wx - BANYAN_BRANCH_FOOT_COORDS.wx, player.wy - BANYAN_BRANCH_FOOT_COORDS.wy) < 0.55 ||
+          playerBranchState.onBranchOrDeck
+        ) {
+          // Already at the base of the banyan branch or on the branch -> climb directly up the branch!
+          treehouseClimbStageRef.current = 'climbing_up';
+          player.targetWx = BANYAN_TREEHOUSE_COORDS.wx;
+          player.targetWy = BANYAN_TREEHOUSE_COORDS.wy;
+          playerSpeechRef.current = {
+            text: '🌿 Naik melewati ranting pohon beringin ke Rumah Pohon...',
+            expiresAt: Date.now() + 3500,
+          };
+        } else {
+          // Walk to the base of the banyan branch first, then climb up the branch
+          treehouseClimbStageRef.current = 'to_foot';
+          player.targetWx = BANYAN_BRANCH_FOOT_COORDS.wx;
+          player.targetWy = BANYAN_BRANCH_FOOT_COORDS.wy;
+        }
+        player.isMoving = Math.hypot(player.wx - player.targetWx, player.wy - player.targetWy) > 0.05;
+        if (player.isMoving) {
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.15 : 0.85;
+        }
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
+        dismissedNearbySignatureRef.current = null;
+        return;
+      }
+
       // 6. Click on ground anywhere across the entire map (except pembatas, gunung, danau, sungai, air mancur)
       sounds.playClick();
       if (isSittingRef.current) {
@@ -3477,14 +3596,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       let targetY = Math.max(-11.75, Math.min(8.0, wy));
 
       // Jika bukan Guru dan mengklik area Hutan Refleksia / Sungai Refleksia di balik pagar (wy < -7.45),
-      // arahkan ke depan pintu gerbang yang dijaga @tomi di jalan belakang Pohon Refleksi
+      // arahkan ke depan pintu gerbang yang dijaga @Sufri di sebelah kiri gerbang
       if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.22) {
         targetX = 0.0;
         targetY = -7.08;
-        tomi.speechText = '⛔ Maaf, area Hutan Refleksia & Sungai Refleksia hanya untuk Guru! 👨‍🏫🔒';
+        tomi.speechText = '⛔ Maaf Nak, area konservasi Hutan Refleksia khusus Guru! 🌱🔒';
         tomi.speechTimer = 6.5;
         playerSpeechRef.current = {
-          text: '🔒 Hanya Guru yang bisa masuk lewat gerbang @tomi di belakang Pohon Refleksi!',
+          text: '🔒 Hanya Guru yang bisa masuk lewat gerbang @Sufri!',
           expiresAt: Date.now() + 4500,
         };
       }
@@ -3509,6 +3628,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         const d = Math.hypot(dirX, dirY) || 1;
         targetX += (dirX / d) * 0.45;
         targetY += (dirY / d) * 0.45;
+      }
+
+      // If currently perched in the Rumah Pohon or on its branch, climb down the banyan branch first before walking away!
+      const currentBranchState = getBanyanTreehouseElevation(player.wx, player.wy);
+      if (currentBranchState.onBranchOrDeck && currentBranchState.progress > 0.15) {
+        treehouseClimbStageRef.current = 'climbing_down';
+        afterClimbDownTargetRef.current = { wx: targetX, wy: targetY, isRun };
+        player.targetWx = BANYAN_BRANCH_FOOT_COORDS.wx;
+        player.targetWy = BANYAN_BRANCH_FOOT_COORDS.wy;
+        player.isMoving = true;
+        player.isRunning = false;
+        player.speed = 0.85;
+        clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now(), isRun };
+        return;
+      } else {
+        treehouseClimbStageRef.current = null;
+        afterClimbDownTargetRef.current = null;
       }
       clickRippleRef.current = { wx: targetX, wy: targetY, time: performance.now(), isRun };
       player.targetWx = targetX;
@@ -3927,6 +4063,59 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               setNearbyAction({ type: 'tree', treeIndex: envAct.treeIndex });
             }
             sendHeartbeatRef.current?.();
+          } else if (treehouseClimbStageRef.current === 'to_foot') {
+            // Reached the foot of the banyan branch -> now automatically climb up the branch to the Rumah Pohon!
+            treehouseClimbStageRef.current = 'climbing_up';
+            player.wx = BANYAN_BRANCH_FOOT_COORDS.wx;
+            player.wy = BANYAN_BRANCH_FOOT_COORDS.wy;
+            player.targetWx = BANYAN_TREEHOUSE_COORDS.wx;
+            player.targetWy = BANYAN_TREEHOUSE_COORDS.wy;
+            player.isMoving = true;
+            player.isRunning = false;
+            player.speed = 0.78;
+            player.facing = 'up-left';
+            playerSpeechRef.current = {
+              text: '🌿 Meniti ranting pohon beringin naik ke Rumah Pohon...',
+              expiresAt: Date.now() + 3500,
+            };
+            sendHeartbeatRef.current?.();
+          } else if (treehouseClimbStageRef.current === 'climbing_up') {
+            treehouseClimbStageRef.current = null;
+            player.wx = BANYAN_TREEHOUSE_COORDS.wx;
+            player.wy = BANYAN_TREEHOUSE_COORDS.wy;
+            player.targetWx = BANYAN_TREEHOUSE_COORDS.wx;
+            player.targetWy = BANYAN_TREEHOUSE_COORDS.wy;
+            player.isMoving = false;
+            player.isRunning = false;
+            player.speed = 0.88;
+            player.walkFrame = 0;
+            player.facing = 'down-right';
+            dismissedNearbySignatureRef.current = null;
+            sounds.playClick();
+            sendHeartbeatRef.current?.();
+          } else if (treehouseClimbStageRef.current === 'climbing_down') {
+            treehouseClimbStageRef.current = null;
+            player.wx = BANYAN_BRANCH_FOOT_COORDS.wx;
+            player.wy = BANYAN_BRANCH_FOOT_COORDS.wy;
+            if (afterClimbDownTargetRef.current) {
+              const nextDest = afterClimbDownTargetRef.current;
+              afterClimbDownTargetRef.current = null;
+              player.targetWx = nextDest.wx;
+              player.targetWy = nextDest.wy;
+              player.isMoving = Math.hypot(player.wx - nextDest.wx, player.wy - nextDest.wy) > 0.06;
+              player.isRunning = nextDest.isRun;
+              player.speed = nextDest.isRun ? 1.28 : 0.88;
+            } else {
+              player.targetWx = BANYAN_BRANCH_FOOT_COORDS.wx;
+              player.targetWy = BANYAN_BRANCH_FOOT_COORDS.wy;
+              player.isMoving = false;
+              player.isRunning = false;
+              player.speed = 0.88;
+              player.walkFrame = 0;
+              player.facing = 'down-right';
+            }
+            dismissedNearbySignatureRef.current = null;
+            sendHeartbeatRef.current?.();
           } else {
             player.isMoving = false;
             player.isRunning = false;
@@ -3988,8 +4177,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             setPendingConfirmation({
               type: 'cafe',
               id: 'cafe',
-              name: 'Toko Roti & Kafe Warga',
-              tagline: 'Kopi hangat, roti lezat & eskrim menyegarkan',
+              name: 'Lapak Refleksia',
+              tagline: 'Kuliner warga, kopi hangat, roti artisan & eskrim segar',
               icon: '☕',
             });
           }
@@ -4098,14 +4287,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           | 'town_rules'
           | 'beringin'
           | 'announcement_board'
-          | 'wisma_mailbox';
+          | 'wisma_mailbox'
+          | 'treehouse';
         treeIndex?: number;
         leafId?: number;
         benchId?: BenchId;
         benchName?: string;
         wismaId?: HousingUnitDef['id'];
         wismaName?: string;
+        isUpInTreehouse?: boolean;
       } | null = null;
+
+      const treehouseElevInfo = getBanyanTreehouseElevation(player.wx, player.wy);
+      const distToTreehouseFoot = Math.hypot(
+        player.wx - BANYAN_BRANCH_FOOT_COORDS.wx,
+        player.wy - BANYAN_BRANCH_FOOT_COORDS.wy
+      );
+      const distToTreehouseTrunk = Math.hypot(
+        player.wx - BANYAN_TREEHOUSE_COORDS.wx,
+        player.wy - BANYAN_TREEHOUSE_COORDS.wy
+      );
+      const isNearTreehouse =
+        treehouseElevInfo.onBranchOrDeck || distToTreehouseFoot < 1.45 || distToTreehouseTrunk < 1.55;
 
       if (isSittingRef.current) {
         const currentSeat = sittingSeatRef.current;
@@ -4118,6 +4321,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         else if (matchedSwing) seatName = matchedSwing.name;
         else if (currentSeat === 'literacy') seatName = 'Bangku Sudut Literasi';
         detectedNearby = { type: 'bench', benchId: currentSeat || undefined, benchName: seatName };
+      } else if (isNearTreehouse) {
+        detectedNearby = {
+          type: 'treehouse',
+          isUpInTreehouse: treehouseElevInfo.progress > 0.68,
+        };
       } else if (nearLeafId !== -1) {
         detectedNearby = { type: 'dry_leaf', leafId: nearLeafId };
       } else if (Math.hypot(player.wx - ANNOUNCEMENT_BOARD_COORDS.wx, player.wy - ANNOUNCEMENT_BOARD_COORDS.wy) < 1.55) {
@@ -6268,10 +6476,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ctx.stroke();
 
       // 1) Stone & Pebble Riverbank Coping (Tepi Batu Sungai Utama dari Danau Pusat ke Air Terjun Selatan)
+      // Stop stone coping slightly before the waterfall crest so no hard horizontal stone bar crosses the waterfall mouth!
       const bankNW = toScreen(rivW0 - 0.14, rivYStart, 0, camera.x, camera.y);
       const bankNE = toScreen(rivW1 + 0.14, rivYStart, 0, camera.x, camera.y);
-      const bankSE = toScreen(rivW1 + 0.14, rivYEnd, 0, camera.x, camera.y);
-      const bankSW = toScreen(rivW0 - 0.14, rivYEnd, 0, camera.x, camera.y);
+      const bankSE = toScreen(rivW1 + 0.14, rivYEnd - 0.16, 0, camera.x, camera.y);
+      const bankSW = toScreen(rivW0 - 0.14, rivYEnd - 0.16, 0, camera.x, camera.y);
 
       ctx.fillStyle = isNight ? '#334155' : '#cbd5e1';
       ctx.beginPath();
@@ -6295,8 +6504,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       const bedNW = toScreen(rivW0, rivYStart, 0, camera.x, camera.y);
       const bedNE = toScreen(rivW1, rivYStart, 0, camera.x, camera.y);
-      const bedSE = toScreen(rivW1, rivYEnd, 0, camera.x, camera.y);
-      const bedSW = toScreen(rivW0, rivYEnd, 0, camera.x, camera.y);
+      const bedSE = toScreen(rivW1, rivYEnd - 0.12, 0, camera.x, camera.y);
+      const bedSW = toScreen(rivW0, rivYEnd - 0.12, 0, camera.x, camera.y);
 
       ctx.fillStyle = isNight ? '#0f172a' : '#475569';
       ctx.beginPath();
@@ -6308,10 +6517,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ctx.fill();
 
       // 2) Flowing River Water Channel & Seamless Danau Pusat Water Surface
+      // Curve the southern lip outward at rivYEnd + 0.04 so it flows seamlessly into the waterfall without any straight seam line
       const rivNW = toScreen(rivW0 + 0.04, rivYStart, -1.5, camera.x, camera.y);
       const rivNE = toScreen(rivW1 - 0.04, rivYStart, -1.5, camera.x, camera.y);
-      const rivSE = toScreen(rivW1 - 0.04, rivYEnd, -1.5, camera.x, camera.y);
-      const rivSW = toScreen(rivW0 + 0.04, rivYEnd, -1.5, camera.x, camera.y);
+      const rivSE = toScreen(rivW1 - 0.03, rivYEnd + 0.02, -1.5, camera.x, camera.y);
+      const rivSMid = toScreen((rivW0 + rivW1) * 0.5, rivYEnd + 0.09, -2.5, camera.x, camera.y);
+      const rivSW = toScreen(rivW0 + 0.03, rivYEnd + 0.02, -1.5, camera.x, camera.y);
 
       const rivGrad = ctx.createLinearGradient(rivNW.x, rivNW.y, rivSE.x, rivSE.y);
       rivGrad.addColorStop(0, isNight ? '#0369a1' : '#0284c7');
@@ -6324,7 +6535,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ctx.moveTo(rivNW.x, rivNW.y);
       ctx.lineTo(rivNE.x, rivNE.y);
       ctx.lineTo(rivSE.x, rivSE.y);
-      ctx.lineTo(rivSW.x, rivSW.y);
+      ctx.quadraticCurveTo(rivSMid.x, rivSMid.y, rivSW.x, rivSW.y);
       ctx.closePath();
       ctx.fill();
 
@@ -7364,126 +7575,220 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ctx.stroke();
 
       // ---------------------------------------------------------
-      // 2D. AIR TERJUN ESTETIK, HIDUP & DINAMIS DI UJUNG SUNGAI BAGIAN DEPAN
-      //     (Spilling over the Front Cliff Edge at wy = +8.5, wx = 6.96 .. 8.12)
+      // 2D. AIR TERJUN NATURAL & ORGANIK DI UJUNG SUNGAI BAGIAN DEPAN
+      //     (Seamless curved water crest & multi-layered organic cascades at wy = +8.5, wx = 6.96 .. 8.12 — NO hard border lines!)
       // ---------------------------------------------------------
-      const wfSway = Math.sin(elapsed * 4.5) * 0.025;
-      const wfW0 = rivW0 + 0.03 + wfSway;
-      const wfW1 = rivW1 - 0.03 - wfSway;
-      const wfTopL = toScreen(wfW0, edgeLim, -1.0, camera.x, camera.y);
-      const wfTopR = toScreen(wfW1, edgeLim, -1.0, camera.x, camera.y);
-      const wfMidL = toScreen(wfW0 + 0.06, edgeLim + 0.08, -78, camera.x, camera.y);
-      const wfMidR = toScreen(wfW1 - 0.06, edgeLim + 0.08, -78, camera.x, camera.y);
-      const wfBotL = toScreen(wfW0 + 0.14, edgeLim + 0.15, -172, camera.x, camera.y);
-      const wfBotR = toScreen(wfW1 - 0.14, edgeLim + 0.15, -172, camera.x, camera.y);
+      const wfSway = Math.sin(elapsed * 3.8) * 0.022;
+      const wfW0 = rivW0 + 0.01 + wfSway;
+      const wfW1 = rivW1 - 0.01 - wfSway;
+      const wfMidWx = (wfW0 + wfW1) * 0.5;
 
-      // Architectural Minimalist Cut-Stone Spillway Lip at Cliff Edge
-      const lipL = toScreen(rivW0 - 0.06, edgeLim, 0, camera.x, camera.y);
-      const lipR = toScreen(rivW1 + 0.06, edgeLim, 0, camera.x, camera.y);
-      ctx.strokeStyle = isNight ? '#94a3b8' : '#e2e8f0';
-      ctx.lineWidth = 3.2 * zRiv;
-      ctx.beginPath();
-      ctx.moveTo(lipL.x, lipL.y);
-      ctx.lineTo(lipR.x, lipR.y);
-      ctx.stroke();
+      // Seamless top lip starts slightly inside the river (edgeLim - 0.14) so it blends 100% smoothly without any straight edge
+      const wfSourceL = toScreen(wfW0 + 0.02, edgeLim - 0.14, -1.5, camera.x, camera.y);
+      const wfSourceMid = toScreen(wfMidWx, edgeLim - 0.04, -1.2, camera.x, camera.y);
+      const wfSourceR = toScreen(wfW1 - 0.02, edgeLim - 0.14, -1.5, camera.x, camera.y);
+
+      const wfTopL = toScreen(wfW0, edgeLim + 0.02, -3.0, camera.x, camera.y);
+      const wfTopMid = toScreen(wfMidWx, edgeLim + 0.09, -6.5, camera.x, camera.y);
+      const wfTopR = toScreen(wfW1, edgeLim + 0.02, -3.0, camera.x, camera.y);
+
+      const wfMidL = toScreen(wfW0 + 0.04, edgeLim + 0.09, -78, camera.x, camera.y);
+      const wfMidR = toScreen(wfW1 - 0.04, edgeLim + 0.09, -78, camera.x, camera.y);
+      const wfBotL = toScreen(wfW0 + 0.10, edgeLim + 0.16, -176, camera.x, camera.y);
+      const wfBotMid = toScreen(wfMidWx, edgeLim + 0.22, -184, camera.x, camera.y);
+      const wfBotR = toScreen(wfW1 - 0.10, edgeLim + 0.16, -176, camera.x, camera.y);
 
       // Soft Ambient Aqua Glow Behind Waterfall
-      const wfGlowCenter = toScreen((wfW0 + wfW1) * 0.5, edgeLim + 0.06, -85, camera.x, camera.y);
+      const wfGlowCenter = toScreen(wfMidWx, edgeLim + 0.06, -85, camera.x, camera.y);
       const wfAmbientGlow = ctx.createRadialGradient(
         wfGlowCenter.x,
         wfGlowCenter.y,
         4 * zRiv,
         wfGlowCenter.x,
         wfGlowCenter.y,
-        46 * zRiv
+        50 * zRiv
       );
-      wfAmbientGlow.addColorStop(0, 'rgba(125, 211, 252, 0.36)');
-      wfAmbientGlow.addColorStop(0.6, 'rgba(56, 189, 248, 0.14)');
+      wfAmbientGlow.addColorStop(0, isNight ? 'rgba(56, 189, 248, 0.34)' : 'rgba(125, 211, 252, 0.42)');
+      wfAmbientGlow.addColorStop(0.6, 'rgba(56, 189, 248, 0.16)');
       wfAmbientGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
       ctx.fillStyle = wfAmbientGlow;
       ctx.beginPath();
-      ctx.ellipse(wfGlowCenter.x, wfGlowCenter.y, 26 * zRiv, 52 * zRiv, -0.15, 0, Math.PI * 2);
+      ctx.ellipse(wfGlowCenter.x, wfGlowCenter.y, 30 * zRiv, 56 * zRiv, -0.15, 0, Math.PI * 2);
       ctx.fill();
 
-      // Upper Sheer Waterfall Curtain (alt 0 -> -78)
-      const wfGradUpper = ctx.createLinearGradient(wfTopL.x, wfTopL.y, wfMidL.x, wfMidL.y);
-      wfGradUpper.addColorStop(0, 'rgba(240, 249, 255, 0.98)');
-      wfGradUpper.addColorStop(0.3, 'rgba(56, 189, 248, 0.92)');
-      wfGradUpper.addColorStop(0.75, 'rgba(14, 165, 233, 0.88)');
-      wfGradUpper.addColorStop(1, 'rgba(224, 242, 254, 0.96)');
-
-      ctx.fillStyle = wfGradUpper;
+      // Dark wet cliff shadow recess behind the falling water streams (gives natural depth to the cliff gorge)
+      const gorgeGrad = ctx.createLinearGradient(wfTopMid.x, wfTopMid.y, wfBotMid.x, wfBotMid.y);
+      gorgeGrad.addColorStop(0, isNight ? 'rgba(15, 23, 42, 0.55)' : 'rgba(30, 41, 59, 0.38)');
+      gorgeGrad.addColorStop(0.7, isNight ? 'rgba(15, 23, 42, 0.42)' : 'rgba(51, 65, 85, 0.28)');
+      gorgeGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
+      ctx.fillStyle = gorgeGrad;
       ctx.beginPath();
-      ctx.moveTo(wfTopL.x, wfTopL.y);
-      ctx.lineTo(wfTopR.x, wfTopR.y);
-      ctx.lineTo(wfMidR.x, wfMidR.y);
-      ctx.lineTo(wfMidL.x, wfMidL.y);
+      ctx.moveTo(wfTopL.x - 2 * zRiv, wfTopL.y);
+      ctx.quadraticCurveTo(wfTopMid.x, wfTopMid.y + 3 * zRiv, wfTopR.x + 2 * zRiv, wfTopR.y);
+      ctx.quadraticCurveTo(wfMidR.x + 3 * zRiv, wfMidR.y, wfBotR.x, wfBotR.y);
+      ctx.quadraticCurveTo(wfBotMid.x, wfBotMid.y, wfBotL.x, wfBotL.y);
+      ctx.quadraticCurveTo(wfMidL.x - 3 * zRiv, wfMidL.y, wfTopL.x - 2 * zRiv, wfTopL.y);
       ctx.closePath();
       ctx.fill();
 
-      // Stepped Minimalist Brown Rock Ledge Mid-Waterfall (at alt = -78)
-      const ledgeL = toScreen(wfW0 - 0.1, edgeLim + 0.05, -78, camera.x, camera.y);
-      const ledgeR = toScreen(wfW1 + 0.1, edgeLim + 0.05, -78, camera.x, camera.y);
-      const ledgeBot = toScreen((wfW0 + wfW1) * 0.5, edgeLim + 0.08, -90, camera.x, camera.y);
-      fillCliffPoly(
-        [ledgeL, ledgeR, ledgeBot],
-        isNight ? '#451a03' : '#78350f',
-        isNight ? '#270f03' : '#451a03',
-        1.0
-      );
+      // Seamless Curved Crest Roll-Over (blends the river surface smoothly over the cliff lip with zero lines)
+      const rollGrad = ctx.createLinearGradient(wfSourceMid.x, wfSourceMid.y, wfMidL.x, wfMidL.y);
+      rollGrad.addColorStop(0, isNight ? 'rgba(14, 165, 233, 0.92)' : 'rgba(56, 189, 248, 0.95)');
+      rollGrad.addColorStop(0.18, isNight ? 'rgba(125, 211, 252, 0.96)' : 'rgba(186, 230, 253, 0.98)');
+      rollGrad.addColorStop(0.48, isNight ? 'rgba(56, 189, 248, 0.90)' : 'rgba(14, 165, 233, 0.90)');
+      rollGrad.addColorStop(0.82, isNight ? 'rgba(14, 165, 233, 0.86)' : 'rgba(56, 189, 248, 0.88)');
+      rollGrad.addColorStop(1, 'rgba(186, 230, 253, 0.92)');
 
-      // Lower Cascading Waterfall Curtain (alt -78 -> -172)
-      const wfGradLower = ctx.createLinearGradient(wfMidL.x, wfMidL.y, wfBotL.x, wfBotL.y);
-      wfGradLower.addColorStop(0, 'rgba(240, 249, 255, 0.95)');
-      wfGradLower.addColorStop(0.35, 'rgba(56, 189, 248, 0.85)');
-      wfGradLower.addColorStop(0.75, 'rgba(125, 211, 252, 0.68)');
+      ctx.fillStyle = rollGrad;
+      ctx.beginPath();
+      ctx.moveTo(wfSourceL.x, wfSourceL.y);
+      ctx.quadraticCurveTo(wfSourceMid.x, wfSourceMid.y, wfSourceR.x, wfSourceR.y);
+      ctx.quadraticCurveTo(wfTopR.x + 1.5 * zRiv, wfTopR.y, wfMidR.x, wfMidR.y);
+      ctx.quadraticCurveTo(
+        (wfMidL.x + wfMidR.x) * 0.5,
+        (wfMidL.y + wfMidR.y) * 0.5 + 4 * zRiv,
+        wfMidL.x,
+        wfMidL.y
+      );
+      ctx.quadraticCurveTo(wfTopL.x - 1.5 * zRiv, wfTopL.y, wfSourceL.x, wfSourceL.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Natural Mossy River Boulders (Batu Alam Berlumut) Partially Emerging Mid-Cascade (No harsh stroke lines!)
+      const midRockClusters = [
+        { wx: wfW0 + 0.14, wy: edgeLim + 0.07, alt: -74, rx: 6.2, ry: 4.0, rot: -0.2 },
+        { wx: wfMidWx - 0.08, wy: edgeLim + 0.09, alt: -80, rx: 5.4, ry: 3.5, rot: 0.12 },
+        { wx: wfW1 - 0.16, wy: edgeLim + 0.07, alt: -72, rx: 5.8, ry: 3.8, rot: -0.15 },
+      ];
+      midRockClusters.forEach((rc) => {
+        const rPt = toScreen(rc.wx, rc.wy, rc.alt, camera.x, camera.y);
+        ctx.fillStyle = isNight ? '#334155' : '#57534e';
+        ctx.beginPath();
+        ctx.ellipse(rPt.x, rPt.y, rc.rx * zRiv, rc.ry * zRiv, rc.rot, 0, Math.PI * 2);
+        ctx.fill();
+        // Soft moss cap on top of rock
+        ctx.fillStyle = isNight ? '#14532d' : '#3f6212';
+        ctx.beginPath();
+        ctx.ellipse(rPt.x - 0.5 * zRiv, rPt.y - 1.1 * zRiv, rc.rx * 0.72 * zRiv, rc.ry * 0.55 * zRiv, rc.rot, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Lower Cascading Waterfall Curtain (Organic curved streams blending into mist at alt -74 -> -180)
+      const wfGradLower = ctx.createLinearGradient(wfMidL.x, wfMidL.y, wfBotMid.x, wfBotMid.y);
+      wfGradLower.addColorStop(0, 'rgba(224, 242, 254, 0.94)');
+      wfGradLower.addColorStop(0.32, isNight ? 'rgba(14, 165, 233, 0.85)' : 'rgba(56, 189, 248, 0.86)');
+      wfGradLower.addColorStop(0.72, 'rgba(125, 211, 252, 0.65)');
       wfGradLower.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
       ctx.fillStyle = wfGradLower;
       ctx.beginPath();
       ctx.moveTo(wfMidL.x, wfMidL.y);
-      ctx.lineTo(wfMidR.x, wfMidR.y);
-      ctx.lineTo(wfBotR.x, wfBotR.y);
-      ctx.lineTo(wfBotL.x, wfBotL.y);
+      ctx.quadraticCurveTo(
+        (wfMidL.x + wfMidR.x) * 0.5,
+        (wfMidL.y + wfMidR.y) * 0.5 - 2 * zRiv,
+        wfMidR.x,
+        wfMidR.y
+      );
+      ctx.quadraticCurveTo(wfBotR.x + 2 * zRiv, (wfMidR.y + wfBotR.y) * 0.5, wfBotR.x, wfBotR.y);
+      ctx.quadraticCurveTo(wfBotMid.x, wfBotMid.y, wfBotL.x, wfBotL.y);
+      ctx.quadraticCurveTo(wfBotL.x - 2 * zRiv, (wfMidL.y + wfBotL.y) * 0.5, wfMidL.x, wfMidL.y);
       ctx.closePath();
       ctx.fill();
 
-      // 1) Lively Multi-Speed Vertical Cascading Water Ribbons & Foaming Veins
-      for (let ws = 0; ws < 24; ws++) {
-        const t = (ws + 0.5) / 24;
-        const wWx = wfW0 + 0.04 + t * (wfW1 - wfW0 - 0.08);
-        const speed = 105 + (ws % 4) * 24;
-        const dropOffset = (elapsed * speed + ws * 19) % 162;
-        const dropAlt0 = -dropOffset;
-        const ribbonLen = 22 + (ws % 3) * 11;
-        const dropAlt1 = Math.max(-168, dropAlt0 - ribbonLen);
-        const wyShift0 = edgeLim + (dropOffset / 162) * 0.14;
-        const wyShift1 = edgeLim + (Math.min(168, dropOffset + ribbonLen) / 162) * 0.14;
-        const dPt0 = toScreen(wWx, wyShift0, dropAlt0, camera.x, camera.y);
-        const dPt1 = toScreen(wWx, wyShift1, dropAlt1, camera.x, camera.y);
+      // 1) Natural S-Curved Cascading Water Veins & Translucent Silky Streams
+      ctx.lineCap = 'round';
+      for (let ws = 0; ws < 26; ws++) {
+        const t = (ws + 0.5) / 26;
+        const wWx = wfW0 + 0.03 + t * (wfW1 - wfW0 - 0.06);
+        const speed = 96 + (ws % 5) * 20;
+        const dropOffset = (elapsed * speed + ws * 17) % 168;
+        const dropAlt0 = -2 - dropOffset;
+        const ribbonLen = 24 + (ws % 3) * 12;
+        const dropAlt1 = Math.max(-174, dropAlt0 - ribbonLen);
+        const waveX0 = Math.sin(dropOffset * 0.05 + ws) * 0.025;
+        const waveX1 = Math.sin((dropOffset + ribbonLen) * 0.05 + ws) * 0.035;
+        const wyShift0 = edgeLim + (dropOffset / 168) * 0.15;
+        const wyShift1 = edgeLim + (Math.min(174, dropOffset + ribbonLen) / 168) * 0.15;
+        const dPt0 = toScreen(wWx + waveX0, wyShift0, dropAlt0, camera.x, camera.y);
+        const dPt1 = toScreen(wWx + waveX1, wyShift1, dropAlt1, camera.x, camera.y);
+        const midCtrlX = (dPt0.x + dPt1.x) * 0.5 + Math.sin(elapsed * 5 + ws) * 1.4 * zRiv;
+        const midCtrlY = (dPt0.y + dPt1.y) * 0.5;
 
         ctx.strokeStyle =
           ws % 3 === 0
-            ? 'rgba(255, 255, 255, 0.92)'
+            ? 'rgba(255, 255, 255, 0.86)'
             : ws % 2 === 0
-            ? 'rgba(224, 242, 254, 0.78)'
-            : 'rgba(125, 211, 252, 0.65)';
-        ctx.lineWidth = (ws % 3 === 0 ? 1.8 : 1.1) * zRiv;
+            ? 'rgba(224, 242, 254, 0.72)'
+            : 'rgba(125, 211, 252, 0.58)';
+        ctx.lineWidth = (ws % 3 === 0 ? 2.1 : 1.3) * zRiv;
         ctx.beginPath();
         ctx.moveTo(dPt0.x, dPt0.y);
-        ctx.lineTo(dPt1.x, dPt1.y);
+        ctx.quadraticCurveTo(midCtrlX, midCtrlY, dPt1.x, dPt1.y);
         ctx.stroke();
       }
 
-      // 2) Dynamic Bouncing Water Droplets & Spray Arcs off the Spillway & Mid-Ledge
+      // 2) Natural Mossy Riverbank Boulders & Lush Ferns Flanking Left & Right Waterfall Lips (Hiding Cliff Seam Naturally)
+      const flankBoulders = [
+        // Left riverbank lip boulders
+        { wx: rivW0 - 0.14, wy: edgeLim - 0.06, alt: 1.5, rx: 7.5, ry: 4.8, moss: true },
+        { wx: rivW0 - 0.04, wy: edgeLim + 0.01, alt: -1.5, rx: 6.0, ry: 4.0, moss: true },
+        { wx: rivW0 - 0.22, wy: edgeLim + 0.02, alt: 0.5, rx: 5.5, ry: 3.6, moss: false },
+        // Right riverbank lip boulders
+        { wx: rivW1 + 0.14, wy: edgeLim - 0.06, alt: 1.5, rx: 7.8, ry: 4.9, moss: true },
+        { wx: rivW1 + 0.04, wy: edgeLim + 0.01, alt: -1.5, rx: 6.2, ry: 4.1, moss: true },
+        { wx: rivW1 + 0.22, wy: edgeLim + 0.02, alt: 0.5, rx: 5.6, ry: 3.7, moss: false },
+      ];
+      flankBoulders.forEach((b) => {
+        const bPt = toScreen(b.wx, b.wy, b.alt, camera.x, camera.y);
+        ctx.fillStyle = isNight ? '#334155' : '#64748b';
+        ctx.beginPath();
+        ctx.ellipse(bPt.x, bPt.y, b.rx * zRiv, b.ry * zRiv, -0.18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = isNight ? '#475569' : '#94a3b8';
+        ctx.beginPath();
+        ctx.ellipse(bPt.x - 1.0 * zRiv, bPt.y - 0.9 * zRiv, b.rx * 0.65 * zRiv, b.ry * 0.55 * zRiv, -0.18, 0, Math.PI * 2);
+        ctx.fill();
+        if (b.moss) {
+          ctx.fillStyle = isNight ? '#15803d' : '#4d7c0f';
+          ctx.beginPath();
+          ctx.ellipse(bPt.x, bPt.y - 1.4 * zRiv, b.rx * 0.68 * zRiv, b.ry * 0.45 * zRiv, -0.1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+
+      // 3) Soft Organic White-Aqua Foam Billows Along Crest & Mid-Cascade Rocks
+      for (let f = 0; f < 11; f++) {
+        const ft = f / 10;
+        const curveDip = Math.sin(ft * Math.PI) * 3.5 * zRiv;
+        const fxTop = wfTopL.x + ft * (wfTopR.x - wfTopL.x);
+        const fyTop = wfTopL.y + ft * (wfTopR.y - wfTopL.y) + curveDip * 0.45;
+        const rPulse = (2.8 + Math.sin(elapsed * 7.5 + f * 1.1) * 1.0) * zRiv;
+        ctx.fillStyle = f % 2 === 0 ? 'rgba(255, 255, 255, 0.82)' : 'rgba(224, 242, 254, 0.72)';
+        ctx.beginPath();
+        ctx.arc(fxTop, fyTop, rPulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        const fxMid = wfMidL.x + ft * (wfMidR.x - wfMidL.x);
+        const fyMid = wfMidL.y + ft * (wfMidR.y - wfMidL.y) + curveDip * 0.3;
+        ctx.beginPath();
+        ctx.arc(
+          fxMid + Math.sin(elapsed * 6 + f) * 1.2 * zRiv,
+          fyMid + Math.cos(elapsed * 7 + f) * 1.0 * zRiv,
+          rPulse * 1.2,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+
+      // 4) Dynamic Bouncing Water Droplets & Spray Arcs off the Cascade
       for (let dp = 0; dp < 18; dp++) {
-        const phase = (elapsed * 2.4 + dp * 0.37) % 1.0;
+        const phase = (elapsed * 2.3 + dp * 0.37) % 1.0;
         const isMidSplash = dp % 2 === 0;
         const baseWx = wfW0 + ((dp * 0.19) % 1.0) * (wfW1 - wfW0);
         const spreadWx = (dp % 3 - 1) * 0.16 * phase;
-        const startAlt = isMidSplash ? -76 : -4;
-        // Parabolic arc upward bounce then gravity drop
-        const arcAlt = startAlt + Math.sin(phase * Math.PI) * 12 - phase * phase * 42;
+        const startAlt = isMidSplash ? -76 : -5;
+        const arcAlt = startAlt + Math.sin(phase * Math.PI) * 11 - phase * phase * 40;
         const spPt = toScreen(
           baseWx + spreadWx,
           edgeLim + 0.08 + phase * 0.18,
@@ -7492,56 +7797,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           camera.y
         );
         const alpha = Math.max(0, 1 - phase * 0.95);
-        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.9).toFixed(2)})`;
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.85).toFixed(2)})`;
         ctx.beginPath();
-        ctx.arc(spPt.x, spPt.y, (1.4 + (1 - phase) * 1.1) * zRiv, 0, Math.PI * 2);
+        ctx.arc(spPt.x, spPt.y, (1.3 + (1 - phase) * 1.0) * zRiv, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // 3) Churning White-Cyan Spillway Crest Foam at Top Lip & Mid Rock Ledge
-      for (let f = 0; f < 9; f++) {
-        const ft = f / 8;
-        const fxTop = wfTopL.x + ft * (wfTopR.x - wfTopL.x);
-        const fyTop = wfTopL.y + ft * (wfTopR.y - wfTopL.y);
-        const rPulse = (3.0 + Math.sin(elapsed * 8.5 + f * 1.1) * 1.1) * zRiv;
-        ctx.fillStyle = f % 2 === 0 ? 'rgba(255, 255, 255, 0.94)' : 'rgba(224, 242, 254, 0.85)';
-        ctx.beginPath();
-        ctx.arc(fxTop, fyTop, rPulse, 0, Math.PI * 2);
-        ctx.fill();
-
-        const fxMid = wfMidL.x + ft * (wfMidR.x - wfMidL.x);
-        const fyMid = wfMidL.y + ft * (wfMidR.y - wfMidL.y);
-        ctx.beginPath();
-        ctx.arc(
-          fxMid + Math.sin(elapsed * 6 + f) * 1.2 * zRiv,
-          fyMid + Math.cos(elapsed * 7 + f) * 1.0 * zRiv,
-          rPulse * 1.25,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
-      }
-
-      // 4) Billowing Multi-Layered Mist & Rising Vapor Clouds at Waterfall Base
-      const mistCenter = toScreen((wfW0 + wfW1) * 0.5, edgeLim + 0.14, -158, camera.x, camera.y);
+      // 5) Billowing Multi-Layered Mist & Rising Vapor Clouds at Waterfall Base
+      const mistCenter = toScreen(wfMidWx, edgeLim + 0.15, -162, camera.x, camera.y);
       const mistGrad = ctx.createRadialGradient(
         mistCenter.x,
         mistCenter.y,
         3 * zRiv,
         mistCenter.x,
         mistCenter.y,
-        38 * zRiv
+        42 * zRiv
       );
-      mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
-      mistGrad.addColorStop(0.45, 'rgba(186, 230, 253, 0.48)');
+      mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0.86)');
+      mistGrad.addColorStop(0.45, 'rgba(186, 230, 253, 0.50)');
       mistGrad.addColorStop(1, 'rgba(186, 230, 253, 0)');
       ctx.fillStyle = mistGrad;
       ctx.beginPath();
       ctx.ellipse(
         mistCenter.x,
         mistCenter.y,
-        (32 + Math.sin(elapsed * 4.5) * 4) * zRiv,
-        (16 + Math.cos(elapsed * 4.5) * 2.5) * zRiv,
+        (34 + Math.sin(elapsed * 4.2) * 4) * zRiv,
+        (17 + Math.cos(elapsed * 4.2) * 2.5) * zRiv,
         -0.22,
         0,
         Math.PI * 2
@@ -7552,7 +7833,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       for (let mp = 0; mp < 4; mp++) {
         const mProg = (elapsed * 0.65 + mp * 0.25) % 1.0;
         const mWx = wfW0 + 0.15 + ((mp * 0.27) % 0.75) * (wfW1 - wfW0);
-        const mAlt = -162 + mProg * 46;
+        const mAlt = -164 + mProg * 48;
         const mPt = toScreen(mWx, edgeLim + 0.16, mAlt, camera.x, camera.y);
         const mAlpha = Math.sin(mProg * Math.PI) * 0.52;
         const mRad = (9 + mProg * 14) * zRiv;
@@ -7564,17 +7845,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ctx.restore();
 
       // Outer platform border line: ONLY stroke the visible front-left and front-right cliff edges
-      // from the front base of the mountains (wy = -11.92) down to cornerS so the northern map edges are hidden beneath the mountains!
+      // AND break/skip the line across the river waterfall mouth (wx = rivW0 - 0.16 .. rivW1 + 0.16) so NO border line crosses the waterfall!
       const cornerE_Front = toScreen(GRID_RADIUS + 0.5, -11.92, 0, camera.x, camera.y);
       const cornerS = toScreen(GRID_RADIUS + 0.5, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
       const cornerW = toScreen(-GRID_RADIUS - 0.5, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
       const cornerW_Front = toScreen(-GRID_RADIUS - 0.5, -11.92, 0, camera.x, camera.y);
+      const wfGapLeft = toScreen(rivW0 - 0.16, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
+      const wfGapRight = toScreen(rivW1 + 0.16, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
 
       ctx.strokeStyle = isNight ? '#0a1610' : '#2d4e33';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(cornerW_Front.x, cornerW_Front.y);
       ctx.lineTo(cornerW.x, cornerW.y);
+      ctx.lineTo(wfGapLeft.x, wfGapLeft.y);
+      ctx.moveTo(wfGapRight.x, wfGapRight.y);
       ctx.lineTo(cornerS.x, cornerS.y);
       ctx.lineTo(cornerE_Front.x, cornerE_Front.y);
       ctx.stroke();
@@ -7698,6 +7983,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'avatar'; data: AvatarData; isPlayer: boolean; depth: number }
         | { type: 'tree'; wx: number; wy: number; depth: number; index: number }
         | { type: 'wilderness_tree'; tree: WildernessTreeDef; wx: number; wy: number; depth: number }
+        | { type: 'banyan_treehouse'; wx: number; wy: number; depth: number }
         | { type: 'hutan_sign'; wx: number; wy: number; depth: number }
         | {
             type: 'wilderness_fence_bay';
@@ -7723,10 +8009,24 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | { type: 'housing_gate'; wx: number; wy: number; depth: number }
         | { type: 'dry_leaf'; leaf: DryLeafItem; wx: number; wy: number; depth: number }
         | { type: 'lake_fishing_boat'; wx: number; wy: number; depth: number }
-        | { type: 'river_heron'; wx: number; wy: number; depth: number }
+        | {
+            type: 'river_heron';
+            heronId: 0 | 1 | 2;
+            wx: number;
+            wy: number;
+            alt: number;
+            isFlying: boolean;
+            flightProgress: number;
+            flightHeading: number;
+            flapPhase: number;
+            peckDown: number;
+            wadeStep: number;
+            facingDir: 1 | -1;
+            depth: number;
+          }
         | {
             type: 'forest_wildlife';
-            kind: 'deer_stag' | 'deer_doe' | 'squirrel' | 'rabbit' | 'ground_bird';
+            kind: 'deer_stag' | 'deer_doe' | 'squirrel' | 'rabbit' | 'ground_bird' | 'fox' | 'kancil';
             wx: number;
             wy: number;
             depth: number;
@@ -7762,6 +8062,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       drawItems.push({ type: 'cafe', depth: cafeWx + cafeWy });
 
       const getAvatarRenderDepth = (avData: AvatarData, isLocalPlayer: boolean): number => {
+        const branchElev = getBanyanTreehouseElevation(avData.wx, avData.wy);
+        if (branchElev.onBranchOrDeck) {
+          // Ensure avatar climbing the banyan branch or standing on the Rumah Pohon veranda renders in front of the tree trunk & cabin wall
+          return BANYAN_TREEHOUSE_COORDS.wx + BANYAN_TREEHOUSE_COORDS.wy + 1.35;
+        }
         const sittingNow = isLocalPlayer ? isSittingRef.current : Boolean(avData.isSitting);
         const seatId = (isLocalPlayer ? sittingSeatRef.current : avData.sittingSeat) as BenchId | undefined;
         if (sittingNow && seatId) {
@@ -7818,12 +8123,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         });
       });
 
-      // Papan Penunjuk Hutan Belantara di Belakang Pohon Refleksi [-0.85, -7.85]
+      // Rumah Pohon di Atas Pohon Beringin Raksasa (Ujung Kiri Hutan Kaki Gunung [-6.78, -10.95])
       drawItems.push({
-        type: 'hutan_sign',
-        wx: HUTAN_BELANTARA_SIGN_COORDS.wx,
-        wy: HUTAN_BELANTARA_SIGN_COORDS.wy,
-        depth: HUTAN_BELANTARA_SIGN_COORDS.wx + HUTAN_BELANTARA_SIGN_COORDS.wy,
+        type: 'banyan_treehouse',
+        wx: BANYAN_TREEHOUSE_COORDS.wx,
+        wy: BANYAN_TREEHOUSE_COORDS.wy,
+        depth: BANYAN_TREEHOUSE_COORDS.wx + BANYAN_TREEHOUSE_COORDS.wy,
       });
 
       // Pagar Minimalis Pembatas Hutan Belantara & Danau Pusat (wy = -7.62)
@@ -7976,26 +8281,136 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         depth: 4.85 - 10.35,
       });
 
-      // 12. Burung Bangau di Sungai (Singgah & Terbang Berkeliling Sungai)
-      const heronPhase = (elapsed % 20);
-      let heronCurWx = 7.35;
-      let heronCurWy = -3.85;
-      if (heronPhase > 8 && heronPhase <= 16) {
-        const flightFrac = (heronPhase - 8) / 8;
-        heronCurWy = -3.85 + Math.sin(flightFrac * Math.PI) * 4.8;
-        heronCurWx = 7.35 + Math.sin(flightFrac * Math.PI * 2) * 0.35;
-      } else if (heronPhase > 16) {
-        const returnFrac = (heronPhase - 16) / 4;
-        heronCurWy = -3.85 + (1 - returnFrac) * 0.4;
-      }
-      drawItems.push({
-        type: 'river_heron',
-        wx: heronCurWx,
-        wy: heronCurWy,
-        depth: heronCurWx + heronCurWy + 0.1,
+      // 12. 3 Burung Bangau Putih (Ardea alba) di Sungai & Muara Danau dengan Siklus Berbeda & Smooth
+      const computeHeronLifecycle = (heronId: 0 | 1 | 2) => {
+        // Setiap bangau memiliki titik singgah, durasi siklus, fase awal, dan lintasan terbang melingkar yang smooth (C1 continuous)
+        const configs = [
+          {
+            // Bangau 1: Tepian Hulu-Tengah Sungai (Utara Jembatan)
+            homeWx: 7.32,
+            homeWy: -4.25,
+            cycleDur: 24.0,
+            wadeDur: 9.5,
+            phaseOffset: 0.0,
+            loopAmpWx: 0.46,
+            loopSpanWy: 4.65,
+            maxAlt: 36.0,
+            wadeFacing: 1 as 1 | -1,
+            flapFreq: 7.2,
+          },
+          {
+            // Bangau 2: Tepian Hilir Sungai (Selatan Jembatan)
+            homeWx: 7.38,
+            homeWy: 2.55,
+            cycleDur: 29.0,
+            wadeDur: 11.5,
+            phaseOffset: 10.5,
+            loopAmpWx: -0.52,
+            loopSpanWy: -4.95,
+            maxAlt: 40.0,
+            wadeFacing: -1 as 1 | -1,
+            flapFreq: 6.8,
+          },
+          {
+            // Bangau 3: Muara Sungai Refleksia & Danau (Dekat Dermaga & Teratai)
+            homeWx: 6.48,
+            homeWy: -8.85,
+            cycleDur: 33.0,
+            wadeDur: 13.0,
+            phaseOffset: 20.5,
+            loopAmpWx: -1.85,
+            loopSpanWy: -1.65,
+            maxAlt: 38.0,
+            wadeFacing: -1 as 1 | -1,
+            flapFreq: 6.4,
+          },
+        ] as const;
+
+        const cfg = configs[heronId];
+        const t = (elapsed + cfg.phaseOffset) % cfg.cycleDur;
+
+        if (t <= cfg.wadeDur) {
+          // FASE SINGGAH & BERBURU IKAN DI AIR DANGKAL (Smooth wading & pecking)
+          const wadeStep = Math.sin(t * 1.6 + heronId * 2.1);
+          const wx = cfg.homeWx + Math.sin(t * 0.8) * 0.05;
+          const wy = cfg.homeWy + Math.cos(t * 0.8) * 0.06;
+          // Smooth cosine-eased pecking every ~3.2 seconds
+          const peckCycle = (t + heronId * 0.9) % 3.2;
+          let peckDown = 0;
+          if (peckCycle > 2.0 && peckCycle < 2.8) {
+            const pNorm = (peckCycle - 2.0) / 0.8;
+            peckDown = 0.5 - 0.5 * Math.cos(pNorm * Math.PI * 2);
+          }
+          return {
+            heronId,
+            wx,
+            wy,
+            alt: -0.6,
+            isFlying: false,
+            flightProgress: 0,
+            flightHeading: 0,
+            flapPhase: 0,
+            peckDown,
+            wadeStep,
+            facingDir: cfg.wadeFacing,
+          };
+        }
+
+        // FASE TERBANG MELINGKAR SMOOTH (C1-continuous closed trajectory starting & ending at homeWx, homeWy)
+        const flightDur = cfg.cycleDur - cfg.wadeDur;
+        const p = (t - cfg.wadeDur) / flightDur; // 0.0 -> 1.0
+        const posAt = (u: number) => {
+          const env = Math.pow(Math.sin(u * Math.PI), 1.35);
+          const cosLoop = 0.5 - 0.5 * Math.cos(u * Math.PI * 2);
+          const sinLoop = Math.sin(u * Math.PI * 2);
+          const wx =
+            heronId === 2
+              ? cfg.homeWx + cosLoop * cfg.loopAmpWx + sinLoop * 0.55 * env
+              : cfg.homeWx + sinLoop * cfg.loopAmpWx * env;
+          const wy =
+            heronId === 2
+              ? cfg.homeWy + sinLoop * cfg.loopSpanWy * env + cosLoop * 1.45
+              : cfg.homeWy + cosLoop * cfg.loopSpanWy;
+          const alt = -0.6 + env * cfg.maxAlt + Math.sin(u * Math.PI * 3) * 3.0 * env;
+          return { wx, wy, alt, env };
+        };
+
+        const cur = posAt(p);
+        const nxt = posAt(Math.min(1, p + 0.008));
+        const curSc = toScreen(cur.wx, cur.wy, cur.alt, camera.x, camera.y);
+        const nxtSc = toScreen(nxt.wx, nxt.wy, nxt.alt, camera.x, camera.y);
+        const flightHeading = Math.atan2(nxtSc.y - curSc.y, nxtSc.x - curSc.x);
+
+        // Faster vigorous wing flaps during smooth takeoff (p < 0.2) and landing flare (p > 0.8), calm majestic glides in mid-flight
+        const edgeBoost = p < 0.22 ? 1.45 : p > 0.78 ? 1.35 : 0.85;
+        const flapAmp = p > 0.38 && p < 0.62 ? 0.55 : 1.0;
+        const flapPhase = Math.sin(elapsed * cfg.flapFreq * edgeBoost + heronId * 1.7) * flapAmp;
+
+        return {
+          heronId,
+          wx: cur.wx,
+          wy: cur.wy,
+          alt: cur.alt,
+          isFlying: true,
+          flightProgress: p,
+          flightHeading,
+          flapPhase,
+          peckDown: 0,
+          wadeStep: 0,
+          facingDir: cfg.wadeFacing,
+        };
+      };
+
+      ([0, 1, 2] as const).forEach((hId) => {
+        const hs = computeHeronLifecycle(hId);
+        drawItems.push({
+          type: 'river_heron',
+          ...hs,
+          depth: hs.wx + hs.wy + 0.1,
+        });
       });
 
-      // 13. Hewan di Hutan Belantara (2 Rusa Dewasa, Tupai, Kelinci, & Burung Berjalan) - Bergerak Random Pelan
+      // 13. Hewan di Hutan Belantara (2 Rusa Dewasa, Tupai, Kelinci, Rubah Hutan, Kancil, & Burung Berjalan) - Bergerak Random Pelan
       // A. Rusa Jantan Dewasa: Berkelana pelan santai di padang rumput barat (siklus 28 detik)
       const stagCycle = elapsed % 28;
       let stagCurWx = -4.85;
@@ -8003,7 +8418,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       let stagFacing: 1 | -1 = 1;
       let stagWalking = false;
       if (stagCycle < 10) {
-        // Melangkah pelan ke arah timur
         const p = stagCycle / 10;
         const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
         stagCurWx = -4.85 + s * 1.15;
@@ -8011,13 +8425,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         stagFacing = 1;
         stagWalking = true;
       } else if (stagCycle < 17) {
-        // Berhenti berdiri gagah, memantau hutan & sniffing udara
         stagCurWx = -3.70;
         stagCurWy = -10.45;
         stagFacing = 1;
         stagWalking = false;
       } else {
-        // Melangkah pelan kembali ke arah barat
         const p = (stagCycle - 17) / 11;
         const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
         stagCurWx = -3.70 - s * 1.15;
@@ -8042,7 +8454,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       let doeFacing: 1 | -1 = -1;
       let doeWalking = false;
       if (doeCycle < 11) {
-        // Melangkah pelan ke arah barat daya
         const p = doeCycle / 11;
         const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
         doeCurWx = -2.35 - s * 0.95;
@@ -8050,13 +8461,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         doeFacing = -1;
         doeWalking = true;
       } else if (doeCycle < 19) {
-        // Berhenti merumput di semak hijau
         doeCurWx = -3.30;
         doeCurWy = -10.85;
         doeFacing = -1;
         doeWalking = false;
       } else {
-        // Melangkah pelan kembali ke timur laut
         const p = (doeCycle - 19) / 13;
         const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
         doeCurWx = -3.30 + s * 0.95;
@@ -8142,7 +8551,79 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         isWalking: rabWalking,
       });
 
-      // E. Burung Hutan: Berjalan acak perlahan di semak-semak hutan
+      // E. Rubah Hutan Merah (Forest Fox - Mamalia Hutan): Melangkah pelan & mengendus bunga hutan (siklus 26 detik)
+      const foxCycle = (elapsed + 5.0) % 26;
+      let foxCurWx = -6.15;
+      let foxCurWy = -10.15;
+      let foxFacing: 1 | -1 = 1;
+      let foxWalking = false;
+      if (foxCycle < 9.5) {
+        const p = foxCycle / 9.5;
+        const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        foxCurWx = -6.15 + s * 1.10;
+        foxCurWy = -10.15 + Math.sin(p * Math.PI) * 0.35;
+        foxFacing = 1;
+        foxWalking = true;
+      } else if (foxCycle < 16.5) {
+        foxCurWx = -5.05;
+        foxCurWy = -10.15;
+        foxFacing = 1;
+        foxWalking = false;
+      } else {
+        const p = (foxCycle - 16.5) / 9.5;
+        const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        foxCurWx = -5.05 - s * 1.10;
+        foxCurWy = -10.15 - Math.sin(p * Math.PI) * 0.30;
+        foxFacing = -1;
+        foxWalking = true;
+      }
+      drawItems.push({
+        type: 'forest_wildlife',
+        kind: 'fox',
+        wx: foxCurWx,
+        wy: foxCurWy,
+        depth: foxCurWx + foxCurWy,
+        facingDir: foxFacing,
+        isWalking: foxWalking,
+      });
+
+      // F. Kancil / Pelanduk Hutan (Lesser Mouse-Deer - Mamalia Hutan Tropis): Berjalan pelan di semak pakis (siklus 24 detik)
+      const kancilCycle = (elapsed + 11.0) % 24;
+      let kancilCurWx = -1.75;
+      let kancilCurWy = -10.95;
+      let kancilFacing: 1 | -1 = 1;
+      let kancilWalking = false;
+      if (kancilCycle < 8.0) {
+        const p = kancilCycle / 8.0;
+        const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        kancilCurWx = -1.75 + s * 0.88;
+        kancilCurWy = -10.95 + Math.sin(p * Math.PI) * 0.28;
+        kancilFacing = 1;
+        kancilWalking = true;
+      } else if (kancilCycle < 15.5) {
+        kancilCurWx = -0.87;
+        kancilCurWy = -10.95;
+        kancilFacing = 1;
+        kancilWalking = false;
+      } else {
+        const p = (kancilCycle - 15.5) / 8.5;
+        const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        kancilCurWx = -0.87 - s * 0.88;
+        kancilCurWy = -10.95 - Math.sin(p * Math.PI) * 0.25;
+        kancilFacing = -1;
+        kancilWalking = true;
+      }
+      drawItems.push({
+        type: 'forest_wildlife',
+        kind: 'kancil',
+        wx: kancilCurWx,
+        wy: kancilCurWy,
+        depth: kancilCurWx + kancilCurWy,
+        facingDir: kancilFacing,
+        isWalking: kancilWalking,
+      });
+
+      // G. Burung Hutan: Berjalan acak perlahan di semak-semak hutan
       const birdCycle = (elapsed * 0.28) % (Math.PI * 2);
       const birdCurWx = -3.2 + Math.sin(birdCycle) * 1.5 + Math.cos(birdCycle * 2.3) * 0.45;
       const birdCurWy = -9.8 + Math.cos(birdCycle) * 0.8 + Math.sin(birdCycle * 1.7) * 0.35;
@@ -10542,6 +11023,308 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           ctx.restore();
+        } else if (item.type === 'banyan_treehouse') {
+          // RUMAH POHON DI ATAS POHON BERINGIN RAKSASA (Ujung Kiri Hutan Kaki Gunung [-6.78, -10.95])
+          // Masuk dengan cara meniti/menaiki ranting besar pohon beringin dari [-5.52, -10.12]
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const footPt = toScreen(BANYAN_BRANCH_FOOT_COORDS.wx, BANYAN_BRANCH_FOOT_COORDS.wy, 0, camera.x, camera.y);
+          const deckPt = toScreen(item.wx, item.wy, BANYAN_TREEHOUSE_ALT, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          const sway = Math.sin(elapsed * 1.4 + item.wx) * 1.2 * z;
+          ctx.save();
+
+          // 1. Wide Canopy Ground Shadow & Root Mound Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.30)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 3 * z, 36 * z, 17 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse((pt.x + footPt.x) * 0.5, (pt.y + footPt.y) * 0.5 + 4 * z, 24 * z, 10 * z, 0.25, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 2. Back Layer of Giant Banyan Crown Foliage (Behind Trunk & Treehouse)
+          const backCanopyClusters = [
+            { dx: -26, dy: -56, rx: 22, ry: 15, c: isNight ? '#064e3b' : '#14532d' },
+            { dx: 22, dy: -58, rx: 21, ry: 14, c: isNight ? '#064e3b' : '#14532d' },
+            { dx: 0, dy: -68, rx: 26, ry: 17, c: isNight ? '#065f46' : '#166534' },
+            { dx: -16, dy: -46, rx: 19, ry: 13, c: isNight ? '#047857' : '#15803d' },
+            { dx: 18, dy: -46, rx: 19, ry: 13, c: isNight ? '#047857' : '#15803d' },
+          ];
+          backCanopyClusters.forEach((cc) => {
+            ctx.fillStyle = cc.c;
+            ctx.beginPath();
+            ctx.ellipse(pt.x + cc.dx * z + sway * 0.5, pt.y + cc.dy * z, cc.rx * z, cc.ry * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          // 3. Giant Ancient Gnarled Banyan Trunk & Buttress Roots (Akar Banir & Batang Utama Pohon Beringin)
+          ctx.fillStyle = isNight ? '#3e1f0d' : '#5c2d16';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 16 * z, pt.y + 3 * z);
+          ctx.quadraticCurveTo(pt.x - 9 * z, pt.y - 16 * z, pt.x - 11 * z, pt.y - 38 * z);
+          ctx.lineTo(pt.x + 11 * z, pt.y - 38 * z);
+          ctx.quadraticCurveTo(pt.x + 9 * z, pt.y - 16 * z, pt.x + 17 * z, pt.y + 3 * z);
+          ctx.closePath();
+          ctx.fill();
+
+          // Bark texture grooves & sunlit wood ribs on the giant banyan trunk
+          ctx.strokeStyle = isNight ? '#5c2d16' : '#78350f';
+          ctx.lineWidth = 1.4 * z;
+          for (let br = -7; br <= 7; br += 3.5) {
+            ctx.beginPath();
+            ctx.moveTo(pt.x + br * 1.3 * z, pt.y + 2 * z);
+            ctx.quadraticCurveTo(pt.x + br * 0.7 * z, pt.y - 18 * z, pt.x + br * 0.95 * z, pt.y - 37 * z);
+            ctx.stroke();
+          }
+
+          // Hanging Aerial Banyan Roots (Sulur Akar Gantung Khas Pohon Beringin)
+          ctx.strokeStyle = isNight ? '#451a03' : '#713f12';
+          ctx.lineWidth = 1.15 * z;
+          const aerialRoots = [-22, -17, -12, 13, 18, 23];
+          aerialRoots.forEach((rxOff, rIdx) => {
+            const topY = pt.y - (42 + (rIdx % 3) * 4) * z;
+            const botY = pt.y - (6 + (rIdx % 2) * 5) * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + rxOff * z + sway * 0.4, topY);
+            ctx.quadraticCurveTo(
+              pt.x + (rxOff + Math.sin(elapsed * 2 + rIdx) * 1.2) * z,
+              (topY + botY) * 0.5,
+              pt.x + rxOff * 0.92 * z,
+              botY
+            );
+            ctx.stroke();
+          });
+
+          // 4. CLIMBABLE GIANT BANYAN BRANCH (Ranting Besar Pohon Beringin untuk Dinaiki ke Rumah Pohon)
+          // Sweeps from the forest floor at footPt [-5.52, -10.12] up to the Treehouse Veranda at deckPt [-6.78, -10.95, alt 38]
+          const branchMidX = (footPt.x + deckPt.x) * 0.5 - 3 * z;
+          const branchMidY = (footPt.y + deckPt.y) * 0.5 - 5 * z;
+
+          // Under-shadow / lower bark thickness of the climbing banyan branch
+          ctx.strokeStyle = isNight ? '#271206' : '#451a03';
+          ctx.lineCap = 'round';
+          ctx.lineWidth = 9.5 * z;
+          ctx.beginPath();
+          ctx.moveTo(footPt.x + 2 * z, footPt.y + 2 * z);
+          ctx.quadraticCurveTo(branchMidX, branchMidY + 2.5 * z, deckPt.x + 6 * z, deckPt.y + 3 * z);
+          ctx.stroke();
+
+          // Main warm bark surface of the climbing banyan branch
+          ctx.strokeStyle = isNight ? '#5c2d16' : '#78350f';
+          ctx.lineWidth = 7.2 * z;
+          ctx.beginPath();
+          ctx.moveTo(footPt.x, footPt.y);
+          ctx.quadraticCurveTo(branchMidX, branchMidY, deckPt.x + 5 * z, deckPt.y + 1 * z);
+          ctx.stroke();
+
+          // Secondary supporting banyan root-strut under the climbing branch
+          ctx.strokeStyle = isNight ? '#3e1f0d' : '#5c2d16';
+          ctx.lineWidth = 3.8 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x + 7 * z, pt.y - 10 * z);
+          ctx.quadraticCurveTo(branchMidX - 4 * z, branchMidY + 6 * z, (footPt.x + branchMidX) * 0.5, (footPt.y + branchMidY) * 0.5 + 1 * z);
+          ctx.stroke();
+
+          // Stepped Wooden Cleat Planks (Pijakan Kayu di Atas Ranting Beringin) & Rope Handrail so climbing is super clear
+          const numSteps = 10;
+          for (let st = 0; st <= numSteps; st++) {
+            const t = st / numSteps;
+            const invT = 1 - t;
+            const sx = invT * invT * footPt.x + 2 * invT * t * branchMidX + t * t * (deckPt.x + 5 * z);
+            const sy = invT * invT * footPt.y + 2 * invT * t * branchMidY + t * t * (deckPt.y + 1 * z);
+            ctx.fillStyle = st % 2 === 0 ? '#b45309' : '#d97706';
+            ctx.strokeStyle = '#451a03';
+            ctx.lineWidth = 0.7 * z;
+            ctx.beginPath();
+            ctx.roundRect(sx - 4.2 * z, sy - 1.3 * z, 8.4 * z, 2.6 * z, 1 * z);
+            ctx.fill();
+            ctx.stroke();
+
+            // Handrail post every 2 steps
+            if (st % 2 === 0) {
+              ctx.strokeStyle = '#78350f';
+              ctx.lineWidth = 1.3 * z;
+              ctx.beginPath();
+              ctx.moveTo(sx + 3.2 * z, sy);
+              ctx.lineTo(sx + 3.2 * z, sy - 7.5 * z);
+              ctx.stroke();
+            }
+          }
+
+          // Rustic Rope Handrail along the climbing banyan branch
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1.2 * z;
+          ctx.beginPath();
+          ctx.moveTo(footPt.x + 3.2 * z, footPt.y - 7.5 * z);
+          ctx.quadraticCurveTo(branchMidX + 3.2 * z, branchMidY - 7.5 * z, deckPt.x + 8.2 * z, deckPt.y - 6.5 * z);
+          ctx.stroke();
+
+          // Small Welcome Stone & Lantern at the Foot of the Banyan Branch [-5.52, -10.12]
+          ctx.fillStyle = isNight ? '#475569' : '#94a3b8';
+          ctx.beginPath();
+          ctx.ellipse(footPt.x, footPt.y + 1.5 * z, 7.5 * z, 3.6 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          // Warm guide lantern at branch base
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath();
+          ctx.arc(footPt.x + 5.2 * z, footPt.y - 8.5 * z, 2.0 * z, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 5. RUMAH POHON BERINGIN PLATFORM & CABIN (Built High in the Canopy at deckPt)
+          // Cantilevered log support struts under platform
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 2.4 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 8 * z, pt.y - 24 * z);
+          ctx.lineTo(deckPt.x - 20 * z, deckPt.y + 2 * z);
+          ctx.moveTo(pt.x + 8 * z, pt.y - 24 * z);
+          ctx.lineTo(deckPt.x + 20 * z, deckPt.y + 2 * z);
+          ctx.stroke();
+
+          // Treehouse Veranda Wooden Deck Platform
+          ctx.fillStyle = '#78350f';
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 1.2 * z;
+          ctx.beginPath();
+          ctx.roundRect(deckPt.x - 24 * z, deckPt.y - 2 * z, 48 * z, 7.5 * z, 2.5 * z);
+          ctx.fill();
+          ctx.stroke();
+
+          // Deck plank lines
+          ctx.strokeStyle = '#92400e';
+          ctx.lineWidth = 0.8 * z;
+          for (let dp = -20; dp <= 20; dp += 5) {
+            ctx.beginPath();
+            ctx.moveTo(deckPt.x + dp * z, deckPt.y - 2 * z);
+            ctx.lineTo(deckPt.x + dp * z, deckPt.y + 5.5 * z);
+            ctx.stroke();
+          }
+
+          // Treehouse Log Cabin Body (Warm Cedar & Teak Planks)
+          const cabW = 34 * z;
+          const cabH = 22 * z;
+          const cabX = deckPt.x - cabW / 2;
+          const cabY = deckPt.y - cabH - 1 * z;
+          ctx.fillStyle = isNight ? '#78350f' : '#b45309';
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 1.1 * z;
+          ctx.beginPath();
+          ctx.roundRect(cabX, cabY, cabW, cabH, 2 * z);
+          ctx.fill();
+          ctx.stroke();
+
+          // Horizontal log cabin siding lines
+          ctx.strokeStyle = isNight ? '#451a03' : '#92400e';
+          ctx.lineWidth = 0.8 * z;
+          for (let ly = 4; ly < 20; ly += 4) {
+            ctx.beginPath();
+            ctx.moveTo(cabX, cabY + ly * z);
+            ctx.lineTo(cabX + cabW, cabY + ly * z);
+            ctx.stroke();
+          }
+
+          // Arched Wooden Treehouse Door (Warmly lit inside)
+          ctx.fillStyle = isNight ? '#fef08a' : '#fde68a';
+          ctx.beginPath();
+          ctx.roundRect(deckPt.x - 4.5 * z, deckPt.y - 14.5 * z, 9 * z, 13.5 * z, [4.5 * z, 4.5 * z, 0, 0]);
+          ctx.fill();
+          ctx.strokeStyle = '#451a03';
+          ctx.lineWidth = 1.1 * z;
+          ctx.stroke();
+          // Door window cross-bars
+          ctx.beginPath();
+          ctx.moveTo(deckPt.x, deckPt.y - 14.5 * z);
+          ctx.lineTo(deckPt.x, deckPt.y - 1 * z);
+          ctx.moveTo(deckPt.x - 4.5 * z, deckPt.y - 8 * z);
+          ctx.lineTo(deckPt.x + 4.5 * z, deckPt.y - 8 * z);
+          ctx.stroke();
+
+          // Circular Treehouse Lookout Windows on Left & Right of Door
+          [-11.2, 11.2].forEach((wxOff) => {
+            ctx.fillStyle = isNight ? '#fef08a' : '#bae6fd';
+            ctx.beginPath();
+            ctx.arc(deckPt.x + wxOff * z, deckPt.y - 11.5 * z, 3.4 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#451a03';
+            ctx.lineWidth = 1.0 * z;
+            ctx.stroke();
+          });
+
+          // Pitched Mossy Timber Gable Roof Over the Treehouse
+          ctx.fillStyle = isNight ? '#14532d' : '#166534';
+          ctx.beginPath();
+          ctx.moveTo(deckPt.x, cabY - 14 * z);
+          ctx.lineTo(deckPt.x - 23 * z, cabY + 2 * z);
+          ctx.lineTo(deckPt.x + 23 * z, cabY + 2 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#fde68a';
+          ctx.lineWidth = 1.2 * z;
+          ctx.stroke();
+
+          // Upper Banyan Crown Leaf Tuft Growing Over the Treehouse Roof Peak
+          ctx.fillStyle = isNight ? '#059669' : '#22c55e';
+          ctx.beginPath();
+          ctx.ellipse(deckPt.x - 7 * z + sway * 0.7, cabY - 15 * z, 12 * z, 7.5 * z, -0.2, 0, Math.PI * 2);
+          ctx.ellipse(deckPt.x + 8 * z + sway * 0.7, cabY - 14 * z, 11 * z, 7 * z, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Veranda Wooden Balcony Railing & Brass Forest Observation Telescope on Left Balcony
+          ctx.strokeStyle = '#fef3c7';
+          ctx.lineWidth = 1.1 * z;
+          ctx.beginPath();
+          ctx.moveTo(deckPt.x - 23 * z, deckPt.y - 6.5 * z);
+          ctx.lineTo(deckPt.x - 6 * z, deckPt.y - 6.5 * z);
+          ctx.moveTo(deckPt.x + 6 * z, deckPt.y - 6.5 * z);
+          ctx.lineTo(deckPt.x + 23 * z, deckPt.y - 6.5 * z);
+          ctx.stroke();
+
+          // Brass Observation Telescope on Left Veranda
+          const teleX = deckPt.x - 19 * z;
+          const teleY = deckPt.y - 7.5 * z;
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1.6 * z;
+          ctx.beginPath();
+          ctx.moveTo(teleX - 3 * z, teleY - 2.5 * z);
+          ctx.lineTo(teleX + 3.5 * z, teleY + 1 * z);
+          ctx.stroke();
+
+          // Hanging Warm Forest Lantern on Right Eave
+          const lanX = deckPt.x + 19 * z;
+          const lanY = cabY + 4 * z;
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath();
+          ctx.arc(lanX, lanY, 2.3 * z, 0, Math.PI * 2);
+          ctx.fill();
+          if (isNight) {
+            const lGlow = ctx.createRadialGradient(lanX, lanY, 1 * z, lanX, lanY, 15 * z);
+            lGlow.addColorStop(0, 'rgba(254, 240, 138, 0.55)');
+            lGlow.addColorStop(1, 'rgba(254, 240, 138, 0)');
+            ctx.fillStyle = lGlow;
+            ctx.beginPath();
+            ctx.arc(lanX, lanY, 15 * z, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Neat Wooden Nameplate on Roof Gable: "🏡 RUMAH POHON"
+          const signW = 34 * z;
+          const signH = 6.8 * z;
+          const signX = deckPt.x - signW / 2;
+          const signY = cabY - 6.5 * z;
+          ctx.fillStyle = '#451a03';
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 0.9 * z;
+          ctx.beginPath();
+          ctx.roundRect(signX, signY, signW, signH, 2 * z);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#fef3c7';
+          ctx.font = `bold ${Math.max(4, Math.round(4.2 * z))}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🏡 RUMAH POHON', deckPt.x, signY + signH / 2, signW - 3 * z);
+
+          ctx.restore();
         } else if (item.type === 'hutan_sign') {
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
@@ -10669,7 +11452,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const pLeft = toScreen(-0.60, item.wy, 0, camera.x, camera.y);
           const pRight = toScreen(0.60, item.wy, 0, camera.x, camera.y);
           const pCenter = toScreen(0.0, item.wy, 0, camera.x, camera.y);
-          const pGuard = toScreen(0.72, -7.32, 0, camera.x, camera.y);
+          const pGuard = toScreen(-0.76, -7.32, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
           const canEnterGate = Boolean(isPlayerTeacher || isMasterKikyRef.current);
           const distToGate = Math.hypot(player.wx - 0.0, player.wy - item.wy);
@@ -10677,7 +11460,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           ctx.save();
 
-          // 1. Minimalist Guard Post Mat under @tomi (di jalan belakang Pohon Refleksi)
+          // 1. Minimalist Guard Post Mat under @Sufri (di sisi KIRI gerbang Hutan Refleksia)
           ctx.fillStyle = isNight ? 'rgba(15, 23, 42, 0.65)' : 'rgba(51, 65, 85, 0.35)';
           ctx.beginPath();
           ctx.ellipse(pGuard.x, pGuard.y + 1.5 * z, 11.5 * z, 5.2 * z, 0, 0, Math.PI * 2);
@@ -13422,101 +14205,296 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
           ctx.restore();
         } else if (item.type === 'cafe') {
-          // SOUTH: TOKO ROTI & KAFE WARGA (Enriched Bakery & Espresso Stall - Enlarged Slightly)
+          // SOUTH: LAPAK REFLEKSIA (Detailed Artisan Bakery, Espresso & Gelato Pavilion)
           const pt = toScreen(cafeWx, cafeWy, 0, camera.x, camera.y);
-          const z = zoomLevelRef.current * 1.16;
+          const z = zoomLevelRef.current * 1.18;
 
           const cafeDistToPlayer = Math.hypot(player.wx - cafeWx, player.wy - cafeWy);
-          const isCafeTransparent = cafeDistToPlayer < 2.0;
+          const isCafeTransparent = cafeDistToPlayer < 1.85 && player.wy < cafeWy - 0.15;
           ctx.save();
           if (isCafeTransparent) {
-            ctx.globalAlpha = 0.45;
+            ctx.globalAlpha = 0.55;
           }
 
           setCafeScreenPos({
             x: pt.x,
-            y: pt.y - 44 * z,
+            y: pt.y - 46 * z,
             visible: true,
           });
 
-          // Ground shadow
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+          // 1. Warm Terracotta & Cobblestone Patio Deck Underneath Lapak Refleksia
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
           ctx.beginPath();
-          ctx.ellipse(pt.x + 2, pt.y + 6, 28 * z, 14 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x, pt.y + 8 * z, 46 * z, 19 * z, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // Stall body (Warm wood planks)
-          ctx.fillStyle = '#d97706';
-          ctx.fillRect(pt.x - 24 * z, pt.y - 14 * z, 48 * z, 22 * z);
-          // Horizontal timber grain lines
-          ctx.strokeStyle = '#b45309';
-          ctx.lineWidth = 1 * z;
-          for (let pl = -10; pl <= 6; pl += 4) {
-            ctx.beginPath();
-            ctx.moveTo(pt.x - 24 * z, pt.y + pl * z);
-            ctx.lineTo(pt.x + 24 * z, pt.y + pl * z);
-            ctx.stroke();
-          }
+          const patioGrad = ctx.createLinearGradient(pt.x - 42 * z, pt.y - 4 * z, pt.x + 42 * z, pt.y + 16 * z);
+          patioGrad.addColorStop(0, isNight ? '#334155' : '#d6d3d1');
+          patioGrad.addColorStop(0.5, isNight ? '#475569' : '#e7e5e4');
+          patioGrad.addColorStop(1, isNight ? '#1e293b' : '#c7c2be');
+          ctx.fillStyle = patioGrad;
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 6.5 * z, 43 * z, 16.5 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = isNight ? '#64748b' : '#a8a29e';
+          ctx.lineWidth = 1.1 * z;
+          ctx.stroke();
 
-          // Striped red-white awning with scalloped drape
-          for (let s = 0; s < 6; s++) {
-            ctx.fillStyle = s % 2 === 0 ? '#ef4444' : '#ffffff';
-            const ax = pt.x - 24 * z + s * (48 * z / 6);
-            ctx.fillRect(ax, pt.y - 24 * z, 48 * z / 6, 10 * z);
-            // Scallop bottom
+          // Warm night patio ambient floor glow
+          if (isNight) {
+            const cafeNightGlow = ctx.createRadialGradient(pt.x, pt.y - 6 * z, 4 * z, pt.x, pt.y, 48 * z);
+            cafeNightGlow.addColorStop(0, 'rgba(251, 191, 36, 0.35)');
+            cafeNightGlow.addColorStop(0.6, 'rgba(245, 158, 11, 0.14)');
+            cafeNightGlow.addColorStop(1, 'rgba(245, 158, 11, 0)');
+            ctx.fillStyle = cafeNightGlow;
             ctx.beginPath();
-            ctx.arc(ax + (4 * z), pt.y - 14 * z, 4 * z, 0, Math.PI);
+            ctx.ellipse(pt.x, pt.y + 4 * z, 48 * z, 22 * z, 0, 0, Math.PI * 2);
             ctx.fill();
           }
 
-          // Glass pastry display case on counter
-          ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
-          ctx.fillRect(pt.x - 20 * z, pt.y - 12 * z, 18 * z, 8 * z);
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 0.8 * z;
-          ctx.strokeRect(pt.x - 20 * z, pt.y - 12 * z, 18 * z, 8 * z);
+          // 2. Back Interior Wall, Brick Bakery Oven Chimney & Shelves with Coffee Jars
+          ctx.fillStyle = isNight ? '#1e293b' : '#451a03';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 27 * z, pt.y - 25 * z, 54 * z, 16 * z, 2 * z);
+          ctx.fill();
 
-          // Miniature croissants inside display
+          // Brick Bakery Chimney on Back-Right Roof
+          ctx.fillStyle = isNight ? '#7c2d12' : '#9a3412';
+          ctx.fillRect(pt.x + 15 * z, pt.y - 38 * z, 6.5 * z, 13 * z);
+          ctx.fillStyle = '#451a03';
+          ctx.fillRect(pt.x + 14.2 * z, pt.y - 39.5 * z, 8.1 * z, 2 * z);
+          // Warm bakery aroma puffs rising from chimney
+          for (let ap = 0; ap < 2; ap++) {
+            const pProg = (elapsed * 0.7 + ap * 0.5) % 1.0;
+            const puffX = pt.x + 18.2 * z + Math.sin(elapsed * 3 + ap) * 2.5 * z;
+            const puffY = pt.y - (41 + pProg * 12) * z;
+            ctx.fillStyle = `rgba(255, 255, 255, ${((1 - pProg) * 0.45).toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(puffX, puffY, (2.0 + pProg * 2.5) * z, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Back wall wooden shelf with glass coffee/cookie jars & menu board
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(pt.x - 24 * z, pt.y - 18.5 * z, 30 * z, 1.4 * z);
+          const jarColors = ['#f59e0b', '#84cc16', '#f43f5e', '#38bdf8'];
+          jarColors.forEach((jc, jIdx) => {
+            const jx = pt.x - 21 * z + jIdx * 5.2 * z;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+            ctx.fillRect(jx, pt.y - 22.5 * z, 3.2 * z, 4.0 * z);
+            ctx.fillStyle = jc;
+            ctx.fillRect(jx + 0.4 * z, pt.y - 21.2 * z, 2.4 * z, 2.4 * z);
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(jx - 0.2 * z, pt.y - 23.2 * z, 3.6 * z, 0.9 * z);
+          });
+
+          // Timber Pergola Side Pillars Supporting the Awning
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(pt.x - 27.5 * z, pt.y - 26 * z, 2.6 * z, 32 * z);
+          ctx.fillRect(pt.x + 24.9 * z, pt.y - 26 * z, 2.6 * z, 32 * z);
+
+          // 3. Counter Equipment: Illuminated 2-Tier Glass Pastry Showcase, Twin-Group Espresso Machine & Gelato Tub
+          // A) 2-Tier Illuminated Glass Bakery Showcase (Left Counter)
+          ctx.fillStyle = 'rgba(186, 230, 253, 0.42)';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 24 * z, pt.y - 16.5 * z, 20 * z, 10.5 * z, [3 * z, 3 * z, 0, 0]);
+          ctx.fill();
+          ctx.strokeStyle = '#fef3c7';
+          ctx.lineWidth = 1.0 * z;
+          ctx.stroke();
+          // Middle glass shelf inside pastry display
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 23.5 * z, pt.y - 11.2 * z);
+          ctx.lineTo(pt.x - 4.5 * z, pt.y - 11.2 * z);
+          ctx.stroke();
+          // Top shelf: Golden Croissants & Glazed Donuts
           ctx.fillStyle = '#f59e0b';
           ctx.beginPath();
-          ctx.arc(pt.x - 15 * z, pt.y - 8 * z, 2.5 * z, 0, Math.PI);
-          ctx.arc(pt.x - 7 * z, pt.y - 8 * z, 2.5 * z, 0, Math.PI);
+          ctx.ellipse(pt.x - 19.5 * z, pt.y - 13.0 * z, 2.6 * z, 1.5 * z, -0.2, 0, Math.PI * 2);
+          ctx.ellipse(pt.x - 14.0 * z, pt.y - 13.0 * z, 2.6 * z, 1.5 * z, 0.2, 0, Math.PI * 2);
           ctx.fill();
+          ctx.fillStyle = '#ec4899';
+          ctx.beginPath();
+          ctx.arc(pt.x - 8.5 * z, pt.y - 13.0 * z, 1.9 * z, 0, Math.PI * 2);
+          ctx.fill();
+          // Bottom shelf: Artisan Sourdough Loaf & Berry Cake Slices
+          ctx.fillStyle = '#d97706';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 21 * z, pt.y - 9.2 * z, 6.5 * z, 2.8 * z, 1.4 * z);
+          ctx.fill();
+          ctx.fillStyle = '#fde047';
+          ctx.fillRect(pt.x - 12.5 * z, pt.y - 9.2 * z, 5.5 * z, 2.6 * z);
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(pt.x - 12.5 * z, pt.y - 9.8 * z, 5.5 * z, 0.9 * z);
 
-          // Espresso machine on right counter
+          // B) Center Wooden Register & Stacked Ceramic Coffee Cups
+          ctx.fillStyle = '#f8fafc';
+          ctx.fillRect(pt.x - 1.5 * z, pt.y - 12.5 * z, 2.6 * z, 4.5 * z);
+          ctx.fillRect(pt.x + 1.6 * z, pt.y - 11.2 * z, 2.6 * z, 3.2 * z);
+
+          // C) Twin-Group Italian Espresso Machine & Bean Grinder (Right Counter)
           ctx.fillStyle = '#334155';
-          ctx.fillRect(pt.x + 6 * z, pt.y - 14 * z, 10 * z, 10 * z);
+          ctx.beginPath();
+          ctx.roundRect(pt.x + 5.5 * z, pt.y - 17 * z, 11.5 * z, 11 * z, 1.5 * z);
+          ctx.fill();
+          // Brass top cup-warmer rail & front panel
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(pt.x + 6.2 * z, pt.y - 16.2 * z, 10.1 * z, 1.8 * z);
           ctx.fillStyle = '#cbd5e1';
-          ctx.fillRect(pt.x + 8 * z, pt.y - 12 * z, 6 * z, 3 * z);
-
+          ctx.fillRect(pt.x + 6.8 * z, pt.y - 13.5 * z, 8.9 * z, 3.2 * z);
+          // Round pressure gauge dial
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(pt.x + 11.2 * z, pt.y - 12.0 * z, 1.2 * z, 0, Math.PI * 2);
+          ctx.fill();
           // Animated rising steam wisps from espresso machine
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.68)';
           ctx.lineWidth = 1.2 * z;
           for (let st = 0; st < 2; st++) {
-            const steamY = pt.y - (16 + ((elapsed * 12 + st * 10) % 18)) * z;
-            const steamX = pt.x + (11 + st * 4) * z + Math.sin(elapsed * 4 + st) * 3 * z;
+            const steamY = pt.y - (18 + ((elapsed * 12 + st * 9) % 16)) * z;
+            const steamX = pt.x + (8.5 + st * 4.5) * z + Math.sin(elapsed * 4 + st) * 2.2 * z;
             ctx.beginPath();
             ctx.moveTo(steamX, steamY);
-            ctx.lineTo(steamX + 1.5 * z, steamY - 4 * z);
+            ctx.quadraticCurveTo(steamX - 1.5 * z, steamY - 2.5 * z, steamX + 1.5 * z, steamY - 5 * z);
             ctx.stroke();
           }
 
-          // Floating Pill Badge above Toko Roti awning ONLY when touched/opened (compact & semi-transparent, fades after 5s stationary)
+          // D) Gelato & Ice Cream Display Tub on Far-Right Counter
+          ctx.fillStyle = '#e0f2fe';
+          ctx.fillRect(pt.x + 18 * z, pt.y - 13 * z, 7.5 * z, 7 * z);
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 0.8 * z;
+          ctx.strokeRect(pt.x + 18 * z, pt.y - 13 * z, 7.5 * z, 7 * z);
+          // Colorful gelato scoops (Strawberry Pink, Matcha Green, Vanilla Cream)
+          const scoops = [
+            { dx: 19.8, c: '#f472b6' },
+            { dx: 21.8, c: '#4ade80' },
+            { dx: 23.8, c: '#fef08a' },
+          ];
+          scoops.forEach((sc) => {
+            ctx.fillStyle = sc.c;
+            ctx.beginPath();
+            ctx.arc(pt.x + sc.dx * z, pt.y - 13.2 * z, 1.5 * z, Math.PI, 0);
+            ctx.fill();
+          });
+
+          // 4. Main Artisan Counter Body (Marble Countertop, Warm Teak Slats & Brass Foot-Rail)
+          // Cream marble countertop overhang
+          ctx.fillStyle = '#fef3c7';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 28 * z, pt.y - 7.2 * z, 56 * z, 2.6 * z, 1.2 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#b45309';
+          ctx.lineWidth = 0.8 * z;
+          ctx.stroke();
+
+          // Counter body (Rich warm teak wood with vertical architectural slats)
+          ctx.fillStyle = '#b45309';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 26.5 * z, pt.y - 4.8 * z, 53 * z, 13.8 * z, [0, 0, 2 * z, 2 * z]);
+          ctx.fill();
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 0.9 * z;
+          for (let sl = -24; sl <= 24; sl += 4) {
+            ctx.beginPath();
+            ctx.moveTo(pt.x + sl * z, pt.y - 4.6 * z);
+            ctx.lineTo(pt.x + sl * z, pt.y + 8.6 * z);
+            ctx.stroke();
+          }
+
+          // Warm under-counter LED strip & brass foot rail
+          ctx.strokeStyle = '#fde047';
+          ctx.lineWidth = 1.1 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 25 * z, pt.y - 4.2 * z);
+          ctx.lineTo(pt.x + 25 * z, pt.y - 4.2 * z);
+          ctx.stroke();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1.2 * z;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 24 * z, pt.y + 7.8 * z);
+          ctx.lineTo(pt.x + 24 * z, pt.y + 7.8 * z);
+          ctx.stroke();
+
+          // Front Counter Plaque ("☕ LAPAK REFLEKSIA 🥐")
+          ctx.fillStyle = '#fffbeb';
+          ctx.strokeStyle = '#92400e';
+          ctx.lineWidth = 1.1 * z;
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 21 * z, pt.y - 2.2 * z, 42 * z, 8.2 * z, 2.2 * z);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#78350f';
+          ctx.font = `bold ${Math.round(5.4 * z)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('☕ LAPAK REFLEKSIA 🥐', pt.x, pt.y + 2.0 * z);
+
+          // 5. Boutique Striped Canopy Awning & Warm Edison Festoon String Lights
+          const numStripes = 8;
+          const totalAwningW = 58 * z;
+          const stripeW = totalAwningW / numStripes;
+          for (let s = 0; s < numStripes; s++) {
+            ctx.fillStyle = s % 2 === 0 ? '#dc2626' : s % 4 === 1 ? '#fffbeb' : '#059669';
+            const ax = pt.x - totalAwningW / 2 + s * stripeW;
+            ctx.fillRect(ax, pt.y - 29 * z, stripeW + 0.4, 9.5 * z);
+            // Scallop bottom valence
+            ctx.beginPath();
+            ctx.arc(ax + stripeW / 2, pt.y - 19.5 * z, stripeW / 2, 0, Math.PI);
+            ctx.fill();
+          }
+          // Awning top timber crown beam
+          ctx.fillStyle = '#451a03';
+          ctx.fillRect(pt.x - 29.5 * z, pt.y - 30.8 * z, 59 * z, 2.2 * z);
+
+          // Hanging Warm Edison String Lights under the Awning Eave
+          for (let bl = 0; bl < 7; bl++) {
+            const bx = pt.x - 24 * z + bl * 8 * z;
+            const by = pt.y - 17.2 * z + (bl % 2) * 0.8 * z;
+            ctx.fillStyle = isNight ? '#fef08a' : '#fde047';
+            ctx.beginPath();
+            ctx.arc(bx, by, 1.35 * z, 0, Math.PI * 2);
+            ctx.fill();
+            if (isNight) {
+              ctx.fillStyle = 'rgba(254, 240, 138, 0.35)';
+              ctx.beginPath();
+              ctx.arc(bx, by, 3.6 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
+          // Rooftop Framed Marquee Signboard ("LAPAK REFLEKSIA")
+          const roofSignW = 44 * z;
+          const roofSignH = 8.5 * z;
+          ctx.fillStyle = '#1e293b';
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1.2 * z;
+          ctx.beginPath();
+          ctx.roundRect(pt.x - roofSignW / 2, pt.y - 38.5 * z, roofSignW, roofSignH, 2.5 * z);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#fde68a';
+          ctx.font = `bold ${Math.round(5.2 * z)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('✨ LAPAK REFLEKSIA ✨', pt.x, pt.y - 34.2 * z);
+
+          // Floating Pill Badge above Lapak Refleksia ONLY when touched/opened
           const isCafeTouched = (lastTouchedIdRef.current === 'cafe' || isCafeMenuOpen) && overheadTagAlpha > 0.005;
           if (isCafeTouched) {
-            const trBadgeY = pt.y - 36 * z;
+            const trBadgeY = pt.y - 46 * z;
             ctx.save();
             ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.62)';
-            const trLabel = '🥐 Toko Roti & Kafe';
-            ctx.font = `bold ${Math.round(8.0 * z)}px sans-serif`;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+            const trLabel = '🥐 Lapak Refleksia';
+            ctx.font = `bold ${Math.round(7.8 * z)}px sans-serif`;
             const trMetrics = ctx.measureText(trLabel);
             const trW = trMetrics.width + 11 * z;
-            const trH = 15 * z;
+            const trH = 14.5 * z;
             ctx.beginPath();
-            ctx.roundRect(pt.x - trW / 2, trBadgeY - trH / 2, trW, trH, 7.5 * z);
+            ctx.roundRect(pt.x - trW / 2, trBadgeY - trH / 2, trW, trH, 7 * z);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(245, 158, 11, 0.72)';
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.78)';
             ctx.lineWidth = 1.0 * z;
             ctx.stroke();
             ctx.fillStyle = '#fef3c7';
@@ -13526,88 +14504,104 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
 
-          // Signboard "TOKO ROTI & KAFE" on front counter
-          ctx.fillStyle = '#fef3c7';
-          ctx.strokeStyle = '#b45309';
-          ctx.lineWidth = 1 * z;
-          ctx.beginPath();
-          ctx.roundRect(pt.x - 20 * z, pt.y - 2 * z, 40 * z, 8 * z, 2 * z);
-          ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = '#92400e';
-          ctx.font = `bold ${Math.round(5.5 * z)}px sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('☕ TOKO ROTI & KAFE 🥐', pt.x, pt.y + 2.5 * z);
-
-          // Outdoor cafe bistro table with parasol umbrella on left
+          // 6. Outdoor Bistro Tables, Parasol Umbrellas, Potted Plants, Chalkboard Menu & Barrels
           const tableX = pt.x - 36 * z;
-          const tableY = pt.y + 4 * z;
-          // Parasol umbrella
-          ctx.fillStyle = '#ef4444';
+          const tableY = pt.y + 4.5 * z;
+          // Two-tone striped parasol umbrella
+          ctx.fillStyle = '#dc2626';
           ctx.beginPath();
-          ctx.arc(tableX, tableY - 18 * z, 12 * z, Math.PI, 0);
+          ctx.arc(tableX, tableY - 18.5 * z, 12.5 * z, Math.PI, 0);
+          ctx.fill();
+          ctx.fillStyle = '#fffbeb';
+          ctx.beginPath();
+          ctx.moveTo(tableX, tableY - 31 * z);
+          ctx.arc(tableX, tableY - 18.5 * z, 12.5 * z, -Math.PI * 0.68, -Math.PI * 0.32);
+          ctx.closePath();
           ctx.fill();
           // Parasol pole
           ctx.strokeStyle = '#94a3b8';
           ctx.lineWidth = 1.5 * z;
           ctx.beginPath();
-          ctx.moveTo(tableX, tableY - 18 * z);
-          ctx.lineTo(tableX, tableY);
+          ctx.moveTo(tableX, tableY - 18.5 * z);
+          ctx.lineTo(tableX, tableY + 1 * z);
           ctx.stroke();
-          // Small round wooden tabletop
+          // Round wooden tabletop with coffee cup & pastry plate
           ctx.fillStyle = '#78350f';
           ctx.beginPath();
-          ctx.ellipse(tableX, tableY - 6 * z, 8 * z, 4 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(tableX, tableY - 5.5 * z, 8.8 * z, 4.4 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 0.7 * z;
+          ctx.stroke();
+          // Tiny coffee cup & saucer on bistro table
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(tableX - 2.2 * z, tableY - 6.2 * z, 1.5 * z, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.arc(tableX + 2.4 * z, tableY - 5.8 * z, 1.6 * z, 0, Math.PI * 2);
           ctx.fill();
 
-          // Woven bistro chair tucked beside the table
-          ctx.fillStyle = '#92400e';
-          ctx.fillRect(tableX + 9 * z, tableY - 4 * z, 5 * z, 4 * z); // seat
-          ctx.fillRect(tableX + 12 * z, tableY - 11 * z, 2 * z, 8 * z); // backrest
-          ctx.strokeStyle = '#78350f';
-          ctx.lineWidth = 0.8 * z;
-          ctx.strokeRect(tableX + 9 * z, tableY - 4 * z, 5 * z, 4 * z);
+          // Two woven bistro chairs flanking the table
+          [-12.5, 9.2].forEach((chOff, cIdx) => {
+            const cx = tableX + chOff * z;
+            ctx.fillStyle = '#92400e';
+            ctx.fillRect(cx, tableY - 4 * z, 4.8 * z, 3.8 * z);
+            ctx.fillRect(cIdx === 0 ? cx : cx + 3 * z, tableY - 10.5 * z, 1.8 * z, 7.5 * z);
+          });
 
-          // A-Frame Chalkboard Easel Menu beside Cafe
-          const easelX = pt.x + 26 * z;
-          const easelY = pt.y + 6 * z;
-          // Wooden A-frame legs
+          // Potted Monstera / Tropical Herb Planters on Patio Corners
+          [-28.5, 34.5].forEach((pxOff) => {
+            const potX = pt.x + pxOff * z;
+            const potY = pt.y + 8.5 * z;
+            ctx.fillStyle = '#c2410c';
+            ctx.beginPath();
+            ctx.roundRect(potX - 3.2 * z, potY - 4.2 * z, 6.4 * z, 4.8 * z, 1 * z);
+            ctx.fill();
+            ctx.fillStyle = '#16a34a';
+            ctx.beginPath();
+            ctx.arc(potX - 1.8 * z, potY - 6.2 * z, 2.6 * z, 0, Math.PI * 2);
+            ctx.arc(potX + 1.8 * z, potY - 6.0 * z, 2.5 * z, 0, Math.PI * 2);
+            ctx.arc(potX, potY - 8.0 * z, 2.8 * z, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          // A-Frame Chalkboard Easel Menu beside Lapak Refleksia
+          const easelX = pt.x + 26.5 * z;
+          const easelY = pt.y + 6.5 * z;
           ctx.strokeStyle = '#78350f';
           ctx.lineWidth = 1.4 * z;
           ctx.beginPath();
-          ctx.moveTo(easelX, easelY - 14 * z);
+          ctx.moveTo(easelX, easelY - 14.5 * z);
           ctx.lineTo(easelX - 6 * z, easelY + 4 * z);
-          ctx.moveTo(easelX, easelY - 14 * z);
+          ctx.moveTo(easelX, easelY - 14.5 * z);
           ctx.lineTo(easelX + 6 * z, easelY + 4 * z);
           ctx.stroke();
-          // Slate Blackboard
           ctx.fillStyle = '#0f172a';
-          ctx.fillRect(easelX - 5 * z, easelY - 11 * z, 10 * z, 11 * z);
-          ctx.strokeStyle = '#92400e';
-          ctx.lineWidth = 0.8 * z;
-          ctx.strokeRect(easelX - 5 * z, easelY - 11 * z, 10 * z, 11 * z);
-          // Chalk menu text
+          ctx.fillRect(easelX - 5.2 * z, easelY - 11.5 * z, 10.4 * z, 11.5 * z);
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 0.85 * z;
+          ctx.strokeRect(easelX - 5.2 * z, easelY - 11.5 * z, 10.4 * z, 11.5 * z);
           ctx.fillStyle = '#fef08a';
-          ctx.font = `bold ${Math.round(3.8 * z)}px sans-serif`;
+          ctx.font = `bold ${Math.round(3.4 * z)}px sans-serif`;
           ctx.textAlign = 'center';
-          ctx.fillText('MENU', easelX, easelY - 7 * z);
+          ctx.fillText('LAPAK', easelX, easelY - 8.2 * z);
           ctx.fillStyle = '#ffffff';
-          ctx.font = `${Math.round(2.8 * z)}px sans-serif`;
-          ctx.fillText('☕ 2 XP', easelX, easelY - 3.5 * z);
-          ctx.fillText('🥐 1 XP', easelX, easelY - 0.5 * z);
+          ctx.font = `${Math.round(2.7 * z)}px sans-serif`;
+          ctx.fillText('☕ 2 XP', easelX, easelY - 4.8 * z);
+          ctx.fillText('🥐 1 XP', easelX, easelY - 1.8 * z);
 
-          // Coffee Bean Barrel with brass bands
-          const barrelX = pt.x - 22 * z;
-          const barrelY = pt.y + 8 * z;
+          // Coffee Bean Barrel with brass bands & Sacks of Flour/Coffee
+          const barrelX = pt.x - 21 * z;
+          const barrelY = pt.y + 8.5 * z;
           ctx.fillStyle = '#78350f';
           ctx.beginPath();
-          ctx.ellipse(barrelX, barrelY, 4.5 * z, 6 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(barrelX, barrelY, 4.6 * z, 6 * z, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.strokeStyle = '#f59e0b';
-          ctx.lineWidth = 0.8 * z;
+          ctx.lineWidth = 0.85 * z;
           ctx.stroke();
-          // Barrel brass hoop lines
           ctx.strokeStyle = '#d97706';
           ctx.beginPath();
           ctx.moveTo(barrelX - 4 * z, barrelY - 2 * z);
@@ -13616,18 +14610,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineTo(barrelX + 4 * z, barrelY + 2 * z);
           ctx.stroke();
 
-          // Sack of Flour ("TEPUNG") beside barrel
+          // Burlap Sack ("KOPI") beside barrel
           ctx.fillStyle = '#fef3c7';
           ctx.beginPath();
-          ctx.roundRect(barrelX + 8 * z, barrelY - 1 * z, 6 * z, 5.5 * z, 2 * z);
+          ctx.roundRect(barrelX + 7.5 * z, barrelY - 1 * z, 6.5 * z, 5.5 * z, 2 * z);
           ctx.fill();
           ctx.strokeStyle = '#d97706';
           ctx.lineWidth = 0.6 * z;
           ctx.stroke();
           ctx.fillStyle = '#92400e';
-          ctx.font = `bold ${Math.round(2.2 * z)}px sans-serif`;
+          ctx.font = `bold ${Math.round(2.3 * z)}px sans-serif`;
           ctx.textAlign = 'center';
-          ctx.fillText('FLOUR', barrelX + 11 * z, barrelY + 2.5 * z);
+          ctx.fillText('KOPI', barrelX + 10.8 * z, barrelY + 2.4 * z);
           ctx.restore();
         } else if (item.type === 'housing_gate') {
           // GERBANG & PAPAN KOMPLEKS PERUMAHAN GURU & WISMA DKV (Di Belakang Perpustakaan Kampus [-6.55, 0])
@@ -13914,9 +14908,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
           ctx.restore();
         } else if (item.type === 'avatar') {
-          // AVATARS (Smooth, Natural Leg Swing, Arm Swing, and Gentle Bobbing)
+          // AVATARS (Smooth, Natural Leg Swing, Arm Swing, Gentle Bobbing & Banyan Treehouse Branch Elevation)
           const av = item.data;
-          const pt = toScreen(av.wx, av.wy, 0, camera.x, camera.y);
+          const avBranchElev = getBanyanTreehouseElevation(av.wx, av.wy);
+          const pt = toScreen(av.wx, av.wy, avBranchElev.elevation, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
           const isFemale = item.isPlayer
@@ -14534,6 +15529,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineTo(pt.x - 2.2 * z, avY - 12.0 * z);
             ctx.closePath();
             ctx.fill();
+          } else if (av.role === 'penjaga_kolam') {
+            // @SUFRI (AHLI TANAMAN & PENJAGA GERBANG HUTAN): Kemeja Botani Krem-Hijau + Rompi Lapangan Ahli Tanaman (Olive-Khaki Botanist Vest) + Lencana Daun Flora
+            ctx.fillStyle = '#ecfccb'; // Soft sage-cream botanist shirt
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.4 * z, avY - 14.2 * z, 10.8 * z, 8.8 * z, 2.2 * z);
+            ctx.fill();
+            // Olive-Green Botanist Field Vest panels (Left & Right)
+            ctx.fillStyle = '#3f6212';
+            ctx.fillRect(pt.x - 5.2 * z, avY - 14.0 * z, 3.8 * z, 8.4 * z);
+            ctx.fillRect(pt.x + 1.4 * z, avY - 14.0 * z, 3.8 * z, 8.4 * z);
+            // Khaki herbarium & seed utility pockets on vest
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(pt.x - 4.7 * z, avY - 9.2 * z, 2.8 * z, 2.6 * z);
+            ctx.fillRect(pt.x + 1.9 * z, avY - 9.2 * z, 2.8 * z, 2.6 * z);
+            // Green leaf specimen badge on left chest
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.ellipse(pt.x - 3.2 * z, avY - 11.8 * z, 1.5 * z, 0.9 * z, -0.4, 0, Math.PI * 2);
+            ctx.fill();
+            // Brown leather belt at waist
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(pt.x - 5.2 * z, avY - 6.4 * z, 10.4 * z, 1.2 * z);
           } else if (isJournalistAvatar) {
             // TAMU KOTA (WARTAWAN / REPORTER): Light-Blue Press Shirt + Khaki Multi-Pocket Journalist Vest + Hanging "PRESS" ID Card Lanyard
             ctx.fillStyle = '#bae6fd';
@@ -14779,6 +15796,57 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(pt.x + 4.6 * z, avY - 10 * z, 2.4 * z, 2.6 * z);
+          } else if (av.role === 'penjaga_kolam') {
+            // @SUFRI (AHLI TANAMAN): Tangan kiri memegang pot terakota berisi bibit tanaman hijau, tangan kanan memegang kaca pembesar (lup botani)
+            const inspectSway = Math.sin(elapsed * 3.2) * 0.8 * z;
+            ctx.fillStyle = '#ecfccb';
+            ctx.fillRect(pt.x - 7.1 * z, avY - 13.0 * z, 2.2 * z, 6.2 * z);
+            ctx.fillRect(pt.x + 4.9 * z, avY - 13.0 * z + inspectSway * 0.4, 2.2 * z, 6.0 * z);
+            // Hands
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x - 6.0 * z, avY - 6.6 * z, 1.3 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 6.0 * z, avY - 6.8 * z + inspectSway * 0.4, 1.3 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Terracotta Mini Pot with Rare Green Seedling held in Left Hand
+            const potX = pt.x - 6.4 * z;
+            const potY = avY - 7.5 * z;
+            ctx.fillStyle = '#c2410c';
+            ctx.beginPath();
+            ctx.moveTo(potX - 2.1 * z, potY - 2.4 * z);
+            ctx.lineTo(potX + 2.1 * z, potY - 2.4 * z);
+            ctx.lineTo(potX + 1.5 * z, potY + 0.8 * z);
+            ctx.lineTo(potX - 1.5 * z, potY + 0.8 * z);
+            ctx.closePath();
+            ctx.fill();
+            // Sprout stem & two lush green botanical leaves
+            ctx.strokeStyle = '#15803d';
+            ctx.lineWidth = 1.0 * z;
+            ctx.beginPath();
+            ctx.moveTo(potX, potY - 2.4 * z);
+            ctx.lineTo(potX, potY - 5.6 * z);
+            ctx.stroke();
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.ellipse(potX - 1.5 * z, potY - 5.2 * z, 1.7 * z, 0.9 * z, -0.45, 0, Math.PI * 2);
+            ctx.ellipse(potX + 1.5 * z, potY - 5.5 * z, 1.7 * z, 0.9 * z, 0.45, 0, Math.PI * 2);
+            ctx.fill();
+            // Brass Botanist Magnifying Glass (Lup Ahli Tanaman) in Right Hand
+            const loupeX = pt.x + 7.5 * z;
+            const loupeY = avY - 9.2 * z + inspectSway;
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 1.3 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x + 6.0 * z, avY - 6.8 * z + inspectSway * 0.4);
+            ctx.lineTo(loupeX - 0.6 * z, loupeY + 1.2 * z);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(186, 230, 253, 0.75)';
+            ctx.beginPath();
+            ctx.arc(loupeX, loupeY, 2.1 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.0 * z;
+            ctx.stroke();
           } else if (isDancingNow) {
             // DANCING ARMS: Alternating disco arm pump & groove
             const beat = (elapsed * 8) % (Math.PI * 2);
@@ -15136,6 +16204,66 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(pt.x - 3.3 * z, avY - 19.2 * z, 0.9 * z, 0.9 * z);
             ctx.fillRect(pt.x + 1.5 * z, avY - 19.2 * z, 0.9 * z, 0.9 * z);
+          } else if (av.role === 'penjaga_kolam') {
+            // @SUFRI (PERAWAKAN AGAK TUA BERKACAMATA AHLI TANAMAN): Rambut Beruban Perak, Kerutan Dahi Bijak, Kumis & Janggut Putih Rapi, Kacamata Bulat Emas
+            // Silver-grey hair at crown & temples (agak tua / beruban rapi)
+            ctx.fillStyle = '#cbd5e1';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 21.0 * z, 5.4 * z, Math.PI * 0.95, Math.PI * 0.05);
+            ctx.fill();
+            // Side silver hair tufts at temples
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(pt.x - 5.3 * z, avY - 21.0 * z, 1.6 * z, 3.0 * z);
+            ctx.fillRect(pt.x + 3.7 * z, avY - 21.0 * z, 1.6 * z, 3.0 * z);
+            // Receding mature forehead highlight & subtle wisdom lines
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 20.6 * z, 3.1 * z, 1.3 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(120, 53, 15, 0.38)';
+            ctx.lineWidth = 0.65 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 2.0 * z, avY - 20.7 * z);
+            ctx.lineTo(pt.x + 2.0 * z, avY - 20.7 * z);
+            ctx.moveTo(pt.x - 1.5 * z, avY - 19.9 * z);
+            ctx.lineTo(pt.x + 1.5 * z, avY - 19.9 * z);
+            ctx.stroke();
+            // Bushy silver eyebrows
+            ctx.fillStyle = '#e2e8f0';
+            ctx.fillRect(pt.x - 3.6 * z, avY - 19.6 * z, 2.2 * z, 0.75 * z);
+            ctx.fillRect(pt.x + 1.4 * z, avY - 19.6 * z, 2.2 * z, 0.75 * z);
+            // Classic Round Gold-Rimmed Botanist Glasses (Berkacamata)
+            ctx.fillStyle = 'rgba(186, 230, 253, 0.72)';
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.2 * z, avY - 18.1 * z, 2.0 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 2.2 * z, avY - 18.1 * z, 2.0 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 1.15 * z;
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.2 * z, avY - 18.1 * z, 2.0 * z, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(pt.x + 2.2 * z, avY - 18.1 * z, 2.0 * z, 0, Math.PI * 2);
+            ctx.stroke();
+            // Gold bridge between lenses
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 0.2 * z, avY - 18.1 * z);
+            ctx.lineTo(pt.x + 0.2 * z, avY - 18.1 * z);
+            ctx.stroke();
+            // Lens glint
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 3.0 * z, avY - 18.9 * z, 0.8 * z, 0.8 * z);
+            ctx.fillRect(pt.x + 1.4 * z, avY - 18.9 * z, 0.8 * z, 0.8 * z);
+            // Distinguished silver-grey mustache & short goatee beard
+            ctx.fillStyle = '#cbd5e1';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 15.6 * z, 2.4 * z, 0.85 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 14.0 * z, 1.45 * z, 0, Math.PI);
+            ctx.fill();
           } else if (isJournalistAvatar) {
             // TAMU KOTA (WARTAWAN / REPORTER): Classic Brown Reporter Fedora Hat with Dark Hatband, White "PRESS" Ticket Card & Journalist Glasses
             // Hair under fedora
@@ -15615,7 +16743,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           } else if (av.role === 'penjaga_literasi') {
             labelText = `@patra`;
           } else if (av.role === 'penjaga_kolam') {
-            labelText = `@tomi`;
+            labelText = `@Sufri`;
           } else if (av.role === 'kepala_balai') {
             labelText = `@sony`;
           }
@@ -16316,217 +17444,203 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.restore();
         } else if (item.type === 'river_heron') {
           // ---------------------------------------------------------
-          // BURUNG BANGAU DI SUNGAI (Singgah di Dangkal, Berburu Ikan, & Terbang Berkeliling)
+          // 3 BURUNG BANGAU PUTIH (Ardea alba) DI SUNGAI & MUARA DANAU
+          // (Siklus Berbeda & Smooth: Singgah di Air Dangkal, Mematuk Ikan, Lepas Landas, Melayang, & Mendarat Halus)
           // ---------------------------------------------------------
           const z = zoomLevelRef.current;
-          const cycleTime = elapsed % 20; // 20-second lifecycle
-
-          let hWx = item.wx;
-          let hWy = item.wy;
-          let hAlt = 0;
-          let isFlying = false;
-          let flightHeading = 0;
-          let flapPhase = 0;
-          let peckDown = 0;
-
-          if (cycleTime <= 8.0) {
-            // PHASE 1: Singgah di dangkal sungai, memantau air & mematuk ikan
-            hWx = 7.35;
-            hWy = -3.85;
-            hAlt = -0.6; // wading in shallow water
-            isFlying = false;
-            // Pecking behavior every ~2.5 seconds
-            const peckSub = (cycleTime % 2.5);
-            if (peckSub > 1.8 && peckSub < 2.3) {
-              peckDown = Math.sin(((peckSub - 1.8) / 0.5) * Math.PI);
-            }
-          } else if (cycleTime <= 11.0) {
-            // PHASE 2: Lepas landas (Take-off) & menanjak sepanjang sungai
-            const prog = (cycleTime - 8.0) / 3.0; // 0 to 1
-            hWx = 7.35 + Math.sin(prog * Math.PI) * 0.3;
-            hWy = -3.85 + prog * 2.6;
-            hAlt = prog * 36;
-            isFlying = true;
-            flightHeading = 0.42;
-            flapPhase = Math.sin(elapsed * 12.0); // rapid take-off flaps
-          } else if (cycleTime <= 16.0) {
-            // PHASE 3: Terbang melayang anggun (Soaring & Banking) menyusuri sungai
-            const prog = (cycleTime - 11.0) / 5.0; // 0 to 1
-            hWx = 7.35 + Math.sin(prog * Math.PI * 2) * 0.45;
-            hWy = -1.25 + Math.sin(prog * Math.PI) * 2.8;
-            hAlt = 36 + Math.sin(prog * Math.PI) * 6;
-            isFlying = true;
-            flightHeading = 0.42 + Math.cos(prog * Math.PI) * 0.35;
-            flapPhase = Math.sin(elapsed * 6.5); // majestic soaring flaps
-          } else {
-            // PHASE 4: Menukik kembali, rem angin, mendarat di dangkal sungai
-            const prog = (cycleTime - 16.0) / 4.0; // 0 to 1
-            hWx = 7.35 + (1 - prog) * 0.25;
-            hWy = -3.85 + (1 - prog) * 1.5;
-            hAlt = (1 - prog) * 36 - 0.6;
-            isFlying = prog < 0.88;
-            flightHeading = -2.7; // banking back north
-            flapPhase = Math.sin(elapsed * 9.0) * (1 - prog); // cupped air-brake flaps
-          }
+          const {
+            wx: hWx,
+            wy: hWy,
+            alt: hAlt,
+            isFlying,
+            flightProgress,
+            flightHeading,
+            flapPhase,
+            peckDown,
+            wadeStep,
+            facingDir,
+          } = item;
 
           const hPt = toScreen(hWx, hWy, hAlt, camera.x, camera.y);
           const shadowPt = toScreen(hWx, hWy, -0.6, camera.x, camera.y);
 
           ctx.save();
 
-          // Cast shadow on river water surface
-          const shadowAlpha = Math.max(0.12, 0.38 - (hAlt / 40) * 0.22);
-          const shadowScale = Math.max(0.5, 1.0 - (hAlt / 40) * 0.45);
+          // Cast soft shadow on river water surface
+          const shadowAlpha = Math.max(0.10, 0.36 - (Math.max(0, hAlt) / 42) * 0.22);
+          const shadowScale = Math.max(0.48, 1.0 - (Math.max(0, hAlt) / 42) * 0.45);
           ctx.fillStyle = `rgba(15, 23, 42, ${shadowAlpha.toFixed(2)})`;
           ctx.beginPath();
-          ctx.ellipse(shadowPt.x, shadowPt.y, 8.5 * z * shadowScale, 3.8 * z * shadowScale, 0.4, 0, Math.PI * 2);
+          ctx.ellipse(shadowPt.x, shadowPt.y, 8.2 * z * shadowScale, 3.6 * z * shadowScale, 0.35, 0, Math.PI * 2);
           ctx.fill();
 
           if (!isFlying) {
             // -------------------------------------------------------
-            // WADING / STANDING HERON (Ardea alba / Burung Bangau Putih)
+            // WADING / STANDING GREAT WHITE EGRET (Ardea alba)
             // -------------------------------------------------------
             ctx.translate(hPt.x, hPt.y);
+            ctx.scale(facingDir, 1);
 
-            // Water ripple around wading feet
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
+            // Concentric water ripples around wading legs
+            const ripPulse = 0.85 + Math.sin(elapsed * 3.2 + item.heronId * 2.1) * 0.18;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.42)';
             ctx.lineWidth = 0.8 * z;
             ctx.beginPath();
-            ctx.ellipse(0, 0, 5.2 * z, 2.2 * z, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, 5.4 * z * ripPulse, 2.3 * z * ripPulse, 0, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Long yellow-orange wading legs
-            ctx.strokeStyle = '#d97706';
-            ctx.lineWidth = 1.1 * z;
+            // Long slender Ardea alba wading legs (dark lower tarsus with warm yellow-olive upper tibia)
+            const legStride = wadeStep * 0.9 * z;
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1.15 * z;
             // Left leg
             ctx.beginPath();
-            ctx.moveTo(-1.4 * z, 0);
-            ctx.lineTo(-1.2 * z, -9.5 * z);
+            ctx.moveTo(-1.3 * z - legStride * 0.4, 0);
+            ctx.lineTo(-1.1 * z, -9.8 * z);
             ctx.stroke();
-            // Right leg (slight forward step)
+            // Right leg
             ctx.beginPath();
-            ctx.moveTo(1.2 * z, 0);
-            ctx.lineTo(0.8 * z, -9.5 * z);
+            ctx.moveTo(1.3 * z + legStride * 0.4, 0);
+            ctx.lineTo(0.9 * z, -9.8 * z);
             ctx.stroke();
 
-            // Slender white egret body
+            // Pure snow-white Great Egret body (Ardea alba) with delicate ornamental back plumes (aigrettes)
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.ellipse(0, -13 * z, 4.2 * z, 6.2 * z, 0.25, 0, Math.PI * 2);
+            ctx.ellipse(0, -13.2 * z, 4.5 * z, 6.4 * z, 0.24, 0, Math.PI * 2);
             ctx.fill();
 
-            // Soft feather shade on breast
+            // Subtle pearl-white folded wing shading & filamentous tail plumes
             ctx.fillStyle = '#e2e8f0';
             ctx.beginPath();
-            ctx.ellipse(0.8 * z, -11.5 * z, 2.4 * z, 4.2 * z, 0.25, 0, Math.PI * 2);
+            ctx.ellipse(0.6 * z, -12.0 * z, 2.5 * z, 4.4 * z, 0.24, 0, Math.PI * 2);
             ctx.fill();
-
-            // Elegant S-curved long neck & head
-            const headAngle = peckDown * 0.85;
-            const headX = (2.5 + peckDown * 4.5) * z;
-            const headY = (-19 + peckDown * 9.5) * z;
-
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.4 * z;
+            ctx.strokeStyle = '#f8fafc';
+            ctx.lineWidth = 0.85 * z;
             ctx.beginPath();
-            ctx.moveTo(0, -17 * z);
-            ctx.quadraticCurveTo(1.5 * z, -18 * z, headX, headY);
+            ctx.moveTo(-2.5 * z, -10.0 * z);
+            ctx.lineTo(-5.2 * z, -7.2 * z);
+            ctx.moveTo(-2.0 * z, -9.2 * z);
+            ctx.lineTo(-4.6 * z, -6.5 * z);
             ctx.stroke();
 
-            // Heron head
+            // Characteristic S-curved slender neck & head (smoothly extending when pecking fish)
+            const headAngle = peckDown * 0.85;
+            const headX = (2.6 + peckDown * 4.8) * z;
+            const headY = (-19.5 + peckDown * 10.2) * z;
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.35 * z;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0.2 * z, -17.0 * z);
+            ctx.bezierCurveTo(
+              -1.2 * z,
+              (-18.5 + peckDown * 3.0) * z,
+              (2.8 + peckDown * 2.0) * z,
+              (-18.0 + peckDown * 6.0) * z,
+              headX,
+              headY
+            );
+            ctx.stroke();
+
+            // Sleek white egret head
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.ellipse(headX, headY, 2.2 * z, 1.4 * z, 0.2 + headAngle, 0, Math.PI * 2);
+            ctx.ellipse(headX, headY, 2.3 * z, 1.45 * z, 0.18 + headAngle, 0, Math.PI * 2);
             ctx.fill();
 
-            // Sharp dagger-shaped yellow bill
+            // Iconic bright yellow-orange dagger bill of Ardea alba
             ctx.fillStyle = '#eab308';
             ctx.beginPath();
-            ctx.moveTo(headX + 1.5 * z, headY - 0.4 * z);
-            ctx.lineTo(headX + 6.8 * z + peckDown * 2 * z, headY + (peckDown * 3.5) * z);
-            ctx.lineTo(headX + 1.5 * z, headY + 0.6 * z);
+            ctx.moveTo(headX + 1.5 * z, headY - 0.45 * z);
+            ctx.lineTo(headX + 7.2 * z + peckDown * 2.2 * z, headY + peckDown * 3.8 * z);
+            ctx.lineTo(headX + 1.5 * z, headY + 0.65 * z);
             ctx.closePath();
             ctx.fill();
 
-            // Splash ring if pecking into water
-            if (peckDown > 0.6) {
-              ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+            // Splash ring & silver minnow glint when bill strikes the water
+            if (peckDown > 0.55) {
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.78)';
               ctx.lineWidth = 1.0 * z;
               ctx.beginPath();
-              ctx.ellipse(headX + 6.8 * z, 0, 4.0 * z, 1.8 * z, 0, 0, Math.PI * 2);
+              ctx.ellipse(headX + 7.0 * z, 0, 4.4 * z * peckDown, 1.9 * z * peckDown, 0, 0, Math.PI * 2);
               ctx.stroke();
             }
 
-            // Black eye dot
+            // Golden-yellow iris & dark pupil
             ctx.fillStyle = '#0f172a';
             ctx.beginPath();
-            ctx.arc(headX + 0.4 * z, headY - 0.3 * z, 0.45 * z, 0, Math.PI * 2);
+            ctx.arc(headX + 0.5 * z, headY - 0.3 * z, 0.48 * z, 0, Math.PI * 2);
             ctx.fill();
           } else {
             // -------------------------------------------------------
-            // FLYING HERON (Wings Outstretched, Long Legs Trailing)
+            // FLYING GREAT WHITE EGRET (Ardea alba — Broad Snow-White Wings, Retracted S-Neck & Trailing Legs)
             // -------------------------------------------------------
             ctx.translate(hPt.x, hPt.y);
             ctx.rotate(flightHeading);
 
-            // Trailing slender legs behind body
-            ctx.strokeStyle = '#d97706';
-            ctx.lineWidth = 0.9 * z;
+            // Smooth landing/takeoff leg extension blend
+            const isNearTouchdown = flightProgress < 0.12 || flightProgress > 0.88;
+            const legDrop = isNearTouchdown ? 2.2 * z : 0;
+
+            // Long dark legs trailing cleanly behind the tail in flight
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1.0 * z;
             ctx.beginPath();
-            ctx.moveTo(-4 * z, 0);
-            ctx.lineTo(-14 * z, -0.6 * z);
-            ctx.moveTo(-4 * z, 0.8 * z);
-            ctx.lineTo(-13.5 * z, 1.2 * z);
+            ctx.moveTo(-4.2 * z, 0);
+            ctx.lineTo(-14.5 * z, -0.6 * z + legDrop);
+            ctx.moveTo(-4.2 * z, 0.8 * z);
+            ctx.lineTo(-14.0 * z, 1.2 * z + legDrop);
             ctx.stroke();
 
-            // Aerodynamic white torso
+            // Streamlined snow-white egret body
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.ellipse(0, 0, 6.2 * z, 2.8 * z, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, 6.5 * z, 2.9 * z, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Retracted S-curve neck in flight & sharp yellow bill
+            // Retracted S-curve neck characteristic of Ardea alba in flight
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.2 * z;
+            ctx.lineWidth = 2.25 * z;
             ctx.beginPath();
-            ctx.moveTo(4 * z, 0);
-            ctx.quadraticCurveTo(7 * z, -1.8 * z, 9.5 * z, 0);
+            ctx.moveTo(4.2 * z, 0);
+            ctx.quadraticCurveTo(7.2 * z, -1.9 * z, 9.8 * z, 0);
             ctx.stroke();
 
-            // Sharp yellow bill
+            // Sharp yellow-orange dagger bill pointing forward
             ctx.fillStyle = '#eab308';
             ctx.beginPath();
-            ctx.moveTo(9.5 * z, -0.6 * z);
-            ctx.lineTo(15.5 * z, 0);
-            ctx.lineTo(9.5 * z, 0.6 * z);
+            ctx.moveTo(9.8 * z, -0.65 * z);
+            ctx.lineTo(16.0 * z, 0);
+            ctx.lineTo(9.8 * z, 0.65 * z);
             ctx.closePath();
             ctx.fill();
 
-            // Outstretched Broad Wings (Left & Right Flapping)
-            const wingSpan = 16 * z;
-            const wingFlapY = flapPhase * 9 * z;
+            // Broad, arched snow-white wings with smooth sinusoidal flapping & primary feather tips
+            const wingSpan = 16.8 * z;
+            const wingFlapY = flapPhase * 9.2 * z;
 
-            // Port (Left) Wing
+            // Left Wing
             ctx.fillStyle = '#f8fafc';
             ctx.beginPath();
-            ctx.moveTo(1 * z, -1.5 * z);
-            ctx.quadraticCurveTo(0, -wingSpan * 0.7, -5 * z, -wingSpan + wingFlapY);
-            ctx.lineTo(-7 * z, -wingSpan * 0.8 + wingFlapY * 0.8);
-            ctx.lineTo(-3 * z, -1.5 * z);
+            ctx.moveTo(1.2 * z, -1.5 * z);
+            ctx.quadraticCurveTo(0.2 * z, -wingSpan * 0.68, -5.2 * z, -wingSpan + wingFlapY);
+            ctx.lineTo(-7.4 * z, -wingSpan * 0.8 + wingFlapY * 0.8);
+            ctx.lineTo(-3.2 * z, -1.5 * z);
             ctx.closePath();
             ctx.fill();
-            // Wingtip flight feathers (remiges)
             ctx.strokeStyle = '#cbd5e1';
             ctx.lineWidth = 0.7 * z;
             ctx.stroke();
 
-            // Starboard (Right) Wing
+            // Right Wing
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.moveTo(1 * z, 1.5 * z);
-            ctx.quadraticCurveTo(0, wingSpan * 0.7, -5 * z, wingSpan - wingFlapY);
-            ctx.lineTo(-7 * z, wingSpan * 0.8 - wingFlapY * 0.8);
-            ctx.lineTo(-3 * z, 1.5 * z);
+            ctx.moveTo(1.2 * z, 1.5 * z);
+            ctx.quadraticCurveTo(0.2 * z, wingSpan * 0.68, -5.2 * z, wingSpan - wingFlapY);
+            ctx.lineTo(-7.4 * z, wingSpan * 0.8 - wingFlapY * 0.8);
+            ctx.lineTo(-3.2 * z, 1.5 * z);
             ctx.closePath();
             ctx.fill();
             ctx.strokeStyle = '#e2e8f0';
@@ -16972,11 +18086,248 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.beginPath();
             ctx.arc(headX + 0.5 * z, headY - 0.4 * z, 0.35 * z, 0, Math.PI * 2);
             ctx.fill();
+          } else if (item.kind === 'fox') {
+            // =======================================================
+            // 6. RUBAH HUTAN MERAH (Forest Red Fox — Mamalia Hutan Belantara)
+            // =======================================================
+            const foxLegSwing = isWalking ? Math.sin(elapsed * 4.6) * 2.0 * z : 0;
+            const tailSway = Math.sin(elapsed * 2.8) * 0.14;
+            const sniffBob = isWalking ? 0 : Math.sin(elapsed * 5.5) * 0.7 * z;
+
+            // Ground shadow
+            ctx.fillStyle = isNight ? 'rgba(15, 23, 42, 0.38)' : 'rgba(0, 0, 0, 0.24)';
+            ctx.beginPath();
+            ctx.ellipse(0, 1.1 * z, 7.5 * z, 3.2 * z, 0.15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Large Bushy Fox Tail with Snowy White Tip
+            ctx.save();
+            ctx.translate(-5.2 * z, -4.8 * z);
+            ctx.rotate(tailSway);
+            ctx.fillStyle = '#c2410c';
+            ctx.beginPath();
+            ctx.ellipse(-3.5 * z, -1.2 * z, 4.6 * z, 2.1 * z, 0.35, 0, Math.PI * 2);
+            ctx.fill();
+            // White tail tip
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(-6.8 * z, -2.4 * z, 1.9 * z, 1.4 * z, 0.35, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Dark-stockinged slender fox legs
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1.2 * z;
+            ctx.beginPath();
+            ctx.moveTo(-3.8 * z, -3.2 * z);
+            ctx.lineTo(-4.4 * z - foxLegSwing, 1.0 * z);
+            ctx.moveTo(-2.0 * z, -3.2 * z);
+            ctx.lineTo(-2.2 * z + foxLegSwing, 1.1 * z);
+            ctx.moveTo(2.4 * z, -3.2 * z);
+            ctx.lineTo(2.8 * z + foxLegSwing, 1.1 * z);
+            ctx.moveTo(4.0 * z, -3.2 * z);
+            ctx.lineTo(4.5 * z - foxLegSwing, 1.0 * z);
+            ctx.stroke();
+
+            // Sleek Rufous-Orange Fox Body
+            ctx.fillStyle = '#ea580c';
+            ctx.beginPath();
+            ctx.ellipse(0, -5.2 * z, 5.8 * z, 3.2 * z, -0.08, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Snowy White Chest Bib & Underbelly
+            ctx.fillStyle = '#fff7ed';
+            ctx.beginPath();
+            ctx.ellipse(1.6 * z, -4.2 * z, 3.6 * z, 1.6 * z, -0.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Fox Head & Pointed Muzzle
+            ctx.fillStyle = '#ea580c';
+            ctx.beginPath();
+            ctx.ellipse(4.8 * z, -7.2 * z + sniffBob, 2.8 * z, 2.1 * z, 0.15, 0, Math.PI * 2);
+            ctx.fill();
+            // White cheek & jaw fur
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(4.2 * z, -6.5 * z + sniffBob);
+            ctx.lineTo(8.2 * z, -6.4 * z + sniffBob);
+            ctx.lineTo(4.8 * z, -5.4 * z + sniffBob);
+            ctx.closePath();
+            ctx.fill();
+            // Black nose tip
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(8.1 * z, -6.6 * z + sniffBob, 0.55 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Pointed triangular ears with dark tips
+            ctx.fillStyle = '#c2410c';
+            ctx.beginPath();
+            ctx.moveTo(3.2 * z, -8.5 * z + sniffBob);
+            ctx.lineTo(4.0 * z, -11.4 * z + sniffBob);
+            ctx.lineTo(5.1 * z, -8.6 * z + sniffBob);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(4.0 * z, -11.0 * z + sniffBob, 0.55 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Amber/dark eye
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(5.8 * z, -7.5 * z + sniffBob, 0.45 * z, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (item.kind === 'kancil') {
+            // =======================================================
+            // 7. KANCIL / PELANDUK HUTAN (Lesser Mouse-Deer — Mamalia Kecil Hutan Tropis)
+            // =======================================================
+            const kancilStep = isWalking ? Math.sin(elapsed * 5.0) * 1.6 * z : 0;
+            const headGraze = isWalking ? 0 : Math.sin(elapsed * 3.2) * 0.9 * z;
+
+            // Ground shadow
+            ctx.fillStyle = isNight ? 'rgba(15, 23, 42, 0.35)' : 'rgba(0, 0, 0, 0.22)';
+            ctx.beginPath();
+            ctx.ellipse(0, 0.9 * z, 5.6 * z, 2.5 * z, 0.12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pencil-thin delicate mouse-deer legs
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 0.95 * z;
+            ctx.beginPath();
+            ctx.moveTo(-3.2 * z, -2.8 * z);
+            ctx.lineTo(-3.6 * z - kancilStep, 0.9 * z);
+            ctx.moveTo(-1.8 * z, -2.8 * z);
+            ctx.lineTo(-1.9 * z + kancilStep, 1.0 * z);
+            ctx.moveTo(2.0 * z, -2.5 * z);
+            ctx.lineTo(2.3 * z + kancilStep, 1.0 * z);
+            ctx.moveTo(3.2 * z, -2.5 * z);
+            ctx.lineTo(3.5 * z - kancilStep, 0.9 * z);
+            ctx.stroke();
+
+            // Characteristic arched, rounded hindquarters & golden-brown coat of Kancil
+            ctx.fillStyle = '#b45309';
+            ctx.beginPath();
+            ctx.ellipse(-0.4 * z, -4.8 * z, 4.6 * z, 3.1 * z, 0.14, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Signature white throat/chest chevron stripe of Kancil
+            ctx.strokeStyle = '#fef3c7';
+            ctx.lineWidth = 1.1 * z;
+            ctx.beginPath();
+            ctx.moveTo(2.2 * z, -3.5 * z);
+            ctx.lineTo(3.8 * z, -5.8 * z + headGraze * 0.5);
+            ctx.stroke();
+
+            // Petite tapering head & large gentle dark eye
+            ctx.fillStyle = '#d97706';
+            ctx.beginPath();
+            ctx.ellipse(4.1 * z, -6.2 * z + headGraze, 2.2 * z, 1.5 * z, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            // Rounded ears
+            ctx.fillStyle = '#92400e';
+            ctx.beginPath();
+            ctx.ellipse(2.9 * z, -7.6 * z + headGraze, 1.1 * z, 0.65 * z, -0.5, 0, Math.PI * 2);
+            ctx.fill();
+            // Expressive dark eye with white highlight
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(4.6 * z, -6.4 * z + headGraze, 0.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Tiny dark nose
+            ctx.beginPath();
+            ctx.arc(6.1 * z, -5.9 * z + headGraze, 0.4 * z, 0, Math.PI * 2);
+            ctx.fill();
           }
 
           ctx.restore();
         }
       });
+
+      // -----------------------------------------------------------
+      // BURUNG HUTAN YANG BERPUTAR-PUTAR DI ATAS HUTAN REFLEKSIA (Soaring Forest Bird)
+      // -----------------------------------------------------------
+      {
+        const z = zoomLevelRef.current;
+        const orbitAngle = elapsed * 0.48;
+        const orbitRx = 2.05;
+        const orbitRy = 1.28;
+        const centerWx = -3.35;
+        const centerWy = -9.85;
+        const bWx = centerWx + Math.cos(orbitAngle) * orbitRx;
+        const bWy = centerWy + Math.sin(orbitAngle) * orbitRy;
+        const bAlt = 48 + Math.sin(elapsed * 1.6) * 4.5;
+
+        const nextAngle = orbitAngle + 0.04;
+        const nextWx = centerWx + Math.cos(nextAngle) * orbitRx;
+        const nextWy = centerWy + Math.sin(nextAngle) * orbitRy;
+
+        const bPt = toScreen(bWx, bWy, bAlt, camera.x, camera.y);
+        const nextPt = toScreen(nextWx, nextWy, bAlt, camera.x, camera.y);
+        const shadowPt = toScreen(bWx, bWy, 0, camera.x, camera.y);
+        const heading = Math.atan2(nextPt.y - bPt.y, nextPt.x - bPt.x);
+        const flap = Math.sin(elapsed * 5.8) * 0.55;
+
+        ctx.save();
+        // Soft ground shadow moving beneath the circling bird in Hutan Refleksia
+        ctx.fillStyle = isNight ? 'rgba(15, 23, 42, 0.16)' : 'rgba(15, 23, 42, 0.20)';
+        ctx.beginPath();
+        ctx.ellipse(shadowPt.x, shadowPt.y, 5.5 * z, 2.5 * z, heading, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Soaring Forest Bird (Elang / Burung Hutan Berputar-putar di Atas Kanopi Hutan)
+        ctx.translate(bPt.x, bPt.y);
+        ctx.rotate(heading);
+
+        const span = 11.5 * z;
+        const wingTipY = flap * 4.5 * z;
+
+        // Fanned tail feathers
+        ctx.fillStyle = '#451a03';
+        ctx.beginPath();
+        ctx.moveTo(-2.5 * z, 0);
+        ctx.lineTo(-7.2 * z, -2.4 * z);
+        ctx.lineTo(-7.8 * z, 0);
+        ctx.lineTo(-7.2 * z, 2.4 * z);
+        ctx.closePath();
+        ctx.fill();
+
+        // Outstretched soaring wings (Left & Right)
+        ctx.fillStyle = '#78350f';
+        ctx.beginPath();
+        ctx.moveTo(1.5 * z, -1.0 * z);
+        ctx.quadraticCurveTo(0, -span * 0.65, -2.8 * z, -span + wingTipY);
+        ctx.lineTo(-4.8 * z, -span * 0.78 + wingTipY * 0.7);
+        ctx.lineTo(-2.5 * z, -1.0 * z);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(1.5 * z, 1.0 * z);
+        ctx.quadraticCurveTo(0, span * 0.65, -2.8 * z, span - wingTipY);
+        ctx.lineTo(-4.8 * z, span * 0.78 - wingTipY * 0.7);
+        ctx.lineTo(-2.5 * z, 1.0 * z);
+        ctx.closePath();
+        ctx.fill();
+
+        // Warm golden-cream wing coverts & body
+        ctx.fillStyle = '#b45309';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 4.6 * z, 1.9 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // White-crested head & yellow beak
+        ctx.fillStyle = '#fef3c7';
+        ctx.beginPath();
+        ctx.arc(3.8 * z, 0, 1.45 * z, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.moveTo(4.8 * z, -0.5 * z);
+        ctx.lineTo(6.8 * z, 0);
+        ctx.lineTo(4.8 * z, 0.5 * z);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
 
       // -----------------------------------------------------------
       // MINIMALIST WATER ARC EFFECT FROM AVATAR TO TREE (1.0s)
@@ -18136,9 +19487,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }`}
         >
           {isCafeMenuOpen ? (
-            /* 1. MENU TOKO ROTI & KAFE (Compact & Semi-Transparent) */
+            /* 1. MENU LAPAK REFLEKSIA (Compact & Semi-Transparent) */
             <aside
-              aria-label="Menu Toko Roti & Kafe"
+              aria-label="Menu Lapak Refleksia"
               className="w-full max-w-[310px] sm:max-w-[340px] pointer-events-auto animate-fade-in-down"
               onPointerDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
@@ -18148,14 +19499,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 <div className="w-full flex items-center justify-between border-b border-slate-700/50 pb-1">
                   <div className="text-[11px] font-bold text-slate-200 flex items-center gap-1 whitespace-nowrap">
                     <span>☕</span>
-                    <span className="font-extrabold text-white">Toko Roti & Kafe Warga</span>
+                    <span className="font-extrabold text-white">Lapak Refleksia</span>
                     <span className="text-slate-400">•</span>
                     <span className="text-amber-300 font-mono text-[10px]">🪙 {studentPoints} XP</span>
                   </div>
                   <button
                     onClick={() => setIsCafeMenuOpen(false)}
                     className="p-0.5 rounded-md text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
-                    title="Tutup Menu Kafe"
+                    title="Tutup Menu Lapak Refleksia"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -18489,6 +19840,91 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     <Pin className="w-3 h-3" />
                     <span>Tulis Jurnal</span>
                   </button>
+                </div>
+              ) : nearbyAction.type === 'treehouse' ? (
+                <div className="bg-[#121e2c]/72 backdrop-blur-md border border-emerald-400/50 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600/80 to-emerald-600/80 border border-amber-300/45 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
+                      🏡
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-amber-300 flex items-center gap-1 leading-none">
+                        <span>{nearbyAction.isUpInTreehouse ? 'Puncak Pohon Beringin' : 'Kaki Gunung • Hutan Barat'}</span>
+                      </div>
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
+                        {nearbyAction.isUpInTreehouse ? 'Rumah Pohon Beringin' : 'Ranting Pohon Beringin'}
+                      </h4>
+                      <p className="text-[9.5px] truncate text-emerald-100/90 leading-tight">
+                        {nearbyAction.isUpInTreehouse
+                          ? 'Masuk ke Rumah Pohon atau turun ranting beringin'
+                          : 'Naik melalui ranting pohon beringin untuk masuk'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {nearbyAction.isUpInTreehouse ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            sounds.playOpenModal();
+                            setIsTreehouseModalOpen(true);
+                          }}
+                          className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/95 to-teal-600/95 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] font-bold border border-emerald-300/50 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                        >
+                          <span>🚪 Masuk</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            const p = playerRef.current;
+                            if (!p) return;
+                            sounds.playClick();
+                            treehouseClimbStageRef.current = 'climbing_down';
+                            afterClimbDownTargetRef.current = null;
+                            p.targetWx = BANYAN_BRANCH_FOOT_COORDS.wx;
+                            p.targetWy = BANYAN_BRANCH_FOOT_COORDS.wy;
+                            p.isMoving = true;
+                            p.isRunning = false;
+                            p.speed = 0.82;
+                          }}
+                          className="py-1 px-2 rounded-lg bg-amber-700/85 hover:bg-amber-600 text-amber-100 text-[10px] font-bold border border-amber-400/40 shadow-sm transition cursor-pointer active:scale-95 whitespace-nowrap"
+                          title="Turun melewati ranting pohon beringin"
+                        >
+                          🌿 Turun
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          const p = playerRef.current;
+                          if (!p) return;
+                          sounds.playClick();
+                          const dFoot = Math.hypot(
+                            p.wx - BANYAN_BRANCH_FOOT_COORDS.wx,
+                            p.wy - BANYAN_BRANCH_FOOT_COORDS.wy
+                          );
+                          if (dFoot < 0.55) {
+                            treehouseClimbStageRef.current = 'climbing_up';
+                            p.targetWx = BANYAN_TREEHOUSE_COORDS.wx;
+                            p.targetWy = BANYAN_TREEHOUSE_COORDS.wy;
+                          } else {
+                            treehouseClimbStageRef.current = 'to_foot';
+                            p.targetWx = BANYAN_BRANCH_FOOT_COORDS.wx;
+                            p.targetWy = BANYAN_BRANCH_FOOT_COORDS.wy;
+                          }
+                          p.isMoving = true;
+                          p.isRunning = false;
+                          p.speed = 0.82;
+                          playerSpeechRef.current = {
+                            text: '🌿 Naik meniti ranting pohon beringin ke Rumah Pohon...',
+                            expiresAt: Date.now() + 3500,
+                          };
+                        }}
+                        className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/95 to-emerald-600/95 hover:from-amber-500 hover:to-emerald-500 text-white text-[10.5px] font-bold border border-amber-300/50 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span>🌿 Naik Ranting</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : nearbyAction.type === 'literacy' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-cyan-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
@@ -19611,6 +21047,179 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   <p className="text-xs text-slate-200 leading-relaxed mt-0.5">{sug.content}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RUMAH POHON BERINGIN HUTAN REFLEKSIA (Di Ujung Kiri Hutan Kaki Gunung) */}
+      {isTreehouseModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 animate-fade-in"
+          onClick={() => setIsTreehouseModalOpen(false)}
+        >
+          <div
+            className="bg-[#101d19] border border-emerald-400/50 rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9)] text-white relative overflow-hidden max-h-[88dvh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3.5 border-b border-emerald-900/70 mb-3.5 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500/25 to-emerald-500/25 text-amber-300 flex items-center justify-center border border-amber-400/40 text-xl">
+                  🏡
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    <span>Rumah Pohon Beringin • Hutan Refleksia</span>
+                  </h3>
+                  <p className="text-[11px] text-emerald-200/80">
+                    Pos Pengamatan Kanopi di Ujung Kiri Hutan Kaki Gunung • Akses via Ranting Beringin
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTreehouseModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 mb-3.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedTreehouseTab('panorama')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition cursor-pointer ${
+                  selectedTreehouseTab === 'panorama'
+                    ? 'bg-emerald-600/35 border-emerald-400 text-white shadow'
+                    : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                🔭 Teropong Kanopi
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedTreehouseTab('ekologi')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition cursor-pointer ${
+                  selectedTreehouseTab === 'ekologi'
+                    ? 'bg-amber-600/35 border-amber-400 text-white shadow'
+                    : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                🌿 Catatan @Sufri
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedTreehouseTab('istirahat')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition cursor-pointer ${
+                  selectedTreehouseTab === 'istirahat'
+                    ? 'bg-teal-600/35 border-teal-400 text-white shadow'
+                    : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                🍵 Balkon Santai
+              </button>
+            </div>
+
+            <div className="space-y-3 overflow-y-auto pr-1 flex-1 text-xs sm:text-sm text-slate-200">
+              {selectedTreehouseTab === 'panorama' && (
+                <div className="space-y-2.5">
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-950/70 via-slate-900/90 to-slate-900 border border-emerald-500/35">
+                    <div className="font-extrabold text-emerald-300 text-xs uppercase tracking-wider mb-1">
+                      🔭 Lensa Teropong Kuningan • Ketinggian 38m MDPL
+                    </div>
+                    <p className="text-xs text-slate-200 leading-relaxed">
+                      Dari beranda kayu di atas tajuk Pohon Beringin raksasa ini, terlihat jelas barisan Gunung Utara yang bergradasi hijau-batu, kepakan 1 burung elang hutan yang berputar di udara, serta kawanan rusa, rubah hutan, kancil, kelinci, dan tupai di bawah kanopi.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                      <div className="font-bold text-amber-300 text-xs">🦢 Timur Laut (Sungai Refleksia)</div>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        3 Burung Bangau Putih (<i>Ardea alba</i>) tampak mendarat dan terbang bergantian secara anggun di tepi danau.
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                      <div className="font-bold text-sky-300 text-xs">🏛️ Selatan (Kota Refleksia)</div>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        Atap Balai Kota, Perpustakaan, Menara Mentor, hingga Lapak Refleksia terlihat harmonis dari puncak pohon.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedTreehouseTab === 'ekologi' && (
+                <div className="space-y-2.5">
+                  <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/35">
+                    <div className="font-extrabold text-amber-300 text-xs mb-1">
+                      🌱 Jurnal Botani Pak @Sufri (Ahli Tanaman Hutan Refleksia)
+                    </div>
+                    <p className="text-xs text-slate-200 leading-relaxed">
+                      &ldquo;Pohon Beringin (<i>Ficus benjamina</i>) di kaki gunung barat ini memiliki ranting rendah berakar gantung yang sangat kokoh, sehingga kita dapat meniti rantingnya langsung menuju Rumah Pohon tanpa merusak batang utama.&rdquo;
+                    </p>
+                  </div>
+                  <ul className="space-y-1.5 text-xs text-slate-300 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <li>• <b>Flora Kanopi:</b> Beringin Tua, Pinus Pegunungan, Pakis Hutan, &amp; Lumut Lembah.</li>
+                    <li>• <b>Fauna Mamalia &amp; Avifauna:</b> Rusa Jantan &amp; Betina, Rubah Merah, Kancil, Kelinci, Tupai, Elang Hutan, &amp; 3 Bangau Putih.</li>
+                  </ul>
+                </div>
+              )}
+
+              {selectedTreehouseTab === 'istirahat' && (
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-950/60 to-slate-900 border border-teal-500/35 flex flex-col items-center text-center gap-2.5">
+                  <span className="text-3xl">🍃</span>
+                  <h4 className="font-extrabold text-white text-sm">
+                    Hirup Udara Segar Kanopi Hutan &amp; Kaki Gunung
+                  </h4>
+                  <p className="text-xs text-slate-300 max-w-md leading-relaxed">
+                    Dengarkan semilir angin pucuk beringin dan gemericik air dari lereng gunung untuk menyegarkan pikiran sebelum kembali mengajar dan berkarya.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playRewardXp();
+                      if (onAddXp) {
+                        onAddXp(1, 'Refleksi Alam di Rumah Pohon Beringin');
+                      }
+                      showToast('🌿 Segar sekali! Menikmati suasana Rumah Pohon Beringin (+1 XP)', 3500);
+                      setIsTreehouseModalOpen(false);
+                    }}
+                    className="mt-1 py-2 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                  >
+                    ✨ Hirup Udara Segar Kanopi (+1 XP)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-emerald-900/60 flex items-center justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const p = playerRef.current;
+                  setIsTreehouseModalOpen(false);
+                  if (p) {
+                    sounds.playClick();
+                    treehouseClimbStageRef.current = 'climbing_down';
+                    afterClimbDownTargetRef.current = null;
+                    p.targetWx = BANYAN_BRANCH_FOOT_COORDS.wx;
+                    p.targetWy = BANYAN_BRANCH_FOOT_COORDS.wy;
+                    p.isMoving = true;
+                    p.isRunning = false;
+                    p.speed = 0.82;
+                  }
+                }}
+                className="py-2 px-4 rounded-xl bg-amber-700/80 hover:bg-amber-600 text-amber-100 font-bold text-xs border border-amber-400/40 transition cursor-pointer"
+              >
+                🌿 Turun Ranting Beringin
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsTreehouseModalOpen(false)}
+                className="py-2 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition cursor-pointer"
+              >
+                Tutup
+              </button>
             </div>
           </div>
         </div>
