@@ -539,11 +539,11 @@ export const isSolidCollision = (
     return true;
   }
 
-  // Danau Pusat Sungai Mengalir water basin (wx: 1.85 .. 7.15, wy: -12.25 .. -8.78)
-  // Leaves the lakeside viewing deck at (wx: 1.55, wy: -10.15), the fishing pier deck (wx: 1.55..2.45), and southern shore walkable
+  // Danau Pusat / Sungai Refleksia water basin (wx: 1.85 .. 7.15, wy: -12.25 .. -8.78)
+  // Leaves the 1-tile (1 petak) fishing deck around (wx: 2.05, wy: -10.15) and lakeside viewing deck walkable
   if (wx > 1.85 - padding && wy < -8.78 + padding) {
-    // Dermaga pemancingan kayu di tepi danau (bisa dinaiki untuk memancing)
-    if (wx >= 1.55 - padding && wx <= 2.45 + padding && wy >= -10.55 - padding && wy <= -9.75 + padding) {
+    // Dermaga pemancingan kayu 1 petak di tepi danau (bisa dinaiki untuk memancing)
+    if (wx >= 1.45 - padding && wx <= 2.35 + padding && wy >= -10.55 - padding && wy <= -9.75 + padding) {
       return false;
     }
     return true;
@@ -554,14 +554,7 @@ export const isSolidCollision = (
     return true;
   }
 
-  // Perumahan Guru & Siswa footprint along West edge behind Perpustakaan Kampus
-  for (const h of HOUSING_UNITS) {
-    if (Math.abs(wx - h.wx) < 0.62 + padding && Math.abs(wy - h.wy) < 0.62 + padding) {
-      return true;
-    }
-  }
-
-  // Central Fountain pool
+  // Central Fountain pool (Air Mancur Pusat)
   if (Math.hypot(wx, wy) < 0.92 + padding) {
     return true;
   }
@@ -3092,9 +3085,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
+      // Reset any auto-dismissed nearby popup when the user explicitly clicks/taps on the map
+      dismissedNearbySignatureRef.current = null;
+
       // 1. Check Click on Cafe Stall (Toko Roti & Kafe di ujung kota belakang Lab DKV)
+      // Harus berjalan mendekati kafe terlebih dahulu, lalu pop-up konfirmasi akan muncul saat avatar sudah di dekat kafe
       const cafeDist = Math.hypot(wx - cafeWx, wy - cafeWy);
-      if (cafeDist < 1.95) {
+      if (cafeDist < 1.65) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3103,41 +3100,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         pendingSeatRef.current = null;
         player.targetWx = 4.15;
         player.targetWy = 4.15; // Counter front
-        player.isMoving = true;
-        player.isRunning = isRun;
-        player.speed = isRun ? 1.28 : 0.88;
+        player.isMoving = Math.hypot(player.wx - 4.15, player.wy - 4.15) > 0.08;
+        if (player.isMoving) {
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.28 : 0.88;
+        }
         clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
         pendingBuildingId = null;
-        lastTouchedIdRef.current = 'cafe';
-        setPendingConfirmation({
-          type: 'cafe',
-          id: 'cafe',
-          name: 'Toko Roti & Kafe Warga',
-          tagline: 'Kopi hangat, roti lezat & eskrim menyegarkan',
-          icon: '☕',
-        });
+        // Reset lastTouchedIdRef so proximity check triggers the top pop-up once avatar is near Cafe
+        lastTouchedIdRef.current = null;
         return;
       }
 
-      // Reset any auto-dismissed nearby popup when the user explicitly clicks/taps on the map
-      dismissedNearbySignatureRef.current = null;
-
       // 1b. Check Click on Papan Peraturan Kota di Dekat Gapura Masuk [1.45, 5.95] or Welcome Gate [0, 6.15]
+      // Avatar harus berjalan ke dekat papan peraturan terlebih dahulu, dan masuk ke informasi melalui pop-up di atas
       const rulesDist = Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy);
       const gateDist = Math.hypot(wx - 0, wy - 6.15);
-      if (rulesDist < 1.35 || gateDist < 1.45) {
+      if (rulesDist < 1.25 || gateDist < 1.35) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
           setSittingSeat(null);
         }
         pendingSeatRef.current = null;
-        const playerNearRules =
-          Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 ||
-          Math.hypot(player.wx - 0, player.wy - 6.15) < 1.65;
         player.targetWx = 1.25;
         player.targetWy = 5.95;
-        player.isMoving = !playerNearRules;
+        player.isMoving = Math.hypot(player.wx - 1.25, player.wy - 5.95) > 0.08;
         if (player.isMoving) {
           player.isRunning = isRun;
           player.speed = isRun ? 1.28 : 0.88;
@@ -3147,32 +3135,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
-        if (playerNearRules) {
-          setNearbyAction({ type: 'town_rules' });
-          sounds.playOpenModal();
-          if (onOpenTownRules) {
-            onOpenTownRules();
-          } else {
-            setIsTownRulesModalOpen(true);
-          }
-        }
         return;
       }
 
       // 1c. Check Click on Pohon Beringin Jurnal Harian (3 petak di samping kiri dekat Bank Materi [-2.95, -5.85])
+      // Avatar harus berjalan ke dekat Pohon Jurnal terlebih dahulu, lalu masuk ke informasi melalui pop-up di atas
       const beringinDist = Math.hypot(wx - BERINGIN_TREE_COORDS.wx, wy - BERINGIN_TREE_COORDS.wy);
-      if (beringinDist < 1.75) {
+      if (beringinDist < 1.55) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
           setSittingSeat(null);
         }
         pendingSeatRef.current = null;
-        const playerNearBeringin =
-          Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.75;
         player.targetWx = BERINGIN_TREE_COORDS.wx;
         player.targetWy = BERINGIN_TREE_COORDS.wy + 0.6;
-        player.isMoving = !playerNearBeringin;
+        player.isMoving =
+          Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - (BERINGIN_TREE_COORDS.wy + 0.6)) > 0.08;
         if (player.isMoving) {
           player.isRunning = isRun;
           player.speed = isRun ? 1.28 : 0.88;
@@ -3182,28 +3161,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
-        if (playerNearBeringin) {
-          setNearbyAction({ type: 'beringin' });
-          sounds.playOpenModal();
-          setIsJurnalModalOpen(true);
-        }
         return;
       }
 
       // 1d. Check Click on Papan Pengumuman Guru di Dekat Balai Kota [-1.55, -3.45]
+      // Avatar harus berjalan ke dekat Papan Pengumuman terlebih dahulu, lalu membuka informasi melalui pop-up di atas
       const annBoardDist = Math.hypot(wx - ANNOUNCEMENT_BOARD_COORDS.wx, wy - ANNOUNCEMENT_BOARD_COORDS.wy);
-      if (annBoardDist < 1.25) {
+      if (annBoardDist < 1.15) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
           setSittingSeat(null);
         }
         pendingSeatRef.current = null;
-        const playerNearAnnBoard =
-          Math.hypot(player.wx - ANNOUNCEMENT_BOARD_COORDS.wx, player.wy - ANNOUNCEMENT_BOARD_COORDS.wy) < 1.65;
         player.targetWx = -1.35;
         player.targetWy = -3.15;
-        player.isMoving = !playerNearAnnBoard;
+        player.isMoving = Math.hypot(player.wx - -1.35, player.wy - -3.15) > 0.08;
         if (player.isMoving) {
           player.isRunning = isRun;
           player.speed = isRun ? 1.28 : 0.88;
@@ -3213,16 +3186,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
-        setNearbyAction({ type: 'announcement_board' });
-        sounds.playOpenModal();
         setTeacherAnnouncements(StorageService.getTeacherAnnouncements());
-        setIsAnnouncementModalOpen(true);
         return;
       }
 
       const canAccessWilderness = Boolean(isPlayerTeacher || isMasterKikyRef.current);
 
-      // 1f. Check Click directly on @tomi or Gerbang Hutan Belantara & Danau Pusat [wx: -0.65..1.05, wy: -7.95..-7.05]
+      // 1f. Check Click directly on @tomi or Gerbang Hutan Refleksia [wx: -0.65..1.05, wy: -7.95..-7.05]
       if (Math.hypot(wx - 0.25, wy - -7.48) < 1.05) {
         sounds.playClick();
         if (isSittingRef.current) {
@@ -3235,15 +3205,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
         if (canAccessWilderness) {
-          tomi.speechText = 'Silakan masuk Bapak/Ibu Guru! Gerbang Hutan & Danau terbuka 🌲🔓';
+          tomi.speechText = 'Silakan masuk Bapak/Ibu Guru! Gerbang Hutan Refleksia terbuka 🌲🔓';
           tomi.speechTimer = 6.0;
           player.targetWx = 0.0;
           player.targetWy = player.wy > WILDERNESS_FENCE_WY ? -8.35 : -6.85;
         } else {
-          tomi.speechText = '⛔ Maaf, area Hutan Belantara & Danau Pusat hanya bisa dimasuki oleh Guru! 👨‍🏫🔒';
+          tomi.speechText = '⛔ Maaf, area Hutan Refleksia & Sungai Refleksia hanya untuk Guru! 👨‍🏫🔒';
           tomi.speechTimer = 6.5;
           playerSpeechRef.current = {
-            text: '🔒 Area Hutan Belantara & Danau Pusat khusus Guru (dijaga @tomi)',
+            text: '🔒 Area Hutan Refleksia khusus Guru (dijaga @tomi)',
             expiresAt: Date.now() + 4500,
           };
           player.targetWx = 0.0;
@@ -3256,10 +3226,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 2. Check Click on Spot Pemancingan di Danau Pusat Sungai [2.05, -10.15] (Dermaga Pemancingan Diperbesar)
+      // 2. Check Click on Spot Pemancingan 1 Petak di Sungai Refleksia [2.05, -10.15]
       const fishSpotDist = Math.hypot(wx - FISHING_SPOT_COORDS.wx, wy - FISHING_SPOT_COORDS.wy);
       const lakeClick = wx > 1.75 && wx < 6.85 && wy > -12.0 && wy < -8.85;
-      if (fishSpotDist < 2.75 || lakeClick) {
+      if (fishSpotDist < 1.45 || lakeClick) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3271,10 +3241,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
         if (!canAccessWilderness) {
-          tomi.speechText = '⛔ Maaf, area Hutan Belantara & Danau Pusat hanya bisa dimasuki oleh Guru! 👨‍🏫🔒';
+          tomi.speechText = '⛔ Maaf, area Hutan Refleksia & Sungai Refleksia hanya untuk Guru! 👨‍🏫🔒';
           tomi.speechTimer = 6.5;
           playerSpeechRef.current = {
-            text: '🔒 Hanya Guru yang bisa masuk ke Hutan & Danau Pusat lewat gerbang @tomi!',
+            text: '🔒 Hanya Guru yang bisa masuk ke Hutan Refleksia lewat gerbang @tomi!',
             expiresAt: Date.now() + 4500,
           };
           player.targetWx = 0.0;
@@ -3292,14 +3262,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         player.isRunning = isRun;
         player.speed = isRun ? 1.28 : 0.88;
         clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
-        setNearbyAction({ type: 'fishing' });
         return;
       }
 
       // 3. Check Click on Benches (8 Minimalist Fountain Benches [2-seater], 2 Literacy Benches [2-seater], 2 Campfire Benches [2-seater]) & 2 Swing Structures (-1 XP)
       for (const group of ALL_TWO_PERSON_BENCHES) {
         const groupDist = Math.hypot(wx - group.wx, wy - group.wy);
-        if (groupDist < 0.95) {
+        if (groupDist < 0.85) {
           const distA = Math.hypot(wx - group.seats[0].wx, wy - group.seats[0].wy);
           const distB = Math.hypot(wx - group.seats[1].wx, wy - group.seats[1].wy);
           const preferredIdx: 0 | 1 = distB < distA ? 1 : 0;
@@ -3311,7 +3280,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       }
 
       // 3b. Check Click directly on Campfire in Corner [-4.65, 4.65] -> Walk to & sit on nearest available Campfire Bench to warm up!
-      if (Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 1.25) {
+      if (Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 1.15) {
         const distLeft = Math.hypot(wx - CAMPFIRE_BENCHES[0].wx, wy - CAMPFIRE_BENCHES[0].wy);
         const distRight = Math.hypot(wx - CAMPFIRE_BENCHES[1].wx, wy - CAMPFIRE_BENCHES[1].wy);
         const firstGroup = distRight < distLeft ? CAMPFIRE_BENCHES[1] : CAMPFIRE_BENCHES[0];
@@ -3327,7 +3296,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // 3c. Check Click on 2 Swing Locations (4 Swing Seats, walks there first then costs 1 XP to ride)
       for (const swing of REFLECTION_SWINGS) {
         const swingDist = Math.hypot(wx - swing.wx, wy - swing.wy);
-        if (swingDist < 0.95) {
+        if (swingDist < 0.88) {
           pendingBuildingId = null;
           lastTouchedIdRef.current = null;
           rideSwingWithXp(swing, isRun);
@@ -3336,16 +3305,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       }
 
       // 3d. Check Click on Sudut Literasi Warga di Samping Balai Kota [2.35, -6.15]
+      // Avatar berjalan ke dekat Sudut Literasi terlebih dahulu, lalu membuka bacaan melalui pop-up di atas
       const litSpotDist = Math.hypot(wx - LITERACY_CORNER_COORDS.wx, wy - LITERACY_CORNER_COORDS.wy);
-      if (litSpotDist < 1.85) {
+      if (litSpotDist < 1.35) {
         sounds.playClick();
+        if (isSittingRef.current) {
+          setIsSitting(false);
+          setSittingSeat(null);
+        }
+        pendingSeatRef.current = null;
         pendingBuildingId = null;
         lastTouchedIdRef.current = null;
-        const targetLitBench = LITERACY_BENCHES[0];
-        walkToSeatAndSit(targetLitBench.seats[0].id, targetLitBench.seats[0].wx, targetLitBench.seats[0].wy, targetLitBench.facing, () => {
-          sounds.playOpenModal();
-          setIsLiteracyModalOpen(true);
-        }, isRun);
+        setPendingConfirmation(null);
+        setIsCafeMenuOpen(false);
+        player.targetWx = LITERACY_CORNER_COORDS.wx;
+        player.targetWy = LITERACY_CORNER_COORDS.wy + 0.45;
+        player.isMoving =
+          Math.hypot(player.wx - LITERACY_CORNER_COORDS.wx, player.wy - (LITERACY_CORNER_COORDS.wy + 0.45)) > 0.08;
+        if (player.isMoving) {
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.28 : 0.88;
+        }
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
         return;
       }
 
@@ -3353,7 +3334,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       for (const leaf of dryLeavesRef.current) {
         if (leaf.pickedAt !== null) continue;
         const leafDist = Math.hypot(wx - leaf.wx, wy - leaf.wy);
-        if (leafDist < 0.72) {
+        if (leafDist < 0.68) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
@@ -3383,11 +3364,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 4b. Check Click on Map Trees -> Walk to tree & harvest ripe apples (+2 XP) or select tree
+      // 4b. Check Click on Map Trees -> Walk to tree & show pop-up at top when near
       for (let tIdx = 0; tIdx < TREES_LIST.length; tIdx++) {
         const [tx, ty] = TREES_LIST[tIdx];
         const tDist = Math.hypot(wx - tx, wy - ty);
-        if (tDist < 0.85) {
+        if (tDist < 0.78) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
@@ -3396,38 +3377,26 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           pendingSeatRef.current = null;
           pendingBuildingId = null;
           lastTouchedIdRef.current = null;
-          const pDist = Math.hypot(player.wx - tx, player.wy - ty);
-          const cyc = treeCyclesRef.current[tIdx];
-          if (pDist <= 1.05) {
-            setNearbyAction({ type: 'tree', treeIndex: tIdx });
-            if (cyc?.hasRipeApples) {
-              handleHarvestTreeAppleRef.current(tIdx);
-            }
-          } else {
-            const standX = tx + (player.wx >= tx ? 0.42 : -0.42);
-            const standY = ty + (player.wy >= ty ? 0.42 : -0.42);
-            pendingEnvActionRef.current = {
-              type: 'harvest_apple',
-              treeIndex: tIdx,
-              targetX: standX,
-              targetY: standY,
-            };
-            player.targetWx = standX;
-            player.targetWy = standY;
-            player.isMoving = true;
+          const standX = tx + (player.wx >= tx ? 0.42 : -0.42);
+          const standY = ty + (player.wy >= ty ? 0.42 : -0.42);
+          player.targetWx = standX;
+          player.targetWy = standY;
+          player.isMoving = Math.hypot(player.wx - standX, player.wy - standY) > 0.08;
+          if (player.isMoving) {
             player.isRunning = isRun;
             player.speed = isRun ? 1.28 : 0.88;
-            clickRippleRef.current = { wx: standX, wy: standY, time: performance.now(), isRun };
           }
+          clickRippleRef.current = { wx: standX, wy: standY, time: performance.now(), isRun };
           return;
         }
       }
 
       // 4c. Check Click on Perumahan Guru & Siswa + Kotak Surat Kecil (Masukan & Saran) behind Perpustakaan Kampus
+      // Avatar harus berjalan ke dekat Wisma/Kotak Surat terlebih dahulu, lalu membuka kotak saran melalui pop-up di atas
       for (const h of HOUSING_UNITS) {
         const distToHouse = Math.hypot(wx - h.wx, wy - h.wy);
         const distToMailbox = Math.hypot(wx - (h.wx + 0.75), wy - (h.wy + 0.25));
-        if (distToHouse < 1.35 || distToMailbox < 1.05) {
+        if (distToHouse < 1.15 || distToMailbox < 0.95) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
@@ -3436,35 +3405,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           pendingSeatRef.current = null;
           player.targetWx = -6.05;
           player.targetWy = h.wy;
-          player.isMoving = true;
-          player.isRunning = isRun;
-          player.speed = isRun ? 1.28 : 0.88;
+          player.isMoving = Math.hypot(player.wx - -6.05, player.wy - h.wy) > 0.08;
+          if (player.isMoving) {
+            player.isRunning = isRun;
+            player.speed = isRun ? 1.28 : 0.88;
+          }
           clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
           pendingBuildingId = null;
           lastTouchedIdRef.current = null;
-          setNearbyAction({
-            type: 'wisma_mailbox',
-            wismaId: h.id,
-            wismaName: h.name,
-          });
-          sounds.playOpenModal();
-          setActiveWismaMailbox(h);
+          setPendingConfirmation(null);
+          setIsCafeMenuOpen(false);
           return;
         }
       }
 
-      // 5. Check Click on Buildings
+      // 5. Check Click on Buildings -> Walk to building doorstep first; top pop-up appears when avatar is near the building
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
         const dist = Math.hypot(wx - bx, wy - by);
-        if (dist < 2.35 || (Math.abs(wx - bx) < 1.95 && Math.abs(wy - by) < 1.95)) {
+        if (dist < 1.55 || (Math.abs(wx - bx) < 1.35 && Math.abs(wy - by) < 1.35)) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
             setSittingSeat(null);
           }
           pendingSeatRef.current = null;
-          // Walk to doorstep outside solid collision zone
+          // Walk to doorstep so proximity check triggers pendingConfirmation pop-up
           if (b.id === 'balai_kota') {
             player.targetWx = 0;
             player.targetWy = -3.0;
@@ -3476,7 +3442,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWy = 0;
           } else if (b.id === 'monumen_warga') {
             player.targetWx = 0;
-            player.targetWy = 1.25;
+            player.targetWy = 1.15;
           } else if (b.id === 'masjid') {
             player.targetWx = 4.45;
             player.targetWy = -4.65;
@@ -3487,32 +3453,35 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWx = bx * 0.68;
             player.targetWy = by * 0.68;
           }
-          player.isMoving = true;
-          player.isRunning = isRun;
-          player.speed = isRun ? 1.28 : 0.88;
+          player.isMoving = Math.hypot(player.wx - player.targetWx, player.wy - player.targetWy) > 0.08;
+          if (player.isMoving) {
+            player.isRunning = isRun;
+            player.speed = isRun ? 1.28 : 0.88;
+          }
           clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
           pendingBuildingId = b.id;
+          // Reset lastTouchedIdRef so clicking a building when already nearby re-triggers its confirmation pop-up
           lastTouchedIdRef.current = null;
           return;
         }
       }
 
-      // 6. Click on ground anywhere across expanded platform (including +6 northern Hutan Belantara & Danau Pusat deck)
+      // 6. Click on ground anywhere across the entire map (except pembatas, gunung, danau, sungai, air mancur)
       sounds.playClick();
       if (isSittingRef.current) {
         setIsSitting(false);
         setSittingSeat(null);
       }
       pendingSeatRef.current = null;
-      let targetX = Math.max(-7.8, Math.min(8.0, wx));
-      let targetY = Math.max(-11.72, Math.min(7.8, wy));
+      let targetX = Math.max(-8.0, Math.min(8.0, wx));
+      let targetY = Math.max(-11.75, Math.min(8.0, wy));
 
-      // Jika bukan Guru dan mengklik area Hutan Belantara / Danau Pusat di balik pagar (wy < -7.45),
+      // Jika bukan Guru dan mengklik area Hutan Refleksia / Sungai Refleksia di balik pagar (wy < -7.45),
       // arahkan ke depan pintu gerbang yang dijaga @tomi di jalan belakang Pohon Refleksi
       if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.22) {
         targetX = 0.0;
         targetY = -7.08;
-        tomi.speechText = '⛔ Maaf, area Hutan Belantara & Danau Pusat hanya bisa dimasuki oleh Guru! 👨‍🏫🔒';
+        tomi.speechText = '⛔ Maaf, area Hutan Refleksia & Sungai Refleksia hanya untuk Guru! 👨‍🏫🔒';
         tomi.speechTimer = 6.5;
         playerSpeechRef.current = {
           text: '🔒 Hanya Guru yang bisa masuk lewat gerbang @tomi di belakang Pohon Refleksi!',
@@ -3520,7 +3489,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         };
       }
 
-      // If clicking directly on Danau Pusat water basin, guide avatar to Lakeside Viewing Deck or southern shore
+      // If clicking directly on Danau water basin, guide avatar to Lakeside Viewing Deck or southern shore
       if (targetX > 1.82 && targetY < -8.72) {
         if (targetX < 4.2 && targetY < -9.2) {
           targetX = DANAU_VIEW_DECK_COORDS.wx;
@@ -3534,7 +3503,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         targetX = 6.68;
       }
       if (isSolidCollision(targetX, targetY, 0.1, canAccessWilderness)) {
-        // Nudge away from solid obstacle
+        // Nudge away from solid obstacle (pembatas, gunung, danau, sungai, air mancur)
         const dirX = player.wx - targetX;
         const dirY = player.wy - targetY;
         const d = Math.hypot(dirX, dirY) || 1;
@@ -3927,80 +3896,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             else if (faceDx >= 0 && faceDy < 0) player.facing = 'up-right';
             else player.facing = 'up-left';
           }
-
-          // Proximity touch check: show confirmation popup at top WITHOUT interrupting player movement (skip while walking to a seat)
-          if (!pendingSeatRef.current) {
-            const isNearBeringinSpot =
-              Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.75;
-            const isNearRulesSpot =
-              Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 ||
-              Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55;
-
-            let touchedBuilding: BuildingInfo | null = null;
-            if (!isNearBeringinSpot && !isNearRulesSpot) {
-              for (const b of BUILDINGS_INFO) {
-                const [bx, , by] = b.position;
-                // Avoid triggering Balai Kota when walking behind it toward Pohon Beringin
-                if (b.id === 'balai_kota' && player.wy < -4.65) continue;
-                const bDist = Math.hypot(player.wx - bx, player.wy - by);
-                const threshold = b.id === 'monumen_warga' ? 1.4 : 1.7;
-                if (bDist < threshold) {
-                  touchedBuilding = b;
-                  break;
-                }
-              }
-            }
-
-            const cafeDist = Math.hypot(player.wx - cafeWx, player.wy - cafeWy);
-            if (isNearBeringinSpot || isNearRulesSpot) {
-              if (lastTouchedIdRef.current) {
-                lastTouchedIdRef.current = null;
-                setPendingConfirmation(null);
-              }
-            } else if (cafeDist < 1.6) {
-              if (lastTouchedIdRef.current !== 'cafe') {
-                lastTouchedIdRef.current = 'cafe';
-                sounds.playClick();
-                setPendingConfirmation({
-                  type: 'cafe',
-                  id: 'cafe',
-                  name: 'Toko Roti & Kafe Warga',
-                  tagline: 'Kopi hangat, roti lezat & eskrim menyegarkan',
-                  icon: '☕',
-                });
-              }
-            } else if (touchedBuilding) {
-              if (lastTouchedIdRef.current !== touchedBuilding.id) {
-                lastTouchedIdRef.current = touchedBuilding.id;
-                sounds.playClick();
-                setPendingConfirmation({
-                  type: 'building',
-                  id: touchedBuilding.id,
-                  name: touchedBuilding.name,
-                  tagline: touchedBuilding.tagline,
-                  icon: touchedBuilding.icon,
-                  color: touchedBuilding.color,
-                });
-              }
-            } else if (lastTouchedIdRef.current) {
-              // Player has moved away from building/cafe: auto-dismiss top popup
-              const prevId = lastTouchedIdRef.current;
-              let away = false;
-              if (prevId === 'cafe') {
-                if (cafeDist > 2.0) away = true;
-              } else {
-                const prevB = BUILDINGS_INFO.find((b) => b.id === prevId);
-                if (prevB) {
-                  const d = Math.hypot(player.wx - prevB.position[0], player.wy - prevB.position[2]);
-                  if (d > 2.1 || (prevB.id === 'balai_kota' && player.wy < -4.65)) away = true;
-                }
-              }
-              if (away) {
-                lastTouchedIdRef.current = null;
-                setPendingConfirmation(null);
-              }
-            }
-          }
         } else {
           // Arrived at target destination! Check if avatar was walking to a seat/swing or tree apple / dry leaf
           if (pendingSeatRef.current) {
@@ -4030,9 +3925,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               handlePickDryLeafRef.current(envAct.leafId);
             } else if (envAct.type === 'harvest_apple') {
               setNearbyAction({ type: 'tree', treeIndex: envAct.treeIndex });
-              if (treeCyclesRef.current[envAct.treeIndex]?.hasRipeApples) {
-                handleHarvestTreeAppleRef.current(envAct.treeIndex);
-              }
             }
             sendHeartbeatRef.current?.();
           } else {
@@ -4051,7 +3943,90 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // Proximity checks: Riverside Fishing Dock & Kolam [5.9, -2.2], Sudut Literasi Samping Balai Kota [2.35, -6.15], 8 Minimalist Fountain Benches (2-seater), 2 Campfire Benches, 2 Swing Structures + Literacy Bench
+      // Building & Cafe Proximity Check (Runs whether moving or stationary so the top pop-up ALWAYS appears when near any building/cafe)
+      if (!pendingSeatRef.current) {
+        const isNearBeringinSpot =
+          Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.75;
+        const isNearRulesSpot =
+          Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 ||
+          Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55;
+        const isNearAnnBoardSpot =
+          Math.hypot(player.wx - ANNOUNCEMENT_BOARD_COORDS.wx, player.wy - ANNOUNCEMENT_BOARD_COORDS.wy) < 1.55;
+        const isNearWismaSpot = HOUSING_UNITS.some(
+          (h) =>
+            Math.hypot(player.wx - (h.wx + 0.85), player.wy - h.wy) < 1.35 ||
+            Math.hypot(player.wx - h.wx, player.wy - h.wy) < 1.55
+        );
+        const isNearLiteracySpot =
+          Math.hypot(player.wx - LITERACY_CORNER_COORDS.wx, player.wy - LITERACY_CORNER_COORDS.wy) < 1.45;
+
+        let touchedBuilding: BuildingInfo | null = null;
+        if (!isNearBeringinSpot && !isNearRulesSpot && !isNearAnnBoardSpot && !isNearWismaSpot && !isNearLiteracySpot) {
+          for (const b of BUILDINGS_INFO) {
+            const [bx, , by] = b.position;
+            // Avoid triggering Balai Kota when walking behind it toward Pohon Beringin
+            if (b.id === 'balai_kota' && player.wy < -4.65) continue;
+            const bDist = Math.hypot(player.wx - bx, player.wy - by);
+            const threshold = b.id === 'monumen_warga' ? 1.45 : 1.75;
+            if (bDist < threshold) {
+              touchedBuilding = b;
+              break;
+            }
+          }
+        }
+
+        const cafeDist = Math.hypot(player.wx - cafeWx, player.wy - cafeWy);
+        if (isNearBeringinSpot || isNearRulesSpot || isNearAnnBoardSpot || isNearWismaSpot || isNearLiteracySpot) {
+          if (lastTouchedIdRef.current) {
+            lastTouchedIdRef.current = null;
+            setPendingConfirmation(null);
+          }
+        } else if (cafeDist < 1.7) {
+          if (lastTouchedIdRef.current !== 'cafe') {
+            lastTouchedIdRef.current = 'cafe';
+            sounds.playClick();
+            setPendingConfirmation({
+              type: 'cafe',
+              id: 'cafe',
+              name: 'Toko Roti & Kafe Warga',
+              tagline: 'Kopi hangat, roti lezat & eskrim menyegarkan',
+              icon: '☕',
+            });
+          }
+        } else if (touchedBuilding) {
+          if (lastTouchedIdRef.current !== touchedBuilding.id) {
+            lastTouchedIdRef.current = touchedBuilding.id;
+            sounds.playClick();
+            setPendingConfirmation({
+              type: 'building',
+              id: touchedBuilding.id,
+              name: touchedBuilding.name,
+              tagline: touchedBuilding.tagline,
+              icon: touchedBuilding.icon,
+              color: touchedBuilding.color,
+            });
+          }
+        } else if (lastTouchedIdRef.current) {
+          // Player has moved away from building/cafe: auto-dismiss top popup
+          const prevId = lastTouchedIdRef.current;
+          let away = false;
+          if (prevId === 'cafe') {
+            if (cafeDist > 2.05) away = true;
+          } else {
+            const prevB = BUILDINGS_INFO.find((b) => b.id === prevId);
+            if (prevB) {
+              const d = Math.hypot(player.wx - prevB.position[0], player.wy - prevB.position[2]);
+              if (d > 2.15 || (prevB.id === 'balai_kota' && player.wy < -4.65)) away = true;
+            }
+          }
+          if (away) {
+            lastTouchedIdRef.current = null;
+            setPendingConfirmation(null);
+          }
+        }
+      }
+
+      // Proximity checks: Spot Memancing Sungai Refleksia, Sudut Literasi Samping Balai Kota [2.35, -6.15], 8 Minimalist Fountain Benches (2-seater), 2 Campfire Benches, 2 Swing Structures + Literacy Bench
       const fishDist = Math.hypot(player.wx - FISHING_SPOT_COORDS.wx, player.wy - FISHING_SPOT_COORDS.wy);
       const litDist = Math.hypot(player.wx - LITERACY_CORNER_COORDS.wx, player.wy - LITERACY_CORNER_COORDS.wy);
       const litBenchDist = Math.min(
@@ -4107,7 +4082,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       for (const h of HOUSING_UNITS) {
         const dMailbox = Math.hypot(player.wx - (h.wx + 0.85), player.wy - h.wy);
         const dHouse = Math.hypot(player.wx - h.wx, player.wy - h.wy);
-        if (dMailbox < 1.25 || dHouse < 1.55) {
+        if (dMailbox < 1.35 || dHouse < 1.55) {
           nearWismaUnit = h;
           break;
         }
@@ -4145,7 +4120,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         detectedNearby = { type: 'bench', benchId: currentSeat || undefined, benchName: seatName };
       } else if (nearLeafId !== -1) {
         detectedNearby = { type: 'dry_leaf', leafId: nearLeafId };
-      } else if (Math.hypot(player.wx - ANNOUNCEMENT_BOARD_COORDS.wx, player.wy - ANNOUNCEMENT_BOARD_COORDS.wy) < 1.45) {
+      } else if (Math.hypot(player.wx - ANNOUNCEMENT_BOARD_COORDS.wx, player.wy - ANNOUNCEMENT_BOARD_COORDS.wy) < 1.55) {
         detectedNearby = { type: 'announcement_board' };
       } else if (nearWismaUnit) {
         detectedNearby = {
@@ -4153,24 +4128,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           wismaId: nearWismaUnit.id,
           wismaName: nearWismaUnit.name,
         };
-      } else if (nearBench) {
-        detectedNearby = { type: 'bench', benchId: nearBench.id, benchName: nearBench.name };
-      } else if (Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 || Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55) {
-        if (lastTouchedIdRef.current) {
-          lastTouchedIdRef.current = null;
-          setPendingConfirmation(null);
-        }
+      } else if (
+        Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 ||
+        Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55
+      ) {
         detectedNearby = { type: 'town_rules' };
       } else if (Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.75) {
-        if (lastTouchedIdRef.current) {
-          lastTouchedIdRef.current = null;
-          setPendingConfirmation(null);
-        }
         detectedNearby = { type: 'beringin' };
-      } else if (litDist < 1.25) {
+      } else if (litDist < 1.45) {
         detectedNearby = { type: 'literacy' };
       } else if (fishDist < 1.75) {
         detectedNearby = { type: 'fishing' };
+      } else if (nearBench) {
+        detectedNearby = { type: 'bench', benchId: nearBench.id, benchName: nearBench.name };
       } else if (nearTreeIdx !== -1) {
         detectedNearby = { type: 'tree', treeIndex: nearTreeIdx };
       }
@@ -9842,31 +9812,31 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
           ctx.restore();
         } else if (item.type === 'fishing_spot') {
-          // DERMAGA PEMANCINGAN DANAU PUSAT SUNGAI (Diperbesar & Diperluas dengan Dek Ujung Lebar untuk Tempat Memancing)
+          // DERMAGA PEMANCINGAN 1 PETAK DI SUNGAI REFLEKSIA (Ukuran 1 Petak Isometrik Rapi & Papan "Sungai Refleksia" di Dalam Frame)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
           ctx.save();
 
-          // 1. SWIMMING KOI & GENTLE RIPPLES IN DANAU PUSAT SUNGAI NEAR ENLARGED PIER TIP
-          const pondX = pt.x + 38 * z;
-          const pondY = pt.y + 16 * z;
+          // 1. SWIMMING KOI & GENTLE RIPPLES IN SUNGAI REFLEKSIA NEAR 1-TILE PIER TIP
+          const pondX = pt.x + 28 * z;
+          const pondY = pt.y + 8 * z;
 
-          // Subtle Minimalist Water Ripples off the pier tip
+          // Subtle Minimalist Water Ripples off the 1-tile pier tip
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
           ctx.lineWidth = 0.85 * z;
           for (let wp = 0; wp < 2; wp++) {
-            const wRadius = ((elapsed * 4.5 + wp * 16) % (34 * z));
+            const wRadius = ((elapsed * 4.5 + wp * 16) % (30 * z));
             ctx.beginPath();
             ctx.ellipse(pondX, pondY, wRadius, wRadius * 0.48, 0, 0, Math.PI * 2);
             ctx.stroke();
           }
 
-          // 3 Graceful Minimalist Koi Fish Silhouettes (Kohaku, Yamabuki, Sanke) swimming in Danau Pusat
+          // 3 Graceful Minimalist Koi Fish Silhouettes swimming near the 1-tile pier
           const koiConfigs = [
-            { color: '#f97316', spot: '#ffffff', speed: 0.52, radius: 15 },
-            { color: '#fbbf24', spot: '#fef08a', speed: 0.44, radius: 22 },
-            { color: '#f8fafc', spot: '#ef4444', speed: 0.58, radius: 10 },
+            { color: '#f97316', spot: '#ffffff', speed: 0.52, radius: 13 },
+            { color: '#fbbf24', spot: '#fef08a', speed: 0.44, radius: 19 },
+            { color: '#f8fafc', spot: '#ef4444', speed: 0.58, radius: 9 },
           ];
 
           koiConfigs.forEach((koi, kIdx) => {
@@ -9877,73 +9847,76 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const heading = kAngle + Math.PI / 2;
             const tailWag = Math.sin(elapsed * 6.5 + kIdx) * 1.6 * z;
 
-            // Sleek tapered koi body
             ctx.fillStyle = koi.color;
             ctx.beginPath();
-            ctx.ellipse(kx, ky, 3.4 * z, 1.5 * z, heading, 0, Math.PI * 2);
+            ctx.ellipse(kx, ky, 3.2 * z, 1.4 * z, heading, 0, Math.PI * 2);
             ctx.fill();
 
-            // Minimalist dorsal spot
             ctx.fillStyle = koi.spot;
             ctx.beginPath();
-            ctx.arc(kx + Math.cos(heading) * 0.8 * z, ky + Math.sin(heading) * 0.8 * z, 1.0 * z, 0, Math.PI * 2);
+            ctx.arc(kx + Math.cos(heading) * 0.8 * z, ky + Math.sin(heading) * 0.8 * z, 0.95 * z, 0, Math.PI * 2);
             ctx.fill();
 
-            // Delicate crescent tail fin
             ctx.strokeStyle = koi.color;
-            ctx.lineWidth = 1.1 * z;
+            ctx.lineWidth = 1.05 * z;
             ctx.beginPath();
-            ctx.moveTo(kx - Math.cos(heading) * 2.8 * z, ky - Math.sin(heading) * 2.8 * z);
+            ctx.moveTo(kx - Math.cos(heading) * 2.6 * z, ky - Math.sin(heading) * 2.6 * z);
             ctx.lineTo(
-              kx - Math.cos(heading) * 5.2 * z + tailWag * 0.5,
-              ky - Math.sin(heading) * 5.2 * z + tailWag * 0.3
+              kx - Math.cos(heading) * 4.8 * z + tailWag * 0.5,
+              ky - Math.sin(heading) * 4.8 * z + tailWag * 0.3
             );
             ctx.stroke();
           });
 
-          // 2. ENLARGED CANTILEVERED TEAK TIMBER FISHING PIER + WIDE T-SHAPED ANGLER PLATFORM (Dermaga Kayu Tempat Memancing Diperbesar)
-          // 6 sturdy pier support pilings in lake water with subtle water rings
+          // 2. 1-TILE (1 PETAK) ISOMETRIC TEAK TIMBER FISHING PLATFORM
+          // 1 petak isometric diamond dimensions: halfW = 28 * z, halfH = 14 * z
+          const tileHalfW = 28 * z;
+          const tileHalfH = 14 * z;
+          const pNorth = { x: pt.x, y: pt.y - tileHalfH };
+          const pEast = { x: pt.x + tileHalfW, y: pt.y };
+          const pSouth = { x: pt.x, y: pt.y + tileHalfH };
+          const pWest = { x: pt.x - tileHalfW, y: pt.y };
+
+          // 4 corner timber pilings supporting the 1-tile deck
           const pierPilings = [
-            { px: pt.x - 16 * z, py: pt.y + 8 * z },
-            { px: pt.x - 2 * z, py: pt.y + 15 * z },
-            { px: pt.x + 12 * z, py: pt.y + 23 * z },
-            { px: pt.x + 26 * z, py: pt.y + 9 * z },
-            { px: pt.x + 12 * z, py: pt.y + 2 * z },
-            { px: pt.x - 4 * z, py: pt.y - 5 * z },
+            { px: pt.x - 16 * z, py: pt.y + 4 * z },
+            { px: pt.x, py: pt.y + 12 * z },
+            { px: pt.x + 16 * z, py: pt.y + 4 * z },
+            { px: pt.x + 24 * z, py: pt.y - 1 * z },
           ];
           for (const pil of pierPilings) {
             ctx.fillStyle = '#1e293b';
-            ctx.fillRect(pil.px - 1.6 * z, pil.py, 3.2 * z, 10.5 * z);
+            ctx.fillRect(pil.px - 1.5 * z, pil.py, 3.0 * z, 9.0 * z);
             ctx.strokeStyle = 'rgba(224, 242, 254, 0.38)';
-            ctx.lineWidth = 0.8 * z;
+            ctx.lineWidth = 0.75 * z;
             ctx.beginPath();
-            ctx.ellipse(pil.px, pil.py + 10 * z, 4.4 * z, 1.8 * z, 0, 0, Math.PI * 2);
+            ctx.ellipse(pil.px, pil.py + 8.5 * z, 3.8 * z, 1.5 * z, 0, 0, Math.PI * 2);
             ctx.stroke();
           }
 
-          // 3D Side fascia of the Enlarged Isometric Wooden Pier (Walkway + Wide Fishing Deck)
+          // 3D Side fascia of the 1-Tile Wooden Fishing Deck
           ctx.fillStyle = '#451a03';
           ctx.beginPath();
-          ctx.moveTo(pt.x - 36 * z, pt.y - 1 * z);
-          ctx.lineTo(pt.x + 13 * z, pt.y + 24 * z);
-          ctx.lineTo(pt.x + 28 * z, pt.y + 9 * z);
-          ctx.lineTo(pt.x + 28 * z, pt.y + 13 * z);
-          ctx.lineTo(pt.x + 13 * z, pt.y + 28 * z);
-          ctx.lineTo(pt.x - 36 * z, pt.y + 3 * z);
+          ctx.moveTo(pWest.x, pWest.y);
+          ctx.lineTo(pSouth.x, pSouth.y);
+          ctx.lineTo(pEast.x, pEast.y);
+          ctx.lineTo(pEast.x, pEast.y + 3.8 * z);
+          ctx.lineTo(pSouth.x, pSouth.y + 3.8 * z);
+          ctx.lineTo(pWest.x, pWest.y + 3.8 * z);
           ctx.closePath();
           ctx.fill();
 
-          // Top Teak Decking Surface of the Enlarged Fishing Pier (Wider & Longer for Comfortable Fishing)
-          const pierGrad = ctx.createLinearGradient(pt.x - 36 * z, pt.y - 16 * z, pt.x + 28 * z, pt.y + 24 * z);
+          // Top Teak Decking Surface of the 1-Tile (1 Petak) Fishing Spot
+          const pierGrad = ctx.createLinearGradient(pWest.x, pNorth.y, pEast.x, pSouth.y);
           pierGrad.addColorStop(0, isNight ? '#78350f' : '#b45309');
           pierGrad.addColorStop(0.55, isNight ? '#92400e' : '#d97706');
           pierGrad.addColorStop(1, isNight ? '#b45309' : '#f59e0b');
           ctx.fillStyle = pierGrad;
           ctx.beginPath();
-          ctx.moveTo(pt.x - 21 * z, pt.y - 16 * z);
-          ctx.lineTo(pt.x + 28 * z, pt.y + 9 * z);
-          ctx.lineTo(pt.x + 13 * z, pt.y + 24 * z);
-          ctx.lineTo(pt.x - 36 * z, pt.y - 1 * z);
+          ctx.moveTo(pNorth.x, pNorth.y);
+          ctx.lineTo(pEast.x, pEast.y);
+          ctx.lineTo(pSouth.x, pSouth.y);
+          ctx.lineTo(pWest.x, pWest.y);
           ctx.closePath();
           ctx.fill();
 
@@ -9951,137 +9924,135 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineWidth = 0.85 * z;
           ctx.stroke();
 
-          // Crisp isometric plank slat lines across the enlarged pier (12 wide planks)
+          // Crisp isometric plank slat lines across the 1-tile deck (7 planks)
           ctx.strokeStyle = 'rgba(69, 26, 3, 0.48)';
-          ctx.lineWidth = 0.8 * z;
-          for (let s = 1; s < 12; s++) {
-            const t = s / 12;
-            const lx = (pt.x - 21 * z) + t * (49 * z);
-            const ly = (pt.y - 16 * z) + t * (25 * z);
-            const rx = (pt.x - 36 * z) + t * (49 * z);
-            const ry = (pt.y - 1 * z) + t * (25 * z);
+          ctx.lineWidth = 0.75 * z;
+          for (let s = 1; s < 7; s++) {
+            const t = s / 7;
+            const lx = pNorth.x + (pEast.x - pNorth.x) * t;
+            const ly = pNorth.y + (pEast.y - pNorth.y) * t;
+            const rx = pWest.x + (pSouth.x - pWest.x) * t;
+            const ry = pWest.y + (pSouth.y - pWest.y) * t;
             ctx.beginPath();
             ctx.moveTo(lx, ly);
             ctx.lineTo(rx, ry);
             ctx.stroke();
           }
 
-          // Sleek Minimalist Low-Profile Pier Bollards & Handrail along North-East Edge (4 Bollards)
+          // Minimalist Low-Profile Pier Bollards & Handrail along North-East Edge of 1-Tile Deck
           const bollardCoords = [
-            [pt.x - 20 * z, pt.y - 15.2 * z],
-            [pt.x - 5 * z, pt.y - 7.6 * z],
-            [pt.x + 10 * z, pt.y + 0.0 * z],
-            [pt.x + 25 * z, pt.y + 7.6 * z],
+            [pNorth.x + (pEast.x - pNorth.x) * 0.12, pNorth.y + (pEast.y - pNorth.y) * 0.12],
+            [pNorth.x + (pEast.x - pNorth.x) * 0.5, pNorth.y + (pEast.y - pNorth.y) * 0.5],
+            [pNorth.x + (pEast.x - pNorth.x) * 0.88, pNorth.y + (pEast.y - pNorth.y) * 0.88],
           ];
-          // Taut minimalist stainless & timber top rail
           ctx.strokeStyle = isNight ? '#94a3b8' : '#cbd5e1';
-          ctx.lineWidth = 1.25 * z;
+          ctx.lineWidth = 1.15 * z;
           ctx.beginPath();
-          ctx.moveTo(bollardCoords[0][0], bollardCoords[0][1] - 7.0 * z);
-          ctx.lineTo(bollardCoords[1][0], bollardCoords[1][1] - 7.0 * z);
-          ctx.lineTo(bollardCoords[2][0], bollardCoords[2][1] - 7.0 * z);
-          ctx.lineTo(bollardCoords[3][0], bollardCoords[3][1] - 7.0 * z);
+          ctx.moveTo(bollardCoords[0][0], bollardCoords[0][1] - 6.2 * z);
+          ctx.lineTo(bollardCoords[1][0], bollardCoords[1][1] - 6.2 * z);
+          ctx.lineTo(bollardCoords[2][0], bollardCoords[2][1] - 6.2 * z);
           ctx.stroke();
 
           bollardCoords.forEach(([bx, by]) => {
             ctx.fillStyle = '#1e293b';
-            ctx.fillRect(bx - 1.2 * z, by - 8.0 * z, 2.4 * z, 8.0 * z);
-            // Warm LED cap on each bollard
+            ctx.fillRect(bx - 1.1 * z, by - 7.0 * z, 2.2 * z, 7.0 * z);
             ctx.fillStyle = '#fef08a';
-            ctx.fillRect(bx - 1.2 * z, by - 8.8 * z, 2.4 * z, 1.1 * z);
+            ctx.fillRect(bx - 1.1 * z, by - 7.8 * z, 2.2 * z, 1.0 * z);
           });
 
-          // Wooden Angler Stool & Cyan Bait Bucket on the Enlarged Pier Deck
+          // Wooden Angler Stool & Cyan Bait Bucket on the 1-Tile Deck
           ctx.fillStyle = '#78350f';
           ctx.beginPath();
-          ctx.roundRect(pt.x - 6 * z, pt.y + 2 * z, 7.5 * z, 4.2 * z, 1.2 * z);
+          ctx.roundRect(pt.x - 5 * z, pt.y + 0.5 * z, 6.5 * z, 3.8 * z, 1.1 * z);
           ctx.fill();
           ctx.strokeStyle = '#fde68a';
-          ctx.lineWidth = 0.65 * z;
+          ctx.lineWidth = 0.6 * z;
           ctx.stroke();
 
-          // Cyan Bait Bucket (Ember Umpan) & Woven Fish Basket near Pier End
           ctx.fillStyle = '#0284c7';
           ctx.beginPath();
-          ctx.roundRect(pt.x + 6 * z, pt.y + 10 * z, 4.6 * z, 4.8 * z, 1.1 * z);
+          ctx.roundRect(pt.x + 5 * z, pt.y + 2.5 * z, 4.2 * z, 4.4 * z, 1.0 * z);
           ctx.fill();
           ctx.strokeStyle = '#bae6fd';
-          ctx.lineWidth = 0.7 * z;
-          ctx.stroke();
-
-          // Minimalist Wooden Signboard "DANAU PUSAT SUNGAI" on the North-West Bank of the Pier
-          const signPtX = pt.x - 25 * z;
-          const signPtY = pt.y - 16 * z;
-          ctx.fillStyle = '#451a03';
-          ctx.fillRect(signPtX - 6 * z, signPtY - 12 * z, 1.6 * z, 12 * z);
-          ctx.fillRect(signPtX + 4.4 * z, signPtY - 12 * z, 1.6 * z, 12 * z);
-          ctx.fillStyle = isNight ? '#78350f' : '#92400e';
-          ctx.beginPath();
-          ctx.roundRect(signPtX - 11.5 * z, signPtY - 19.5 * z, 23 * z, 9.5 * z, 1.8 * z);
-          ctx.fill();
-          ctx.strokeStyle = '#fef3c7';
           ctx.lineWidth = 0.65 * z;
           ctx.stroke();
+
+          // Framed Wooden Signboard "Sungai Refleksia" on the North-West corner of the 1-Tile Pier (Strictly fitted inside frame)
+          const signPtX = pt.x - 16 * z;
+          const signPtY = pt.y - 8.5 * z;
+          const signBoxW = 46 * z;
+          const signBoxH = 11.5 * z;
+          const signBoxX = signPtX - signBoxW / 2;
+          const signBoxY = signPtY - 20.5 * z;
+
+          // Dual timber support posts
+          ctx.fillStyle = '#451a03';
+          ctx.fillRect(signPtX - 10 * z, signPtY - 10 * z, 1.8 * z, 10 * z);
+          ctx.fillRect(signPtX + 8.2 * z, signPtY - 10 * z, 1.8 * z, 10 * z);
+
+          // Outer & Inner Signboard Frame
+          ctx.fillStyle = isNight ? '#1e293b' : '#78350f';
+          ctx.beginPath();
+          ctx.roundRect(signBoxX, signBoxY, signBoxW, signBoxH, 2.4 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 0.9 * z;
+          ctx.stroke();
+
+          // Strictly clip "Sungai Refleksia" inside the frame
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(signBoxX + 1.5 * z, signBoxY + 1.0 * z, signBoxW - 3.0 * z, signBoxH - 2.0 * z, 1.6 * z);
+          ctx.clip();
           ctx.fillStyle = '#fef3c7';
-          ctx.font = `bold ${Math.max(4, Math.round(4.0 * z))}px sans-serif`;
+          ctx.font = `bold ${Math.max(4, Math.round(5.0 * z))}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('DANAU PUSAT', signPtX, signPtY - 16.2 * z);
-          ctx.fillStyle = '#7dd3fc';
-          ctx.font = `bold ${Math.max(3, Math.round(3.4 * z))}px sans-serif`;
-          ctx.fillText('SUNGAI', signPtX, signPtY - 12.4 * z);
-
-          // Minimalist Wooden Tackle Case & Sleek Resting Rods at Enlarged Pier Tip
-          ctx.fillStyle = '#1e293b';
-          ctx.beginPath();
-          ctx.roundRect(pt.x - 16 * z, pt.y - 3.5 * z, 6.2 * z, 4.2 * z, 0.9 * z);
-          ctx.fill();
-          ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(pt.x - 15.0 * z, pt.y - 2.1 * z, 4.2 * z, 0.9 * z);
+          ctx.fillText('Sungai Refleksia', signPtX, signBoxY + signBoxH / 2, signBoxW - 4.5 * z);
+          ctx.restore();
 
           // Resting minimalist carbon/bamboo fishing rods when player is not actively fishing
           if (!isFishingRef.current) {
             ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 1.3 * z;
+            ctx.lineWidth = 1.2 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x + 11 * z, pt.y + 14 * z);
-            ctx.lineTo(pt.x + 31 * z, pt.y + 5 * z);
-            ctx.moveTo(pt.x + 15 * z, pt.y + 11 * z);
-            ctx.lineTo(pt.x + 34 * z, pt.y + 2 * z);
+            ctx.moveTo(pt.x + 8 * z, pt.y + 4 * z);
+            ctx.lineTo(pt.x + 25 * z, pt.y - 2 * z);
+            ctx.moveTo(pt.x + 11 * z, pt.y + 2 * z);
+            ctx.lineTo(pt.x + 27 * z, pt.y - 4 * z);
             ctx.stroke();
 
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
             ctx.lineWidth = 0.65 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x + 31 * z, pt.y + 5 * z);
-            ctx.lineTo(pt.x + 32 * z, pt.y + 18 * z);
+            ctx.moveTo(pt.x + 25 * z, pt.y - 2 * z);
+            ctx.lineTo(pt.x + 26 * z, pt.y + 8 * z);
             ctx.stroke();
 
-            // Minimalist red-white float bobber
             ctx.fillStyle = '#ef4444';
             ctx.beginPath();
-            ctx.arc(pt.x + 32 * z, pt.y + 18 * z, 1.6 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 26 * z, pt.y + 8 * z, 1.5 * z, 0, Math.PI * 2);
             ctx.fill();
           }
 
-          // 3. FLOATING BADGE: 🎣 Spot Memancing Danau Pusat ONLY when player approaches & not stationary > 5s
+          // 3. FLOATING BADGE: 🎣 Spot Memancing • Sungai Refleksia ONLY when player approaches & not stationary > 5s
           const distToFishing = Math.hypot(player.wx - item.wx, player.wy - item.wy);
           if (distToFishing < 2.3 && overheadTagAlpha > 0.005) {
             ctx.save();
             ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
-            const dockTagY = pt.y - 44 * z;
-            const dockLabel = '🎣 Spot Memancing Danau Pusat';
-            ctx.font = `bold ${Math.round(7.5 * z)}px sans-serif`;
+            const dockTagY = pt.y - 38 * z;
+            const dockLabel = '🎣 Spot Memancing • Sungai Refleksia';
+            ctx.font = `bold ${Math.round(6.8 * z)}px sans-serif`;
             const dM = ctx.measureText(dockLabel);
             const dW = dM.width + 10 * z;
-            const dH = 14 * z;
+            const dH = 13 * z;
 
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
             ctx.beginPath();
-            ctx.roundRect(pt.x - dW / 2, dockTagY - dH / 2, dW, dH, 7 * z);
+            ctx.roundRect(pt.x - dW / 2, dockTagY - dH / 2, dW, dH, 6.5 * z);
             ctx.fill();
             ctx.strokeStyle = 'rgba(56, 189, 248, 0.68)';
-            ctx.lineWidth = 0.95 * z;
+            ctx.lineWidth = 0.9 * z;
             ctx.stroke();
 
             ctx.fillStyle = '#bae6fd';
@@ -10608,7 +10579,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fillStyle = '#bbf7d0';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('🌲 HUTAN BELANTARA', pt.x, by + bh / 2, bw - 5 * z);
+          ctx.fillText('🌲 Hutan Refleksia', pt.x, by + bh / 2, bw - 5 * z);
           ctx.restore();
 
           ctx.restore();
@@ -10814,7 +10785,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           });
 
-          // 5. Overhead Minimalist Portal Crossbeam & "KHUSUS GURU" Signboard
+          // 5. Overhead Minimalist Portal Crossbeam & "Hutan Refleksia" Signboard Aligned Following the Forest Gate Isometric Position
           ctx.strokeStyle = isNight ? '#0f172a' : '#1e293b';
           ctx.lineWidth = 2.6 * z;
           ctx.beginPath();
@@ -10822,28 +10793,51 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineTo(pRight.x, pRight.y - pillarH + 1.5 * z);
           ctx.stroke();
 
-          const signW = 92 * z;
-          const signH = 13.5 * z;
-          const signX = pCenter.x - signW / 2;
-          const signY = pCenter.y - pillarH - 12.5 * z;
-          ctx.fillStyle = isNight ? 'rgba(15, 23, 42, 0.94)' : 'rgba(30, 41, 59, 0.94)';
+          // Vertical steel mounting brackets connecting the portal arch crossbeam to the signboard
+          const gateDx = pRight.x - pLeft.x;
+          const gateDy = pRight.y - pLeft.y;
+          const gateSlope = Math.abs(gateDx) > 0.001 ? gateDy / gateDx : 0.5;
+          const signCenterY = pCenter.y - pillarH - 6.8 * z;
+          const signW = Math.max(54 * z, Math.min(68 * z, Math.abs(gateDx) * 0.92));
+          const signH = 12.5 * z;
+
+          ctx.save();
+          ctx.translate(pCenter.x, signCenterY);
+          // Align signboard parallel to the isometric angle & position of the forest gate crossbeam
+          ctx.transform(1, gateSlope, 0, 1, 0, 0);
+
+          // Support struts down to the crossbeam
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 1.6 * z;
+          ctx.beginPath();
+          ctx.moveTo(-signW * 0.32, signH / 2);
+          ctx.lineTo(-signW * 0.32, signH / 2 + 3.5 * z);
+          ctx.moveTo(signW * 0.32, signH / 2);
+          ctx.lineTo(signW * 0.32, signH / 2 + 3.5 * z);
+          ctx.stroke();
+
+          // Framed Signboard Body
+          ctx.fillStyle = isNight ? 'rgba(15, 23, 42, 0.95)' : 'rgba(30, 41, 59, 0.95)';
           ctx.strokeStyle = canEnterGate ? '#10b981' : '#f59e0b';
           ctx.lineWidth = 1.15 * z;
           ctx.beginPath();
-          ctx.roundRect(signX, signY, signW, signH, 3.5 * z);
+          ctx.roundRect(-signW / 2, -signH / 2, signW, signH, 3.2 * z);
           ctx.fill();
           ctx.stroke();
 
-          ctx.font = `bold ${Math.max(5, Math.round(5.6 * z))}px sans-serif`;
+          // Strictly clip "Hutan Refleksia" inside the aligned gate signboard frame
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(-signW / 2 + 1.5 * z, -signH / 2 + 1.0 * z, signW - 3.0 * z, signH - 2.0 * z, 2.2 * z);
+          ctx.clip();
+          ctx.font = `bold ${Math.max(5, Math.round(6.0 * z))}px sans-serif`;
           ctx.fillStyle = canEnterGate ? '#a7f3d0' : '#fde68a';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(
-            canEnterGate ? '🌲 GERBANG HUTAN & DANAU • AKSES GURU 🔓' : '🌲 GERBANG HUTAN & DANAU • KHUSUS GURU 🔒',
-            pCenter.x,
-            signY + signH / 2,
-            signW - 5 * z
-          );
+          ctx.fillText('🌲 Hutan Refleksia', 0, 0, signW - 5 * z);
+          ctx.restore();
+
+          ctx.restore();
 
           ctx.restore();
         } else if (item.type === 'building') {
@@ -15570,8 +15564,37 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
-          // 6. TRANSPARENT USERNAME TAG PILL
-          const tagPosY = avY - (isKikyTimeTraveler || isJournalistAvatar ? 30 : 28) * z;
+          // Helper to word-wrap overhead text into compact multi-line arrays so text never stretches long horizontally
+          const wrapOverheadText = (text: string, maxWidthPx: number, maxLinesCount: number = 3): string[] => {
+            const words = text.trim().split(/\s+/);
+            const lines: string[] = [];
+            let currentLine = '';
+            for (const word of words) {
+              const testLine = currentLine ? `${currentLine} ${word}` : word;
+              if (ctx.measureText(testLine).width <= maxWidthPx || !currentLine) {
+                currentLine = testLine;
+              } else {
+                lines.push(currentLine);
+                currentLine = word;
+                if (lines.length >= maxLinesCount - 1) {
+                  break;
+                }
+              }
+            }
+            if (currentLine && lines.length < maxLinesCount) {
+              const remainingIdx = words.indexOf(currentLine.split(' ')[0]);
+              if (lines.length === maxLinesCount - 1 && remainingIdx !== -1) {
+                // Combine remaining words if on last allowed line
+                const joinedRest = words.slice(remainingIdx).join(' ');
+                lines.push(joinedRest);
+              } else {
+                lines.push(currentLine);
+              }
+            }
+            return lines.length > 0 ? lines : [text];
+          };
+
+          // 6. COMPACT & WRAPPED USERNAME TAG PILL (Diperkecil & Di-wrap Rapi)
           let labelText = `@${av.handle}`;
           if (isKikyTimeTraveler) {
             labelText = `⏳ @${av.handle}`;
@@ -15597,10 +15620,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             labelText = `@sony`;
           }
 
-          ctx.font = `${isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar ? 'bold' : '600'} ${Math.round((isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar ? 8.5 : 7.8) * z)}px sans-serif`;
-          const tM = ctx.measureText(labelText);
-          const tW = tM.width + 9 * z;
-          const tH = 13.5 * z;
+          const tagFontPx = Math.max(
+            5.5,
+            Math.round((isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar ? 6.5 : 6.0) * z)
+          );
+          ctx.font = `${isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar ? 'bold' : '600'} ${tagFontPx}px sans-serif`;
+          const maxTagLineW = 68 * z;
+          const tagLines = wrapOverheadText(labelText, maxTagLineW, 2);
+          const tagLineH = 7.4 * z;
+          let maxMeasuredTagW = 0;
+          for (const tl of tagLines) {
+            maxMeasuredTagW = Math.max(maxMeasuredTagW, ctx.measureText(tl).width);
+          }
+          const tW = Math.min(78 * z, maxMeasuredTagW + 7.5 * z);
+          const tH = tagLines.length * tagLineH + 3.6 * z;
+          const tagBottomY = avY - (isKikyTimeTraveler || isJournalistAvatar ? 21.5 : 20.5) * z;
+          const tagPosY = tagBottomY - tH / 2;
 
           // Lightweight Transparent Pill Background so it never clutters the city view
           ctx.fillStyle = isKikyTimeTraveler
@@ -15611,46 +15646,49 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ? 'rgba(120, 53, 15, 0.45)'
             : 'rgba(15, 23, 42, 0.28)';
           ctx.beginPath();
-          ctx.roundRect(pt.x - tW / 2, tagPosY - tH / 2, tW, tH, 6.5 * z);
+          ctx.roundRect(pt.x - tW / 2, tagPosY - tH / 2, tW, tH, 5.2 * z);
           ctx.fill();
 
           if (isKikyTimeTraveler) {
             ctx.strokeStyle = 'rgba(34, 211, 238, 0.9)';
-            ctx.lineWidth = 1.3 * z;
+            ctx.lineWidth = 1.1 * z;
             ctx.stroke();
             ctx.fillStyle = '#67e8f9';
           } else if (isJournalistAvatar) {
             ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
-            ctx.lineWidth = 1.2 * z;
+            ctx.lineWidth = 1.0 * z;
             ctx.stroke();
             ctx.fillStyle = '#fde047';
           } else if (isTeacherAvatar) {
             ctx.strokeStyle = 'rgba(251, 191, 36, 0.75)';
-            ctx.lineWidth = 1.2 * z;
+            ctx.lineWidth = 1.0 * z;
             ctx.stroke();
             ctx.fillStyle = '#fde047';
           } else if (item.isPlayer) {
             ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
-            ctx.lineWidth = 0.9 * z;
+            ctx.lineWidth = 0.8 * z;
             ctx.stroke();
             ctx.fillStyle = 'rgba(224, 242, 254, 0.92)';
           } else if (av.isOnlineRemote) {
             ctx.strokeStyle = 'rgba(52, 211, 153, 0.42)';
-            ctx.lineWidth = 0.9 * z;
+            ctx.lineWidth = 0.8 * z;
             ctx.stroke();
             ctx.fillStyle = 'rgba(209, 250, 229, 0.92)';
           } else {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
-            ctx.lineWidth = 0.7 * z;
+            ctx.lineWidth = 0.65 * z;
             ctx.stroke();
-            ctx.fillStyle = 'rgba(241, 245, 249, 0.78)';
+            ctx.fillStyle = 'rgba(241, 245, 249, 0.82)';
           }
 
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(labelText, pt.x, tagPosY);
+          const firstTagLineY = tagPosY - ((tagLines.length - 1) * tagLineH) / 2;
+          for (let li = 0; li < tagLines.length; li++) {
+            ctx.fillText(tagLines[li], pt.x, firstTagLineY + li * tagLineH, tW - 4 * z);
+          }
 
-          // 7. COMIC SPEECH BUBBLE (Floats cleanly above nametag)
+          // 7. COMPACT MULTI-LINE WRAPPED SPEECH BUBBLE (Diperkecil, Tidak Memanjang & Di-wrap Rapi di Atas Nametag)
           let speech: string | undefined = av.speechText;
           if (item.isPlayer && playerSpeechRef.current && Date.now() < playerSpeechRef.current.expiresAt) {
             speech = playerSpeechRef.current.text;
@@ -15659,35 +15697,52 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             speech = baristaSpeechRef.current.text;
           }
 
+          let speechTopEdgeY = tagPosY - tH / 2;
           if (speech) {
-            ctx.font = `bold ${Math.round(9 * z)}px sans-serif`;
-            const sMetrics = ctx.measureText(speech);
-            const sW = sMetrics.width + 14 * z;
-            const sH = 20 * z;
-            const bubbleY = tagPosY - 18 * z;
+            const speechFontPx = Math.max(5.5, Math.round(6.3 * z));
+            ctx.font = `600 ${speechFontPx}px sans-serif`;
+            const maxSpeechLineW = 86 * z;
+            const speechLines = wrapOverheadText(speech, maxSpeechLineW, 3);
+            const speechLineH = 7.8 * z;
+            let maxMeasuredSpeechW = 0;
+            for (const sl of speechLines) {
+              maxMeasuredSpeechW = Math.max(maxMeasuredSpeechW, ctx.measureText(sl).width);
+            }
+            const sW = Math.min(96 * z, Math.max(26 * z, maxMeasuredSpeechW + 9 * z));
+            const sH = speechLines.length * speechLineH + 5.5 * z;
+            const bubbleBottomY = tagPosY - tH / 2 - 4.2 * z;
+            const bubbleY = bubbleBottomY - sH / 2;
+            speechTopEdgeY = bubbleY - sH / 2;
 
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+            ctx.lineWidth = 0.75 * z;
             ctx.beginPath();
-            ctx.roundRect(pt.x - sW / 2, bubbleY - sH / 2, sW, sH, 10 * z);
+            ctx.roundRect(pt.x - sW / 2, bubbleY - sH / 2, sW, sH, 5.5 * z);
             ctx.fill();
+            ctx.stroke();
 
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
             ctx.beginPath();
-            ctx.moveTo(pt.x - 3, bubbleY + sH / 2);
-            ctx.lineTo(pt.x + 3, bubbleY + sH / 2);
-            ctx.lineTo(pt.x, bubbleY + sH / 2 + 4 * z);
+            ctx.moveTo(pt.x - 2.4 * z, bubbleBottomY);
+            ctx.lineTo(pt.x + 2.4 * z, bubbleBottomY);
+            ctx.lineTo(pt.x, bubbleBottomY + 3.2 * z);
             ctx.closePath();
             ctx.fill();
 
             ctx.fillStyle = '#0f172a';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(speech, pt.x, bubbleY);
+            const firstSpeechLineY = bubbleY - ((speechLines.length - 1) * speechLineH) / 2;
+            for (let si = 0; si < speechLines.length; si++) {
+              ctx.fillText(speechLines[si], pt.x, firstSpeechLineY + si * speechLineH, sW - 5 * z);
+            }
           }
 
           // 8. FLOATING EMOTE BADGE & PARTICLES (Suka ❤️, Lambai 👋, Tertawa 😂, Joget 🎵, Jempol 👍)
           if (activeEmote && Date.now() < activeEmote.expiresAt) {
             const emoteBounce = Math.sin(elapsed * 7) * 2.5 * z;
-            const baseEmoteY = speech ? tagPosY - 34 * z : tagPosY - 14 * z;
+            const baseEmoteY = speechTopEdgeY - 12 * z;
             const emoteY = baseEmoteY + emoteBounce;
 
             // Floating Emote Bubble with Glow
@@ -15812,9 +15867,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               const enterT = Math.min(1.0, elapsedXp / 320);
               const springScale = enterT < 1.0 ? 0.35 + 0.85 * Math.sin(enterT * Math.PI * 0.55) : 1.0;
 
-              // Float upward smoothly from tagPosY
-              const floatDistance = (18 + Math.pow(progress, 0.72) * 46) * z + (idx * 16 * z);
-              const xpY = tagPosY - (speech ? 28 * z : 14 * z) - floatDistance;
+              // Float upward smoothly from speechTopEdgeY
+              const floatDistance = (14 + Math.pow(progress, 0.72) * 44) * z + (idx * 16 * z);
+              const xpY = speechTopEdgeY - floatDistance;
               const xpX = pt.x;
 
               // Fade out gently in the last 30% of lifetime
@@ -18568,11 +18623,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     </div>
                     <div className="min-w-0">
                       <div className="text-[8.5px] font-bold tracking-wider uppercase text-sky-300 leading-none">
-                        Dermaga Danau Pusat Sungai
+                        Sungai Refleksia
                       </div>
                       <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
                         {!isFishing
-                          ? 'Spot Memancing Danau Pusat'
+                          ? 'Spot Memancing • Sungai Refleksia'
                           : fishingPhase === 'casting'
                           ? 'Melempar Pancing...'
                           : fishingPhase === 'pulling'
