@@ -540,8 +540,12 @@ export const isSolidCollision = (
   }
 
   // Danau Pusat Sungai Mengalir water basin (wx: 1.85 .. 7.15, wy: -12.25 .. -8.78)
-  // Leaves the lakeside viewing deck at (wx: 1.55, wy: -10.15) and southern shore walkable
+  // Leaves the lakeside viewing deck at (wx: 1.55, wy: -10.15), the fishing pier deck (wx: 1.55..2.45), and southern shore walkable
   if (wx > 1.85 - padding && wy < -8.78 + padding) {
+    // Dermaga pemancingan kayu di tepi danau (bisa dinaiki untuk memancing)
+    if (wx >= 1.55 - padding && wx <= 2.45 + padding && wy >= -10.55 - padding && wy <= -9.75 + padding) {
+      return false;
+    }
     return true;
   }
 
@@ -1454,36 +1458,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       playerRef.current.activeEmote = emoteObj;
     }
     setIsEmoteMenuOpen(false);
-
-    // If an avatar was targeted, make that avatar respond too!
-    const target = emoteTargetAvatarRef.current;
-    if (target) {
-      target.activeEmote = { ...emoteObj };
-      const nowMs = Date.now();
-      const targetName = target.name || `@${target.handle}`;
-      if (type === 'thumbsup') {
-        target.speechText = `👍 Mantap, ${studentName}! Semangat terus ya!`;
-        target.speechTimer = 4.5;
-        playerSpeechRef.current = { text: `👍 Jempol mantap untuk ${targetName}!`, expiresAt: nowMs + 4000 };
-      } else if (type === 'love') {
-        target.speechText = `❤️ Terima kasih banyak, ${studentName}!`;
-        target.speechTimer = 4.5;
-        playerSpeechRef.current = { text: `❤️ Apresiasi hangat untuk ${targetName}!`, expiresAt: nowMs + 4000 };
-      } else if (type === 'wave') {
-        target.speechText = `👋 Halo ${studentName}! Senang bertemu denganmu!`;
-        target.speechTimer = 4.5;
-        playerSpeechRef.current = { text: `👋 Menyapa ramah ${targetName}!`, expiresAt: nowMs + 4000 };
-      } else if (type === 'laugh') {
-        target.speechText = `😂 Hahaha seru sekali ya ${studentName}!`;
-        target.speechTimer = 4.5;
-        playerSpeechRef.current = { text: `😂 Tertawa ceria bersama ${targetName}!`, expiresAt: nowMs + 4000 };
-      } else if (type === 'dance') {
-        target.speechText = `🎵 Asyik! Mari joget bersama!`;
-        target.speechTimer = 5.0;
-        playerSpeechRef.current = { text: `🎵 Berjoget ria bersama ${targetName}!`, expiresAt: nowMs + 4500 };
-      }
-      emoteTargetAvatarRef.current = null;
-    }
+    emoteTargetAvatarRef.current = null;
 
     if (type === 'dance') {
       sounds.playDanceMusic();
@@ -3091,39 +3066,30 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setIsEmoteMenuOpen(false);
       }
 
-      // 0B. Check Click on Any Other Avatar (NPC or Online Citizen) -> Open 5-Reaction Circular Menu around target avatar!
-      let clickedOtherAvatar: AvatarData | null = null;
+      // 0B. Check Click on NPC -> Show NPC Greeting / Voice Speech ONLY (TIDAK membuka menu reaksi avatar lain)
+      // "Pastikan kita tidak bisa mengakses reaksi avatar lainnya. Kita hanya bisa mengakses avatar kita sendiri."
+      let clickedNpc: AvatarData | null = null;
       for (const npc of npcs) {
         const nPt = toScreen(npc.wx, npc.wy, 0, camera.x, camera.y);
         const dScreen = Math.hypot(sx - nPt.x, sy - (nPt.y - 12 * z));
         const dWorld = Math.hypot(wx - npc.wx, wy - npc.wy);
         if (dScreen < 26 * z || dWorld < 0.62) {
-          clickedOtherAvatar = npc;
+          clickedNpc = npc;
           break;
         }
       }
-      if (!clickedOtherAvatar) {
-        remotePlayersRef.current.forEach((rem) => {
-          if (clickedOtherAvatar) return;
-          const rPt = toScreen(rem.wx, rem.wy, 0, camera.x, camera.y);
-          const dScreen = Math.hypot(sx - rPt.x, sy - (rPt.y - 12 * z));
-          const dWorld = Math.hypot(wx - rem.wx, wy - rem.wy);
-          if (dScreen < 26 * z || dWorld < 0.62) {
-            clickedOtherAvatar = rem;
-          }
-        });
-      }
 
-      if (clickedOtherAvatar) {
+      if (clickedNpc) {
         sounds.playClick();
-        emoteTargetAvatarRef.current = clickedOtherAvatar;
-        const oPt = toScreen(clickedOtherAvatar.wx, clickedOtherAvatar.wy, 0, camera.x, camera.y);
-        setPlayerScreenPos({ x: Math.round(oPt.x), y: Math.round(oPt.y - 12 * z) });
-        setIsEmoteMenuOpen(true);
-        // If the clicked avatar is @tomi at the wilderness gate, only return if the player is a teacher or not trying to cross
-        if (clickedOtherAvatar.id !== 'tomi') {
-          return;
+        if (clickedNpc.speeches && clickedNpc.speeches.length > 0) {
+          const sIdx = Math.floor(Math.random() * clickedNpc.speeches.length);
+          clickedNpc.speechText = clickedNpc.speeches[sIdx];
+          clickedNpc.speechTimer = 5.0;
         }
+        if (clickedNpc.id === 'tomi' && !isTeacher) {
+          showToast('🔒 Gerbang Hutan & Danau dijaga ketat oleh @tomi khusus Guru!', 3200);
+        }
+        return;
       }
 
       // 1. Check Click on Cafe Stall (Toko Roti & Kafe di ujung kota belakang Lab DKV)
@@ -5052,17 +5018,29 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // ---------------------------------------------------------
       // 2B. ISOMETRIC BASE TILES & PATHWAYS (17x23 Expanded Grid: gy -14..+8)
       // ---------------------------------------------------------
+      // Satu-satunya jalan setapak di hutan adalah jalan alami berumput menuju dermaga pemancingan
+      const isFishingTrail = (gx: number, gy: number) => {
+        // Alur jalan setapak dari gerbang hutan [0, -7] menuju dermaga pemancingan danau [2, -10]
+        if (gx === 0 && gy === -7) return true;
+        if (gx === 1 && (gy === -8 || gy === -9)) return true;
+        if (gx === 2 && (gy === -9 || gy === -10)) return true;
+        return false;
+      };
+
       const isPathway = (gx: number, gy: number) => {
+        // Di area Hutan Belantara (gy <= -7), HANYA jalan menuju tempat pemancingan yang ada
+        if (gy <= -7) {
+          return isFishingTrail(gx, gy);
+        }
+
         // Inner loop road at |gx| == 3 or |gy| == 3
         if (Math.abs(gx) === 3 && Math.abs(gy) <= 5) return true;
         if (Math.abs(gy) === 3 && Math.abs(gx) <= 5) return true;
         // Outer promenade loop road at |gx| == 5 or |gy| == 5
         if (Math.abs(gx) === 5 && Math.abs(gy) <= 5) return true;
         if (Math.abs(gy) === 5 && Math.abs(gx) <= 5) return true;
-        // Connecting central spokes to north/east/west, extended northward into Hutan Belantara (gy = -11..+8)
-        if (gx === 0 && gy >= -11 && gy <= 8) return true;
-        // Scenic Woodland Trail branching to Hutan Belantara West & Dermaga Pemancingan Danau Pusat (gy = -10, gx = -2..+1)
-        if (gy === -10 && gx >= -2 && gx <= 1) return true;
+        // Connecting central avenue in town up to the forest gate (gy = -6..+8)
+        if (gx === 0 && gy >= -6 && gy <= 8) return true;
         if (Math.abs(gx) <= 1 && gy === 6) return true;
         if (gy === 0 && gx >= -7 && gx <= 8) return true;
         // Residential Boulevard in front of Perumahan Guru & Wisma X/XI/XII DKV behind Perpustakaan Kampus
@@ -5170,12 +5148,63 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         ctx.stroke();
       };
 
-      // Deep Wilderness Forest turf target colors (reached smoothly at gy <= -11)
-      const wildernessGrassColor = isNight ? '#063e2e' : '#146c32';
-      const wildernessGrassAltColor = isNight ? '#053326' : '#115e2b';
-      const wildernessGrassBorder = isNight ? '#04281e' : '#0f5125';
-      const wildernessPathColor = isNight ? '#334155' : '#dfd9ce';
-      const wildernessPathBorder = isNight ? '#1e293b' : '#b8b0a4';
+      // Draw organic lush multi-tiered forest shrubs / semak-semak lebat
+      const drawForestBush = (wx: number, wy: number, scale: number = 1.0, seed: number = 0) => {
+        const bPt = toScreen(wx, wy, 0, camera.x, camera.y);
+        const z = zTile * scale;
+        const sway = Math.sin(elapsed * 1.8 + wx * 1.2 + wy * 0.9) * 0.35 * z;
+
+        ctx.save();
+        ctx.translate(bPt.x + sway, bPt.y);
+
+        // Soft ground shadow under the bush
+        ctx.fillStyle = isNight ? 'rgba(0, 0, 0, 0.28)' : 'rgba(20, 83, 45, 0.22)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0.8 * z, 5.2 * z, 2.4 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 1. Deep under-leaf foliage layer
+        ctx.fillStyle = isNight ? '#064e3b' : '#14532d';
+        ctx.beginPath();
+        ctx.arc(-2.4 * z, -1.8 * z, 2.8 * z, 0, Math.PI * 2);
+        ctx.arc(2.2 * z, -1.8 * z, 2.7 * z, 0, Math.PI * 2);
+        ctx.arc(0, -3.2 * z, 3.2 * z, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Middle lush foliage cluster
+        ctx.fillStyle = isNight ? '#047857' : '#16a34a';
+        ctx.beginPath();
+        ctx.arc(-1.6 * z, -2.6 * z, 2.5 * z, 0, Math.PI * 2);
+        ctx.arc(1.6 * z, -2.5 * z, 2.4 * z, 0, Math.PI * 2);
+        ctx.arc(0, -4.2 * z, 2.8 * z, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3. Top sunlit leaf crests & highlights
+        ctx.fillStyle = isNight ? '#10b981' : '#4ade80';
+        ctx.beginPath();
+        ctx.arc(-0.8 * z, -4.5 * z, 1.4 * z, 0, Math.PI * 2);
+        ctx.arc(1.0 * z, -4.2 * z, 1.3 * z, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Optional tiny woodland berries / wild flower dots
+        if (seed % 3 === 0) {
+          ctx.fillStyle = seed % 2 === 0 ? '#fde047' : '#f43f5e';
+          ctx.beginPath();
+          ctx.arc(-1.2 * z, -3.5 * z, 0.65 * z, 0, Math.PI * 2);
+          ctx.arc(1.5 * z, -3.2 * z, 0.65 * z, 0, Math.PI * 2);
+          ctx.arc(0.2 * z, -4.8 * z, 0.7 * z, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      };
+
+      // Deep Wilderness Forest turf target colors - SEMUA HIJAU & ASRI (TIDAK ADA HITAM)
+      const wildernessGrassColor = isNight ? '#0d5336' : '#15803d';
+      const wildernessGrassAltColor = isNight ? '#0f603e' : '#16a34a';
+      const wildernessGrassBorder = isNight ? '#083c27' : '#166534';
+      const wildernessPathColor = isNight ? '#0e4a2d' : '#4d7c43';
+      const wildernessPathBorder = isNight ? '#093a22' : '#3d6735';
 
       // Draw all isometric base tiles across expanded map (gy: -14..+8, gx: -8..+8)
       // with a smooth multi-row gradient between City Grass (gy >= -4) and Wilderness Forest (gy <= -11)
@@ -5194,6 +5223,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const isLakeTile = gx >= 2 && gx <= 7 && gy >= -12 && gy <= -9;
           const isUnderMountain = gy <= -12;
           const isRoad = isPathway(gx, gy);
+          const isFishingPathTile = isFishingTrail(gx, gy);
+          const isCityRoad = isRoad && !isFishingPathTile;
 
           // Organic per-tile micro-dither so the transition feels natural & hand-crafted
           const checkerShift = (gx + gy) % 2 === 0 ? -0.04 : 0.05;
@@ -5202,22 +5233,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (isRiverZone || isLakeTile) {
             ctx.fillStyle = blendHexColor(isNight ? '#1e293b' : '#cbd5e1', isNight ? '#0f172a' : '#64748b', tileBlend);
             ctx.strokeStyle = blendHexColor(isNight ? '#334155' : '#94a3b8', isNight ? '#1e293b' : '#475569', tileBlend);
-          } else if (isRoad) {
-            ctx.fillStyle = blendHexColor(pathColor, wildernessPathColor, tileBlend * 0.85);
-            ctx.strokeStyle = blendHexColor(pathBorder, wildernessPathBorder, tileBlend * 0.85);
+          } else if (isCityRoad) {
+            ctx.fillStyle = blendHexColor(pathColor, '#e2e8f0', tileBlend * 0.5);
+            ctx.strokeStyle = blendHexColor(pathBorder, '#cbd5e1', tileBlend * 0.5);
+          } else if (isFishingPathTile) {
+            // Jalan setapak menuju tempat memancing - warna alami tanah berumput (hijau bumi, TIDAK HITAM)
+            ctx.fillStyle = isNight ? '#0e4a2d' : '#4d7c43';
+            ctx.strokeStyle = isNight ? '#093a22' : '#3d6735';
           } else {
+            // SEMUA TANAH DI HUTAN HIJAU SEGAR (emerald & lush forest green, TIDAK ADA HITAM)
             const targetForestGrass = (gx + gy) % 2 === 0 ? wildernessGrassColor : wildernessGrassAltColor;
-            let finalGrassColor = blendHexColor(grassColor, targetForestGrass, tileBlend);
-            let finalGrassBorder = blendHexColor(grassBorder, wildernessGrassBorder, tileBlend);
-
-            // Gradasi warna tanah maps dan kaki gunung (smooth transition to mountain base loam & rock)
-            if (gy <= -9.5) {
-              const mtnBlend = Math.max(0, Math.min(1, (-9.5 - gy) / 2.5));
-              const mtnSoilColor = isNight ? '#122316' : '#274426';
-              const mtnSoilBorder = isNight ? '#182f1f' : '#334f2d';
-              finalGrassColor = blendHexColor(finalGrassColor, mtnSoilColor, mtnBlend * 0.72);
-              finalGrassBorder = blendHexColor(finalGrassBorder, mtnSoilBorder, mtnBlend * 0.72);
-            }
+            const finalGrassColor = blendHexColor(grassColor, targetForestGrass, tileBlend);
+            const finalGrassBorder = blendHexColor(grassBorder, wildernessGrassBorder, tileBlend);
 
             ctx.fillStyle = finalGrassColor;
             ctx.strokeStyle = finalGrassBorder;
@@ -5236,7 +5263,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           }
 
-          if (isUnderMountain || isRiverZone || isLakeTile || isRoad) {
+          if (isRiverZone || isLakeTile || isCityRoad) {
             continue;
           }
 
@@ -5255,13 +5282,40 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           }
 
-          // Deep forest floor details (gy <= -9)
-          if (gy <= -9) {
+          // HANYA JALAN MENUJU TEMPAT MEMANCING ITU PUN BANYAK RUMPUT
+          if (isFishingPathTile) {
+            const breeze = Math.sin(elapsed * 2.0 + gx * 0.7 + gy * 0.6) * 0.6 * zTile;
+            drawTidyGrassTuft(gx - 0.28, gy - 0.22, breeze);
+            drawTidyGrassTuft(gx + 0.25, gy + 0.20, breeze);
+            drawTidyGrassTuft(gx - 0.08, gy + 0.24, breeze);
+            drawTidyGrassTuft(gx + 0.10, gy - 0.22, breeze);
+            drawTidyFlower(gx - 0.18, gy + 0.14, Math.abs(gx * 3 + gy * 7), 0.75);
+            continue;
+          }
+
+          // SEMUA TANAH DI HUTAN SEMUA HIJAU DAN BERSEMAK (gy <= -7)
+          if (gy <= -7) {
             const breeze = Math.sin(elapsed * 1.9 + gx * 0.7 + gy * 0.6) * 0.6 * zTile;
-            drawTidyGrassTuft(gx - 0.14, gy - 0.12, breeze);
-            drawTidyGrassTuft(gx + 0.16, gy + 0.14, breeze);
-            if ((Math.abs(gx * 3 + gy * 5)) % 3 === 0) {
-              drawTidyFlower(gx + 0.18, gy + 0.10, Math.abs(gx + gy * 3), 0.86);
+            const bushSeed = Math.abs(gx * 11 + gy * 17);
+
+            // Rerumputan segar bergoyang lembut
+            drawTidyGrassTuft(gx - 0.26, gy - 0.18, breeze);
+            drawTidyGrassTuft(gx + 0.24, gy + 0.20, breeze);
+            drawTidyGrassTuft(gx + 0.22, gy - 0.22, breeze);
+            drawTidyGrassTuft(gx - 0.20, gy + 0.24, breeze);
+
+            // Semak-semak hutan berdaun lebat (Lush organic forest shrubs)
+            drawForestBush(gx - 0.14, gy - 0.08, 1.05, bushSeed);
+            if (bushSeed % 2 === 0) {
+              drawForestBush(gx + 0.20, gy + 0.14, 0.88, bushSeed + 1);
+            }
+            if (bushSeed % 3 === 0) {
+              drawForestBush(gx - 0.06, gy + 0.26, 0.78, bushSeed + 2);
+            }
+
+            // Bunga hutan & semanggi liar
+            if (bushSeed % 2 === 1) {
+              drawTidyFlower(gx + 0.16, gy - 0.12, bushSeed, 0.88);
             }
             continue;
           }
@@ -5444,18 +5498,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         const turfSMidW = mPt(-3.80, -11.32, 0);
         const turfSW = mPt(-8.52, -11.45, 0);
 
-        // Seamless multi-stop elevation gradient blending forest map floor into mountain roots
+        // Seamless multi-stop elevation gradient: SEMUA HIJAU SEGAR (TIDAK ADA HITAM)
         const apronGrad = ctx.createLinearGradient(0, turfSCenter.y, 0, turfNW.y);
         if (isNight) {
-          apronGrad.addColorStop(0.0, '#0d2315');
-          apronGrad.addColorStop(0.3, '#122316');
-          apronGrad.addColorStop(0.65, '#162218');
-          apronGrad.addColorStop(1.0, '#1c241c');
+          apronGrad.addColorStop(0.0, '#0d5336');
+          apronGrad.addColorStop(0.35, '#0f603e');
+          apronGrad.addColorStop(0.70, '#107049');
+          apronGrad.addColorStop(1.0, '#0d5336');
         } else {
           apronGrad.addColorStop(0.0, '#15803d');
-          apronGrad.addColorStop(0.3, '#1e6231');
-          apronGrad.addColorStop(0.65, '#2b4d2e');
-          apronGrad.addColorStop(1.0, '#384b35');
+          apronGrad.addColorStop(0.35, '#16a34a');
+          apronGrad.addColorStop(0.70, '#22c55e');
+          apronGrad.addColorStop(1.0, '#15803d');
         }
 
         ctx.save();
@@ -5472,20 +5526,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         ctx.fill();
         ctx.restore();
 
-        // Transitional low-poly foothill scree & mossy bedrock facets along the southern mountain skirt
-        const foothillScree: Array<{ fx: number; fy: number; sw: number; sh: number; color: string }> = [
-          { fx: -6.2, fy: -11.55, sw: 1.8, sh: 1.1, color: '#3b4e3a' },
-          { fx: -3.1, fy: -11.42, sw: 2.2, sh: 1.3, color: '#2f4530' },
-          { fx: 0.8, fy: -11.38, sw: 2.4, sh: 1.2, color: '#384c35' },
-          { fx: 4.1, fy: -11.45, sw: 1.9, sh: 1.0, color: '#314732' },
-          { fx: 6.8, fy: -11.58, sw: 2.3, sh: 1.4, color: '#394e37' },
+        // Bantalan semak & lumut hijau alami di kaki bukit (Lush green moss & shrub mounds)
+        const foothillCushions: Array<{ fx: number; fy: number; sw: number; sh: number; color: string }> = [
+          { fx: -6.2, fy: -11.55, sw: 1.8, sh: 1.1, color: isNight ? '#0f603e' : '#16a34a' },
+          { fx: -3.1, fy: -11.42, sw: 2.2, sh: 1.3, color: isNight ? '#107049' : '#22c55e' },
+          { fx: 0.8, fy: -11.38, sw: 2.4, sh: 1.2, color: isNight ? '#0d5336' : '#15803d' },
+          { fx: 4.1, fy: -11.45, sw: 1.9, sh: 1.0, color: isNight ? '#0f603e' : '#16a34a' },
+          { fx: 6.8, fy: -11.58, sw: 2.3, sh: 1.4, color: isNight ? '#107049' : '#22c55e' },
         ];
-        foothillScree.forEach((stone) => {
-          const pt = toScreen(stone.fx, stone.fy, 0, camera.x, camera.y);
+        foothillCushions.forEach((cushion) => {
+          const pt = toScreen(cushion.fx, cushion.fy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
-          ctx.fillStyle = isNight ? '#162419' : stone.color;
+          ctx.fillStyle = cushion.color;
           ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y, stone.sw * 3.8 * z, stone.sh * 2.0 * z, 0.15, 0, Math.PI * 2);
+          ctx.ellipse(pt.x, pt.y, cushion.sw * 3.8 * z, cushion.sh * 2.0 * z, 0.15, 0, Math.PI * 2);
           ctx.fill();
         });
 
@@ -7706,6 +7760,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             wx: number;
             wy: number;
             depth: number;
+            facingDir?: 1 | -1;
+            isWalking?: boolean;
           };
 
       const drawItems: DrawItem[] = [];
@@ -7969,53 +8025,167 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         depth: heronCurWx + heronCurWy + 0.1,
       });
 
-      // 13. Hewan di Hutan Belantara (2 Rusa Dewasa, Tupai, Kelinci, & Burung Berjalan)
-      // Rusa Jantan Dewasa Bertanduk
+      // 13. Hewan di Hutan Belantara (2 Rusa Dewasa, Tupai, Kelinci, & Burung Berjalan) - Bergerak Random Pelan
+      // A. Rusa Jantan Dewasa: Berkelana pelan santai di padang rumput barat (siklus 28 detik)
+      const stagCycle = elapsed % 28;
+      let stagCurWx = -4.85;
+      let stagCurWy = -10.45;
+      let stagFacing: 1 | -1 = 1;
+      let stagWalking = false;
+      if (stagCycle < 10) {
+        // Melangkah pelan ke arah timur
+        const p = stagCycle / 10;
+        const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        stagCurWx = -4.85 + s * 1.15;
+        stagCurWy = -10.45 + Math.sin(p * Math.PI) * 0.45;
+        stagFacing = 1;
+        stagWalking = true;
+      } else if (stagCycle < 17) {
+        // Berhenti berdiri gagah, memantau hutan & sniffing udara
+        stagCurWx = -3.70;
+        stagCurWy = -10.45;
+        stagFacing = 1;
+        stagWalking = false;
+      } else {
+        // Melangkah pelan kembali ke arah barat
+        const p = (stagCycle - 17) / 11;
+        const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        stagCurWx = -3.70 - s * 1.15;
+        stagCurWy = -10.45 - Math.sin(p * Math.PI) * 0.35;
+        stagFacing = -1;
+        stagWalking = true;
+      }
       drawItems.push({
         type: 'forest_wildlife',
         kind: 'deer_stag',
-        wx: -4.85,
-        wy: -10.45,
-        depth: -4.85 - 10.45,
+        wx: stagCurWx,
+        wy: stagCurWy,
+        depth: stagCurWx + stagCurWy,
+        facingDir: stagFacing,
+        isWalking: stagWalking,
       });
 
-      // Rusa Betina Dewasa
+      // B. Rusa Betina Dewasa: Bergerak pelan dan merumput di dekat pepohonan (siklus 32 detik)
+      const doeCycle = elapsed % 32;
+      let doeCurWx = -2.35;
+      let doeCurWy = -10.85;
+      let doeFacing: 1 | -1 = -1;
+      let doeWalking = false;
+      if (doeCycle < 11) {
+        // Melangkah pelan ke arah barat daya
+        const p = doeCycle / 11;
+        const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        doeCurWx = -2.35 - s * 0.95;
+        doeCurWy = -10.85 + Math.sin(p * Math.PI) * 0.40;
+        doeFacing = -1;
+        doeWalking = true;
+      } else if (doeCycle < 19) {
+        // Berhenti merumput di semak hijau
+        doeCurWx = -3.30;
+        doeCurWy = -10.85;
+        doeFacing = -1;
+        doeWalking = false;
+      } else {
+        // Melangkah pelan kembali ke timur laut
+        const p = (doeCycle - 19) / 13;
+        const s = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        doeCurWx = -3.30 + s * 0.95;
+        doeCurWy = -10.85 - Math.sin(p * Math.PI) * 0.30;
+        doeFacing = 1;
+        doeWalking = true;
+      }
       drawItems.push({
         type: 'forest_wildlife',
         kind: 'deer_doe',
-        wx: -2.35,
-        wy: -10.85,
-        depth: -2.35 - 10.85,
+        wx: doeCurWx,
+        wy: doeCurWy,
+        depth: doeCurWx + doeCurWy,
+        facingDir: doeFacing,
+        isWalking: doeWalking,
       });
 
-      // Tupai Ekor Lebat
+      // C. Tupai Ekor Lebat: Scurry pelan di antara semak/pohon dan duduk memakan biji (siklus 18 detik)
+      const sqCycle = elapsed % 18;
+      let sqCurWx = -0.95;
+      let sqCurWy = -9.85;
+      let sqFacing: 1 | -1 = 1;
+      let sqWalking = false;
+      if (sqCycle < 4.5) {
+        const p = sqCycle / 4.5;
+        sqCurWx = -0.95 + p * 0.70;
+        sqCurWy = -9.85 + Math.sin(p * Math.PI) * 0.25;
+        sqFacing = 1;
+        sqWalking = true;
+      } else if (sqCycle < 13.5) {
+        sqCurWx = -0.25;
+        sqCurWy = -9.85;
+        sqFacing = 1;
+        sqWalking = false;
+      } else {
+        const p = (sqCycle - 13.5) / 4.5;
+        sqCurWx = -0.25 - p * 0.70;
+        sqCurWy = -9.85 - Math.sin(p * Math.PI) * 0.25;
+        sqFacing = -1;
+        sqWalking = true;
+      }
       drawItems.push({
         type: 'forest_wildlife',
         kind: 'squirrel',
-        wx: -0.95,
-        wy: -9.85,
-        depth: -0.95 - 9.85,
+        wx: sqCurWx,
+        wy: sqCurWy,
+        depth: sqCurWx + sqCurWy,
+        facingDir: sqFacing,
+        isWalking: sqWalking,
       });
 
-      // Kelinci Hutan
+      // D. Kelinci Hutan: Melompat pelan dan berhenti menggoyangkan hidung (siklus 21 detik)
+      const rabCycle = elapsed % 21;
+      let rabCurWx = -3.55;
+      let rabCurWy = -9.45;
+      let rabFacing: 1 | -1 = 1;
+      let rabWalking = false;
+      if (rabCycle < 6.5) {
+        const p = rabCycle / 6.5;
+        rabCurWx = -3.55 + p * 0.85;
+        rabCurWy = -9.45 + Math.sin(p * Math.PI * 4) * 0.12;
+        rabFacing = 1;
+        rabWalking = true;
+      } else if (rabCycle < 14.5) {
+        rabCurWx = -2.70;
+        rabCurWy = -9.45;
+        rabFacing = 1;
+        rabWalking = false;
+      } else {
+        const p = (rabCycle - 14.5) / 6.5;
+        rabCurWx = -2.70 - p * 0.85;
+        rabCurWy = -9.45 - Math.sin(p * Math.PI * 4) * 0.12;
+        rabFacing = -1;
+        rabWalking = true;
+      }
       drawItems.push({
         type: 'forest_wildlife',
         kind: 'rabbit',
-        wx: -3.55,
-        wy: -9.45,
-        depth: -3.55 - 9.45,
+        wx: rabCurWx,
+        wy: rabCurWy,
+        depth: rabCurWx + rabCurWy,
+        facingDir: rabFacing,
+        isWalking: rabWalking,
       });
 
-      // Burung Hutan Berjalan Random di Semak
-      const birdCycle = (elapsed * 0.42) % (Math.PI * 2);
-      const birdCurWx = -3.2 + Math.sin(birdCycle) * 1.8 + Math.cos(birdCycle * 2.3) * 0.45;
-      const birdCurWy = -9.8 + Math.cos(birdCycle) * 0.95 + Math.sin(birdCycle * 1.7) * 0.35;
+      // E. Burung Hutan: Berjalan acak perlahan di semak-semak hutan
+      const birdCycle = (elapsed * 0.28) % (Math.PI * 2);
+      const birdCurWx = -3.2 + Math.sin(birdCycle) * 1.5 + Math.cos(birdCycle * 2.3) * 0.45;
+      const birdCurWy = -9.8 + Math.cos(birdCycle) * 0.8 + Math.sin(birdCycle * 1.7) * 0.35;
+      const birdVelX = Math.cos(birdCycle) * 1.5 - 2.3 * Math.sin(birdCycle * 2.3) * 0.45;
+      const birdFacing: 1 | -1 = birdVelX >= 0 ? 1 : -1;
       drawItems.push({
         type: 'forest_wildlife',
         kind: 'ground_bird',
         wx: birdCurWx,
         wy: birdCurWy,
         depth: birdCurWx + birdCurWy,
+        facingDir: birdFacing,
+        isWalking: true,
       });
 
       drawItems.sort((a, b) => a.depth - b.depth);
@@ -16316,14 +16486,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // ---------------------------------------------------------
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
+          const facing = item.facingDir ?? 1;
+          const isWalking = Boolean(item.isWalking);
 
           ctx.save();
           ctx.translate(pt.x, pt.y);
+          ctx.scale(facing, 1);
 
           if (item.kind === 'deer_stag') {
             // =======================================================
             // 1. RUSA JANTAN DEWASA BERTANDUK (Adult Male Antlered Stag)
             // =======================================================
+            const legSwing = isWalking ? Math.sin(elapsed * 4.2) * 2.5 * z : 0;
             const headAlertSway = Math.sin(elapsed * 1.8) * 0.04;
             const earFlick = Math.sin(elapsed * 4.5) > 0.8 ? 0.25 : 0;
 
@@ -16339,14 +16513,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             // Back legs
             ctx.beginPath();
             ctx.moveTo(-6 * z, -5 * z);
-            ctx.lineTo(-7.5 * z, 1.2 * z);
+            ctx.lineTo(-7.5 * z - legSwing, 1.2 * z);
             ctx.moveTo(-4 * z, -5 * z);
-            ctx.lineTo(-4.5 * z, 1.4 * z);
+            ctx.lineTo(-4.5 * z + legSwing, 1.4 * z);
             // Front legs
             ctx.moveTo(4 * z, -5 * z);
-            ctx.lineTo(4.8 * z, 1.4 * z);
+            ctx.lineTo(4.8 * z + legSwing, 1.4 * z);
             ctx.moveTo(6.5 * z, -5 * z);
-            ctx.lineTo(7.2 * z, 1.2 * z);
+            ctx.lineTo(7.2 * z - legSwing, 1.2 * z);
             ctx.stroke();
 
             // Chestnut brown deer body
@@ -16441,6 +16615,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             // =======================================================
             // 2. RUSA BETINA DEWASA (Adult Grazing Female Doe)
             // =======================================================
+            const legSwingDoe = isWalking ? Math.sin(elapsed * 4.0) * 2.2 * z : 0;
             const grazeSway = Math.sin(elapsed * 2.2) * 0.05;
             const grazeY = Math.sin(elapsed * 1.5) * 1.2 * z;
 
@@ -16455,13 +16630,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 1.3 * z;
             ctx.beginPath();
             ctx.moveTo(-5.5 * z, -4.5 * z);
-            ctx.lineTo(-6.8 * z, 1.1 * z);
+            ctx.lineTo(-6.8 * z - legSwingDoe, 1.1 * z);
             ctx.moveTo(-3.5 * z, -4.5 * z);
-            ctx.lineTo(-4.0 * z, 1.3 * z);
+            ctx.lineTo(-4.0 * z + legSwingDoe, 1.3 * z);
             ctx.moveTo(4.0 * z, -4.5 * z);
-            ctx.lineTo(4.6 * z, 1.3 * z);
+            ctx.lineTo(4.6 * z + legSwingDoe, 1.3 * z);
             ctx.moveTo(6.0 * z, -4.5 * z);
-            ctx.lineTo(6.6 * z, 1.1 * z);
+            ctx.lineTo(6.6 * z - legSwingDoe, 1.1 * z);
             ctx.stroke();
 
             // Doe body (honey caramel coat)
@@ -16588,13 +16763,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             // =======================================================
             // 4. KELINCI HUTAN (Cottontail Bunny with Twitching Nose & Hop)
             // =======================================================
-            const hopCycle = (elapsed * 2.8) % 4.0;
             let hopY = 0;
             let hopStretch = 1.0;
-            if (hopCycle < 0.6) {
-              const hopProg = hopCycle / 0.6;
-              hopY = -Math.sin(hopProg * Math.PI) * 4.5 * z;
-              hopStretch = 1.15;
+            if (isWalking) {
+              const hopCycle = (elapsed * 3.8) % 1.0;
+              if (hopCycle < 0.6) {
+                const hopProg = hopCycle / 0.6;
+                hopY = -Math.sin(hopProg * Math.PI) * 5.2 * z;
+                hopStretch = 1.18;
+              }
+            } else {
+              // Gentle breathing stretch when stopped
+              hopStretch = 1.0 + Math.sin(elapsed * 3.0) * 0.04;
             }
             const noseTwitch = Math.sin(elapsed * 12.0) * 0.3 * z;
 

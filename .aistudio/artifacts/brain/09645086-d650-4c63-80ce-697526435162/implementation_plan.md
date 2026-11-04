@@ -151,4 +151,20 @@ Peningkatan fitur interaktif dan visual pada Kota Refleksia SMK Negeri 2 Goronta
   - Kelinci hutan (*cottontail*) dengan telinga panjang tegak yang melompat dan menggoyangkan hidung.
   - Burung hutan yang berjalan acak (*ground bird*) di bawah pepohonan dengan langkah kaki bergantian dan anggukan kepala khas saat mematuk biji-bijian.
 
+---
+
+## 7. Pemulihan Tanah Hutan Hijau & Bersemak + Jalan Memancing Alami (Selesai Dikerjakan)
+- [x] **Perbaikan Tanah Hitam Menjadi 100% Hijau**:
+  - Menghilangkan interpolasi warna tanah humus hitam/gelap (`#274426` & `#122316`) pada petak hutan utara.
+  - Mengubah warna dasar rumput hutan (`wildernessGrassColor` & `wildernessGrassAltColor`) menjadi hijau zamrud segar (`#15803d` / `#16a34a` di siang hari, dan `#0d5336` / `#0f603e` di malam hari), tanpa ada area yang menjadi hitam atau abu-abu gelap.
+  - Mengubah gradien landasan kaki gunung (*apron*) dan bantalan lumut kaki bukit menjadi 100% hijau asri.
+- [x] **Semua Tanah di Hutan Hijau dan Bersemak**:
+  - Menambahkan generator semak bertingkat (*procedural multi-tiered forest shrubs*) `drawForestBush` dengan daun berlapis dan highlight hijau muda (`#4ade80`).
+  - Merender 3-4 rumpun rumput bergoyang dan 2-3 semak lebat di setiap petak tanah hutan belantara (`gy <= -7`).
+- [x] **Hanya Jalan Menuju Tempat Memancing (Banyak Rumput)**:
+  - Menghapus semua jalan aspal/paving lurus lama di hutan belantara.
+  - Satu-satunya jalan di hutan belantara adalah jalan setapak alami berliku dari gerbang hutan `[0, -7]` menuju dermaga memancing danau `[2, -10]`.
+  - Jalan setapak dicat dengan warna tanah alami berumput dan ditumbuhi lebat rumpun rumput serta bunga semanggi liar (*overgrown with lush grass tufts & clovers*), sehingga menyatu indah dengan lantai hutan.
+
+
 
