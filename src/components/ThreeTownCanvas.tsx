@@ -263,11 +263,85 @@ export const TREES_LIST: [number, number][] = [
 // =============================================================
 export const NORTH_EXPANSION_TILES = 6; // +6 kotak ke utara di belakang Pohon Refleksi
 export const DANAU_PUSAT_COORDS = { wx: 4.55, wy: -10.45 };
-export const DANAU_VIEW_DECK_COORDS = { wx: 1.78, wy: -10.15 };
+// Area Dermaga Pemancingan (4 titik memancing di atas papan kayu dermaga, tidak terlalu di ujung agar pasti di atas dermaga & tidak menumpuk)
+export interface FishingPierSpotDef {
+  id: string;
+  label: string;
+  wx: number;
+  wy: number;
+}
+export const FISHING_PIER_SPOTS: FishingPierSpotDef[] = [
+  { id: 'pier_spot_1', label: 'Titik Dermaga 1', wx: 2.02, wy: -10.56 },
+  { id: 'pier_spot_2', label: 'Titik Dermaga 2', wx: 2.22, wy: -10.46 },
+  { id: 'pier_spot_3', label: 'Titik Dermaga 3', wx: 2.36, wy: -10.22 },
+  { id: 'pier_spot_4', label: 'Titik Dermaga 4', wx: 2.46, wy: -9.94 },
+];
+export const DANAU_VIEW_DECK_COORDS = { wx: 2.22, wy: -10.46 };
 export const HUTAN_BELANTARA_SIGN_COORDS = { wx: -0.85, wy: -7.85 };
 export const HYDRO_PLANT_COORDS = { wx: 6.52, wy: -11.82 };
 export const LIGHTHOUSE_COORDS = { wx: 7.58, wy: -11.48 };
 export const RIVERSIDE_SEATING_COORDS = { wx: 6.36, wy: -1.95 };
+
+export type LakeFishId = 'ikan_batu' | 'ikan_mujair' | 'ikan_mas' | 'kepiting_danau';
+
+export interface LakeFishDef {
+  id: LakeFishId;
+  name: string;
+  icon: string;
+  xpPrice: number;
+  rarityLabel: string;
+  chanceWeight: number; // Semakin mahal harga jual, semakin kecil peluang & semakin cepat harus ditarik
+  biteWindowMs: number;
+  color: string;
+  desc: string;
+}
+
+export const LAKE_FISH_CATALOG: LakeFishDef[] = [
+  {
+    id: 'ikan_batu',
+    name: 'Ikan Batu',
+    icon: '🐟',
+    xpPrice: 2,
+    rarityLabel: 'Mudah (Umum)',
+    chanceWeight: 45,
+    biteWindowMs: 2400,
+    color: '#64748b',
+    desc: 'Ikan dasar berbatu Sungai Refleksia yang jinak dan mudah terpancing.',
+  },
+  {
+    id: 'ikan_mujair',
+    name: 'Ikan Mujair',
+    icon: '🐠',
+    xpPrice: 3,
+    rarityLabel: 'Sedang',
+    chanceWeight: 30,
+    biteWindowMs: 1950,
+    color: '#0ea5e9',
+    desc: 'Ikan air tawar gesit yang menyukai perairan tenang di tepi dermaga.',
+  },
+  {
+    id: 'ikan_mas',
+    name: 'Ikan Mas',
+    icon: '🐡',
+    xpPrice: 5,
+    rarityLabel: 'Sulit (Langka)',
+    chanceWeight: 16,
+    biteWindowMs: 1500,
+    color: '#f59e0b',
+    desc: 'Ikan bersisik keemasan yang lincah menyambar umpan lalu cepat kabur.',
+  },
+  {
+    id: 'kepiting_danau',
+    name: 'Kepiting Danau',
+    icon: '🦀',
+    xpPrice: 6,
+    rarityLabel: 'Sangat Sulit (Super Langka)',
+    chanceWeight: 9,
+    biteWindowMs: 1200,
+    color: '#ef4444',
+    desc: 'Kepiting capit merah penghuni dasar terdalam danau, paling dicari Pak @Sufri!',
+  },
+];
 
 export interface WildernessTreeDef {
   wx: number;
@@ -564,16 +638,16 @@ export const isSolidCollision = (
     return true;
   }
 
-  // Hanya Guru yang bisa masuk melewati Gerbang Hutan Belantara & Danau Pusat (wy < -7.62)
+  // Hanya Guru atau Siswa yang sudah membayar tiket 5 XP yang bisa masuk melewati Gerbang Hutan Refleksia (wy < -7.62)
   if (!allowWildernessAccess && wy < WILDERNESS_FENCE_WY + 0.08 + padding) {
     return true;
   }
 
   // Danau Pusat / Sungai Refleksia water basin (wx: 1.85 .. 7.15, wy: -12.25 .. -8.78)
-  // Leaves the 1-tile (1 petak) fishing deck around (wx: 2.05, wy: -10.15) and lakeside viewing deck walkable
+  // Leaves the extra-large fishing pier extending out to ujung dermaga (wx: 2.76, wy: -10.86) walkable
   if (wx > 1.85 - padding && wy < -8.78 + padding) {
-    // Dermaga pemancingan kayu 1 petak di tepi danau (bisa dinaiki untuk memancing)
-    if (wx >= 1.45 - padding && wx <= 2.35 + padding && wy >= -10.55 - padding && wy <= -9.75 + padding) {
+    // Dermaga pemancingan kayu besar hingga ke ujung dermaga di tepi Sungai Refleksia
+    if (wx >= 1.05 - padding && wx <= 3.12 + padding && wy >= -11.22 - padding && wy <= -9.12 + padding) {
       return false;
     }
     return true;
@@ -1558,13 +1632,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     if (typeof window === 'undefined') return 0;
     try {
       const saved = parseInt(localStorage.getItem(dryLeafStorageKey) || '0', 10);
-      return Number.isNaN(saved) ? 0 : saved % 5;
+      return Number.isNaN(saved) || saved < 0 ? 0 : saved;
     } catch {
       return 0;
     }
   });
   const pickedDryLeavesCountRef = useRef<number>(pickedDryLeavesCount);
   pickedDryLeavesCountRef.current = pickedDryLeavesCount;
+
+  // Buah Apel yang dipetik dari pohon (Setiap petik pohon berbuah = 7 Apel masuk ke Tas, dijual ke Pak @Sufri 2 XP / 7 Apel)
+  const appleStorageKey = `kota_refleksi_apples_${studentId || studentName}`;
+  const [pickedApplesCount, setPickedApplesCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const saved = parseInt(localStorage.getItem(appleStorageKey) || '0', 10);
+      return Number.isNaN(saved) || saved < 0 ? 0 : saved;
+    } catch {
+      return 0;
+    }
+  });
+  const pickedApplesCountRef = useRef<number>(pickedApplesCount);
+  pickedApplesCountRef.current = pickedApplesCount;
+
+  // State & Ref Animasi Membakar Daun Kering pada Api Unggun (Api Unggun menjadi sedikit lebih besar & menyala terang)
+  const campfireBoostUntilRef = useRef<number>(0);
+  const campfireBurnAnimStartRef = useRef<number>(0);
+  const burnedLeavesAccumRef = useRef<number>(0);
 
   // Respawn picked dry leaves gently after 90 seconds so the city always has neat garden leaves to tidy up
   useEffect(() => {
@@ -1586,10 +1679,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     return () => window.clearInterval(leafRespawnTimer);
   }, []);
 
-  // Pending interactive walk-to-harvest-apple or walk-to-pick-leaf target
+  // Pending interactive walk-to-harvest-apple, walk-to-pick-leaf, or walk-to-burn-leaves target
   const pendingEnvActionRef = useRef<
     | { type: 'harvest_apple'; treeIndex: number; targetX: number; targetY: number }
     | { type: 'pick_leaf'; leafId: number; targetX: number; targetY: number }
+    | { type: 'burn_leaves'; targetX: number; targetY: number }
     | null
   >(null);
 
@@ -1682,7 +1776,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const treehouseClimbStageRef = useRef<'to_foot' | 'climbing_up' | 'climbing_down' | null>(null);
   const afterClimbDownTargetRef = useRef<{ wx: number; wy: number; isRun: boolean } | null>(null);
 
-  // Nearby interaction (tree watering/apple harvesting, dry leaf pickup, fishing spot, literacy corner, bench, town rules board, beringin tree journal, announcement board, wisma mailbox, or banyan treehouse)
+  // Tiket akses masuk Hutan Refleksia untuk Siswa (5 XP)
+  const [hasPaidWildernessAccess, setHasPaidWildernessAccess] = useState(false);
+  const hasPaidWildernessAccessRef = useRef(false);
+  hasPaidWildernessAccessRef.current = hasPaidWildernessAccess;
+
+  // Nearby interaction (tree watering/apple harvesting, dry leaf pickup, fishing spot, literacy corner, bench, town rules board, beringin tree journal, announcement board, wisma mailbox, banyan treehouse, or wilderness gate ticket)
   const [nearbyAction, setNearbyAction] = useState<{
     type:
       | 'tree'
@@ -1694,7 +1793,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       | 'beringin'
       | 'announcement_board'
       | 'wisma_mailbox'
-      | 'treehouse';
+      | 'treehouse'
+      | 'wilderness_gate';
     treeIndex?: number;
     leafId?: number;
     benchId?: BenchId;
@@ -1714,7 +1814,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       | 'beringin'
       | 'announcement_board'
       | 'wisma_mailbox'
-      | 'treehouse';
+      | 'treehouse'
+      | 'wilderness_gate';
     treeIndex?: number;
     leafId?: number;
     benchId?: BenchId;
@@ -1739,7 +1840,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | 'beringin'
         | 'announcement_board'
         | 'wisma_mailbox'
-        | 'treehouse';
+        | 'treehouse'
+        | 'wilderness_gate';
       treeIndex?: number;
       leafId?: number;
       benchId?: BenchId;
@@ -1752,17 +1854,59 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   };
   const dismissedNearbySignatureRef = useRef<string | null>(null);
 
-  // Fishing state, phase ('casting' | 'waiting' | 'pulling' | null) & timers
+  // Fishing state, phase ('casting' | 'waiting' | 'biting' | 'pulling' | null), timers & caught fish inventory for selling to Pak @Sufri
   const [isFishing, setIsFishing] = useState(false);
   const isFishingRef = useRef(false);
   isFishingRef.current = isFishing;
-  const [fishingPhase, setFishingPhase] = useState<'casting' | 'waiting' | 'pulling' | null>(null);
-  const fishingPhaseRef = useRef<'casting' | 'waiting' | 'pulling' | null>(null);
+  const [fishingPhase, setFishingPhase] = useState<'casting' | 'waiting' | 'biting' | 'pulling' | null>(null);
+  const fishingPhaseRef = useRef<'casting' | 'waiting' | 'biting' | 'pulling' | null>(null);
   fishingPhaseRef.current = fishingPhase;
   const fishingTimerRef = useRef<number | null>(null);
+  const fishingBiteEscapeTimerRef = useRef<number | null>(null);
   const fishingStartTimeRef = useRef<number>(0);
   const fishingPullStartTimeRef = useRef<number>(0);
-  const caughtFishRef = useRef<{ name: string; icon: string } | null>(null);
+  const pendingStartFishingAtTipRef = useRef<boolean>(false);
+  const selectedFishingSpotRef = useRef<FishingPierSpotDef>(FISHING_PIER_SPOTS[1]);
+  const executeCastAtPierTipRef = useRef<() => void>(() => {});
+  const pendingBiteFishRef = useRef<LakeFishDef | null>(null);
+  const caughtFishRef = useRef<LakeFishDef | null>(null);
+  const [isSufriFishModalOpen, setIsSufriFishModalOpen] = useState(false);
+  const [isBagOpen, setIsBagOpen] = useState(false);
+  const [fishInventory, setFishInventory] = useState<Record<LakeFishId, number>>(() => {
+    try {
+      const saved = localStorage.getItem('kota_refleksia_fish_bag_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ikan_batu: Number(parsed.ikan_batu) || 0,
+          ikan_mujair: Number(parsed.ikan_mujair) || 0,
+          ikan_mas: Number(parsed.ikan_mas) || 0,
+          kepiting_danau: Number(parsed.kepiting_danau) || 0,
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return { ikan_batu: 0, ikan_mujair: 0, ikan_mas: 0, kepiting_danau: 0 };
+  });
+  const updateFishInventory = (updater: (prev: Record<LakeFishId, number>) => Record<LakeFishId, number>) => {
+    setFishInventory((prev) => {
+      const next = updater(prev);
+      try {
+        localStorage.setItem('kota_refleksia_fish_bag_v1', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+  const totalCaughtFishCount =
+    fishInventory.ikan_batu + fishInventory.ikan_mujair + fishInventory.ikan_mas + fishInventory.kepiting_danau;
+  const totalCaughtFishXpValue =
+    fishInventory.ikan_batu * 2 +
+    fishInventory.ikan_mujair * 3 +
+    fishInventory.ikan_mas * 5 +
+    fishInventory.kepiting_danau * 6;
 
   // 5-Second Soft Auto-Dismiss & Soft Appearance State for Information Popups (pendingConfirmation, nearbyAction, isCafeMenuOpen)
   const [isInfoPopupSoftFading, setIsInfoPopupSoftFading] = useState(false);
@@ -1849,6 +1993,36 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [onlineListInteractionTick, setOnlineListInteractionTick] = useState<number>(0);
   const sendHeartbeatRef = useRef<(() => void) | null>(null);
 
+  // Helper memilih titik dermaga memancing terbaik (di atas dermaga & tidak menumpuk dengan avatar lain)
+  const chooseFishingPierSpot = (clickWx?: number, clickWy?: number): FishingPierSpotDef => {
+    const p = playerRef.current;
+    const remotes = Array.from(remotePlayersRef.current.values());
+    const isSpotOccupiedByRemote = (spot: FishingPierSpotDef) =>
+      remotes.some((r) => Math.hypot(r.wx - spot.wx, r.wy - spot.wy) < 0.22);
+
+    // Jika pemain mengklik dekat salah satu titik di dermaga, prioritaskan titik kosong terdekat dari klik
+    const refWx = clickWx !== undefined ? clickWx : p ? p.wx : DANAU_VIEW_DECK_COORDS.wx;
+    const refWy = clickWy !== undefined ? clickWy : p ? p.wy : DANAU_VIEW_DECK_COORDS.wy;
+
+    // Jika pemain sudah berdiri tepat di salah satu titik yang tidak ditempati pemain lain dan tidak mengklik titik lain
+    if (clickWx === undefined && p) {
+      const currentStanding = FISHING_PIER_SPOTS.find(
+        (s) => Math.hypot(p.wx - s.wx, p.wy - s.wy) < 0.22 && !isSpotOccupiedByRemote(s)
+      );
+      if (currentStanding) {
+        selectedFishingSpotRef.current = currentStanding;
+        return currentStanding;
+      }
+    }
+
+    const sortedByDist = [...FISHING_PIER_SPOTS].sort(
+      (a, b) => Math.hypot(refWx - a.wx, refWy - a.wy) - Math.hypot(refWx - b.wx, refWy - b.wy)
+    );
+    const freeSpot = sortedByDist.find((s) => !isSpotOccupiedByRemote(s)) || sortedByDist[0];
+    selectedFishingSpotRef.current = freeSpot;
+    return freeSpot;
+  };
+
   // Auto-close Warga Online dropdown softly after 10 seconds if not clicked
   useEffect(() => {
     setIsOnlineListSoftFading(false);
@@ -1901,6 +2075,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   onAddXpRef.current = onAddXp;
   const handleHarvestTreeAppleRef = useRef<(treeIdx: number) => void>(() => {});
   const handlePickDryLeafRef = useRef<(leafId: number) => void>(() => {});
+  const handleBurnDryLeavesAtCampfireRef = useRef<() => void>(() => {});
 
   // Helper to check if a specific seat ID is occupied by any remote online player
   const isSeatOccupiedByRemote = (seatId: BenchId): boolean => {
@@ -2671,21 +2846,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       facing: 'down-left',
     };
 
-    // 3. Ibu Kantin Toko Roti & Kafe (Ma Uba) - Posisi tepat di DEPAN Toko menyambut warga
+    // 3. Ibu Kantin Lapak Refleksia (Ma Uba) - Posisi tepat di SAMPING KIRI Lapak Refleksia menyambut warga
     const maUba: AvatarData = {
       id: 'ma_uba',
       role: 'barista',
       handle: 'ma_uba',
       name: 'Ma Uba',
       roleLabel: 'Ibu Kantin',
-      wx: 4.88,
-      wy: 4.82,
-      targetWx: 4.88,
-      targetWy: 4.82,
-      anchorX: 4.88,
-      anchorY: 4.82,
+      wx: 4.02,
+      wy: 4.86,
+      targetWx: 4.02,
+      targetWy: 4.86,
+      anchorX: 4.02,
+      anchorY: 4.86,
       wanderRadius: 0,
-      speed: 0, // Berdiri ramah tepat di depan Toko
+      speed: 0, // Berdiri ramah di samping kiri Lapak Refleksia (tidak menutupi meja kasir depan)
       shirtColor: '#ea580c', // Blus hangat dengan celemek putih Ibu Kantin
       pantsColor: '#7c2d12',
       hairColor: '#451a03',
@@ -2693,7 +2868,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       isMoving: false,
       pauseTimer: 99999,
       walkFrame: 0,
-      facing: 'down-left',
+      facing: 'down-right',
     };
 
     // 4. Ibu Muslim Sudut Literasi (Patra) - Selalu berada di Sudut Literasi samping Balai Kota mengajak orang membaca
@@ -2729,7 +2904,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       speechTimer: 5.5,
     };
 
-    // 5. Ahli Tanaman & Penjaga Gerbang Hutan Refleksia (@Sufri) - Berjaga di sisi KIRI pintu gerbang hutan (Khusus Guru)
+    // 5. Ahli Tanaman & Penjaga Gerbang Hutan Refleksia (@Sufri) - Berjaga di sisi KIRI pintu gerbang hutan (Guru Gratis, Siswa 5 XP)
     const tomi: AvatarData = {
       id: 'sufri',
       role: 'penjaga_kolam',
@@ -2754,9 +2929,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       facing: 'down-right',
       speeches: [
         'Bibit tanaman langka di Hutan Refleksia tumbuh subur! 🌱🔍',
-        'Silakan masuk Bapak/Ibu Guru, mari amati flora Hutan Refleksia! 🌿👨‍🏫',
-        'Maaf Nak, area konservasi Hutan Refleksia khusus Guru ya! 🔒🌳',
-        'Jangan lupa menyiram pohon di kota agar berbuah apel segar! 🍎💧',
+        'Punya hasil tangkapan dari Sungai Refleksia? Jual Ikan Batu, Mujair, Ikan Mas, atau Kepiting Danau ke saya ya! 🐟🦀',
+        'Siswa bisa masuk ke Hutan Refleksia dengan tiket konservasi 5 XP ya! 🌲🎫',
+        'Semakin langka ikan danau yang kamu pancing, semakin tinggi XP yang saya berikan! 🐡✨',
       ],
       speechText: 'Bibit tanaman langka di Hutan Refleksia tumbuh subur! 🌱🔍',
       speechTimer: 5.5,
@@ -3139,10 +3314,26 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           clickedNpc.speechText = clickedNpc.speeches[sIdx];
           clickedNpc.speechTimer = 5.0;
         }
-        if ((clickedNpc.id === 'sufri' || clickedNpc.role === 'penjaga_kolam') && !isTeacher) {
-          showToast('🔒 Gerbang Hutan Refleksia dijaga oleh @Sufri (Ahli Tanaman) khusus Guru!', 3200);
+        // If clicking Pak @Sufri, walk the avatar close to @Sufri so the top pop-up for selling fish / forest ticket opens
+        if (clickedNpc.id === 'sufri' || clickedNpc.role === 'penjaga_kolam') {
+          dismissedNearbySignatureRef.current = null;
+          player.targetWx = -0.32;
+          player.targetWy = -7.12;
+          player.isMoving = Math.hypot(player.wx - player.targetWx, player.wy - player.targetWy) > 0.08;
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.28 : 0.88;
+          clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
         }
         return;
+      }
+
+      // If player was actively fishing and clicks elsewhere on the map to walk away, cancel fishing cleanly
+      if (isFishingRef.current || pendingStartFishingAtTipRef.current) {
+        pendingStartFishingAtTipRef.current = false;
+        if (fishingTimerRef.current) clearTimeout(fishingTimerRef.current);
+        if (fishingBiteEscapeTimerRef.current) clearTimeout(fishingBiteEscapeTimerRef.current);
+        setIsFishing(false);
+        setFishingPhase(null);
       }
 
       // Reset any auto-dismissed nearby popup when the user explicitly clicks/taps on the map
@@ -3250,7 +3441,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      const canAccessWilderness = Boolean(isPlayerTeacher || isMasterKikyRef.current);
+      const canAccessWilderness = Boolean(
+        isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current
+      );
 
       // 1f. Check Click directly on @Sufri (gerbang kiri [-0.76, -7.32]) or Gerbang Hutan Refleksia [wx: -1.15..0.85, wy: -7.95..-7.05]
       if (Math.hypot(wx - -0.25, wy - -7.45) < 1.15 || Math.hypot(wx - tomi.wx, wy - tomi.wy) < 0.85) {
@@ -3264,16 +3457,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
+        dismissedNearbySignatureRef.current = null;
         if (canAccessWilderness) {
-          tomi.speechText = 'Silakan masuk Bapak/Ibu Guru! Mari amati flora di Hutan Refleksia 🌱🔓';
+          tomi.speechText = isPlayerTeacher
+            ? 'Silakan masuk Bapak/Ibu Guru! Mari amati flora di Hutan Refleksia 🌱🔓'
+            : 'Silakan masuk Nak! Tiket konservasi Hutan Refleksia sudah aktif 🌱🔓';
           tomi.speechTimer = 6.0;
           player.targetWx = 0.0;
           player.targetWy = player.wy > WILDERNESS_FENCE_WY ? -8.35 : -6.85;
         } else {
-          tomi.speechText = '⛔ Maaf Nak, area konservasi Hutan Refleksia khusus untuk Guru! 🌱🔒';
+          tomi.speechText = '🌲 Halo Nak! Siswa bisa masuk Hutan Refleksia dengan membayar tiket konservasi 5 XP di gerbang ya! 🎫🌱';
           tomi.speechTimer = 6.5;
           playerSpeechRef.current = {
-            text: '🔒 Area Hutan Refleksia khusus Guru (dijaga @Sufri)',
+            text: '🎫 Dekati gerbang @Sufri untuk masuk Hutan Refleksia (-5 XP)',
             expiresAt: Date.now() + 4500,
           };
           player.targetWx = 0.0;
@@ -3286,10 +3482,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 2. Check Click on Spot Pemancingan 1 Petak di Sungai Refleksia [2.05, -10.15]
-      const fishSpotDist = Math.hypot(wx - FISHING_SPOT_COORDS.wx, wy - FISHING_SPOT_COORDS.wy);
-      const lakeClick = wx > 1.75 && wx < 6.85 && wy > -12.0 && wy < -8.85;
-      if (fishSpotDist < 1.45 || lakeClick) {
+      // 2. Check Click on Spot Pemancingan Besar di Sungai Refleksia -> Arahkan Avatar ke salah satu dari 4 Titik Dermaga (di atas dermaga & tidak menumpuk)
+      const minPierSpotDist = Math.min(
+        ...FISHING_PIER_SPOTS.map((s) => Math.hypot(wx - s.wx, wy - s.wy))
+      );
+      const fishSpotDist = Math.min(
+        Math.hypot(wx - FISHING_SPOT_COORDS.wx, wy - FISHING_SPOT_COORDS.wy),
+        minPierSpotDist
+      );
+      const lakeClick = wx > 1.15 && wx < 6.85 && wy > -12.0 && wy < -8.85;
+      if (fishSpotDist < 2.25 || lakeClick) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3300,11 +3502,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         lastTouchedIdRef.current = null;
         setPendingConfirmation(null);
         setIsCafeMenuOpen(false);
+        dismissedNearbySignatureRef.current = null;
         if (!canAccessWilderness) {
-          tomi.speechText = '⛔ Maaf Nak, area Hutan Refleksia & Sungai Refleksia khusus Guru! 🌱🔒';
+          tomi.speechText = '🌲 Halo Nak! Untuk memancing di Sungai Refleksia, silakan bayar tiket masuk hutan 5 XP di gerbang ya! 🎫🌱';
           tomi.speechTimer = 6.5;
           playerSpeechRef.current = {
-            text: '🔒 Hanya Guru yang bisa masuk ke Hutan Refleksia lewat gerbang @Sufri!',
+            text: '🎫 Menuju gerbang Hutan Refleksia (Tiket Masuk 5 XP)...',
             expiresAt: Date.now() + 4500,
           };
           player.targetWx = 0.0;
@@ -3315,10 +3518,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
           return;
         }
-        player.targetWx = DANAU_VIEW_DECK_COORDS.wx;
-        player.targetWy = DANAU_VIEW_DECK_COORDS.wy;
+        const targetPierSpot = chooseFishingPierSpot(wx, wy);
+        player.targetWx = targetPierSpot.wx;
+        player.targetWy = targetPierSpot.wy;
         player.facing = 'down-right';
-        player.isMoving = Math.hypot(player.wx - DANAU_VIEW_DECK_COORDS.wx, player.wy - DANAU_VIEW_DECK_COORDS.wy) > 0.08;
+        player.isMoving = Math.hypot(player.wx - targetPierSpot.wx, player.wy - targetPierSpot.wy) > 0.06;
         player.isRunning = isRun;
         player.speed = isRun ? 1.28 : 0.88;
         clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
@@ -3538,13 +3742,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
         pendingSeatRef.current = null;
         if (!canAccessWilderness) {
+          dismissedNearbySignatureRef.current = null;
           player.targetWx = 0.0;
           player.targetWy = -7.08;
           player.isMoving = Math.hypot(player.wx - 0.0, player.wy - -7.08) > 0.08;
-          tomi.speechText = '⛔ Maaf Nak, Rumah Pohon di Hutan Refleksia khusus Guru! 🌱🔒';
+          tomi.speechText = '🌲 Halo Nak! Untuk naik ke Rumah Pohon, silakan bayar tiket masuk Hutan Refleksia 5 XP di gerbang ya! 🎫🌱';
           tomi.speechTimer = 6.5;
           playerSpeechRef.current = {
-            text: '🔒 Hanya Guru yang bisa naik ke Rumah Pohon Hutan Refleksia!',
+            text: '🎫 Menuju gerbang @Sufri untuk masuk Hutan Refleksia (-5 XP)...',
             expiresAt: Date.now() + 4500,
           };
           clickRippleRef.current = { wx: 0.0, wy: -7.08, time: performance.now(), isRun };
@@ -3595,24 +3800,26 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       let targetX = Math.max(-8.0, Math.min(8.0, wx));
       let targetY = Math.max(-11.75, Math.min(8.0, wy));
 
-      // Jika bukan Guru dan mengklik area Hutan Refleksia / Sungai Refleksia di balik pagar (wy < -7.45),
-      // arahkan ke depan pintu gerbang yang dijaga @Sufri di sebelah kiri gerbang
+      // Jika belum punya akses Hutan Refleksia (Siswa belum bayar 5 XP) dan mengklik area di balik pagar (wy < -7.45),
+      // arahkan ke depan pintu gerbang yang dijaga @Sufri agar pop-up Tiket 5 XP muncul
       if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.22) {
+        dismissedNearbySignatureRef.current = null;
         targetX = 0.0;
         targetY = -7.08;
-        tomi.speechText = '⛔ Maaf Nak, area konservasi Hutan Refleksia khusus Guru! 🌱🔒';
+        tomi.speechText = '🌲 Halo Nak! Siswa bisa masuk Hutan Refleksia dengan membayar 5 XP di gerbang ini ya! 🎫🌱';
         tomi.speechTimer = 6.5;
         playerSpeechRef.current = {
-          text: '🔒 Hanya Guru yang bisa masuk lewat gerbang @Sufri!',
+          text: '🎫 Menuju gerbang Hutan Refleksia (Tiket Masuk 5 XP)...',
           expiresAt: Date.now() + 4500,
         };
       }
 
-      // If clicking directly on Danau water basin, guide avatar to Lakeside Viewing Deck or southern shore
+      // If clicking directly on Danau water basin, guide avatar to nearest free Fishing Pier Spot or southern shore
       if (targetX > 1.82 && targetY < -8.72) {
         if (targetX < 4.2 && targetY < -9.2) {
-          targetX = DANAU_VIEW_DECK_COORDS.wx;
-          targetY = DANAU_VIEW_DECK_COORDS.wy;
+          const chosen = chooseFishingPierSpot(targetX, targetY);
+          targetX = chosen.wx;
+          targetY = chosen.wy;
         } else {
           targetY = -8.58;
         }
@@ -3924,7 +4131,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.wy = player.targetWy;
             player.walkFrame = 0;
           } else {
-            const canEnterWilderness = Boolean(isPlayerTeacher || isMasterKikyRef.current);
+            const canEnterWilderness = Boolean(
+              isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current
+            );
             if (!canEnterWilderness && player.targetWy < WILDERNESS_FENCE_WY + 0.22) {
               player.targetWx = 0.0;
               player.targetWy = -7.08;
@@ -4061,6 +4270,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               handlePickDryLeafRef.current(envAct.leafId);
             } else if (envAct.type === 'harvest_apple') {
               setNearbyAction({ type: 'tree', treeIndex: envAct.treeIndex });
+            } else if (envAct.type === 'burn_leaves') {
+              handleBurnDryLeavesAtCampfireRef.current();
             }
             sendHeartbeatRef.current?.();
           } else if (treehouseClimbStageRef.current === 'to_foot') {
@@ -4116,11 +4327,29 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
             dismissedNearbySignatureRef.current = null;
             sendHeartbeatRef.current?.();
+          } else if (pendingStartFishingAtTipRef.current) {
+            pendingStartFishingAtTipRef.current = false;
+            const activeSpot = selectedFishingSpotRef.current || FISHING_PIER_SPOTS[1];
+            player.wx = activeSpot.wx;
+            player.wy = activeSpot.wy;
+            player.targetWx = activeSpot.wx;
+            player.targetWy = activeSpot.wy;
+            player.isMoving = false;
+            player.isRunning = false;
+            player.speed = 0.88;
+            player.walkFrame = 0;
+            player.facing = 'down-right';
+            sendHeartbeatRef.current?.();
+            executeCastAtPierTipRef.current();
           } else {
             player.isMoving = false;
             player.isRunning = false;
             player.speed = 0.88;
             player.walkFrame = 0;
+            // If arrived at any of the 4 pier spots on the deck, face down-right toward the lake water
+            if (FISHING_PIER_SPOTS.some((s) => Math.hypot(player.wx - s.wx, player.wy - s.wy) < 0.28)) {
+              player.facing = 'down-right';
+            }
             sendHeartbeatRef.current?.();
           }
         }
@@ -4215,8 +4444,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // Proximity checks: Spot Memancing Sungai Refleksia, Sudut Literasi Samping Balai Kota [2.35, -6.15], 8 Minimalist Fountain Benches (2-seater), 2 Campfire Benches, 2 Swing Structures + Literacy Bench
-      const fishDist = Math.hypot(player.wx - FISHING_SPOT_COORDS.wx, player.wy - FISHING_SPOT_COORDS.wy);
+      // Proximity checks: Spot Memancing Sungai Refleksia (termasuk 4 Titik Dermaga di atas dermaga), Sudut Literasi Samping Balai Kota [2.35, -6.15], 8 Minimalist Fountain Benches (2-seater), 2 Campfire Benches, 2 Swing Structures + Literacy Bench
+      const fishDist = Math.min(
+        Math.hypot(player.wx - FISHING_SPOT_COORDS.wx, player.wy - FISHING_SPOT_COORDS.wy),
+        ...FISHING_PIER_SPOTS.map((s) => Math.hypot(player.wx - s.wx, player.wy - s.wy))
+      );
       const litDist = Math.hypot(player.wx - LITERACY_CORNER_COORDS.wx, player.wy - LITERACY_CORNER_COORDS.wy);
       const litBenchDist = Math.min(
         Math.hypot(player.wx - LITERACY_BENCHES[0].wx, player.wy - LITERACY_BENCHES[0].wy),
@@ -4288,7 +4520,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           | 'beringin'
           | 'announcement_board'
           | 'wisma_mailbox'
-          | 'treehouse';
+          | 'treehouse'
+          | 'wilderness_gate';
         treeIndex?: number;
         leafId?: number;
         benchId?: BenchId;
@@ -4310,6 +4543,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       const isNearTreehouse =
         treehouseElevInfo.onBranchOrDeck || distToTreehouseFoot < 1.45 || distToTreehouseTrunk < 1.55;
 
+      const isNearWildernessGate =
+        Math.hypot(player.wx - 0.0, player.wy - WILDERNESS_FENCE_WY) < 1.75 ||
+        Math.hypot(player.wx - -0.76, player.wy - -7.32) < 1.65;
+
       if (isSittingRef.current) {
         const currentSeat = sittingSeatRef.current;
         let seatName = 'Kursi Taman Kota';
@@ -4321,6 +4558,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         else if (matchedSwing) seatName = matchedSwing.name;
         else if (currentSeat === 'literacy') seatName = 'Bangku Sudut Literasi';
         detectedNearby = { type: 'bench', benchId: currentSeat || undefined, benchName: seatName };
+      } else if (isNearWildernessGate) {
+        detectedNearby = { type: 'wilderness_gate' };
       } else if (isNearTreehouse) {
         detectedNearby = {
           type: 'treehouse',
@@ -4345,7 +4584,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         detectedNearby = { type: 'beringin' };
       } else if (litDist < 1.45) {
         detectedNearby = { type: 'literacy' };
-      } else if (fishDist < 1.75) {
+      } else if (fishDist < 2.55) {
         detectedNearby = { type: 'fishing' };
       } else if (nearBench) {
         detectedNearby = { type: 'bench', benchId: nearBench.id, benchName: nearBench.name };
@@ -9004,18 +9243,36 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.restore();
           }
         } else if (item.type === 'campfire_spot') {
-          // API UNGGUN DI SUDUT KOTA [-4.65, 4.65] (Dikelilingi Bangku Penghangat Tubuh)
+          // API UNGGUN DI SUDUT KOTA [-4.05, 4.15] (Dikelilingi Bangku Penghangat Tubuh & Bisa Membakar Daun Kering dari Tas)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
-          // 1. Warm Radial Ground Firelight Aura (Pulses gently with the flames)
+          // Cek apakah Api Unggun sedang membesar karena baru diberi Daun Kering dari Tas
+          const isBoosted = currentTime < campfireBoostUntilRef.current;
+          const burnAgeSec =
+            campfireBurnAnimStartRef.current > 0 ? (currentTime - campfireBurnAnimStartRef.current) / 1000 : 999;
+          const remainingBoostSec = isBoosted ? (campfireBoostUntilRef.current - currentTime) / 1000 : 0;
+          let boostScale = 1.0;
+          if (isBoosted) {
+            if (burnAgeSec < 0.65) {
+              // Animasi api membesar dengan lembut saat daun kering dilempar ke api
+              boostScale = 1.0 + 0.42 * Math.sin((burnAgeSec / 0.65) * (Math.PI / 2));
+            } else if (remainingBoostSec < 2.5) {
+              // Mereda kembali secara perlahan ke ukuran normal
+              boostScale = 1.0 + 0.36 * (remainingBoostSec / 2.5);
+            } else {
+              boostScale = 1.36 + Math.sin(elapsed * 9.0) * 0.06;
+            }
+          }
+
+          // 1. Warm Radial Ground Firelight Aura (Pulses gently with the flames, larger when boosted)
           const firePulse = 1 + Math.sin(elapsed * 7.5) * 0.08 + Math.cos(elapsed * 11.2) * 0.05;
-          const glowRx = 52 * z * firePulse;
-          const glowRy = 26 * z * firePulse;
+          const glowRx = 52 * z * firePulse * boostScale;
+          const glowRy = 26 * z * firePulse * boostScale;
           const fireGlow = ctx.createRadialGradient(pt.x, pt.y, 2 * z, pt.x, pt.y, glowRx);
-          fireGlow.addColorStop(0, 'rgba(254, 240, 138, 0.72)');
-          fireGlow.addColorStop(0.28, 'rgba(251, 146, 60, 0.45)');
-          fireGlow.addColorStop(0.65, 'rgba(234, 88, 12, 0.16)');
+          fireGlow.addColorStop(0, isBoosted ? 'rgba(254, 240, 138, 0.88)' : 'rgba(254, 240, 138, 0.72)');
+          fireGlow.addColorStop(0.28, isBoosted ? 'rgba(251, 146, 60, 0.60)' : 'rgba(251, 146, 60, 0.45)');
+          fireGlow.addColorStop(0.65, 'rgba(234, 88, 12, 0.20)');
           fireGlow.addColorStop(1, 'rgba(234, 88, 12, 0)');
           ctx.fillStyle = fireGlow;
           ctx.beginPath();
@@ -9027,9 +9284,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.beginPath();
           ctx.ellipse(pt.x, pt.y, 14 * z, 7.5 * z, 0, 0, Math.PI * 2);
           ctx.fill();
-          ctx.fillStyle = '#dc2626';
+          ctx.fillStyle = isBoosted ? '#ef4444' : '#dc2626';
           ctx.beginPath();
-          ctx.ellipse(pt.x, pt.y, 9 * z, 4.8 * z, 0, 0, Math.PI * 2);
+          ctx.ellipse(pt.x, pt.y, 9 * z * Math.min(1.25, boostScale), 4.8 * z * Math.min(1.25, boostScale), 0, 0, Math.PI * 2);
           ctx.fill();
 
           // 3. Ring of 10 River Cobblestones around the fire pit
@@ -9045,7 +9302,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 0.8 * z;
             ctx.stroke();
             // Warm inner rim highlight from fire
-            ctx.fillStyle = 'rgba(251, 146, 60, 0.45)';
+            ctx.fillStyle = isBoosted ? 'rgba(253, 224, 71, 0.65)' : 'rgba(251, 146, 60, 0.45)';
             ctx.beginPath();
             ctx.arc(sx - Math.cos(ang) * 1.1 * z, sy - Math.sin(ang) * 0.6 * z, 1.5 * z, 0, Math.PI * 2);
             ctx.fill();
@@ -9062,64 +9319,96 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineTo(pt.x + 8.5 * z, pt.y + 3.0 * z);
           ctx.stroke();
 
-          // 5. Animated Multi-Layer Flickering Campfire Flames
-          const sway1 = Math.sin(elapsed * 8.5) * 2.2 * z;
-          const sway2 = Math.cos(elapsed * 10.5) * 1.8 * z;
-          const flameH = (18 + Math.sin(elapsed * 9.2) * 3.2) * z;
+          // Animasi sederhana daun kering berjatuhan masuk ke bara api unggun saat dibakar (0.0s - 1.35s)
+          if (burnAgeSec >= 0 && burnAgeSec < 1.35) {
+            const leafProgress = burnAgeSec / 1.35;
+            for (let li = 0; li < 4; li++) {
+              const lp = Math.min(1, Math.max(0, (leafProgress - li * 0.12) / 0.65));
+              if (lp <= 0 || lp >= 1) continue;
+              const startX = pt.x + (li % 2 === 0 ? -16 : 16) * z;
+              const startY = pt.y - 26 * z;
+              const lx = startX + (pt.x - startX) * lp + Math.sin(lp * Math.PI * 3 + li) * 3.5 * z;
+              const ly = startY + (pt.y - 4 * z - startY) * lp - Math.sin(lp * Math.PI) * 8 * z;
+              ctx.save();
+              ctx.globalAlpha = 1 - lp * 0.75;
+              ctx.fillStyle = li % 2 === 0 ? '#f59e0b' : '#ea580c';
+              ctx.beginPath();
+              ctx.ellipse(lx, ly, 3.2 * z, 1.7 * z, lp * 4 + li, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            }
+          }
+
+          // 5. Animated Multi-Layer Flickering Campfire Flames (Menjadi lebih besar & tinggi saat daun kering dibakar)
+          const sway1 = Math.sin(elapsed * 8.5) * 2.2 * z * boostScale;
+          const sway2 = Math.cos(elapsed * 10.5) * 1.8 * z * boostScale;
+          const flameH = (18 + Math.sin(elapsed * 9.2) * 3.2) * z * boostScale;
+          const flameWScale = 1 + (boostScale - 1) * 0.72;
 
           // Outer crimson-orange flame
           ctx.fillStyle = '#ea580c';
           ctx.beginPath();
-          ctx.moveTo(pt.x - 8.5 * z, pt.y);
-          ctx.quadraticCurveTo(pt.x - 9 * z, pt.y - flameH * 0.55, pt.x + sway1, pt.y - flameH);
-          ctx.quadraticCurveTo(pt.x + 9 * z, pt.y - flameH * 0.55, pt.x + 8.5 * z, pt.y);
+          ctx.moveTo(pt.x - 8.5 * z * flameWScale, pt.y);
+          ctx.quadraticCurveTo(pt.x - 9 * z * flameWScale, pt.y - flameH * 0.55, pt.x + sway1, pt.y - flameH);
+          ctx.quadraticCurveTo(pt.x + 9 * z * flameWScale, pt.y - flameH * 0.55, pt.x + 8.5 * z * flameWScale, pt.y);
           ctx.closePath();
           ctx.fill();
 
           // Left & Right secondary flame tongues
           ctx.fillStyle = '#f97316';
           ctx.beginPath();
-          ctx.moveTo(pt.x - 7 * z, pt.y);
-          ctx.quadraticCurveTo(pt.x - 8 * z, pt.y - flameH * 0.45, pt.x - 4 * z + sway2, pt.y - flameH * 0.78);
-          ctx.quadraticCurveTo(pt.x, pt.y - flameH * 0.4, pt.x + 2 * z, pt.y);
+          ctx.moveTo(pt.x - 7 * z * flameWScale, pt.y);
+          ctx.quadraticCurveTo(pt.x - 8 * z * flameWScale, pt.y - flameH * 0.45, pt.x - 4 * z * flameWScale + sway2, pt.y - flameH * 0.78);
+          ctx.quadraticCurveTo(pt.x, pt.y - flameH * 0.4, pt.x + 2 * z * flameWScale, pt.y);
           ctx.closePath();
           ctx.fill();
 
           ctx.beginPath();
-          ctx.moveTo(pt.x - 2 * z, pt.y);
-          ctx.quadraticCurveTo(pt.x, pt.y - flameH * 0.4, pt.x + 4.5 * z - sway2, pt.y - flameH * 0.75);
-          ctx.quadraticCurveTo(pt.x + 8 * z, pt.y - flameH * 0.45, pt.x + 7 * z, pt.y);
+          ctx.moveTo(pt.x - 2 * z * flameWScale, pt.y);
+          ctx.quadraticCurveTo(pt.x, pt.y - flameH * 0.4, pt.x + 4.5 * z * flameWScale - sway2, pt.y - flameH * 0.75);
+          ctx.quadraticCurveTo(pt.x + 8 * z * flameWScale, pt.y - flameH * 0.45, pt.x + 7 * z * flameWScale, pt.y);
           ctx.closePath();
           ctx.fill();
 
           // Middle bright amber-gold flame
           ctx.fillStyle = '#fbbf24';
           ctx.beginPath();
-          ctx.moveTo(pt.x - 5.2 * z, pt.y);
-          ctx.quadraticCurveTo(pt.x - 5 * z, pt.y - flameH * 0.45, pt.x + sway2 * 0.7, pt.y - flameH * 0.76);
-          ctx.quadraticCurveTo(pt.x + 5 * z, pt.y - flameH * 0.45, pt.x + 5.2 * z, pt.y);
+          ctx.moveTo(pt.x - 5.2 * z * flameWScale, pt.y);
+          ctx.quadraticCurveTo(pt.x - 5 * z * flameWScale, pt.y - flameH * 0.45, pt.x + sway2 * 0.7, pt.y - flameH * 0.76);
+          ctx.quadraticCurveTo(pt.x + 5 * z * flameWScale, pt.y - flameH * 0.45, pt.x + 5.2 * z * flameWScale, pt.y);
           ctx.closePath();
           ctx.fill();
 
           // Inner white-yellow hot core flame
           ctx.fillStyle = '#fef08a';
           ctx.beginPath();
-          ctx.moveTo(pt.x - 2.8 * z, pt.y);
-          ctx.quadraticCurveTo(pt.x - 2.5 * z, pt.y - flameH * 0.3, pt.x + sway1 * 0.4, pt.y - flameH * 0.48);
-          ctx.quadraticCurveTo(pt.x + 2.5 * z, pt.y - flameH * 0.3, pt.x + 2.8 * z, pt.y);
+          ctx.moveTo(pt.x - 2.8 * z * flameWScale, pt.y);
+          ctx.quadraticCurveTo(pt.x - 2.5 * z * flameWScale, pt.y - flameH * 0.3, pt.x + sway1 * 0.4, pt.y - flameH * 0.48);
+          ctx.quadraticCurveTo(pt.x + 2.5 * z * flameWScale, pt.y - flameH * 0.3, pt.x + 2.8 * z * flameWScale, pt.y);
           ctx.closePath();
           ctx.fill();
 
           // 6. Rising Glowing Sparks / Embers & Warm Smoke Wisps
-          for (let sp = 0; sp < 6; sp++) {
-            const spProg = (elapsed * 0.85 + sp * 0.17) % 1;
-            const spX = pt.x + Math.sin(elapsed * 4 + sp * 1.9) * (6 * z) * (0.4 + spProg);
-            const spY = pt.y - (8 + spProg * 28) * z;
+          const sparkCount = isBoosted ? 11 : 6;
+          for (let sp = 0; sp < sparkCount; sp++) {
+            const spProg = (elapsed * (isBoosted ? 1.15 : 0.85) + sp * (1 / sparkCount)) % 1;
+            const spX = pt.x + Math.sin(elapsed * 4 + sp * 1.9) * (6 * z * boostScale) * (0.4 + spProg);
+            const spY = pt.y - (8 + spProg * 28 * boostScale) * z;
             const spAlpha = Math.max(0, 1 - spProg);
             ctx.fillStyle = sp % 2 === 0 ? `rgba(254, 240, 138, ${spAlpha})` : `rgba(249, 115, 22, ${spAlpha})`;
             ctx.beginPath();
-            ctx.arc(spX, spY, (1.6 - spProg * 0.8) * z, 0, Math.PI * 2);
+            ctx.arc(spX, spY, (1.6 - spProg * 0.8) * z * Math.min(1.25, boostScale), 0, Math.PI * 2);
             ctx.fill();
+          }
+
+          if (burnAgeSec >= 0 && burnAgeSec < 2.2) {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, 1 - burnAgeSec / 2.2);
+            ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
+            ctx.fillStyle = '#fde047';
+            ctx.textAlign = 'center';
+            ctx.fillText('🔥🍂 Daun Kering Dibakar! Api Membesar ✨', pt.x, pt.y - 34 * z - burnAgeSec * 10 * z);
+            ctx.restore();
           }
 
           // Floating Badge above Campfire ONLY when player approaches & not stationary > 5s
@@ -10293,101 +10582,108 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
           ctx.restore();
         } else if (item.type === 'fishing_spot') {
-          // DERMAGA PEMANCINGAN 1 PETAK DI SUNGAI REFLEKSIA (Ukuran 1 Petak Isometrik Rapi & Papan "Sungai Refleksia" di Dalam Frame)
+          // DERMAGA PEMANCINGAN SUPER BESAR DI SUNGAI REFLEKSIA (4 Titik Memancing di Atas Dermaga agar Pasti di Atas Papan & Tidak Menumpuk)
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const pierTipPt = toScreen(DANAU_VIEW_DECK_COORDS.wx, DANAU_VIEW_DECK_COORDS.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
 
           ctx.save();
 
-          // 1. SWIMMING KOI & GENTLE RIPPLES IN SUNGAI REFLEKSIA NEAR 1-TILE PIER TIP
-          const pondX = pt.x + 28 * z;
-          const pondY = pt.y + 8 * z;
+          // 1. SWIMMING LAKE FISH & GENTLE RIPPLES IN SUNGAI REFLEKSIA OFF THE PIER
+          const pondX = pt.x + 76 * z;
+          const pondY = pt.y + 4 * z;
 
-          // Subtle Minimalist Water Ripples off the 1-tile pier tip
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
-          ctx.lineWidth = 0.85 * z;
-          for (let wp = 0; wp < 2; wp++) {
-            const wRadius = ((elapsed * 4.5 + wp * 16) % (30 * z));
+          // Subtle Minimalist Water Ripples off the enlarged pier tip
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+          ctx.lineWidth = 1.0 * z;
+          for (let wp = 0; wp < 3; wp++) {
+            const wRadius = ((elapsed * 5.0 + wp * 16) % (48 * z));
             ctx.beginPath();
             ctx.ellipse(pondX, pondY, wRadius, wRadius * 0.48, 0, 0, Math.PI * 2);
             ctx.stroke();
           }
 
-          // 3 Graceful Minimalist Koi Fish Silhouettes swimming near the 1-tile pier
+          // 6 Lake Fish Silhouettes (Ikan Batu, Mujair, Ikan Mas, Kepiting Danau) swimming near the pier tip
           const koiConfigs = [
-            { color: '#f97316', spot: '#ffffff', speed: 0.52, radius: 13 },
-            { color: '#fbbf24', spot: '#fef08a', speed: 0.44, radius: 19 },
-            { color: '#f8fafc', spot: '#ef4444', speed: 0.58, radius: 9 },
+            { color: '#64748b', spot: '#cbd5e1', speed: 0.48, radius: 15 },
+            { color: '#0ea5e9', spot: '#bae6fd', speed: 0.54, radius: 22 },
+            { color: '#f59e0b', spot: '#fef08a', speed: 0.42, radius: 30 },
+            { color: '#ef4444', spot: '#fecaca', speed: 0.36, radius: 36 },
+            { color: '#fb923c', spot: '#fff7ed', speed: 0.50, radius: 19 },
+            { color: '#94a3b8', spot: '#f8fafc', speed: 0.45, radius: 26 },
           ];
 
           koiConfigs.forEach((koi, kIdx) => {
-            const kAngle = elapsed * koi.speed + kIdx * ((Math.PI * 2) / 3);
+            const kAngle = elapsed * koi.speed + kIdx * ((Math.PI * 2) / koiConfigs.length);
             const kDist = koi.radius * z;
             const kx = pondX + 4 * z + Math.cos(kAngle) * kDist;
             const ky = pondY + Math.sin(kAngle) * (kDist * 0.48);
             const heading = kAngle + Math.PI / 2;
-            const tailWag = Math.sin(elapsed * 6.5 + kIdx) * 1.6 * z;
+            const tailWag = Math.sin(elapsed * 6.5 + kIdx) * 1.9 * z;
 
             ctx.fillStyle = koi.color;
             ctx.beginPath();
-            ctx.ellipse(kx, ky, 3.2 * z, 1.4 * z, heading, 0, Math.PI * 2);
+            ctx.ellipse(kx, ky, 3.8 * z, 1.65 * z, heading, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.fillStyle = koi.spot;
             ctx.beginPath();
-            ctx.arc(kx + Math.cos(heading) * 0.8 * z, ky + Math.sin(heading) * 0.8 * z, 0.95 * z, 0, Math.PI * 2);
+            ctx.arc(kx + Math.cos(heading) * 0.95 * z, ky + Math.sin(heading) * 0.95 * z, 1.1 * z, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.strokeStyle = koi.color;
-            ctx.lineWidth = 1.05 * z;
+            ctx.lineWidth = 1.2 * z;
             ctx.beginPath();
-            ctx.moveTo(kx - Math.cos(heading) * 2.6 * z, ky - Math.sin(heading) * 2.6 * z);
+            ctx.moveTo(kx - Math.cos(heading) * 3.0 * z, ky - Math.sin(heading) * 3.0 * z);
             ctx.lineTo(
-              kx - Math.cos(heading) * 4.8 * z + tailWag * 0.5,
-              ky - Math.sin(heading) * 4.8 * z + tailWag * 0.3
+              kx - Math.cos(heading) * 5.5 * z + tailWag * 0.5,
+              ky - Math.sin(heading) * 5.5 * z + tailWag * 0.3
             );
             ctx.stroke();
           });
 
-          // 2. 1-TILE (1 PETAK) ISOMETRIC TEAK TIMBER FISHING PLATFORM
-          // 1 petak isometric diamond dimensions: halfW = 28 * z, halfH = 14 * z
-          const tileHalfW = 28 * z;
-          const tileHalfH = 14 * z;
+          // 2. EXTRA-LARGE GRAND ISOMETRIC TEAK TIMBER FISHING PIER (EXTENDING OUT TO UJUNG DERMAGA)
+          const tileHalfW = 68 * z;
+          const tileHalfH = 34 * z;
           const pNorth = { x: pt.x, y: pt.y - tileHalfH };
-          const pEast = { x: pt.x + tileHalfW, y: pt.y };
+          const pEast = { x: pt.x + tileHalfW, y: pt.y }; // Ujung Dermaga menghadap danau!
           const pSouth = { x: pt.x, y: pt.y + tileHalfH };
           const pWest = { x: pt.x - tileHalfW, y: pt.y };
 
-          // 4 corner timber pilings supporting the 1-tile deck
+          // 8 heavy timber pilings supporting the extra-large fishing pier
           const pierPilings = [
-            { px: pt.x - 16 * z, py: pt.y + 4 * z },
-            { px: pt.x, py: pt.y + 12 * z },
-            { px: pt.x + 16 * z, py: pt.y + 4 * z },
-            { px: pt.x + 24 * z, py: pt.y - 1 * z },
+            { px: pt.x - 50 * z, py: pt.y + 6 * z },
+            { px: pt.x - 26 * z, py: pt.y + 18 * z },
+            { px: pt.x, py: pt.y + 30 * z },
+            { px: pt.x + 24 * z, py: pt.y + 19 * z },
+            { px: pt.x + 46 * z, py: pt.y + 8 * z },
+            { px: pt.x + 62 * z, py: pt.y + 0.5 * z },
+            { px: pt.x + 36 * z, py: pt.y - 12 * z },
+            { px: pt.x + 12 * z, py: pt.y - 24 * z },
           ];
           for (const pil of pierPilings) {
             ctx.fillStyle = '#1e293b';
-            ctx.fillRect(pil.px - 1.5 * z, pil.py, 3.0 * z, 9.0 * z);
-            ctx.strokeStyle = 'rgba(224, 242, 254, 0.38)';
-            ctx.lineWidth = 0.75 * z;
+            ctx.fillRect(pil.px - 2.2 * z, pil.py, 4.4 * z, 13.5 * z);
+            ctx.strokeStyle = 'rgba(224, 242, 254, 0.45)';
+            ctx.lineWidth = 0.9 * z;
             ctx.beginPath();
-            ctx.ellipse(pil.px, pil.py + 8.5 * z, 3.8 * z, 1.5 * z, 0, 0, Math.PI * 2);
+            ctx.ellipse(pil.px, pil.py + 12.8 * z, 5.6 * z, 2.2 * z, 0, 0, Math.PI * 2);
             ctx.stroke();
           }
 
-          // 3D Side fascia of the 1-Tile Wooden Fishing Deck
+          // 3D Side fascia of the Extra-Large Wooden Fishing Pier
           ctx.fillStyle = '#451a03';
           ctx.beginPath();
           ctx.moveTo(pWest.x, pWest.y);
           ctx.lineTo(pSouth.x, pSouth.y);
           ctx.lineTo(pEast.x, pEast.y);
-          ctx.lineTo(pEast.x, pEast.y + 3.8 * z);
-          ctx.lineTo(pSouth.x, pSouth.y + 3.8 * z);
-          ctx.lineTo(pWest.x, pWest.y + 3.8 * z);
+          ctx.lineTo(pEast.x, pEast.y + 6.2 * z);
+          ctx.lineTo(pSouth.x, pSouth.y + 6.2 * z);
+          ctx.lineTo(pWest.x, pWest.y + 6.2 * z);
           ctx.closePath();
           ctx.fill();
 
-          // Top Teak Decking Surface of the 1-Tile (1 Petak) Fishing Spot
+          // Top Teak Decking Surface of the Extra-Large Fishing Pier
           const pierGrad = ctx.createLinearGradient(pWest.x, pNorth.y, pEast.x, pSouth.y);
           pierGrad.addColorStop(0, isNight ? '#78350f' : '#b45309');
           pierGrad.addColorStop(0.55, isNight ? '#92400e' : '#d97706');
@@ -10402,14 +10698,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fill();
 
           ctx.strokeStyle = isNight ? '#fbbf24' : '#fef3c7';
-          ctx.lineWidth = 0.85 * z;
+          ctx.lineWidth = 1.2 * z;
           ctx.stroke();
 
-          // Crisp isometric plank slat lines across the 1-tile deck (7 planks)
+          // Crisp isometric plank slat lines across the extra-large deck (14 planks)
           ctx.strokeStyle = 'rgba(69, 26, 3, 0.48)';
-          ctx.lineWidth = 0.75 * z;
-          for (let s = 1; s < 7; s++) {
-            const t = s / 7;
+          ctx.lineWidth = 0.9 * z;
+          for (let s = 1; s < 14; s++) {
+            const t = s / 14;
             const lx = pNorth.x + (pEast.x - pNorth.x) * t;
             const ly = pNorth.y + (pEast.y - pNorth.y) * t;
             const rx = pWest.x + (pSouth.x - pWest.x) * t;
@@ -10420,64 +10716,123 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.stroke();
           }
 
-          // Minimalist Low-Profile Pier Bollards & Handrail along North-East Edge of 1-Tile Deck
+          // Structural cross-beams along the pier
+          ctx.strokeStyle = 'rgba(120, 53, 15, 0.55)';
+          ctx.lineWidth = 1.2 * z;
+          ctx.beginPath();
+          ctx.moveTo((pNorth.x + pWest.x) * 0.5, (pNorth.y + pWest.y) * 0.5);
+          ctx.lineTo((pEast.x + pSouth.x) * 0.5, (pEast.y + pSouth.y) * 0.5);
+          ctx.stroke();
+
+          // 4 Titik Memancing di Atas Dermaga (Bukan terlalu di ujung lancip, sehingga kaki & bayangan Avatar 100% di atas papan kayu dermaga & tidak menumpuk)
+          FISHING_PIER_SPOTS.forEach((spot, sIdx) => {
+            const sPt = toScreen(spot.wx, spot.wy, 0, camera.x, camera.y);
+            const isPlayerHere = Math.hypot(player.wx - spot.wx, player.wy - spot.wy) < 0.22;
+            ctx.fillStyle = isPlayerHere
+              ? 'rgba(56, 189, 248, 0.34)'
+              : isNight
+              ? 'rgba(251, 191, 36, 0.20)'
+              : 'rgba(254, 243, 199, 0.34)';
+            ctx.strokeStyle = isPlayerHere ? '#38bdf8' : '#fbbf24';
+            ctx.lineWidth = (isPlayerHere ? 1.3 : 0.95) * z;
+            ctx.beginPath();
+            ctx.ellipse(sPt.x, sPt.y, 7.2 * z, 3.8 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Nomor kecil titik pancing di atas papan dermaga
+            ctx.fillStyle = isPlayerHere ? '#e0f2fe' : '#fef3c7';
+            ctx.font = `bold ${Math.max(4, Math.round(4.6 * z))}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${sIdx + 1}`, sPt.x, sPt.y);
+          });
+
+          // Minimalist Low-Profile Pier Bollards & Handrail along North-East Edge (stopping before the open casting tip)
           const bollardCoords = [
-            [pNorth.x + (pEast.x - pNorth.x) * 0.12, pNorth.y + (pEast.y - pNorth.y) * 0.12],
-            [pNorth.x + (pEast.x - pNorth.x) * 0.5, pNorth.y + (pEast.y - pNorth.y) * 0.5],
-            [pNorth.x + (pEast.x - pNorth.x) * 0.88, pNorth.y + (pEast.y - pNorth.y) * 0.88],
+            [pNorth.x + (pEast.x - pNorth.x) * 0.08, pNorth.y + (pEast.y - pNorth.y) * 0.08],
+            [pNorth.x + (pEast.x - pNorth.x) * 0.28, pNorth.y + (pEast.y - pNorth.y) * 0.28],
+            [pNorth.x + (pEast.x - pNorth.x) * 0.48, pNorth.y + (pEast.y - pNorth.y) * 0.48],
+            [pNorth.x + (pEast.x - pNorth.x) * 0.68, pNorth.y + (pEast.y - pNorth.y) * 0.68],
           ];
           ctx.strokeStyle = isNight ? '#94a3b8' : '#cbd5e1';
-          ctx.lineWidth = 1.15 * z;
+          ctx.lineWidth = 1.3 * z;
           ctx.beginPath();
-          ctx.moveTo(bollardCoords[0][0], bollardCoords[0][1] - 6.2 * z);
-          ctx.lineTo(bollardCoords[1][0], bollardCoords[1][1] - 6.2 * z);
-          ctx.lineTo(bollardCoords[2][0], bollardCoords[2][1] - 6.2 * z);
+          ctx.moveTo(bollardCoords[0][0], bollardCoords[0][1] - 8.2 * z);
+          for (let bi = 1; bi < bollardCoords.length; bi++) {
+            ctx.lineTo(bollardCoords[bi][0], bollardCoords[bi][1] - 8.2 * z);
+          }
           ctx.stroke();
 
           bollardCoords.forEach(([bx, by]) => {
             ctx.fillStyle = '#1e293b';
-            ctx.fillRect(bx - 1.1 * z, by - 7.0 * z, 2.2 * z, 7.0 * z);
+            ctx.fillRect(bx - 1.4 * z, by - 9.2 * z, 2.8 * z, 9.2 * z);
             ctx.fillStyle = '#fef08a';
-            ctx.fillRect(bx - 1.1 * z, by - 7.8 * z, 2.2 * z, 1.0 * z);
+            ctx.fillRect(bx - 1.4 * z, by - 10.4 * z, 2.8 * z, 1.3 * z);
           });
 
-          // Wooden Angler Stool & Cyan Bait Bucket on the 1-Tile Deck
+          // Woven Pandan Fishing Mat, Wooden Angler Bench/Stool, Tackle Box & Cyan Bait Bucket on the Enlarged Deck
+          ctx.fillStyle = isNight ? 'rgba(6, 78, 59, 0.75)' : 'rgba(16, 185, 129, 0.34)';
+          ctx.strokeStyle = '#34d399';
+          ctx.lineWidth = 0.8 * z;
+          ctx.beginPath();
+          ctx.ellipse(pt.x + 8 * z, pt.y + 3.5 * z, 18 * z, 9.2 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          // Wooden Angler Bench/Stool
           ctx.fillStyle = '#78350f';
           ctx.beginPath();
-          ctx.roundRect(pt.x - 5 * z, pt.y + 0.5 * z, 6.5 * z, 3.8 * z, 1.1 * z);
+          ctx.roundRect(pt.x - 8 * z, pt.y - 1.5 * z, 12.5 * z, 6.5 * z, 1.6 * z);
           ctx.fill();
           ctx.strokeStyle = '#fde68a';
-          ctx.lineWidth = 0.6 * z;
+          ctx.lineWidth = 0.85 * z;
           ctx.stroke();
 
+          // Red & Brass Tackle Box
+          ctx.fillStyle = '#dc2626';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 22 * z, pt.y + 5.5 * z, 8.0 * z, 5.2 * z, 1.1 * z);
+          ctx.fill();
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillRect(pt.x - 19.6 * z, pt.y + 7.2 * z, 3.2 * z, 1.4 * z);
+
+          // Cyan Live-Bait Bucket near the pier tip
           ctx.fillStyle = '#0284c7';
           ctx.beginPath();
-          ctx.roundRect(pt.x + 5 * z, pt.y + 2.5 * z, 4.2 * z, 4.4 * z, 1.0 * z);
+          ctx.roundRect(pierTipPt.x - 16 * z, pierTipPt.y + 4.5 * z, 6.6 * z, 6.8 * z, 1.4 * z);
           ctx.fill();
           ctx.strokeStyle = '#bae6fd';
-          ctx.lineWidth = 0.65 * z;
+          ctx.lineWidth = 0.85 * z;
           ctx.stroke();
 
-          // Framed Wooden Signboard "Sungai Refleksia" on the North-West corner of the 1-Tile Pier (Strictly fitted inside frame)
-          const signPtX = pt.x - 16 * z;
-          const signPtY = pt.y - 8.5 * z;
-          const signBoxW = 46 * z;
-          const signBoxH = 11.5 * z;
+          // Floating Keep-Net Ring off the South-East edge of the pier
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 1.15 * z;
+          ctx.beginPath();
+          ctx.ellipse(pt.x + 36 * z, pt.y + 18.5 * z, 6.8 * z, 3.4 * z, 0, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Framed Wooden Signboard "Sungai Refleksia" on the North-West corner of the Extra-Large Pier (Strictly fitted inside frame)
+          const signPtX = pt.x - 34 * z;
+          const signPtY = pt.y - 17.5 * z;
+          const signBoxW = 52 * z;
+          const signBoxH = 12.5 * z;
           const signBoxX = signPtX - signBoxW / 2;
-          const signBoxY = signPtY - 20.5 * z;
+          const signBoxY = signPtY - 22.5 * z;
 
           // Dual timber support posts
           ctx.fillStyle = '#451a03';
-          ctx.fillRect(signPtX - 10 * z, signPtY - 10 * z, 1.8 * z, 10 * z);
-          ctx.fillRect(signPtX + 8.2 * z, signPtY - 10 * z, 1.8 * z, 10 * z);
+          ctx.fillRect(signPtX - 11.5 * z, signPtY - 11 * z, 2.2 * z, 11 * z);
+          ctx.fillRect(signPtX + 9.3 * z, signPtY - 11 * z, 2.2 * z, 11 * z);
 
           // Outer & Inner Signboard Frame
           ctx.fillStyle = isNight ? '#1e293b' : '#78350f';
           ctx.beginPath();
-          ctx.roundRect(signBoxX, signBoxY, signBoxW, signBoxH, 2.4 * z);
+          ctx.roundRect(signBoxX, signBoxY, signBoxW, signBoxH, 2.6 * z);
           ctx.fill();
           ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 0.9 * z;
+          ctx.lineWidth = 1.0 * z;
           ctx.stroke();
 
           // Strictly clip "Sungai Refleksia" inside the frame
@@ -10486,39 +10841,42 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.roundRect(signBoxX + 1.5 * z, signBoxY + 1.0 * z, signBoxW - 3.0 * z, signBoxH - 2.0 * z, 1.6 * z);
           ctx.clip();
           ctx.fillStyle = '#fef3c7';
-          ctx.font = `bold ${Math.max(4, Math.round(5.0 * z))}px sans-serif`;
+          ctx.font = `bold ${Math.max(4, Math.round(5.3 * z))}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('Sungai Refleksia', signPtX, signBoxY + signBoxH / 2, signBoxW - 4.5 * z);
+          ctx.fillText('Sungai Refleksia', signPtX, signBoxY + signBoxH / 2, signBoxW - 5.0 * z);
           ctx.restore();
 
-          // Resting minimalist carbon/bamboo fishing rods when player is not actively fishing
+          // Resting minimalist carbon/bamboo fishing rods at ujung dermaga when player is not actively fishing
           if (!isFishingRef.current) {
             ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 1.2 * z;
+            ctx.lineWidth = 1.4 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x + 8 * z, pt.y + 4 * z);
-            ctx.lineTo(pt.x + 25 * z, pt.y - 2 * z);
-            ctx.moveTo(pt.x + 11 * z, pt.y + 2 * z);
-            ctx.lineTo(pt.x + 27 * z, pt.y - 4 * z);
+            ctx.moveTo(pierTipPt.x - 6 * z, pierTipPt.y + 3 * z);
+            ctx.lineTo(pierTipPt.x + 22 * z, pierTipPt.y - 5 * z);
+            ctx.moveTo(pierTipPt.x - 2 * z, pierTipPt.y + 0.5 * z);
+            ctx.lineTo(pierTipPt.x + 25 * z, pierTipPt.y - 7.5 * z);
             ctx.stroke();
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-            ctx.lineWidth = 0.65 * z;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.58)';
+            ctx.lineWidth = 0.75 * z;
             ctx.beginPath();
-            ctx.moveTo(pt.x + 25 * z, pt.y - 2 * z);
-            ctx.lineTo(pt.x + 26 * z, pt.y + 8 * z);
+            ctx.moveTo(pierTipPt.x + 22 * z, pierTipPt.y - 5 * z);
+            ctx.lineTo(pierTipPt.x + 24 * z, pierTipPt.y + 8 * z);
             ctx.stroke();
 
             ctx.fillStyle = '#ef4444';
             ctx.beginPath();
-            ctx.arc(pt.x + 26 * z, pt.y + 8 * z, 1.5 * z, 0, Math.PI * 2);
+            ctx.arc(pierTipPt.x + 24 * z, pierTipPt.y + 8 * z, 1.8 * z, 0, Math.PI * 2);
             ctx.fill();
           }
 
           // 3. FLOATING BADGE: 🎣 Spot Memancing • Sungai Refleksia ONLY when player approaches & not stationary > 5s
-          const distToFishing = Math.hypot(player.wx - item.wx, player.wy - item.wy);
-          if (distToFishing < 2.3 && overheadTagAlpha > 0.005) {
+          const distToFishing = Math.min(
+            Math.hypot(player.wx - item.wx, player.wy - item.wy),
+            ...FISHING_PIER_SPOTS.map((s) => Math.hypot(player.wx - s.wx, player.wy - s.wy))
+          );
+          if (distToFishing < 2.8 && overheadTagAlpha > 0.005) {
             ctx.save();
             ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
             const dockTagY = pt.y - 38 * z;
@@ -10837,7 +11195,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 ctx.font = `bold ${Math.round(9 * z)}px sans-serif`;
                 ctx.fillStyle = '#fde047';
                 ctx.textAlign = 'center';
-                ctx.fillText('🍎 Dipetik! +2 XP ✨', pt.x, pt.y - 66 * z + harvestFloatY);
+                ctx.fillText('🍎 +7 Apel Masuk Tas! 🎒✨', pt.x, pt.y - 66 * z + harvestFloatY);
               }
 
               ctx.restore();
@@ -10849,7 +11207,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const activeCount = cycle ? cycle.count : 0;
           if (((distPlayerToThisTree < 1.65 && (activeCount > 0 || hasRipeApples || isAutumnTree)) || isRecentlyWatered) && (overheadTagAlpha > 0.005 || hasRipeApples)) {
             const badgeText = hasRipeApples
-              ? '🍎 Petik Apel (+2 XP)'
+              ? '🍎 Petik 7 Apel (Ke Tas)'
               : isAutumnTree
               ? '🍂 Siram agar Hijau'
               : `💧 ${activeCount}/3`;
@@ -11454,7 +11812,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const pCenter = toScreen(0.0, item.wy, 0, camera.x, camera.y);
           const pGuard = toScreen(-0.76, -7.32, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
-          const canEnterGate = Boolean(isPlayerTeacher || isMasterKikyRef.current);
+          const canEnterGate = Boolean(
+            isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current
+          );
           const distToGate = Math.hypot(player.wx - 0.0, player.wy - item.wy);
           const isGateOpen = canEnterGate && distToGate < 2.25;
 
@@ -14416,19 +14776,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineTo(pt.x + 24 * z, pt.y + 7.8 * z);
           ctx.stroke();
 
-          // Front Counter Plaque ("☕ LAPAK REFLEKSIA 🥐")
+          // Front Counter Plaque ("☕ LAPAK REFLEKSIA 🥐") — Strictly clipped inside frame
+          const plaqueW = 44 * z;
+          const plaqueH = 8.6 * z;
+          const plaqueX = pt.x - plaqueW / 2;
+          const plaqueY = pt.y - 2.3 * z;
           ctx.fillStyle = '#fffbeb';
           ctx.strokeStyle = '#92400e';
           ctx.lineWidth = 1.1 * z;
           ctx.beginPath();
-          ctx.roundRect(pt.x - 21 * z, pt.y - 2.2 * z, 42 * z, 8.2 * z, 2.2 * z);
+          ctx.roundRect(plaqueX, plaqueY, plaqueW, plaqueH, 2.2 * z);
           ctx.fill();
           ctx.stroke();
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(plaqueX + 1.4 * z, plaqueY + 0.8 * z, plaqueW - 2.8 * z, plaqueH - 1.6 * z, 1.6 * z);
+          ctx.clip();
           ctx.fillStyle = '#78350f';
-          ctx.font = `bold ${Math.round(5.4 * z)}px sans-serif`;
+          ctx.font = `bold ${Math.max(4, Math.round(5.0 * z))}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('☕ LAPAK REFLEKSIA 🥐', pt.x, pt.y + 2.0 * z);
+          ctx.fillText('☕ LAPAK REFLEKSIA 🥐', pt.x, plaqueY + plaqueH / 2, plaqueW - 4.2 * z);
+          ctx.restore();
 
           // 5. Boutique Striped Canopy Awning & Warm Edison Festoon String Lights
           const numStripes = 8;
@@ -14463,21 +14832,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
-          // Rooftop Framed Marquee Signboard ("LAPAK REFLEKSIA")
-          const roofSignW = 44 * z;
-          const roofSignH = 8.5 * z;
+          // Rooftop Framed Marquee Signboard ("✨ LAPAK REFLEKSIA ✨") — Strictly clipped inside frame
+          const roofSignW = 46 * z;
+          const roofSignH = 9.0 * z;
+          const roofSignX = pt.x - roofSignW / 2;
+          const roofSignY = pt.y - 38.8 * z;
           ctx.fillStyle = '#1e293b';
           ctx.strokeStyle = '#fbbf24';
           ctx.lineWidth = 1.2 * z;
           ctx.beginPath();
-          ctx.roundRect(pt.x - roofSignW / 2, pt.y - 38.5 * z, roofSignW, roofSignH, 2.5 * z);
+          ctx.roundRect(roofSignX, roofSignY, roofSignW, roofSignH, 2.5 * z);
           ctx.fill();
           ctx.stroke();
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(roofSignX + 1.5 * z, roofSignY + 0.9 * z, roofSignW - 3.0 * z, roofSignH - 1.8 * z, 1.8 * z);
+          ctx.clip();
           ctx.fillStyle = '#fde68a';
-          ctx.font = `bold ${Math.round(5.2 * z)}px sans-serif`;
+          ctx.font = `bold ${Math.max(4, Math.round(4.9 * z))}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('✨ LAPAK REFLEKSIA ✨', pt.x, pt.y - 34.2 * z);
+          ctx.fillText('✨ LAPAK REFLEKSIA ✨', pt.x, roofSignY + roofSignH / 2, roofSignW - 4.5 * z);
+          ctx.restore();
 
           // Floating Pill Badge above Lapak Refleksia ONLY when touched/opened
           const isCafeTouched = (lastTouchedIdRef.current === 'cafe' || isCafeMenuOpen) && overheadTagAlpha > 0.005;
@@ -14489,7 +14865,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const trLabel = '🥐 Lapak Refleksia';
             ctx.font = `bold ${Math.round(7.8 * z)}px sans-serif`;
             const trMetrics = ctx.measureText(trLabel);
-            const trW = trMetrics.width + 11 * z;
+            const trW = trMetrics.width + 12 * z;
             const trH = 14.5 * z;
             ctx.beginPath();
             ctx.roundRect(pt.x - trW / 2, trBadgeY - trH / 2, trW, trH, 7 * z);
@@ -14497,16 +14873,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.strokeStyle = 'rgba(245, 158, 11, 0.78)';
             ctx.lineWidth = 1.0 * z;
             ctx.stroke();
+            ctx.beginPath();
+            ctx.roundRect(pt.x - trW / 2 + 1.5 * z, trBadgeY - trH / 2 + 1.0 * z, trW - 3.0 * z, trH - 2.0 * z, 6 * z);
+            ctx.clip();
             ctx.fillStyle = '#fef3c7';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(trLabel, pt.x, trBadgeY);
+            ctx.fillText(trLabel, pt.x, trBadgeY, trW - 5 * z);
             ctx.restore();
           }
 
           // 6. Outdoor Bistro Tables, Parasol Umbrellas, Potted Plants, Chalkboard Menu & Barrels
-          const tableX = pt.x - 36 * z;
-          const tableY = pt.y + 4.5 * z;
+          // Positioned slightly further left so @ma_uba stands neatly right beside the left pillar of Lapak Refleksia
+          const tableX = pt.x - 45 * z;
+          const tableY = pt.y + 6.5 * z;
           // Two-tone striped parasol umbrella
           ctx.fillStyle = '#dc2626';
           ctx.beginPath();
@@ -14552,7 +14932,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           });
 
           // Potted Monstera / Tropical Herb Planters on Patio Corners
-          [-28.5, 34.5].forEach((pxOff) => {
+          [-26.5, 36.5].forEach((pxOff) => {
             const potX = pt.x + pxOff * z;
             const potY = pt.y + 8.5 * z;
             ctx.fillStyle = '#c2410c';
@@ -14567,33 +14947,46 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
           });
 
-          // A-Frame Chalkboard Easel Menu beside Lapak Refleksia
-          const easelX = pt.x + 26.5 * z;
+          // A-Frame Chalkboard Easel Menu beside Lapak Refleksia — Strictly clipped inside board frame
+          const easelX = pt.x + 27.5 * z;
           const easelY = pt.y + 6.5 * z;
+          const boardW = 13.4 * z;
+          const boardH = 12.2 * z;
+          const boardX = easelX - boardW / 2;
+          const boardY = easelY - 12.0 * z;
           ctx.strokeStyle = '#78350f';
           ctx.lineWidth = 1.4 * z;
           ctx.beginPath();
-          ctx.moveTo(easelX, easelY - 14.5 * z);
-          ctx.lineTo(easelX - 6 * z, easelY + 4 * z);
-          ctx.moveTo(easelX, easelY - 14.5 * z);
-          ctx.lineTo(easelX + 6 * z, easelY + 4 * z);
+          ctx.moveTo(easelX, easelY - 15.0 * z);
+          ctx.lineTo(easelX - 7.0 * z, easelY + 4 * z);
+          ctx.moveTo(easelX, easelY - 15.0 * z);
+          ctx.lineTo(easelX + 7.0 * z, easelY + 4 * z);
           ctx.stroke();
           ctx.fillStyle = '#0f172a';
-          ctx.fillRect(easelX - 5.2 * z, easelY - 11.5 * z, 10.4 * z, 11.5 * z);
+          ctx.beginPath();
+          ctx.roundRect(boardX, boardY, boardW, boardH, 1.2 * z);
+          ctx.fill();
           ctx.strokeStyle = '#d97706';
-          ctx.lineWidth = 0.85 * z;
-          ctx.strokeRect(easelX - 5.2 * z, easelY - 11.5 * z, 10.4 * z, 11.5 * z);
-          ctx.fillStyle = '#fef08a';
-          ctx.font = `bold ${Math.round(3.4 * z)}px sans-serif`;
+          ctx.lineWidth = 0.9 * z;
+          ctx.stroke();
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(boardX + 0.9 * z, boardY + 0.8 * z, boardW - 1.8 * z, boardH - 1.6 * z, 0.8 * z);
+          ctx.clip();
           ctx.textAlign = 'center';
-          ctx.fillText('LAPAK', easelX, easelY - 8.2 * z);
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#fef08a';
+          ctx.font = `bold ${Math.max(3, Math.round(3.1 * z))}px sans-serif`;
+          ctx.fillText('LAPAK', easelX, boardY + 2.8 * z, boardW - 2.4 * z);
           ctx.fillStyle = '#ffffff';
-          ctx.font = `${Math.round(2.7 * z)}px sans-serif`;
-          ctx.fillText('☕ 2 XP', easelX, easelY - 4.8 * z);
-          ctx.fillText('🥐 1 XP', easelX, easelY - 1.8 * z);
+          ctx.font = `${Math.max(3, Math.round(2.5 * z))}px sans-serif`;
+          ctx.fillText('☕ 2 XP', easelX, boardY + 6.4 * z, boardW - 2.4 * z);
+          ctx.fillText('🥐 1 XP', easelX, boardY + 9.6 * z, boardW - 2.4 * z);
+          ctx.restore();
 
           // Coffee Bean Barrel with brass bands & Sacks of Flour/Coffee
-          const barrelX = pt.x - 21 * z;
+          const barrelX = pt.x - 19.5 * z;
           const barrelY = pt.y + 8.5 * z;
           ctx.fillStyle = '#78350f';
           ctx.beginPath();
@@ -14610,18 +15003,28 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineTo(barrelX + 4 * z, barrelY + 2 * z);
           ctx.stroke();
 
-          // Burlap Sack ("KOPI") beside barrel
+          // Burlap Sack ("KOPI") beside barrel — Strictly clipped inside sack frame
+          const sackX = barrelX + 6.8 * z;
+          const sackY = barrelY - 1.2 * z;
+          const sackW = 8.4 * z;
+          const sackH = 6.0 * z;
           ctx.fillStyle = '#fef3c7';
           ctx.beginPath();
-          ctx.roundRect(barrelX + 7.5 * z, barrelY - 1 * z, 6.5 * z, 5.5 * z, 2 * z);
+          ctx.roundRect(sackX, sackY, sackW, sackH, 2.0 * z);
           ctx.fill();
           ctx.strokeStyle = '#d97706';
-          ctx.lineWidth = 0.6 * z;
+          ctx.lineWidth = 0.65 * z;
           ctx.stroke();
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(sackX + 0.7 * z, sackY + 0.6 * z, sackW - 1.4 * z, sackH - 1.2 * z, 1.4 * z);
+          ctx.clip();
           ctx.fillStyle = '#92400e';
-          ctx.font = `bold ${Math.round(2.3 * z)}px sans-serif`;
+          ctx.font = `bold ${Math.max(2, Math.round(2.2 * z))}px sans-serif`;
           ctx.textAlign = 'center';
-          ctx.fillText('KOPI', barrelX + 10.8 * z, barrelY + 2.4 * z);
+          ctx.textBaseline = 'middle';
+          ctx.fillText('KOPI', sackX + sackW / 2, sackY + sackH / 2, sackW - 1.8 * z);
+          ctx.restore();
           ctx.restore();
         } else if (item.type === 'housing_gate') {
           // GERBANG & PAPAN KOMPLEKS PERUMAHAN GURU & WISMA DKV (Di Belakang Perpustakaan Kampus [-6.55, 0])
@@ -15605,6 +16008,47 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             }
           }
 
+          // 2B. TAS AVATAR (Setiap Avatar memiliki Tas Ransel / Tas Selempang untuk menyimpan Ikan & Daun Kering)
+          {
+            const bagSide = av.facing === 'down-left' || av.facing === 'up-left' ? 1 : -1;
+            // Ransel Punggung / Kantong Tas Samping
+            ctx.fillStyle = '#78350f';
+            ctx.beginPath();
+            ctx.roundRect(
+              pt.x + (bagSide > 0 ? 3.8 * z : -6.6 * z),
+              avY - 13.4 * z,
+              2.8 * z,
+              6.6 * z,
+              1.1 * z
+            );
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 0.65 * z;
+            ctx.stroke();
+            // Tutup Atas Tas & Gesper Kuningan
+            ctx.fillStyle = '#92400e';
+            ctx.fillRect(
+              pt.x + (bagSide > 0 ? 3.9 * z : -6.5 * z),
+              avY - 13.4 * z,
+              2.6 * z,
+              2.2 * z
+            );
+            ctx.fillStyle = '#fde047';
+            ctx.fillRect(
+              pt.x + (bagSide > 0 ? 4.8 * z : -5.6 * z),
+              avY - 11.4 * z,
+              0.9 * z,
+              0.9 * z
+            );
+            // Tali Selempang Tas menyilang di dada
+            ctx.strokeStyle = 'rgba(120, 53, 15, 0.85)';
+            ctx.lineWidth = 1.15 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - bagSide * 3.4 * z, avY - 13.8 * z);
+            ctx.lineTo(pt.x + bagSide * 4.2 * z, avY - 7.2 * z);
+            ctx.stroke();
+          }
+
           // 3. ARMS & HANDS
           const isReadingNow = Boolean(
             item.isPlayer &&
@@ -16539,9 +16983,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             );
             ctx.fill();
 
-            // Bobber & fishing line trajectory (Parabolic cast flight -> splash -> floating bobber -> upward pull arc)
-            const targetBobberX = pt.x + 36 * z;
-            const targetBobberY = avY + (4 + Math.sin(elapsed * 8) * 2.8) * z;
+            // Bobber & fishing line trajectory (Parabolic cast flight -> splash -> floating bobber -> vigorous bite tug -> upward pull arc)
+            const isBitingNow = item.isPlayer && fishingPhaseRef.current === 'biting';
+            const targetBobberX = pt.x + 56 * z;
+            const targetBobberY =
+              avY +
+              (4 +
+                (isBitingNow
+                  ? Math.sin(elapsed * 26) * 4.5 + Math.abs(Math.cos(elapsed * 18)) * 2.5
+                  : Math.sin(elapsed * 5.5) * 1.8)) *
+                z;
 
             let bobberX = targetBobberX;
             let bobberY = targetBobberY;
@@ -16596,7 +17047,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             } else {
               ctx.quadraticCurveTo(
                 (rodTipX + bobberX) * 0.5,
-                (rodTipY + bobberY) * 0.5 + 3 * z,
+                (rodTipY + bobberY) * 0.5 + (isBitingNow ? 0.5 * z : 3 * z),
                 bobberX,
                 bobberY
               );
@@ -16612,6 +17063,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.beginPath();
             ctx.arc(bobberX, bobberY, 2.8 * z, 0, Math.PI);
             ctx.fill();
+
+            // Vigorous Splash & "❗ TARIK!" Alert Badge above Bobber when Fish is Biting!
+            if (isBitingNow && isInWater && !isPullingNow) {
+              const splashR = (4 + ((elapsed * 22) % 10)) * z;
+              ctx.strokeStyle = 'rgba(254, 240, 138, 0.9)';
+              ctx.lineWidth = 1.4 * z;
+              ctx.beginPath();
+              ctx.ellipse(bobberX, bobberY + 1.5 * z, splashR, splashR * 0.48, 0, 0, Math.PI * 2);
+              ctx.stroke();
+
+              const badgeY = bobberY - 12 * z - Math.abs(Math.sin(elapsed * 12)) * 3 * z;
+              const bW = 34 * z;
+              const bH = 10.5 * z;
+              ctx.fillStyle = 'rgba(220, 38, 38, 0.95)';
+              ctx.strokeStyle = '#fef08a';
+              ctx.lineWidth = 1.0 * z;
+              ctx.beginPath();
+              ctx.roundRect(bobberX - bW / 2, badgeY - bH / 2, bW, bH, 4 * z);
+              ctx.fill();
+              ctx.stroke();
+              ctx.fillStyle = '#ffffff';
+              ctx.font = `bold ${Math.max(4, Math.round(5.0 * z))}px sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('❗ TARIK!', bobberX, badgeY, bW - 3 * z);
+            }
 
             // Leaping Caught Fish during Pulling Animation (Mengangkat Pancing)
             if (isPullingNow) {
@@ -16633,21 +17110,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 ctx.stroke();
               }
 
-              // Draw Golden-Orange Leaping Fish attached below the bobber
+              // Draw Leaping Caught Species (colored by caughtFishRef) attached below the bobber
               const fishX = bobberX;
               const fishY = bobberY + 4.2 * z;
+              const fishBodyColor = caughtFishRef.current?.color || '#f97316';
               ctx.save();
               ctx.translate(fishX, fishY);
               ctx.rotate(-0.45 + pullProgress * 0.9);
-              ctx.fillStyle = '#f97316';
+              ctx.fillStyle = fishBodyColor;
               ctx.beginPath();
-              ctx.ellipse(0, 0, 4.5 * z, 2.3 * z, 0, 0, Math.PI * 2);
+              ctx.ellipse(0, 0, 4.8 * z, 2.5 * z, 0, 0, Math.PI * 2);
               ctx.fill();
               ctx.fillStyle = '#fbbf24';
               ctx.beginPath();
               ctx.moveTo(3.8 * z, 0);
-              ctx.lineTo(6.8 * z, -2.5 * z);
-              ctx.lineTo(6.8 * z, 2.5 * z);
+              ctx.lineTo(7.0 * z, -2.6 * z);
+              ctx.lineTo(7.0 * z, 2.6 * z);
               ctx.closePath();
               ctx.fill();
               ctx.restore();
@@ -18471,24 +18949,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       }
 
       // ---------------------------------------------------------
-      // 6B. AESTHETIC ROYAL ZEPPELIN CRUISING ABOVE THE CITY (ENLARGED & CRISP "KOTA REFLEKSIA" TEXT)
-      // (Purely atmospheric in the upper sky canopy — zero click/collision interference)
+      // 6B. AESTHETIC ROYAL ZEPPELIN CRUISING HIGH ABOVE THE CITY SKYLINE ("Selamat Datang")
+      // (Flies high above the northern mountain skyline — zero interference with city buildings or activities)
       // ---------------------------------------------------------
       {
-        const z = zoomLevelRef.current * 1.32;
-        // Slow, majestic high-altitude figure-8 / elliptical cruise path high above the north-central skyline
+        const z = zoomLevelRef.current * 1.24;
+        // High-altitude figure-8 / elliptical cruise path high above the northern mountain peaks
         const zepAngle = elapsed * 0.085;
-        const zepWx = Math.cos(zepAngle) * 5.6;
-        const zepWy = -5.2 + Math.sin(zepAngle * 2) * 1.9;
-        const zepAlt = 154 + Math.sin(elapsed * 0.95) * 4.5;
+        const zepWx = Math.cos(zepAngle) * 5.8;
+        const zepWy = -10.8 + Math.sin(zepAngle * 2) * 1.1;
+        const zepAlt = 268 + Math.sin(elapsed * 0.95) * 4.5;
 
         const nextZepAngle = zepAngle + 0.02;
-        const nextZepWx = Math.cos(nextZepAngle) * 5.6;
-        const nextZepWy = -5.2 + Math.sin(nextZepAngle * 2) * 1.9;
+        const nextZepWx = Math.cos(nextZepAngle) * 5.8;
+        const nextZepWy = -10.8 + Math.sin(nextZepAngle * 2) * 1.1;
 
         const zepPt = toScreen(zepWx, zepWy, zepAlt, camera.x, camera.y);
         const nextZepPt = toScreen(nextZepWx, nextZepWy, zepAlt, camera.x, camera.y);
-        const groundShadowPt = toScreen(zepWx, zepWy, 0, camera.x, camera.y);
 
         const dxZep = nextZepPt.x - zepPt.x;
         const dyZep = nextZepPt.y - zepPt.y;
@@ -18497,13 +18974,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         const pitchTilt = Math.max(-0.08, Math.min(0.08, (dyZep / (Math.abs(dxZep) + 0.1)) * 0.18 * dirSign));
 
         ctx.save();
-        // 1) Very faint, soft ground shadow so the Zeppelin feels grounded in 3D space without distracting
-        ctx.fillStyle = isNight ? 'rgba(2, 6, 23, 0.12)' : 'rgba(15, 23, 42, 0.075)';
-        ctx.beginPath();
-        ctx.ellipse(groundShadowPt.x, groundShadowPt.y, 30 * z, 12 * z, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 2) Position & orient high-altitude Zeppelin hull
+        // Position & orient high-altitude Zeppelin hull in the upper sky (no ground shadow over city buildings)
         ctx.translate(zepPt.x, zepPt.y);
         ctx.scale(dirSign, 1);
         ctx.rotate(pitchTilt);
@@ -18690,14 +19161,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         ctx.lineTo(hullRx, bandHalfH);
         ctx.stroke();
 
-        // Crisp "KOTA REFLEKSIA" Emblem Text on the Zeppelin Body (unflipped so it always reads left-to-right)
+        // Crisp "Selamat Datang" Emblem Text on the Zeppelin Body (unflipped so it always reads left-to-right & strictly inside hull)
         ctx.save();
+        ctx.beginPath();
+        ctx.rect(-hullRx * 0.82, -bandHalfH + 0.8 * z, hullRx * 1.64, bandHalfH * 2 - 1.6 * z);
+        ctx.clip();
         ctx.scale(dirSign, 1);
         ctx.fillStyle = '#fef08a';
         ctx.font = `900 ${Math.max(6, Math.round(6.2 * z))}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('KOTA REFLEKSIA', 0, 0, hullRx * 1.55);
+        ctx.fillText('Selamat Datang', 0, 0, hullRx * 1.55);
         ctx.restore();
 
         ctx.restore();
@@ -18941,7 +19415,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   };
 
   // -------------------------------------------------------------
-  // TREE APPLE HARVESTING (+2 XP, Smooth Fade-Out) & WATERING ACTION (Pohon berbuah saat disiram)
+  // TREE APPLE HARVESTING (Petik 7 Apel -> Tersimpan di Tas -> Dijual ke Pak @Sufri 2 XP / 7 Apel)
   // -------------------------------------------------------------
   const handleHarvestTreeApple = (treeIdx: number) => {
     const nowPerf = performance.now();
@@ -18966,25 +19440,140 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     treeCyclesRef.current[treeIdx] = updatedCycle;
     setTreeCycles((prev) => ({ ...prev, [treeIdx]: updatedCycle }));
 
-    sounds.playRewardXp();
-    if (onAddXpRef.current) {
-      onAddXpRef.current(2, 'Memetik Buah Apel Segar di Pohon Kota');
-    } else {
-      addXpFloat(2, 'Memetik Buah Apel Pohon');
-    }
+    // Setiap pohon berbuah memiliki 7 buah apel merah -> masuk ke dalam Tas Avatar!
+    const nextApples = pickedApplesCountRef.current + 7;
+    pickedApplesCountRef.current = nextApples;
+    setPickedApplesCount(nextApples);
+    try {
+      localStorage.setItem(appleStorageKey, String(nextApples));
+    } catch {}
 
-    showToast('🍎 Berhasil memetik buah apel segar! (+2 XP) • Siram pohon lagi untuk menumbuhkan buah berikutnya.', 3600);
+    sounds.playRewardXp();
+    showToast(
+      `🎒🍎 Berhasil memetik 7 Buah Apel segar! Tersimpan di dalam Tas (${nextApples} apel) — Jual ke Pak @Sufri seharga +2 XP / 7 apel!`,
+      4200
+    );
     playerSpeechRef.current = {
-      text: 'Segar banget buah apelnya! Dapat +2 XP 🍎✨',
-      expiresAt: Date.now() + 4000,
+      text: `Segar banget! 7 apel masuk ke 🎒 Tas (${nextApples} apel). Bisa dijual ke Pak @Sufri (+2 XP / 7 apel)! 🍎✨`,
+      expiresAt: Date.now() + 4500,
     };
     sendHeartbeatRef.current?.();
   };
   handleHarvestTreeAppleRef.current = handleHarvestTreeApple;
 
+  const handleSellApplesToSufri = () => {
+    if (pickedApplesCountRef.current < 7) {
+      sounds.playClick();
+      showToast(
+        `🍎 Apel di tasmu baru ${pickedApplesCountRef.current} buah. Butuh 7 apel untuk dijual ke Pak @Sufri seharga +2 XP!`,
+        3400
+      );
+      return;
+    }
+    const nextApples = Math.max(0, pickedApplesCountRef.current - 7);
+    pickedApplesCountRef.current = nextApples;
+    setPickedApplesCount(nextApples);
+    try {
+      localStorage.setItem(appleStorageKey, String(nextApples));
+    } catch {}
+
+    sounds.playRewardXp();
+    if (onAddXpRef.current) {
+      onAddXpRef.current(2, 'Menjual 7 Buah Apel Segar ke Pak @Sufri');
+    } else {
+      addXpFloat(2, 'Menjual 7 Apel ke Pak @Sufri');
+    }
+    const sufriNpc = npcsRef.current.find((n) => n.id === 'sufri');
+    if (sufriNpc) {
+      sufriNpc.speechText = `Wah ranum sekali 7 buah apel merahnya! Ini +2 XP untukmu Nak! 🍎🌱✨`;
+      sufriNpc.speechTimer = 6.0;
+    }
+    playerSpeechRef.current = {
+      text: `Menjual 7 buah apel ke Pak @Sufri (+2 XP)! Sisa di tas: ${nextApples} apel 🍎💰`,
+      expiresAt: Date.now() + 4000,
+    };
+    showToast(`💰 Terjual 7 Buah Apel ke Pak @Sufri (+2 XP)! (Sisa di tas: ${nextApples} apel)`, 3600);
+  };
+
   // -------------------------------------------------------------
-  // DRY LEAF PICKUP ACTION (10 Daun Kering Tersebar di Kota, Memungut 5 Daun Kering = +1 XP, Kota Tetap Bersih)
+  // BURN DRY LEAVES AT CAMPFIRE (Daun Kering di Tas Dibakar pada Api Unggun -> Animasi Api Unggun Membesar)
   // -------------------------------------------------------------
+  const handleBurnDryLeavesAtCampfire = () => {
+    const currentLeaves = pickedDryLeavesCountRef.current;
+    if (currentLeaves <= 0) {
+      sounds.playClick();
+      showToast('🍂 Belum ada daun kering di dalam Tas! Pungut daun kering di taman kota terlebih dahulu.', 3200);
+      return;
+    }
+
+    const p = playerRef.current;
+    const distToCampfire = p ? Math.hypot(p.wx - CAMPFIRE_COORDS.wx, p.wy - CAMPFIRE_COORDS.wy) : 999;
+    if (p && distToCampfire > 1.85) {
+      sounds.playClick();
+      setIsBagOpen(false);
+      dismissedNearbySignatureRef.current = null;
+      const targetX = CAMPFIRE_COORDS.wx + 0.62;
+      const targetY = CAMPFIRE_COORDS.wy - 0.42;
+      pendingEnvActionRef.current = { type: 'burn_leaves', targetX, targetY };
+      p.targetWx = targetX;
+      p.targetWy = targetY;
+      p.isMoving = true;
+      p.isRunning = false;
+      p.speed = 0.92;
+      showToast('🚶 Berjalan menuju Api Unggun untuk membakar daun kering dari tas...', 3000);
+      playerSpeechRef.current = {
+        text: 'Menuju Api Unggun dulu untuk membakar daun kering dari tas! 🔥🍂🚶',
+        expiresAt: Date.now() + 3000,
+      };
+      return;
+    }
+
+    // Bakar hingga 5 daun kering sekaligus (atau seluruh daun yang ada jika < 5)
+    const burnCount = currentLeaves >= 5 ? 5 : currentLeaves;
+    const nextCount = Math.max(0, currentLeaves - burnCount);
+    pickedDryLeavesCountRef.current = nextCount;
+    setPickedDryLeavesCount(nextCount);
+    try {
+      localStorage.setItem(dryLeafStorageKey, String(nextCount));
+    } catch {}
+
+    const nowPerf = performance.now();
+    campfireBurnAnimStartRef.current = nowPerf;
+    campfireBoostUntilRef.current = nowPerf + 24000; // Api unggun menyala lebih besar selama 24 detik
+
+    burnedLeavesAccumRef.current += burnCount;
+    if (burnedLeavesAccumRef.current >= 5) {
+      const bonusXp = Math.floor(burnedLeavesAccumRef.current / 5);
+      burnedLeavesAccumRef.current = burnedLeavesAccumRef.current % 5;
+      sounds.playRewardXp();
+      if (onAddXpRef.current) {
+        onAddXpRef.current(bonusXp, 'Membakar Daun Kering di Api Unggun');
+      } else {
+        addXpFloat(bonusXp, 'Membakar Daun Kering di Api Unggun');
+      }
+      showToast(
+        `🔥🍂 Berhasil membakar ${burnCount} Daun Kering di Api Unggun! Api menyala lebih besar & hangat (+${bonusXp} XP • Sisa di tas: ${nextCount} helai)`,
+        4200
+      );
+      playerSpeechRef.current = {
+        text: `Waaah api unggunnya menyala lebih besar & hangat setelah diberi daun kering! (+${bonusXp} XP) 🔥🍂✨`,
+        expiresAt: Date.now() + 4200,
+      };
+    } else {
+      sounds.playRewardXp();
+      showToast(
+        `🔥🍂 Membakar ${burnCount} Daun Kering di Api Unggun! Api unggun menyala lebih besar & hangat! (${burnedLeavesAccumRef.current}/5 daun menuju +1 XP)`,
+        3800
+      );
+      playerSpeechRef.current = {
+        text: `Memasukkan ${burnCount} daun kering ke api unggun, apinya langsung menyala lebih besar! 🔥🍂✨`,
+        expiresAt: Date.now() + 3800,
+      };
+    }
+    sendHeartbeatRef.current?.();
+  };
+  handleBurnDryLeavesAtCampfireRef.current = handleBurnDryLeavesAtCampfire;
+
   const handlePickDryLeaf = (leafId: number) => {
     const targetLeaf = dryLeavesRef.current.find((l) => l.id === leafId);
     if (!targetLeaf || targetLeaf.pickedAt !== null) return;
@@ -19002,41 +19591,30 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     const remainingLeavesOnMap = nextLeaves.filter((l) => l.pickedAt === null).length;
     const nextCount = pickedDryLeavesCountRef.current + 1;
-    if (nextCount >= 5) {
-      pickedDryLeavesCountRef.current = 0;
-      setPickedDryLeavesCount(0);
-      try {
-        localStorage.setItem(dryLeafStorageKey, '0');
-      } catch {}
+    pickedDryLeavesCountRef.current = nextCount;
+    setPickedDryLeavesCount(nextCount);
+    try {
+      localStorage.setItem(dryLeafStorageKey, String(nextCount));
+    } catch {}
 
+    if (nextCount % 5 === 0) {
       sounds.playRewardXp();
-      if (onAddXpRef.current) {
-        onAddXpRef.current(1, 'Peduli Lingkungan: Memungut 5 Daun Kering');
-      } else {
-        addXpFloat(1, 'Memungut 5 Daun Kering');
-      }
       showToast(
-        `🍂 Luar biasa! Kamu telah memungut 5 Daun Kering & menjaga kebersihan kota (+1 XP)! (${remainingLeavesOnMap}/10 daun tersisa di peta)`,
-        3800
+        `🎒🍂 Daun kering masuk ke dalam Tas (${nextCount} helai di Tas)! Klik tombol "🎒 Tas" di samping Warga Online untuk melihat isi tas & tukar +1 XP!`,
+        4000
       );
       playerSpeechRef.current = {
-        text: '5 daun kering terkumpul! Kota tetap bersih & dapat +1 XP 🍂✨',
-        expiresAt: Date.now() + 4500,
+        text: `Daun kering masuk ke Tas (${nextCount} helai)! Bisa ditukar +1 XP di Tas 🎒🍂✨`,
+        expiresAt: Date.now() + 4200,
       };
     } else {
-      pickedDryLeavesCountRef.current = nextCount;
-      setPickedDryLeavesCount(nextCount);
-      try {
-        localStorage.setItem(dryLeafStorageKey, String(nextCount));
-      } catch {}
-
       sounds.playClick();
       showToast(
-        `🍂 Memungut daun kering (${nextCount}/5). Kumpulkan ${5 - nextCount} daun lagi untuk +1 XP! (${remainingLeavesOnMap}/10 tersebar di peta)`,
-        3200
+        `🎒🍂 Daun kering disimpan ke dalam Tas (${nextCount} helai di Tas • ${remainingLeavesOnMap}/10 tersisa di peta). Cek lewat tombol "🎒 Tas" di header!`,
+        3400
       );
       playerSpeechRef.current = {
-        text: `Memungut daun kering (${nextCount}/5) 🍂`,
+        text: `Memasukkan daun kering ke dalam Tas (${nextCount} helai) 🎒🍂`,
         expiresAt: Date.now() + 3200,
       };
     }
@@ -19126,68 +19704,134 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   // -------------------------------------------------------------
   // FISHING ACTION (-3 XP Saldo with animation)
   // -------------------------------------------------------------
-  const FISH_REWARDS = [
-    { name: 'Ikan Mas Refleksi', icon: '🐠' },
-    { name: 'Gurame DKV Kreatif', icon: '🐟' },
-    { name: 'Udang Windu Danau', icon: '🦐' },
-    { name: 'Ikan Nila Juara', icon: '🐡' },
-    { name: 'Botol Berisi Pesan Bijak', icon: '📜' },
-  ];
+  // FISHING ACTION AT PIER TIP (UJUNG DERMAGA) + RANDOM BITE DELAY + FAST/SLOW REACTION + SELL TO PAK @SUFRI
+  // -------------------------------------------------------------
+  const rollWeightedLakeFish = (): LakeFishDef => {
+    const totalWeight = LAKE_FISH_CATALOG.reduce((acc, f) => acc + f.chanceWeight, 0);
+    let r = Math.random() * totalWeight;
+    for (const f of LAKE_FISH_CATALOG) {
+      if (r < f.chanceWeight) return f;
+      r -= f.chanceWeight;
+    }
+    return LAKE_FISH_CATALOG[0];
+  };
+
+  const executeCastAtPierTip = () => {
+    const p = playerRef.current;
+    const activeSpot = chooseFishingPierSpot();
+    if (p) {
+      p.wx = activeSpot.wx;
+      p.wy = activeSpot.wy;
+      p.targetWx = activeSpot.wx;
+      p.targetWy = activeSpot.wy;
+      p.isMoving = false;
+      p.facing = 'down-right';
+    }
+    sounds.playClick();
+    const nowPerf = performance.now();
+    fishingStartTimeRef.current = nowPerf;
+    fishingPullStartTimeRef.current = 0;
+    pendingBiteFishRef.current = null;
+    caughtFishRef.current = null;
+    if (playerRef.current) {
+      playerRef.current.fishingStartTime = nowPerf;
+    }
+    setFishingPhase('casting');
+    setIsFishing(true);
+    showToast(`🎣 Melempar kail dari ${activeSpot.label} di atas dermaga ke Sungai Refleksia... Tunggu umpan dimakan!`, 3200);
+    playerSpeechRef.current = {
+      text: `Hap! Lempar kail dari atas dermaga (${activeSpot.label})! Tunggu ikannya makan umpan... 🎣`,
+      expiresAt: Date.now() + 3200,
+    };
+
+    if (fishingTimerRef.current) clearTimeout(fishingTimerRef.current);
+    if (fishingBiteEscapeTimerRef.current) clearTimeout(fishingBiteEscapeTimerRef.current);
+
+    // 1. Setelah kail mendarat di air (~1.0 detik), masuk fase menunggu umpan dimakan dengan waktu RANDOM (2.2s - 5.4s)
+    const randomWaitMs = Math.round(2200 + Math.random() * 3200);
+    fishingTimerRef.current = window.setTimeout(() => {
+      setFishingPhase('waiting');
+      showToast('⏳ Menunggu ikan memakan umpan... Siap-siap tarik pancing saat umpan disambar!', 4000);
+
+      fishingTimerRef.current = window.setTimeout(() => {
+        const bittenFish = rollWeightedLakeFish();
+        pendingBiteFishRef.current = bittenFish;
+        setFishingPhase('biting');
+        sounds.playClick();
+        showToast(
+          '💦 UMPAN DIMAKAN! Cepat klik "🎣 Tarik Pancing!" sekarang sebelum ikannya lepas!',
+          bittenFish.biteWindowMs
+        );
+        playerSpeechRef.current = {
+          text: '❗ Umpan dimakan! Cepat klik Tarik Pancing sekarang! 🎣💦',
+          expiresAt: Date.now() + bittenFish.biteWindowMs,
+        };
+
+        // 2. Jika lama ditarik (melewati batas waktu reaksi sesuai tingkat kesulitan ikan), ikan lepas!
+        if (fishingBiteEscapeTimerRef.current) clearTimeout(fishingBiteEscapeTimerRef.current);
+        fishingBiteEscapeTimerRef.current = window.setTimeout(() => {
+          pendingBiteFishRef.current = null;
+          setIsFishing(false);
+          setFishingPhase(null);
+          sounds.playClick();
+          showToast(
+            `💨 Yah! Terlalu lama ditarik, ${bittenFish.name} lepas membawa umpan! Harus cepat ditarik saat tombol muncul.`,
+            4200
+          );
+          playerSpeechRef.current = {
+            text: 'Yah terlambat menarik pancing, ikannya kabur! 💨🐟',
+            expiresAt: Date.now() + 3800,
+          };
+        }, bittenFish.biteWindowMs);
+      }, randomWaitMs);
+    }, 1000);
+  };
+  executeCastAtPierTipRef.current = executeCastAtPierTip;
 
   const handleStartFishing = () => {
     if (isFishing) return;
     setPendingConfirmation(null);
     setIsCafeMenuOpen(false);
-    const cost = 3;
-    if (studentPoints < cost) {
-      sounds.playClick();
-      showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk memancing (saldo kamu ${studentPoints} XP).`, 3500);
-      return;
-    }
 
-    const success = onDeductPoints ? onDeductPoints(cost, 'Memancing Ikan Kota') : true;
-    if (success) {
-      sounds.playClick();
-      const nowPerf = performance.now();
-      fishingStartTimeRef.current = nowPerf;
-      fishingPullStartTimeRef.current = 0;
-      caughtFishRef.current = null;
-      if (playerRef.current) {
-        playerRef.current.fishingStartTime = nowPerf;
-      }
-      setFishingPhase('casting');
-      setIsFishing(true);
-      showToast('🎣 Mengayunkan joran & melempar pancing ke Kolam... (-3 XP)', 3500);
-      playerSpeechRef.current = {
-        text: 'Hap! Lempar pancing dulu ke tengah kolam! 🎣',
-        expiresAt: Date.now() + 3000,
-      };
-
-      if (fishingTimerRef.current) clearTimeout(fishingTimerRef.current);
-      // Setelah animasi melempar pancing selesai (~1.0 detik), masuk fase menunggu interaktif
-      fishingTimerRef.current = window.setTimeout(() => {
-        setFishingPhase('waiting');
-        showToast('💦 Umpan bergoyang! Klik tombol "🎣 Angkat Pancing!" untuk menarik ikan!', 6000);
+    const p = playerRef.current;
+    if (p) {
+      const targetSpot = chooseFishingPierSpot();
+      const distToSpot = Math.hypot(p.wx - targetSpot.wx, p.wy - targetSpot.wy);
+      if (distToSpot > 0.22) {
+        // Pastikan Avatar berjalan ke titik pancing di atas dermaga terlebih dahulu sebelum melempar pancing!
+        sounds.playClick();
+        pendingStartFishingAtTipRef.current = true;
+        p.targetWx = targetSpot.wx;
+        p.targetWy = targetSpot.wy;
+        p.isMoving = true;
+        p.isRunning = false;
+        p.speed = 0.92;
+        showToast(`🚶 Berjalan ke ${targetSpot.label} di atas dermaga untuk mulai memancing...`, 2500);
         playerSpeechRef.current = {
-          text: 'Wah pelampungnya bergoyang! Ayo klik Angkat Pancing! 💦🎣',
-          expiresAt: Date.now() + 4500,
+          text: `Menuju ${targetSpot.label} di atas dermaga dulu biar tidak menumpuk! 🎣🚶`,
+          expiresAt: Date.now() + 2500,
         };
-      }, 1000);
+        return;
+      }
     }
+
+    executeCastAtPierTip();
   };
 
   const handlePullFishingRod = () => {
-    if (!isFishing || fishingPhase === 'pulling') return;
+    if (!isFishing || fishingPhase !== 'biting') return;
     sounds.playClick();
     if (fishingTimerRef.current) clearTimeout(fishingTimerRef.current);
+    if (fishingBiteEscapeTimerRef.current) clearTimeout(fishingBiteEscapeTimerRef.current);
 
-    const randomCatch = FISH_REWARDS[Math.floor(Math.random() * FISH_REWARDS.length)];
-    caughtFishRef.current = randomCatch;
+    const caught = pendingBiteFishRef.current || LAKE_FISH_CATALOG[0];
+    caughtFishRef.current = caught;
+    pendingBiteFishRef.current = null;
     fishingPullStartTimeRef.current = performance.now();
     setFishingPhase('pulling');
-    showToast('🎣 Menarik joran & mengangkat pancing dari air...', 2000);
+    showToast('🎣 Cepat menarik joran & mengangkat tangkapan dari air...', 1800);
     playerSpeechRef.current = {
-      text: 'Tarikk!! Angkat pancingnya! 🎣💦',
+      text: 'Tarikk cepat!! Angkat pancingnya! 🎣💦',
       expiresAt: Date.now() + 2000,
     };
 
@@ -19195,13 +19839,90 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       setIsFishing(false);
       setFishingPhase(null);
       fishingPullStartTimeRef.current = 0;
+      updateFishInventory((prev) => ({
+        ...prev,
+        [caught.id]: (prev[caught.id] || 0) + 1,
+      }));
       sounds.playRewardXp();
-      showToast(`🎉 Hore! Kamu berhasil mengangkat pancing & menangkap ${randomCatch.icon} ${randomCatch.name}!`, 4500);
+      showToast(
+        `🎉 Berhasil didapat! ${caught.icon} ${caught.name} (${caught.rarityLabel}) masuk ke dalam 🎒 Tas — Bisa dijual ke Pak @Sufri (+${caught.xpPrice} XP)!`,
+        4800
+      );
       playerSpeechRef.current = {
-        text: `Dapat ${randomCatch.name}! Hore! 🎣✨`,
+        text: `Hore! Dapat ${caught.icon} ${caught.name}, langsung masuk ke 🎒 Tas! (+${caught.xpPrice} XP di Pak @Sufri) 🎣✨`,
         expiresAt: Date.now() + 5000,
       };
     }, 850);
+  };
+
+  const handleSellSingleFishToSufri = (fishDef: LakeFishDef) => {
+    const qty = fishInventory[fishDef.id] || 0;
+    if (qty <= 0) return;
+    sounds.playRewardXp();
+    updateFishInventory((prev) => ({
+      ...prev,
+      [fishDef.id]: Math.max(0, (prev[fishDef.id] || 0) - 1),
+    }));
+    if (onAddXpRef.current) {
+      onAddXpRef.current(fishDef.xpPrice, `Menjual ${fishDef.name} ke Pak @Sufri`);
+    }
+    const sufriNpc = npcsRef.current.find((n) => n.id === 'sufri');
+    if (sufriNpc) {
+      sufriNpc.speechText = `Terima kasih! ${fishDef.icon} ${fishDef.name} segar sekali, ini +${fishDef.xpPrice} XP untukmu! 🌱✨`;
+      sufriNpc.speechTimer = 6.0;
+    }
+    playerSpeechRef.current = {
+      text: `Menjual 1 ${fishDef.icon} ${fishDef.name} ke Pak @Sufri (+${fishDef.xpPrice} XP)! 💰✨`,
+      expiresAt: Date.now() + 4000,
+    };
+    showToast(`💰 Terjual 1 ${fishDef.icon} ${fishDef.name} ke Pak @Sufri (+${fishDef.xpPrice} XP)!`, 3500);
+  };
+
+  const sellableAppleBundles = Math.floor(pickedApplesCount / 7);
+  const sellableApplesXpValue = sellableAppleBundles * 2;
+  const totalSufriSellableXp = totalCaughtFishXpValue + sellableApplesXpValue;
+
+  const handleSellAllFishToSufri = () => {
+    const appleBundles = Math.floor(pickedApplesCountRef.current / 7);
+    const appleXp = appleBundles * 2;
+    if (totalCaughtFishCount <= 0 && appleBundles <= 0) {
+      sounds.playClick();
+      showToast('🎒 Tasmu belum memiliki ikan atau 7 buah apel untuk dijual ke Pak @Sufri.', 3500);
+      return;
+    }
+    const earnedXp = totalCaughtFishXpValue + appleXp;
+    const countSold = totalCaughtFishCount;
+    const applesSold = appleBundles * 7;
+    sounds.playRewardXp();
+    if (countSold > 0) {
+      updateFishInventory(() => ({
+        ikan_batu: 0,
+        ikan_mujair: 0,
+        ikan_mas: 0,
+        kepiting_danau: 0,
+      }));
+    }
+    if (applesSold > 0) {
+      const remApples = Math.max(0, pickedApplesCountRef.current - applesSold);
+      pickedApplesCountRef.current = remApples;
+      setPickedApplesCount(remApples);
+      try {
+        localStorage.setItem(appleStorageKey, String(remApples));
+      } catch {}
+    }
+    if (onAddXpRef.current) {
+      onAddXpRef.current(earnedXp, `Menjual Hasil Tas (${countSold} Ikan & ${applesSold} Apel) ke Pak @Sufri`);
+    }
+    const sufriNpc = npcsRef.current.find((n) => n.id === 'sufri');
+    if (sufriNpc) {
+      sufriNpc.speechText = `Wah mantap sekali! Seluruh hasil di tasmu saya beli seharga +${earnedXp} XP! 🐟🍎✨`;
+      sufriNpc.speechTimer = 6.5;
+    }
+    playerSpeechRef.current = {
+      text: `Alhamdulillah! Jual hasil pancingan & apel ke Pak @Sufri dapat +${earnedXp} XP! 💰🐟🍎`,
+      expiresAt: Date.now() + 4500,
+    };
+    showToast(`🎉 Berhasil menjual hasil tas ke Pak @Sufri (+${earnedXp} XP)!`, 4200);
   };
 
   // Check if cafeToast is a standalone notification (buying from cafe, standing up, or jumping to citizen)
@@ -19266,6 +19987,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       type="button"
                       onClick={() => {
                         sounds.playClick();
+                        setIsBagOpen(false);
                         setIsOnlineListOpen((prev) => !prev);
                         setOnlineListInteractionTick((t) => t + 1);
                       }}
@@ -19281,17 +20003,30 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       </span>
                     </button>
 
-                    {/* Daun Kering Counter */}
-                    <div
-                      className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-500/45 rounded-full px-2.5 py-1 sm:py-1.5 text-amber-200 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-1 shrink-0"
-                      title="10 Daun Kering tersebar di kota • Pungut setiap 5 daun kering untuk mendapatkan +1 XP"
+                    {/* Tombol Header TAS AVATAR di Samping Info Online (Hanya Icon Tas Saja) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        setIsOnlineListOpen(false);
+                        setIsBagOpen((prev) => !prev);
+                      }}
+                      className={`backdrop-blur-md border rounded-full w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 text-base sm:text-lg font-bold shadow-lg flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0 relative ${
+                        isBagOpen
+                          ? 'bg-amber-950/90 border-amber-400 text-amber-100 ring-2 ring-amber-400/40 shadow-amber-900/50'
+                          : 'bg-[#121e2c]/80 hover:bg-[#1a293b]/90 border-amber-500/55 hover:border-amber-400 text-amber-100'
+                      }`}
+                      title="Isi Tas Avatar (Ikan Danau, Buah Apel & Daun Kering)"
+                      aria-label="Isi Tas Avatar"
                     >
-                      <span>🍂</span>
-                      <span className="font-mono text-amber-300">{pickedDryLeavesCount}/5</span>
-                      <span className="text-[9px] text-emerald-300 font-mono">(+1 XP)</span>
-                    </div>
+                      <span className="select-none leading-none">🎒</span>
+                      {(totalCaughtFishCount > 0 || pickedApplesCount > 0 || pickedDryLeavesCount > 0) && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 border border-slate-900 ring-1 ring-amber-300/60" />
+                      )}
+                    </button>
 
-                    {/* Info Header Memegang Item (Kopi, Roti, Eskrim) Bersama Countdown Timer di Samping Info Daun */}
+
+                    {/* Info Header Memegang Item (Kopi, Roti, Eskrim) Bersama Countdown Timer di Samping Info Tas */}
                     {heldItem && (
                       <div className="bg-[#121e2c]/78 backdrop-blur-md border border-amber-400/55 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 flex items-center gap-1.5 text-[10.5px] sm:text-[11px] font-bold text-amber-200 shadow-lg animate-fade-in-down shrink-0">
                         <span className="text-xs sm:text-sm">
@@ -19469,6 +20204,198 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       </div>
                     </div>
                   )}
+
+                  {/* Popover ISI TAS KITA (Muncul saat tombol 🎒 Tas di samping Warga Online diklik) */}
+                  {isBagOpen && (
+                    <div
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1 bg-[#0f172a]/95 backdrop-blur-md border border-amber-400/55 rounded-2xl p-3 text-white shadow-2xl w-[min(340px,calc(100vw-2rem))] max-w-sm animate-fade-in-down max-h-[75vh] sm:max-h-[80vh] overflow-y-auto z-40"
+                    >
+                      {/* Header Tas */}
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-700/80">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-base">🎒</span>
+                          <div>
+                            <div className="text-[11px] sm:text-xs font-extrabold text-amber-300 leading-tight">
+                              Isi Tas Kita ({studentName})
+                            </div>
+                            <div className="text-[9px] text-slate-300 leading-tight">
+                              Penyimpanan Apel, Ikan Danau &amp; Daun Kering
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsBagOpen(false)}
+                          className="w-5 h-5 rounded-full bg-slate-800/85 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                          title="Tutup tas"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Bagian 1: Daun Kering di Dalam Tas (Bisa Dibakar pada Api Unggun) */}
+                      <div className="bg-slate-900/80 border border-amber-500/35 rounded-xl p-2.5 mb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-base shrink-0">
+                              🍂
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[10.5px] sm:text-[11px] font-extrabold text-amber-200 leading-tight">
+                                Daun Kering Taman
+                              </div>
+                              <div className="text-[9px] text-slate-300 leading-tight mt-0.5">
+                                Tersimpan: <span className="font-mono font-bold text-amber-300">{pickedDryLeavesCount} helai</span> • Bakar di Api Unggun!
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleBurnDryLeavesAtCampfire}
+                            disabled={pickedDryLeavesCount <= 0}
+                            className={`px-2 py-1 rounded-lg text-[9.5px] font-extrabold border transition shrink-0 ${
+                              pickedDryLeavesCount > 0
+                                ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white border-amber-300/70 cursor-pointer active:scale-95 shadow-sm'
+                                : 'bg-slate-800/70 text-slate-400 border-slate-700 cursor-not-allowed'
+                            }`}
+                            title="Bakar daun kering yang tersimpan di tas pada Api Unggun agar nyala api menjadi lebih besar"
+                          >
+                            🔥 Bakar di Api
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Bagian 2: Buah Apel Merah di Dalam Tas (Dijual ke Pak @Sufri: 2 XP / 7 Apel) */}
+                      <div className="bg-slate-900/80 border border-rose-500/35 rounded-xl p-2.5 mb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-base shrink-0">
+                              🍎
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[10.5px] sm:text-[11px] font-extrabold text-rose-200 leading-tight">
+                                Buah Apel Merah ({pickedApplesCount} Buah)
+                              </div>
+                              <div className="text-[9px] text-slate-300 leading-tight mt-0.5">
+                                Harga di <strong className="text-emerald-300">Pak @Sufri</strong>: <span className="font-mono font-bold text-amber-300">+2 XP / 7 Apel</span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playClick();
+                              const p = playerRef.current;
+                              if (p && Math.hypot(p.wx - -0.32, p.wy - -7.12) < 2.2) {
+                                if (pickedApplesCount >= 7) {
+                                  handleSellApplesToSufri();
+                                } else {
+                                  setIsBagOpen(false);
+                                  setIsSufriFishModalOpen(true);
+                                }
+                              } else if (p) {
+                                setIsBagOpen(false);
+                                dismissedNearbySignatureRef.current = null;
+                                p.targetWx = -0.32;
+                                p.targetWy = -7.12;
+                                p.isMoving = true;
+                                p.isRunning = false;
+                                p.speed = 0.92;
+                                showToast('🚶 Berjalan menuju Pak @Sufri di gerbang hutan untuk menjual 7 apel (+2 XP)...', 3200);
+                              }
+                            }}
+                            className={`px-2 py-1 rounded-lg text-[9.5px] font-extrabold border transition shrink-0 ${
+                              pickedApplesCount >= 7
+                                ? 'bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-slate-950 border-amber-200 cursor-pointer active:scale-95 shadow-sm'
+                                : 'bg-slate-800/80 hover:bg-slate-700 text-amber-200 border-slate-600 cursor-pointer'
+                            }`}
+                          >
+                            {pickedApplesCount >= 7 ? `💰 Jual 7 (+2 XP)` : `${pickedApplesCount}/7 Apel`}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Bagian 3: Ikan Danau Hasil Pancingan di Dalam Tas */}
+                      <div className="bg-slate-900/80 border border-sky-500/35 rounded-xl p-2.5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-300">
+                            🐟 Ikan Hasil Pancingan ({totalCaughtFishCount} Ekor)
+                          </span>
+                          <span className="text-[9.5px] font-mono font-bold text-amber-300">
+                            Nilai: +{totalCaughtFishXpValue} XP
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {LAKE_FISH_CATALOG.map((fish) => {
+                            const count = fishInventory[fish.id] || 0;
+                            return (
+                              <div
+                                key={fish.id}
+                                className={`px-2 py-1.5 rounded-lg border flex items-center justify-between gap-1.5 ${
+                                  count > 0
+                                    ? 'bg-sky-950/55 border-sky-400/45 text-white'
+                                    : 'bg-slate-950/50 border-slate-800 text-slate-400'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="text-sm shrink-0">{fish.icon}</span>
+                                  <div className="min-w-0">
+                                    <div className="text-[9.5px] font-bold truncate leading-tight">
+                                      {fish.name}
+                                    </div>
+                                    <div className="text-[8.5px] text-amber-300/90 font-mono leading-tight">
+                                      +{fish.xpPrice} XP
+                                    </div>
+                                  </div>
+                                </div>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[9.5px] font-mono font-extrabold shrink-0 ${
+                                    count > 0
+                                      ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-400/40'
+                                      : 'bg-slate-800 text-slate-500'
+                                  }`}
+                                >
+                                  {count}x
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Tombol Aksi Jual Ikan & Apel ke Pak @Sufri */}
+                        <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                          <span className="text-[9px] text-slate-300 leading-tight">
+                            Jual ikan &amp; apel ke <strong className="text-emerald-300">Pak @Sufri</strong> (Gerbang Hutan)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playClick();
+                              setIsBagOpen(false);
+                              const p = playerRef.current;
+                              if (p && Math.hypot(p.wx - -0.32, p.wy - -7.12) < 2.2) {
+                                setIsSufriFishModalOpen(true);
+                              } else if (p) {
+                                dismissedNearbySignatureRef.current = null;
+                                p.targetWx = -0.32;
+                                p.targetWy = -7.12;
+                                p.isMoving = true;
+                                p.isRunning = false;
+                                p.speed = 0.92;
+                                showToast('🚶 Berjalan menuju Pak @Sufri di gerbang hutan untuk menjual isi tas...', 3200);
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-[9.5px] font-extrabold border border-amber-200 transition cursor-pointer active:scale-95 shrink-0 whitespace-nowrap shadow-sm"
+                          >
+                            {totalSufriSellableXp > 0 ? `💰 Jual (+${totalSufriSellableXp} XP)` : '🧭 Ke @Sufri'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               );
             })()}
@@ -19490,7 +20417,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             /* 1. MENU LAPAK REFLEKSIA (Compact & Semi-Transparent) */
             <aside
               aria-label="Menu Lapak Refleksia"
-              className="w-full max-w-[310px] sm:max-w-[340px] pointer-events-auto animate-fade-in-down"
+              className="w-full max-w-[min(340px,calc(100vw-1.5rem))] pointer-events-auto animate-fade-in-down"
               onPointerDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
@@ -19566,7 +20493,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             /* 3. POP-UP KONFIRMASI MASUK BANGUNAN / KAFE (Perkecil & Transparan Sedikit) */
             <aside
               aria-label="Konfirmasi Masuk Bangunan"
-              className="w-full max-w-[295px] sm:max-w-[330px] pointer-events-auto animate-fade-in-down"
+              className="w-full max-w-[min(340px,calc(100vw-1.5rem))] pointer-events-auto animate-fade-in-down"
             >
               <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/40 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -19629,7 +20556,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             /* 4. POP-UP AKSI KONTEKSTUAL (Perkecil & Transparan Sedikit) */
             <aside
               aria-label="Aksi Lingkungan Kota"
-              className="w-full max-w-[295px] sm:max-w-[340px] pointer-events-auto animate-fade-in-down"
+              className="w-full max-w-[min(340px,calc(100vw-1.5rem))] pointer-events-auto animate-fade-in-down"
             >
               {nearbyAction.type === 'dry_leaf' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
@@ -19639,25 +20566,41 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     </div>
                     <div className="min-w-0">
                       <div className="text-[8.5px] font-bold tracking-wider uppercase text-amber-300 leading-none">
-                        10 Daun Kering • Terkumpul {pickedDryLeavesCount}/5
+                        10 Daun Kering • Di Tas: {pickedDryLeavesCount} Helai
                       </div>
                       <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
-                        Pungut Daun Kering ({pickedDryLeavesCount}/5)
+                        Pungut Daun Kering ke 🎒 Tas
                       </h4>
                       <p className="text-[9.5px] truncate text-slate-200/90 leading-tight">
-                        {cafeToast || 'Kumpulkan 5 dari 10 daun kering (+1 XP)'}
+                        {cafeToast || 'Masuk ke Tas Avatar (Tukar 5 daun = +1 XP)'}
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handlePickDryLeaf(nearbyAction.leafId ?? 0)}
-                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <span>🍂 Pungut</span>
-                    <span className="text-[9px] font-mono text-emerald-200 bg-amber-950/75 px-1 py-0.5 rounded border border-amber-400/30">
-                      +1 XP
-                    </span>
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handlePickDryLeaf(nearbyAction.leafId ?? 0)}
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                    >
+                      <span>🎒 Pungut</span>
+                      <span className="text-[9px] font-mono text-emerald-200 bg-amber-950/75 px-1 py-0.5 rounded border border-amber-400/30">
+                        Ke Tas
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ) : nearbyAction.type === 'tree' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-emerald-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
@@ -19672,14 +20615,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     <div className="min-w-0">
                       <div className="text-[8.5px] font-bold tracking-wider uppercase text-emerald-300 leading-none">
                         {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
-                          ? 'Pohon Berbuah Apel • Siap Dipetik!'
+                          ? `Pohon Berbuah 7 Apel • Di Tas: ${pickedApplesCount} Apel`
                           : treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
                           ? 'Pohon Daun Gugur • Siram agar Hijau Kembali!'
                           : `Pohon Kota • Disiram ${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3`}
                       </div>
                       <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
                         {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
-                          ? 'Petik Buah Apel Merah (+2 XP)'
+                          ? 'Petik 7 Buah Apel Merah (Simpan ke 🎒 Tas)'
                           : treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
                           ? 'Siram Pohon agar Hijau Kembali'
                           : `Siram Pohon (${treeCycles[nearbyAction.treeIndex || 0]?.count || 0}/3)`}
@@ -19687,38 +20630,54 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       <p className={`text-[9.5px] truncate leading-tight ${cafeToast ? 'text-emerald-200 font-semibold' : 'text-slate-200/90'}`}>
                         {cafeToast ||
                           (treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples
-                            ? 'Buah apel segar siap dipetik (+2 XP)'
+                            ? '7 apel disimpan di Tas & dijual ke Pak @Sufri (+2 XP / 7 apel)'
                             : treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
                             ? 'Siram pohon daun gugur ini agar rimbun & hijau kembali'
-                            : 'Siram pohon 3x agar berbuah apel (+2 XP)')}
+                            : 'Siram pohon 3x agar berbuah 7 apel (Jual ke @Sufri +2 XP)')}
                       </p>
                     </div>
                   </div>
-                  {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples ? (
+                  <div className="flex items-center gap-1 shrink-0">
+                    {treeCycles[nearbyAction.treeIndex || 0]?.hasRipeApples ? (
+                      <button
+                        onClick={() => handleHarvestTreeApple(nearbyAction.treeIndex || 0)}
+                        className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-rose-600/90 to-red-600/90 hover:from-rose-500 hover:to-red-500 text-white text-[10.5px] font-bold border border-rose-400/45 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span>🍎 Petik 7</span>
+                        <span className="text-[9px] font-mono text-amber-200 bg-rose-950/75 px-1 py-0.5 rounded border border-rose-400/30">
+                          Ke Tas
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
+                        className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] font-bold border border-emerald-400/40 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span>
+                          {treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
+                            ? '💧 Siram Hijaukan'
+                            : `💧 Siram (${Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)`}
+                        </span>
+                        <span className="text-[9px] font-mono text-amber-300 bg-emerald-950/75 px-1 py-0.5 rounded border border-emerald-500/30">
+                          -1 XP
+                        </span>
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleHarvestTreeApple(nearbyAction.treeIndex || 0)}
-                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-rose-600/90 to-red-600/90 hover:from-rose-500 hover:to-red-500 text-white text-[10.5px] font-bold border border-rose-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
                     >
-                      <span>🍎 Petik</span>
-                      <span className="text-[9px] font-mono text-amber-200 bg-rose-950/75 px-1 py-0.5 rounded border border-rose-400/30">
-                        +2 XP
-                      </span>
+                      <X className="w-3 h-3" />
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => handleWaterTree(nearbyAction.treeIndex || 0)}
-                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] font-bold border border-emerald-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
-                    >
-                      <span>
-                        {treeCycles[nearbyAction.treeIndex || 0]?.isAutumn
-                          ? '💧 Siram Hijaukan'
-                          : `💧 Siram (${Math.min(3, (treeCycles[nearbyAction.treeIndex || 0]?.count || 0) + 1)}/3)`}
-                      </span>
-                      <span className="text-[9px] font-mono text-amber-300 bg-emerald-950/75 px-1 py-0.5 rounded border border-emerald-500/30">
-                        -1 XP
-                      </span>
-                    </button>
-                  )}
+                  </div>
                 </div>
               ) : nearbyAction.type === 'town_rules' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
@@ -19738,19 +20697,35 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      sounds.playOpenModal();
-                      if (onOpenTownRules) {
-                        onOpenTownRules();
-                      } else {
-                        setIsTownRulesModalOpen(true);
-                      }
-                    }}
-                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <span>📋 Baca</span>
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        sounds.playOpenModal();
+                        if (onOpenTownRules) {
+                          onOpenTownRules();
+                        } else {
+                          setIsTownRulesModalOpen(true);
+                        }
+                      }}
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                    >
+                      <span>📋 Baca</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ) : nearbyAction.type === 'announcement_board' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
@@ -19770,16 +20745,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      sounds.playOpenModal();
-                      setTeacherAnnouncements(StorageService.getTeacherAnnouncements());
-                      setIsAnnouncementModalOpen(true);
-                    }}
-                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <span>📢 Lihat</span>
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        sounds.playOpenModal();
+                        setTeacherAnnouncements(StorageService.getTeacherAnnouncements());
+                        setIsAnnouncementModalOpen(true);
+                      }}
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                    >
+                      <span>📢 Lihat</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ) : nearbyAction.type === 'wisma_mailbox' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-sky-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
@@ -19799,17 +20790,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      sounds.playOpenModal();
-                      const found =
-                        HOUSING_UNITS.find((h) => h.id === nearbyAction.wismaId) || HOUSING_UNITS[0];
-                      setActiveWismaMailbox(found);
-                    }}
-                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-sky-600/90 to-blue-600/90 hover:from-sky-500 hover:to-blue-500 text-white text-[10.5px] font-bold border border-sky-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <span>📮 Kotak Saran</span>
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        sounds.playOpenModal();
+                        const found =
+                          HOUSING_UNITS.find((h) => h.id === nearbyAction.wismaId) || HOUSING_UNITS[0];
+                        setActiveWismaMailbox(found);
+                      }}
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-sky-600/90 to-blue-600/90 hover:from-sky-500 hover:to-blue-500 text-white text-[10.5px] font-bold border border-sky-400/45 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                    >
+                      <span>📮 Kotak Saran</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ) : nearbyAction.type === 'beringin' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-emerald-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
@@ -19830,16 +20837,131 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      sounds.playOpenModal();
-                      setIsJurnalModalOpen(true);
-                    }}
-                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] font-bold border border-emerald-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <Pin className="w-3 h-3" />
-                    <span>Tulis Jurnal</span>
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        sounds.playOpenModal();
+                        setIsJurnalModalOpen(true);
+                      }}
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] font-bold border border-emerald-400/45 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                    >
+                      <Pin className="w-3 h-3" />
+                      <span>Tulis Jurnal</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ) : nearbyAction.type === 'wilderness_gate' ? (
+                <div className="bg-[#121e2c]/78 backdrop-blur-md border border-emerald-400/50 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-emerald-600/80 to-amber-500/80 border border-emerald-300/45 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
+                      {totalCaughtFishCount > 0 ? '🐟' : '🌱'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-emerald-300 flex items-center gap-1 leading-none">
+                        <span>Pak @Sufri • Ahli Tanaman &amp; Pengepul</span>
+                      </div>
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
+                        {!isTeacher && !isMasterKikyRef.current && !hasPaidWildernessAccess
+                          ? 'Gerbang Hutan (5 XP) & Lapak Hasil Tas'
+                          : totalSufriSellableXp > 0
+                          ? `Hasil Tas: Senilai +${totalSufriSellableXp} XP`
+                          : 'Lapak Pengepul Ikan & Apel @Sufri'}
+                      </h4>
+                      <p className={`text-[9.5px] truncate leading-tight ${cafeToast ? 'text-amber-200 font-semibold' : 'text-emerald-100/90'}`}>
+                        {cafeToast ||
+                          (totalSufriSellableXp > 0
+                            ? `Di Tas: ${totalCaughtFishCount} Ikan & ${pickedApplesCount} Apel (+${totalSufriSellableXp} XP)`
+                            : 'Beli: 7 Apel (2 XP) & Ikan Danau (2-6 XP)')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {!isTeacher && !isMasterKikyRef.current && !hasPaidWildernessAccess && (
+                      <button
+                        onClick={() => {
+                          const cost = 5;
+                          if (studentPoints < cost) {
+                            sounds.playClick();
+                            showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk masuk Hutan Refleksia.`, 3200);
+                            return;
+                          }
+                          const ok = onDeductPoints ? onDeductPoints(cost, 'Tiket Masuk Hutan Refleksia') : true;
+                          if (!ok) return;
+                          sounds.playOpenModal();
+                          hasPaidWildernessAccessRef.current = true;
+                          setHasPaidWildernessAccess(true);
+                          const sufriNpc = npcsRef.current.find((n) => n.id === 'sufri');
+                          if (sufriNpc) {
+                            sufriNpc.speechText =
+                              'Terima kasih 5 XP-nya Nak! Silakan masuk & memancing di Sungai Refleksia ya! 🌱🔓';
+                            sufriNpc.speechTimer = 6.5;
+                          }
+                          const p = playerRef.current;
+                          if (p) {
+                            p.targetWx = 0.0;
+                            p.targetWy = -8.45;
+                            p.isMoving = true;
+                            p.isRunning = false;
+                            p.speed = 0.88;
+                          }
+                          playerSpeechRef.current = {
+                            text: '🔓 Asyik! Masuk ke Hutan Refleksia (-5 XP)',
+                            expiresAt: Date.now() + 4000,
+                          };
+                          showToast('🌲 Tiket Hutan Refleksia aktif (-5 XP)! Silakan jelajahi hutan & sungai.', 3500);
+                        }}
+                        className="py-1 px-2 rounded-lg bg-gradient-to-r from-emerald-600/95 to-teal-600/95 hover:from-emerald-500 hover:to-teal-500 text-white text-[10px] font-bold border border-emerald-300/50 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span>🔓 -5 XP</span>
+                      </button>
+                    )}
+                    {totalSufriSellableXp > 0 && (
+                      <button
+                        onClick={handleSellAllFishToSufri}
+                        className="py-1 px-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-[10px] font-extrabold border border-amber-200/70 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                        title="Jual semua ikan dan apel di tas ke Pak @Sufri"
+                      >
+                        <span>💰 Jual (+{totalSufriSellableXp} XP)</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        sounds.playOpenModal();
+                        setIsSufriFishModalOpen(true);
+                      }}
+                      className="py-1 px-2 rounded-lg bg-gradient-to-r from-sky-600/95 to-indigo-600/95 hover:from-sky-500 hover:to-indigo-500 text-white text-[10px] font-bold border border-sky-300/50 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                    >
+                      <span>🌿 Lapak @Sufri</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer shrink-0"
+                      title="Tutup info"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ) : nearbyAction.type === 'treehouse' ? (
                 <div className="bg-[#121e2c]/72 backdrop-blur-md border border-emerald-400/50 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
@@ -19924,6 +21046,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                         <span>🌿 Naik Ranting</span>
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               ) : nearbyAction.type === 'literacy' ? (
@@ -19944,18 +21080,34 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      sounds.playOpenModal();
-                      setIsLiteracyModalOpen(true);
-                    }}
-                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-cyan-600/90 to-blue-600/90 hover:from-cyan-500 hover:to-blue-500 text-white text-[10.5px] font-bold border border-cyan-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <span>📖 Baca</span>
-                    <span className="text-[9px] font-mono text-amber-300 bg-cyan-950/75 px-1 py-0.5 rounded border border-cyan-500/30">
-                      -1 XP
-                    </span>
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        sounds.playOpenModal();
+                        setIsLiteracyModalOpen(true);
+                      }}
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-cyan-600/90 to-blue-600/90 hover:from-cyan-500 hover:to-blue-500 text-white text-[10.5px] font-bold border border-cyan-400/40 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                    >
+                      <span>📖 Baca</span>
+                      <span className="text-[9px] font-mono text-amber-300 bg-cyan-950/75 px-1 py-0.5 rounded border border-cyan-500/30">
+                        -1 XP
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ) : nearbyAction.type === 'bench' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
@@ -19989,117 +21141,201 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                           (nearbyAction.benchId?.startsWith('swing')
                             ? 'Naik ayunan taman (-1 XP)'
                             : nearbyAction.benchId?.startsWith('campfire')
-                            ? 'Hangatkan tubuh bersama warga'
+                            ? pickedDryLeavesCount > 0
+                              ? `Bakar daun kering dari tas (${pickedDryLeavesCount} helai) agar api membesar!`
+                              : 'Hangatkan tubuh atau bakar daun kering dari tas'
                             : 'Bangku taman muat 2 orang')}
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      sounds.playClick();
-                      if (isSittingRef.current) {
-                        const wasSwing = sittingSeatRef.current?.startsWith('swing');
-                        const wasCampfire = sittingSeatRef.current?.startsWith('campfire');
-                        setIsSitting(false);
-                        setSittingSeat(null);
-                        showToast(
-                          wasSwing
-                            ? '🚶 Turun dari ayunan taman.'
-                            : wasCampfire
-                            ? '🚶 Berdiri dari bangku penghangat api unggun.'
-                            : '🚶 Berdiri kembali dari bangku taman.',
-                          2200
-                        );
-                        sendHeartbeatRef.current?.();
-                      } else {
-                        const seat = nearbyAction.benchId || 'fountain_1_a';
-                        if (seat.startsWith('swing')) {
-                          const targetSwing = REFLECTION_SWINGS.find((s) => s.id === seat) || REFLECTION_SWINGS[0];
-                          rideSwingWithXp(targetSwing);
-                        } else {
-                          const matchedGroup = ALL_TWO_PERSON_BENCHES.find((g) =>
-                            g.seats.some((s) => s.id === seat)
+                  <div className="flex items-center gap-1 shrink-0">
+                    {nearbyAction.benchId?.startsWith('campfire') && pickedDryLeavesCount > 0 && (
+                      <button
+                        onClick={handleBurnDryLeavesAtCampfire}
+                        className="py-1 px-2 rounded-lg bg-gradient-to-r from-orange-600/95 to-red-600/95 hover:from-orange-500 hover:to-red-500 text-white text-[10px] font-extrabold border border-amber-300/60 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                        title="Bakar daun kering dari Tas pada Api Unggun agar nyala api menjadi sedikit lebih besar"
+                      >
+                        <span>🔥🍂 Bakar Daun ({pickedDryLeavesCount})</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        sounds.playClick();
+                        if (isSittingRef.current) {
+                          const wasSwing = sittingSeatRef.current?.startsWith('swing');
+                          const wasCampfire = sittingSeatRef.current?.startsWith('campfire');
+                          setIsSitting(false);
+                          setSittingSeat(null);
+                          showToast(
+                            wasSwing
+                              ? '🚶 Turun dari ayunan taman.'
+                              : wasCampfire
+                              ? '🚶 Berdiri dari bangku penghangat api unggun.'
+                              : '🚶 Berdiri kembali dari bangku taman.',
+                            2200
                           );
-                          if (matchedGroup) {
-                            const slotIdx: 0 | 1 = matchedGroup.seats[1].id === seat ? 1 : 0;
-                            sitOnTwoPersonBench(matchedGroup, slotIdx);
-                          } else if (seat === 'literacy' && playerRef.current) {
-                            sitOnTwoPersonBench(LITERACY_BENCHES[0], 0);
+                          sendHeartbeatRef.current?.();
+                        } else {
+                          const seat = nearbyAction.benchId || 'fountain_1_a';
+                          if (seat.startsWith('swing')) {
+                            const targetSwing = REFLECTION_SWINGS.find((s) => s.id === seat) || REFLECTION_SWINGS[0];
+                            rideSwingWithXp(targetSwing);
+                          } else {
+                            const matchedGroup = ALL_TWO_PERSON_BENCHES.find((g) =>
+                              g.seats.some((s) => s.id === seat)
+                            );
+                            if (matchedGroup) {
+                              const slotIdx: 0 | 1 = matchedGroup.seats[1].id === seat ? 1 : 0;
+                              sitOnTwoPersonBench(matchedGroup, slotIdx);
+                            } else if (seat === 'literacy' && playerRef.current) {
+                              sitOnTwoPersonBench(LITERACY_BENCHES[0], 0);
+                            }
                           }
                         }
-                      }
-                    }}
-                    className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
-                  >
-                    <span>
-                      {nearbyAction.benchId?.startsWith('swing')
-                        ? isSittingRef.current
-                          ? '🚶 Turun'
-                          : '🎠 Ayunan'
-                        : nearbyAction.benchId?.startsWith('campfire')
-                        ? isSittingRef.current
+                      }}
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
+                    >
+                      <span>
+                        {nearbyAction.benchId?.startsWith('swing')
+                          ? isSittingRef.current
+                            ? '🚶 Turun'
+                            : '🎠 Ayunan'
+                          : nearbyAction.benchId?.startsWith('campfire')
+                          ? isSittingRef.current
+                            ? '🚶 Berdiri'
+                            : '🔥 Duduk'
+                          : isSittingRef.current
                           ? '🚶 Berdiri'
-                          : '🔥 Duduk'
-                        : isSittingRef.current
-                        ? '🚶 Berdiri'
-                        : '🪑 Duduk'}
-                    </span>
-                    {nearbyAction.benchId?.startsWith('swing') && !isSittingRef.current && (
-                      <span className="text-[9px] font-mono text-amber-200 bg-amber-950/75 px-1 py-0.5 rounded border border-amber-400/30">
-                        -1 XP
+                            : '🪑 Duduk'}
                       </span>
-                    )}
-                  </button>
+                      {nearbyAction.benchId?.startsWith('swing') && !isSittingRef.current && (
+                        <span className="text-[9px] font-mono text-amber-200 bg-amber-950/75 px-1 py-0.5 rounded border border-amber-400/30">
+                          -1 XP
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="bg-[#121e2c]/68 backdrop-blur-md border border-sky-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
+                <div className="bg-[#121e2c]/74 backdrop-blur-md border border-sky-400/50 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
-                      {fishingPhase === 'pulling' ? '🐟' : fishingPhase === 'waiting' ? '💦' : '🎣'}
+                      {fishingPhase === 'pulling'
+                        ? '🐟'
+                        : fishingPhase === 'biting'
+                        ? '💦'
+                        : fishingPhase === 'waiting'
+                        ? '⏳'
+                        : '🎣'}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-sky-300 leading-none">
-                        Sungai Refleksia
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-sky-300 flex items-center gap-1.5 leading-none">
+                        <span>Dermaga Sungai Refleksia (4 Titik)</span>
+                        {totalCaughtFishCount > 0 && (
+                          <span className="text-amber-300 font-mono">
+                            • 🎒 {totalCaughtFishCount} Ikan (+{totalCaughtFishXpValue} XP)
+                          </span>
+                        )}
                       </div>
                       <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
                         {!isFishing
-                          ? 'Spot Memancing • Sungai Refleksia'
+                          ? 'Spot Memancing • Di Atas Dermaga'
                           : fishingPhase === 'casting'
-                          ? 'Melempar Pancing...'
-                          : fishingPhase === 'pulling'
-                          ? 'Mengangkat Pancing...'
-                          : 'Umpan Disambar! Angkat!'}
+                          ? 'Melempar Kail dari Atas Dermaga...'
+                          : fishingPhase === 'waiting'
+                          ? 'Menunggu Ikan Memakan Umpan...'
+                          : fishingPhase === 'biting'
+                          ? '❗ UMPAN DIMAKAN! CEPAT TARIK!'
+                          : 'Mengangkat Pancing ke Tas...'}
                       </h4>
                       <p className={`text-[9.5px] truncate leading-tight ${cafeToast ? 'text-sky-200 font-semibold' : 'text-slate-200/90'}`}>
-                        {cafeToast || 'Santai memancing & dapatkan ikan unik'}
+                        {cafeToast ||
+                          (fishingPhase === 'biting'
+                            ? 'Cepat klik Tarik Pancing sebelum ikannya lepas!'
+                            : fishingPhase === 'waiting'
+                            ? 'Sabar... tombol Tarik Pancing muncul saat umpan dimakan'
+                            : 'Ikan yang didapat masuk ke 🎒 Tas & bisa dijual ke Pak @Sufri')}
                       </p>
                     </div>
                   </div>
-                  {!isFishing ? (
-                    <button
-                      onClick={handleStartFishing}
-                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-sky-600/90 to-blue-600/90 hover:from-sky-500 hover:to-blue-500 text-white text-[10.5px] font-bold border border-sky-400/40 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
-                    >
-                      <span>🎣 Pancing</span>
-                      <span className="text-[9px] font-mono text-amber-300 bg-sky-950/75 px-1 py-0.5 rounded border border-sky-500/30">
-                        -3 XP
+                  <div className="flex items-center gap-1 shrink-0">
+                    {!isFishing ? (
+                      <>
+                        {totalCaughtFishCount > 0 && (
+                          <button
+                            onClick={() => {
+                              const p = playerRef.current;
+                              if (!p) return;
+                              sounds.playClick();
+                              dismissedNearbySignatureRef.current = null;
+                              p.targetWx = -0.32;
+                              p.targetWy = -7.12;
+                              p.isMoving = true;
+                              p.isRunning = false;
+                              p.speed = 0.92;
+                              showToast('🚶 Menuju Pak @Sufri di gerbang hutan untuk menjual ikan...', 3000);
+                            }}
+                            className="py-1 px-2 rounded-lg bg-amber-600/90 hover:bg-amber-500 text-white text-[10px] font-bold border border-amber-300/50 shadow-sm transition cursor-pointer active:scale-95 whitespace-nowrap"
+                            title="Jalan ke Pak @Sufri untuk menjual hasil tangkapan"
+                          >
+                            💰 Jual ({totalCaughtFishCount})
+                          </button>
+                        )}
+                        <button
+                          onClick={handleStartFishing}
+                          className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-sky-600/95 to-blue-600/95 hover:from-sky-500 hover:to-blue-500 text-white text-[10.5px] font-bold border border-sky-400/45 shadow-sm transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
+                        >
+                          <span>🎣 Lempar Kail</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            if (nearbyActionRef.current) {
+                              dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                            }
+                            setNearbyAction(null);
+                          }}
+                          className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                          title="Tutup"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </>
+                    ) : fishingPhase === 'biting' ? (
+                      <button
+                        onClick={handlePullFishingRod}
+                        className="py-1.5 px-3 rounded-lg bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 hover:from-emerald-400 hover:to-rose-400 text-white text-[11px] font-black border border-amber-200/90 shadow-lg shadow-amber-500/35 animate-bounce transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span>🎣 Tarik Pancing!</span>
+                      </button>
+                    ) : fishingPhase === 'pulling' ? (
+                      <button
+                        disabled
+                        className="py-1 px-2.5 rounded-lg bg-amber-600/90 border border-amber-300/60 text-white text-[10px] font-extrabold opacity-90 shrink-0 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span>🐟 Mengangkat...</span>
+                      </button>
+                    ) : (
+                      <span className="py-1 px-2.5 rounded-lg bg-slate-800/90 border border-sky-400/35 text-sky-200 text-[10px] font-bold shrink-0 flex items-center gap-1 whitespace-nowrap animate-pulse">
+                        <span>⏳ Tunggu Umpan...</span>
                       </span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handlePullFishingRod}
-                      disabled={fishingPhase === 'pulling'}
-                      className={`py-1.5 px-2.5 rounded-lg text-white text-[10.5px] font-extrabold border shadow-md transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 whitespace-nowrap ${
-                        fishingPhase === 'pulling'
-                          ? 'bg-amber-600/90 border-amber-300/60 opacity-90'
-                          : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-400 hover:to-sky-400 border-emerald-300/70 animate-bounce shadow-emerald-500/30'
-                      }`}
-                    >
-                      <span>
-                        {fishingPhase === 'pulling' ? '🐟 Mengangkat...' : '🎣 Angkat Pancing!'}
-                      </span>
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </aside>
@@ -21220,6 +22456,182 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               >
                 Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* MODAL LAPAK PENGEPUL IKAN DANAU & HASIL ALAM PAK @SUFRI (JUAL -> XP) */}
+      {/* ============================================================= */}
+      {isSufriFishModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2.5 sm:p-4 animate-fade-in"
+          onClick={() => setIsSufriFishModalOpen(false)}
+        >
+          <div
+            className="bg-[#0b1320] border border-emerald-500/50 rounded-2xl sm:rounded-3xl w-full max-w-lg p-3.5 sm:p-5 shadow-[0_20px_60px_rgba(0,0,0,0.95)] text-white relative overflow-hidden flex flex-col max-h-[88dvh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-2.5 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-500/40 text-lg sm:text-xl font-black shrink-0">
+                  🌱
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-black text-white truncate">
+                      Lapak Pengepul • Pak @Sufri
+                    </h3>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 shrink-0">
+                      Ahli Tanaman
+                    </span>
+                  </div>
+                  <p className="text-[10px] sm:text-[11px] text-emerald-200/80 truncate">
+                    Jual Apel (2 XP / 7 buah) &amp; Ikan Danau dari dalam 🎒 Tasmu!
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSufriFishModalOpen(false)}
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-1.5"
+                title="Tutup lapak"
+              >
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </button>
+            </div>
+
+            {/* Banner Saldo Tas & XP Siap Jual */}
+            <div className="mb-2.5 px-3 py-2 rounded-xl bg-slate-900/90 border border-emerald-500/30 flex items-center justify-between gap-2 shrink-0">
+              <div className="text-[10.5px] sm:text-[11px] text-slate-300 flex items-center gap-1.5 flex-wrap">
+                <span className="font-extrabold text-amber-200">🎒 Di Tasmu:</span>
+                <span className="text-white font-bold">🍎 {pickedApplesCount} Apel</span>
+                <span className="text-slate-500">•</span>
+                <span className="text-white font-bold">🐟 {totalCaughtFishCount} Ikan</span>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-[8.5px] text-slate-400 uppercase tracking-wider block font-semibold leading-none">Total Nilai</span>
+                <span className="text-xs sm:text-sm font-black text-amber-300 font-mono">+{totalSufriSellableXp} XP</span>
+              </div>
+            </div>
+
+            {/* List Item Siap Jual */}
+            <div className="space-y-2 overflow-y-auto pr-1 flex-1">
+              {/* Kartu Jual 7 Buah Apel Merah -> +2 XP */}
+              <div className="p-2.5 sm:p-3 rounded-xl bg-rose-950/30 border border-rose-500/40 flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                    🍎
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-extrabold text-xs sm:text-sm text-white">Buah Apel Merah</span>
+                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                        +2 XP / 7 Buah
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-300 mt-0.5 leading-snug">
+                      Tersimpan: <b className="text-rose-300">{pickedApplesCount} buah</b> ({sellableAppleBundles} paket siap jual)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    disabled={pickedApplesCount < 7}
+                    onClick={handleSellApplesToSufri}
+                    className={`py-1.5 sm:py-2 px-2.5 sm:px-3 rounded-xl font-extrabold text-[11px] sm:text-xs border transition whitespace-nowrap ${
+                      pickedApplesCount >= 7
+                        ? 'bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white border-amber-300/60 cursor-pointer active:scale-95 shadow-md'
+                        : 'bg-slate-800/60 text-slate-500 border-slate-700/50 cursor-not-allowed'
+                    }`}
+                  >
+                    Jual 7 Apel (+2 XP)
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 Jenis Ikan Danau */}
+              {LAKE_FISH_CATALOG.map((fish) => {
+                const qty = fishInventory[fish.id] || 0;
+                return (
+                  <div
+                    key={fish.id}
+                    className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2.5 transition ${
+                      qty > 0
+                        ? 'bg-slate-900/90 border-slate-700/80 shadow-sm'
+                        : 'bg-slate-950/40 border-slate-800/60 opacity-80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                        {fish.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-extrabold text-xs sm:text-sm text-white">{fish.name}</span>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                            +{fish.xpPrice} XP
+                          </span>
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-400/25">
+                            {fish.rarityLabel}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5 leading-snug truncate sm:whitespace-normal">
+                          {fish.desc} • Di Tas: <b className={qty > 0 ? 'text-emerald-300' : 'text-slate-400'}>{qty} ekor</b>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        disabled={qty <= 0}
+                        onClick={() => handleSellSingleFishToSufri(fish)}
+                        className={`py-1.5 sm:py-2 px-2.5 sm:px-3 rounded-xl font-extrabold text-[11px] sm:text-xs border transition whitespace-nowrap ${
+                          qty > 0
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-400/50 cursor-pointer active:scale-95 shadow-md'
+                            : 'bg-slate-800/60 text-slate-500 border-slate-700/50 cursor-not-allowed'
+                        }`}
+                      >
+                        Jual 1 (+{fish.xpPrice} XP)
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer Modal: Total & Tombol Jual Semua */}
+            <div className="mt-2.5 pt-2.5 border-t border-slate-800 flex items-center justify-between gap-2 shrink-0">
+              <div className="text-[11px] text-slate-300 truncate">
+                Total Siap Jual:{' '}
+                <span className="text-amber-300 font-extrabold font-mono">+{totalSufriSellableXp} XP</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={totalSufriSellableXp <= 0}
+                  onClick={handleSellAllFishToSufri}
+                  className={`py-1.5 sm:py-2 px-3 sm:px-4 rounded-xl font-extrabold text-[11px] sm:text-xs border transition whitespace-nowrap ${
+                    totalSufriSellableXp > 0
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 border-amber-200/80 cursor-pointer active:scale-95 shadow-md'
+                      : 'bg-slate-800/60 text-slate-500 border-slate-700/50 cursor-not-allowed'
+                  }`}
+                >
+                  💰 Jual Semua (+{totalSufriSellableXp} XP)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSufriFishModalOpen(false)}
+                  className="py-1.5 sm:py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-[11px] sm:text-xs transition cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         </div>
