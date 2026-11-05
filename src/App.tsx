@@ -906,6 +906,8 @@ export default function App() {
           onLoginStudent={handleLoginStudent}
           onOpenTeacherLogin={() => setIsTeacherPinModalOpen(true)}
           existingStudent={StorageService.getCurrentStudent()}
+          timePeriod={timePeriod}
+          weatherType={weatherType}
         />
 
         {/* Minimalist Cloud Transition (Awan Tertutup & Terbuka) */}

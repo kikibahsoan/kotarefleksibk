@@ -2,18 +2,25 @@ import React, { useState, useMemo } from 'react';
 import { SMK_CLASSES } from '../data/initialData.ts';
 import { Student } from '../types/index.ts';
 import { StorageService } from '../utils/storage.ts';
+import { ThreeTownCanvas } from './ThreeTownCanvas.tsx';
+import { TimePeriod } from '../utils/lofiAudio.ts';
+import { WeatherType } from '../utils/weather.ts';
 import { School, User, Lock, Sparkles, BookOpen, MapPin, Compass, KeyRound, Eye, EyeOff, ShieldCheck, Camera, Newspaper, X } from 'lucide-react';
 
 interface StudentWelcomeProps {
   onLoginStudent: (student: Student) => void;
   onOpenTeacherLogin: () => void;
   existingStudent: Student | null;
+  timePeriod?: TimePeriod;
+  weatherType?: WeatherType;
 }
 
 export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
   onLoginStudent,
   onOpenTeacherLogin,
   existingStudent,
+  timePeriod = 'siang',
+  weatherType = 'normal',
 }) => {
   // If existing student is from deleted DKV 1, ignore it
   const validExistingStudent =
@@ -36,7 +43,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
 
   // Guest Login ("Tamu Kota") Modal State
   const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
-  const [guestName, setGuestName] = useState('Tamu Kota');
+  const [guestName, setGuestName] = useState('');
   const [guestPassword, setGuestPassword] = useState('');
   const [showGuestPassword, setShowGuestPassword] = useState(false);
   const [guestError, setGuestError] = useState('');
@@ -120,28 +127,33 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
     onLoginStudent(loggedStudent);
   };
 
-  // Handle Guest ("Tamu Kota") Login
+  // Handle Guest Login (Nama tamu bebas sesuai nama user, Password: Ter1m4k4s1h)
   const handleGuestSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setGuestError('');
 
     const cleanName = guestName.trim();
-    if (cleanName.toLowerCase() !== 'tamu kota') {
-      setGuestError('Nama akun tamu harus "Tamu Kota".');
+    if (!cleanName) {
+      setGuestError('Silakan masukkan nama Anda terlebih dahulu.');
       return;
     }
 
-    if (guestPassword.trim() !== 'Refleksia11') {
-      setGuestError('Password Tamu salah! Gunakan password: Refleksia11');
+    if (guestPassword.trim() !== 'Ter1m4k4s1h') {
+      setGuestError('Password Tamu salah! Silakan periksa kembali password tamu Anda.');
       return;
     }
+
+    const safeSlug = cleanName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'tamu';
 
     const guestStudent: Student = {
-      id: 'guest-tamu-kota',
-      name: 'Tamu Kota',
+      id: `guest-${safeSlug}`,
+      name: cleanName,
       className: 'Tamu Kota (Wartawan)',
       studentNumber: 'WARTAWAN-01',
-      password: 'Refleksia11',
+      password: 'Ter1m4k4s1h',
       gender: 'L',
       points: 5,
       badges: ['reflektor_pertama'],
@@ -158,18 +170,29 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
 
   return (
     <div className="relative min-h-[100dvh] w-full flex flex-col justify-center items-center py-2 sm:py-5 px-3 sm:px-6 text-slate-100 overflow-y-auto">
-      {/* Background: Gambar Kota Refleksia blurred 70% */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <img
-          src="/assets/aistudio/map_kota_refleksi_composite.webp"
-          alt="Latar Belakang Kota Refleksia"
-          className="w-full h-full object-cover object-center"
+      {/* Background: Live Refleksia City Canvas disesuaikan dengan blur 50% */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none">
+        <div
+          className="w-full h-full"
           style={{
-            filter: 'blur(14px)',
-            transform: 'scale(1.1)',
+            filter: 'blur(6px)',
+            transform: 'scale(1.04)',
           }}
-        />
-        <div className="absolute inset-0 bg-slate-950/60" />
+        >
+          <ThreeTownCanvas
+            onSelectBuilding={() => {}}
+            activeBuilding={null}
+            newMateriBuildingIds={[]}
+            studentId="preview-bg"
+            studentName="Warga Refleksia"
+            studentGender="L"
+            isTeacher={false}
+            isGuest={true}
+            timePeriod={timePeriod}
+            weatherType={weatherType}
+          />
+        </div>
+        <div className="absolute inset-0 bg-slate-950/35" />
       </div>
 
       <div className="w-full max-w-md sm:max-w-lg landscape:max-w-3xl lg:max-w-4xl bg-slate-800/95 border border-slate-700/80 rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-6 landscape:p-5 lg:p-7 relative z-10 overflow-hidden my-auto shrink-0 transition-all">
@@ -227,7 +250,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setGuestName('Tamu Kota');
+                  setGuestName('');
                   setGuestPassword('');
                   setGuestError('');
                   setIsGuestModalOpen(true);
@@ -416,7 +439,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
             <button
               type="button"
               onClick={() => {
-                setGuestName('Tamu Kota');
+                setGuestName('');
                 setGuestPassword('');
                 setGuestError('');
                 setIsGuestModalOpen(true);
@@ -430,7 +453,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
         </div>
       </div>
 
-      {/* GUEST LOGIN MODAL ("Tamu Kota" / Pass: Refleksia11) */}
+      {/* GUEST LOGIN MODAL (Nama Tamu Bebas / Pass: Ter1m4k4s1h) */}
       {isGuestModalOpen && (
         <div
           className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
@@ -485,7 +508,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
             <form onSubmit={handleGuestSubmit} className="space-y-3 relative z-10">
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">
-                  Nama Akun Tamu
+                  Nama Tamu / Nama Anda
                 </label>
                 <input
                   type="text"
@@ -495,8 +518,8 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
                     setGuestName(e.target.value);
                     setGuestError('');
                   }}
-                  placeholder="Tamu Kota"
-                  className="w-full px-3 py-2 bg-slate-950/90 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs sm:text-sm font-semibold"
+                  placeholder="Ketik nama Anda..."
+                  className="w-full px-3 py-2 bg-slate-950/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs sm:text-sm font-semibold"
                 />
               </div>
 

@@ -1352,11 +1352,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   }, []);
   const [cafeToast, setCafeToast] = useState<string | null>(null);
   const cafeToastTimerRef = useRef<number | null>(null);
-  const [cafeScreenPos, setCafeScreenPos] = useState<{ x: number; y: number; visible: boolean }>({
-    x: 0,
-    y: 0,
-    visible: false,
-  });
 
   // Entry confirmation modal state
   const [pendingConfirmation, setPendingConfirmation] = useState<EntryConfirmation | null>(null);
@@ -2319,6 +2314,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   // 4. Local BroadcastChannel
   // -----------------------------------------------------------
   useEffect(() => {
+    // Jangan jalankan sinkronisasi jaringan (WebSocket/SSE/Heartbeat) untuk kanvas latar belakang halaman login
+    if (studentId === 'preview-bg') return;
+
     let isMounted = true;
     const presenceChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window
       ? new BroadcastChannel('kota_refleksi_presence')
@@ -2671,7 +2669,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // Optimasi performa ringan untuk HP, Tablet, dan Laptop:
       // Batasi DPR adaptif agar GPU & baterai tetap hemat dan rendering 60 FPS mulus di layar resolusi tinggi (Retina/OLED)
       const winW = window.innerWidth;
-      const maxDpr = winW < 768 ? 1.25 : winW < 1024 ? 1.5 : 1.75;
+      const isPreviewBg = studentId === 'preview-bg';
+      const maxDpr = isPreviewBg ? 1.0 : winW < 768 ? 1.25 : winW < 1024 ? 1.5 : 1.75;
       const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
       width = container.clientWidth || 800;
       height = container.clientHeight || 600;
@@ -3962,7 +3961,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       sendHeartbeatRef.current?.();
     };
 
+    let lastPointerMoveTime = 0;
     const onPointerMove = (e: MouseEvent) => {
+      const now = performance.now();
+      if (now - lastPointerMoveTime < 28) return;
+      lastPointerMoveTime = now;
+
       const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
 
       const isOverPlayer =
@@ -3988,8 +3992,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       if (isOverInteractiveSpot) {
         canvas.style.cursor = 'pointer';
-        hoveredBuildingRef = null;
-        setHoveredBuilding(null);
+        if (hoveredBuildingRef !== null) {
+          hoveredBuildingRef = null;
+          setHoveredBuilding(null);
+        }
         return;
       }
 
@@ -4002,8 +4008,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      hoveredBuildingRef = found;
-      setHoveredBuilding(found);
+      if (hoveredBuildingRef?.id !== found?.id) {
+        hoveredBuildingRef = found;
+        setHoveredBuilding(found);
+      }
       canvas.style.cursor = found ? 'pointer' : 'default';
     };
 
@@ -4044,11 +4052,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     let lastTime = performance.now();
     let beaconBlink = 0;
 
+    const isPreviewBgMode = studentId === 'preview-bg';
+
     const render = (currentTime: number) => {
       animId = requestAnimationFrame(render);
       // Hentikan proses render kanvas jika tab sedang diminimize / di latar belakang untuk hemat CPU & baterai
       if (document.hidden) {
         lastTime = currentTime;
+        return;
+      }
+      // Untuk latar belakang halaman login yang diblur, batasi ke ~24 FPS agar input form login tetap sangat ringan di HP/Tablet
+      if (isPreviewBgMode && currentTime - lastTime < 40) {
         return;
       }
 
@@ -4101,13 +4115,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       camera.x += (camera.targetX - camera.x) * (delta * 4.5);
       camera.y += (camera.targetY - camera.y) * (delta * 4.5);
 
-      // Update screen coordinates for circular emote menu if open
+      // Update screen coordinates for circular emote menu if open (only re-render React if coordinates changed)
       if (isEmoteMenuOpenRef.current) {
         const target = emoteTargetAvatarRef.current || playerRef.current;
         if (target) {
           const tPt = toScreen(target.wx, target.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
-          setPlayerScreenPos({ x: Math.round(tPt.x), y: Math.round(tPt.y - 12 * z) });
+          const nextX = Math.round(tPt.x);
+          const nextY = Math.round(tPt.y - 12 * z);
+          setPlayerScreenPos((prev) => (prev.x === nextX && prev.y === nextY ? prev : { x: nextX, y: nextY }));
         }
       }
 
@@ -14646,12 +14662,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.globalAlpha = 0.55;
           }
 
-          setCafeScreenPos({
-            x: pt.x,
-            y: pt.y - 46 * z,
-            visible: true,
-          });
-
           // 1. Warm Terracotta & Cobblestone Patio Deck Underneath Lapak Refleksia
           ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
           ctx.beginPath();
@@ -17421,20 +17431,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const baseEmoteY = speechTopEdgeY - 12 * z;
             const emoteY = baseEmoteY + emoteBounce;
 
-            // Floating Emote Bubble with Glow
+            // Floating Emote Bubble with Fast Vector Glow (tanpa shadowBlur yang berat di GPU mobile)
             const badgeR = 12 * z;
             ctx.save();
-            ctx.shadowColor =
+            const emoteGlowColor =
               activeEmote.type === 'love'
-                ? 'rgba(244, 63, 94, 0.7)'
+                ? 'rgba(244, 63, 94, 0.35)'
                 : activeEmote.type === 'dance'
-                ? 'rgba(168, 85, 247, 0.7)'
+                ? 'rgba(168, 85, 247, 0.35)'
                 : activeEmote.type === 'laugh'
-                ? 'rgba(245, 158, 11, 0.7)'
+                ? 'rgba(245, 158, 11, 0.35)'
                 : activeEmote.type === 'thumbsup'
-                ? 'rgba(16, 185, 129, 0.75)'
-                : 'rgba(14, 165, 233, 0.7)';
-            ctx.shadowBlur = 9 * z;
+                ? 'rgba(16, 185, 129, 0.38)'
+                : 'rgba(14, 165, 233, 0.35)';
+            ctx.fillStyle = emoteGlowColor;
+            ctx.beginPath();
+            ctx.arc(pt.x, emoteY, badgeR + 3.5 * z, 0, Math.PI * 2);
+            ctx.fill();
 
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
@@ -17589,10 +17602,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               const pillW = Math.max(52 * z, textMetrics.width + 24 * z);
               const pillH = 22 * z;
 
-              // Shadow
-              ctx.shadowColor = 'rgba(245, 158, 11, 0.75)';
-              ctx.shadowBlur = 10 * z;
-              ctx.shadowOffsetY = 2 * z;
+              // Fast vector drop shadow (tanpa shadowBlur yang berat)
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+              ctx.beginPath();
+              ctx.roundRect(-pillW / 2, -pillH / 2 + 2.5 * z, pillW, pillH, 11 * z);
+              ctx.fill();
 
               // Gradient Capsule
               const pillGrad = ctx.createLinearGradient(-pillW / 2, -pillH / 2, pillW / 2, pillH / 2);
@@ -17605,7 +17619,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.fill();
 
               // Sharp Gold/Yellow Rim
-              ctx.shadowColor = 'transparent';
               ctx.strokeStyle = '#fef08a';
               ctx.lineWidth = 1.8 * z;
               ctx.stroke();
