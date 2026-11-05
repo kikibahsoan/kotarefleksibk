@@ -2668,11 +2668,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     const handleResize = () => {
       if (!container || !canvas) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // Optimasi performa ringan untuk HP, Tablet, dan Laptop:
+      // Batasi DPR adaptif agar GPU & baterai tetap hemat dan rendering 60 FPS mulus di layar resolusi tinggi (Retina/OLED)
+      const winW = window.innerWidth;
+      const maxDpr = winW < 768 ? 1.25 : winW < 1024 ? 1.5 : 1.75;
+      const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
       width = container.clientWidth || 800;
       height = container.clientHeight || 600;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2846,21 +2850,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       facing: 'down-left',
     };
 
-    // 3. Ibu Kantin Lapak Refleksia (Ma Uba) - Posisi tepat di SAMPING KIRI Lapak Refleksia menyambut warga
+    // 3. Ibu Kantin Lapak Refleksia (Ma Uba) - Berdiri di SAMPING KANAN Lapak Refleksia (di depan, tidak tertutup bangunan/atap)
     const maUba: AvatarData = {
       id: 'ma_uba',
       role: 'barista',
       handle: 'ma_uba',
       name: 'Ma Uba',
       roleLabel: 'Ibu Kantin',
-      wx: 4.02,
-      wy: 4.86,
-      targetWx: 4.02,
-      targetWy: 4.86,
-      anchorX: 4.02,
-      anchorY: 4.86,
+      wx: 5.30,
+      wy: 4.38,
+      targetWx: 5.30,
+      targetWy: 4.38,
+      anchorX: 5.30,
+      anchorY: 4.38,
       wanderRadius: 0,
-      speed: 0, // Berdiri ramah di samping kiri Lapak Refleksia (tidak menutupi meja kasir depan)
+      speed: 0, // Berdiri ramah di samping kanan Lapak Refleksia menyambut warga
       shirtColor: '#ea580c', // Blus hangat dengan celemek putih Ibu Kantin
       pantsColor: '#7c2d12',
       hairColor: '#451a03',
@@ -2868,7 +2872,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       isMoving: false,
       pauseTimer: 99999,
       walkFrame: 0,
-      facing: 'down-right',
+      facing: 'down-left',
+      speeches: [
+        'Halo Nak! Mau roti hangat atau minuman segar di Lapak Refleksia? 🥐☕',
+        'Semangat belajarnya ya Nak! Jangan lupa sarapan agar pikiran tetap jernih ✨',
+        'Lapak Refleksia siap melayani seluruh warga dan siswa Refleksia City! 🥖🥤',
+      ],
     };
 
     // 4. Ibu Muslim Sudut Literasi (Patra) - Selalu berada di Sudut Literasi samping Balai Kota mengajak orang membaca
@@ -3271,12 +3280,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       const { sx, sy, wx, wy } = getPointerWorldPos(clientX, clientY);
 
       // 0. Check Click on Player Avatar -> Open/Toggle 5-Reaction Circular Menu (Joget, Jempol, Suka, Tertawa, Lambai)
+      // Only trigger if clicking directly on player's body/sprite (tight radius)
       const z = zoomLevelRef.current;
       const pPt = toScreen(player.wx, player.wy, 0, camera.x, camera.y);
       const distToPlayerScreen = Math.hypot(sx - pPt.x, sy - (pPt.y - 12 * z));
       const distToPlayerWorld = Math.hypot(wx - player.wx, wy - player.wy);
 
-      if (distToPlayerScreen < 28 * z || distToPlayerWorld < 0.65) {
+      if (distToPlayerScreen < 20 * z && distToPlayerWorld < 0.42) {
         sounds.playClick();
         emoteTargetAvatarRef.current = null;
         setIsEmoteMenuOpen((prev) => {
@@ -3301,7 +3311,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         const nPt = toScreen(npc.wx, npc.wy, 0, camera.x, camera.y);
         const dScreen = Math.hypot(sx - nPt.x, sy - (nPt.y - 12 * z));
         const dWorld = Math.hypot(wx - npc.wx, wy - npc.wy);
-        if (dScreen < 26 * z || dWorld < 0.62) {
+        if (dScreen < 20 * z && dWorld < 0.42) {
           clickedNpc = npc;
           break;
         }
@@ -3339,10 +3349,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // Reset any auto-dismissed nearby popup when the user explicitly clicks/taps on the map
       dismissedNearbySignatureRef.current = null;
 
-      // 1. Check Click on Cafe Stall (Toko Roti & Kafe di ujung kota belakang Lab DKV)
-      // Harus berjalan mendekati kafe terlebih dahulu, lalu pop-up konfirmasi akan muncul saat avatar sudah di dekat kafe
+      // 1. Check Click directly on Lapak Refleksia (Toko Roti & Kafe di samping Lab DKV [4.15, 3.55])
+      // Radius diperkecil agar klik di jalan raya/lorong tidak terpental ke kafe
       const cafeDist = Math.hypot(wx - cafeWx, wy - cafeWy);
-      if (cafeDist < 1.65) {
+      const isDirectlyOnCafe = cafeDist < 0.62 || (Math.abs(wx - cafeWx) < 0.62 && Math.abs(wy - cafeWy) < 0.62);
+      if (isDirectlyOnCafe) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3363,11 +3374,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 1b. Check Click on Papan Peraturan Kota di Dekat Gapura Masuk [1.45, 5.95] or Welcome Gate [0, 6.15]
-      // Avatar harus berjalan ke dekat papan peraturan terlebih dahulu, dan masuk ke informasi melalui pop-up di atas
+      // 1b. Check Click directly on Papan Peraturan Kota [1.45, 5.95] or Welcome Gate [0, 6.15]
+      // Radius diperkecil agar klik di jalan utama selatan bebas untuk berjalan
       const rulesDist = Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy);
       const gateDist = Math.hypot(wx - 0, wy - 6.15);
-      if (rulesDist < 1.25 || gateDist < 1.35) {
+      if (rulesDist < 0.38 || gateDist < 0.42) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3389,10 +3400,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 1c. Check Click on Pohon Beringin Jurnal Harian (3 petak di samping kiri dekat Bank Materi [-2.95, -5.85])
-      // Avatar harus berjalan ke dekat Pohon Jurnal terlebih dahulu, lalu masuk ke informasi melalui pop-up di atas
+      // 1c. Check Click directly on Pohon Beringin Jurnal Harian [-2.95, -5.85] (Radius diperkecil)
       const beringinDist = Math.hypot(wx - BERINGIN_TREE_COORDS.wx, wy - BERINGIN_TREE_COORDS.wy);
-      if (beringinDist < 1.55) {
+      if (beringinDist < 0.52) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3415,10 +3425,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 1d. Check Click on Papan Pengumuman Guru di Dekat Balai Kota [-1.55, -3.45]
-      // Avatar harus berjalan ke dekat Papan Pengumuman terlebih dahulu, lalu membuka informasi melalui pop-up di atas
+      // 1d. Check Click directly on Papan Pengumuman Guru [-1.55, -3.45] (Radius diperkecil)
       const annBoardDist = Math.hypot(wx - ANNOUNCEMENT_BOARD_COORDS.wx, wy - ANNOUNCEMENT_BOARD_COORDS.wy);
-      if (annBoardDist < 1.15) {
+      if (annBoardDist < 0.38) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3445,8 +3454,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current
       );
 
-      // 1f. Check Click directly on @Sufri (gerbang kiri [-0.76, -7.32]) or Gerbang Hutan Refleksia [wx: -1.15..0.85, wy: -7.95..-7.05]
-      if (Math.hypot(wx - -0.25, wy - -7.45) < 1.15 || Math.hypot(wx - tomi.wx, wy - tomi.wy) < 0.85) {
+      // 1f. Check Click directly on Pak @Sufri (gerbang kiri [-0.76, -7.32]) or Tiang Gerbang Kayu (radius diperkecil)
+      const isDirectlyOnSufri = Math.hypot(wx - tomi.wx, wy - tomi.wy) < 0.45;
+      const isDirectlyOnGatePost = Math.abs(wx) <= 0.42 && Math.abs(wy - WILDERNESS_FENCE_WY) < 0.28;
+      if (isDirectlyOnSufri || isDirectlyOnGatePost) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3482,16 +3493,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 2. Check Click on Spot Pemancingan Besar di Sungai Refleksia -> Arahkan Avatar ke salah satu dari 4 Titik Dermaga (di atas dermaga & tidak menumpuk)
+      // 2. Check Click directly on Dermaga Pemancingan Kayu di Sungai Refleksia (bukan seluruh area danau!)
+      // Hanya jika klik tepat di atas struktur dermaga kayu [1.15..3.08, -11.15..-9.15] atau dekat titik pemancingan
       const minPierSpotDist = Math.min(
         ...FISHING_PIER_SPOTS.map((s) => Math.hypot(wx - s.wx, wy - s.wy))
       );
-      const fishSpotDist = Math.min(
-        Math.hypot(wx - FISHING_SPOT_COORDS.wx, wy - FISHING_SPOT_COORDS.wy),
-        minPierSpotDist
-      );
-      const lakeClick = wx > 1.15 && wx < 6.85 && wy > -12.0 && wy < -8.85;
-      if (fishSpotDist < 2.25 || lakeClick) {
+      const isOnFishingPier =
+        (wx >= 1.15 && wx <= 3.08 && wy >= -11.15 && wy <= -9.15) ||
+        minPierSpotDist < 0.42;
+
+      if (isOnFishingPier) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3529,10 +3540,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 3. Check Click on Benches (8 Minimalist Fountain Benches [2-seater], 2 Literacy Benches [2-seater], 2 Campfire Benches [2-seater]) & 2 Swing Structures (-1 XP)
+      // 3. Check Click directly on Benches (radius diperkecil menjadi < 0.42 agar jalan samping bangku bisa diklik)
       for (const group of ALL_TWO_PERSON_BENCHES) {
         const groupDist = Math.hypot(wx - group.wx, wy - group.wy);
-        if (groupDist < 0.85) {
+        if (groupDist < 0.42) {
           const distA = Math.hypot(wx - group.seats[0].wx, wy - group.seats[0].wy);
           const distB = Math.hypot(wx - group.seats[1].wx, wy - group.seats[1].wy);
           const preferredIdx: 0 | 1 = distB < distA ? 1 : 0;
@@ -3543,8 +3554,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 3b. Check Click directly on Campfire in Corner [-4.65, 4.65] -> Walk to & sit on nearest available Campfire Bench to warm up!
-      if (Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 1.15) {
+      // 3b. Check Click directly on Campfire in Corner [-4.65, 4.65] (radius diperkecil < 0.48)
+      if (Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 0.48) {
         const distLeft = Math.hypot(wx - CAMPFIRE_BENCHES[0].wx, wy - CAMPFIRE_BENCHES[0].wy);
         const distRight = Math.hypot(wx - CAMPFIRE_BENCHES[1].wx, wy - CAMPFIRE_BENCHES[1].wy);
         const firstGroup = distRight < distLeft ? CAMPFIRE_BENCHES[1] : CAMPFIRE_BENCHES[0];
@@ -3557,10 +3568,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 3c. Check Click on 2 Swing Locations (4 Swing Seats, walks there first then costs 1 XP to ride)
+      // 3c. Check Click directly on 2 Swing Locations (radius diperkecil < 0.45)
       for (const swing of REFLECTION_SWINGS) {
         const swingDist = Math.hypot(wx - swing.wx, wy - swing.wy);
-        if (swingDist < 0.88) {
+        if (swingDist < 0.45) {
           pendingBuildingId = null;
           lastTouchedIdRef.current = null;
           rideSwingWithXp(swing, isRun);
@@ -3568,10 +3579,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 3d. Check Click on Sudut Literasi Warga di Samping Balai Kota [2.35, -6.15]
-      // Avatar berjalan ke dekat Sudut Literasi terlebih dahulu, lalu membuka bacaan melalui pop-up di atas
+      // 3d. Check Click directly on Sudut Literasi Warga [2.35, -6.15] (radius diperkecil < 0.45)
       const litSpotDist = Math.hypot(wx - LITERACY_CORNER_COORDS.wx, wy - LITERACY_CORNER_COORDS.wy);
-      if (litSpotDist < 1.35) {
+      if (litSpotDist < 0.45) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3594,11 +3604,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 4a. Check Click on Dry Leaf (Daun Kering) -> Walk to leaf & pick it up (5 leaves = +1 XP)
+      // 4a. Check Click on Dry Leaf (Daun Kering) -> Walk to leaf & pick it up (radius diperkecil < 0.38)
       for (const leaf of dryLeavesRef.current) {
         if (leaf.pickedAt !== null) continue;
         const leafDist = Math.hypot(wx - leaf.wx, wy - leaf.wy);
-        if (leafDist < 0.68) {
+        if (leafDist < 0.38) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
@@ -3628,11 +3638,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 4b. Check Click on Map Trees -> Walk to tree & show pop-up at top when near
+      // 4b. Check Click directly on Map Trees (radius diperkecil < 0.36)
       for (let tIdx = 0; tIdx < TREES_LIST.length; tIdx++) {
         const [tx, ty] = TREES_LIST[tIdx];
         const tDist = Math.hypot(wx - tx, wy - ty);
-        if (tDist < 0.78) {
+        if (tDist < 0.36) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
@@ -3655,12 +3665,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 4c. Check Click on Perumahan Guru & Siswa + Kotak Surat Kecil (Masukan & Saran) behind Perpustakaan Kampus
-      // Avatar harus berjalan ke dekat Wisma/Kotak Surat terlebih dahulu, lalu membuka kotak saran melalui pop-up di atas
+      // 4c. Check Click directly on Perumahan Guru & Siswa / Kotak Surat Kecil (radius diperkecil)
       for (const h of HOUSING_UNITS) {
         const distToHouse = Math.hypot(wx - h.wx, wy - h.wy);
         const distToMailbox = Math.hypot(wx - (h.wx + 0.75), wy - (h.wy + 0.25));
-        if (distToHouse < 1.15 || distToMailbox < 0.95) {
+        if (distToHouse < 0.52 || distToMailbox < 0.32) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
@@ -3683,11 +3692,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 5. Check Click on Buildings -> Walk to building doorstep first; top pop-up appears when avatar is near the building
+      // 5. Check Click directly on Buildings -> Radius diperkecil agar klik di trotoar/jalan bebas bergerak
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
         const dist = Math.hypot(wx - bx, wy - by);
-        if (dist < 1.55 || (Math.abs(wx - bx) < 1.35 && Math.abs(wy - by) < 1.35)) {
+        const isDirectHit = dist < 0.65 || (Math.abs(wx - bx) < 0.55 && Math.abs(wy - by) < 0.55);
+        if (isDirectHit) {
           sounds.playClick();
           if (isSittingRef.current) {
             setIsSitting(false);
@@ -3730,11 +3740,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 5b. Check Click on Rumah Pohon Beringin atau Ranting Pohon Beringin di Ujung Kiri Hutan Kaki Gunung
+      // 5b. Check Click directly on Rumah Pohon Beringin atau Ranting Pohon Beringin (radius diperkecil)
       const distToTreehouseDeck = Math.hypot(wx - BANYAN_TREEHOUSE_COORDS.wx, wy - BANYAN_TREEHOUSE_COORDS.wy);
       const distToBranchFoot = Math.hypot(wx - BANYAN_BRANCH_FOOT_COORDS.wx, wy - BANYAN_BRANCH_FOOT_COORDS.wy);
       const clickBranchInfo = getBanyanTreehouseElevation(wx, wy);
-      if (distToTreehouseDeck < 1.35 || distToBranchFoot < 0.95 || clickBranchInfo.onBranchOrDeck) {
+      const isDirectTreehouseClick =
+        distToTreehouseDeck < 0.55 ||
+        distToBranchFoot < 0.38 ||
+        (clickBranchInfo.onBranchOrDeck && clickBranchInfo.progress > 0.15);
+
+      if (isDirectTreehouseClick) {
         sounds.playClick();
         if (isSittingRef.current) {
           setIsSitting(false);
@@ -3756,7 +3771,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           return;
         }
         const playerBranchState = getBanyanTreehouseElevation(player.wx, player.wy);
-        if (playerBranchState.progress > 0.72 && distToBranchFoot < 0.95) {
+        if (playerBranchState.progress > 0.72 && distToBranchFoot < 0.55) {
           // Clicking the foot of the branch while up in the treehouse climbs down the branch
           treehouseClimbStageRef.current = 'climbing_down';
           afterClimbDownTargetRef.current = null;
@@ -3790,19 +3805,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
-      // 6. Click on ground anywhere across the entire map (except pembatas, gunung, danau, sungai, air mancur)
+      // 6. Click on ground anywhere across the entire map!
+      // Memastikan semua koordinat pada peta yang ingin dituju dengan kursor bisa diklik
       sounds.playClick();
       if (isSittingRef.current) {
         setIsSitting(false);
         setSittingSeat(null);
       }
       pendingSeatRef.current = null;
-      let targetX = Math.max(-8.0, Math.min(8.0, wx));
-      let targetY = Math.max(-11.75, Math.min(8.0, wy));
+      let targetX = Math.max(-8.15, Math.min(8.15, wx));
+      let targetY = Math.max(-13.5, Math.min(8.15, wy));
 
       // Jika belum punya akses Hutan Refleksia (Siswa belum bayar 5 XP) dan mengklik area di balik pagar (wy < -7.45),
       // arahkan ke depan pintu gerbang yang dijaga @Sufri agar pop-up Tiket 5 XP muncul
-      if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.22) {
+      if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.18) {
         dismissedNearbySignatureRef.current = null;
         targetX = 0.0;
         targetY = -7.08;
@@ -3812,29 +3828,31 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           text: '🎫 Menuju gerbang Hutan Refleksia (Tiket Masuk 5 XP)...',
           expiresAt: Date.now() + 4500,
         };
-      }
-
-      // If clicking directly on Danau water basin, guide avatar to nearest free Fishing Pier Spot or southern shore
-      if (targetX > 1.82 && targetY < -8.72) {
-        if (targetX < 4.2 && targetY < -9.2) {
-          const chosen = chooseFishingPierSpot(targetX, targetY);
-          targetX = chosen.wx;
-          targetY = chosen.wy;
-        } else {
-          targetY = -8.58;
-        }
-      }
-      // Keep target on the inner bank if clicking onto the river water (unless crossing the bridge at |wy| < 0.72)
-      if (targetX > 6.72 && Math.abs(targetY) >= 0.72) {
-        targetX = 6.68;
-      }
-      if (isSolidCollision(targetX, targetY, 0.1, canAccessWilderness)) {
-        // Nudge away from solid obstacle (pembatas, gunung, danau, sungai, air mancur)
+      } else if (isSolidCollision(targetX, targetY, 0.08, canAccessWilderness)) {
+        // Jika kursor tepat mengklik rintangan padat (air dalam danau, sungai tak berjembatan, tebing gunung, air mancur),
+        // telusuri garis lurus menuju posisi avatar untuk mendapatkan koordinat tanah/tepi terdekat yang dapat dipijak
         const dirX = player.wx - targetX;
         const dirY = player.wy - targetY;
         const d = Math.hypot(dirX, dirY) || 1;
-        targetX += (dirX / d) * 0.45;
-        targetY += (dirY / d) * 0.45;
+        const ndx = dirX / d;
+        const ndy = dirY / d;
+        let adjustedX = targetX;
+        let adjustedY = targetY;
+        let foundWalkable = false;
+        for (let step = 0.08; step <= 3.6; step += 0.08) {
+          const testX = targetX + ndx * step;
+          const testY = targetY + ndy * step;
+          if (!isSolidCollision(testX, testY, 0.08, canAccessWilderness)) {
+            adjustedX = testX;
+            adjustedY = testY;
+            foundWalkable = true;
+            break;
+          }
+        }
+        if (foundWalkable) {
+          targetX = adjustedX;
+          targetY = adjustedY;
+        }
       }
 
       // If currently perched in the Rumah Pohon or on its branch, climb down the banyan branch first before walking away!
@@ -3948,25 +3966,25 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
 
       const isOverPlayer =
-        Math.hypot(wx - player.wx, wy - player.wy) < 0.65 ||
-        npcs.some((n) => Math.hypot(wx - n.wx, wy - n.wy) < 0.62) ||
-        Array.from(remotePlayersRef.current.values()).some((r) => Math.hypot(wx - r.wx, wy - r.wy) < 0.62);
+        Math.hypot(wx - player.wx, wy - player.wy) < 0.42 ||
+        npcs.some((n) => Math.hypot(wx - n.wx, wy - n.wy) < 0.42) ||
+        Array.from(remotePlayersRef.current.values()).some((r) => Math.hypot(wx - r.wx, wy - r.wy) < 0.42);
 
       const isOverInteractiveSpot =
         isOverPlayer ||
-        Math.hypot(wx - cafeWx, wy - cafeWy) < 2.1 ||
-        Math.hypot(wx - FISHING_SPOT_COORDS.wx, wy - FISHING_SPOT_COORDS.wy) < 2.75 ||
-        Math.hypot(wx - (-4.3), wy - 1.8) < 2.0 ||
-        Math.hypot(wx - (-3.7), wy - 1.8) < 1.05 ||
-        Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 1.35 ||
-        Math.hypot(wx - BERINGIN_TREE_COORDS.wx, wy - BERINGIN_TREE_COORDS.wy) < 1.65 ||
-        Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy) < 1.35 ||
-        Math.hypot(wx - 0, wy - 6.15) < 1.45 ||
-        HOUSING_UNITS.some((h) => Math.hypot(wx - h.wx, wy - h.wy) < 1.35) ||
-        ALL_TWO_PERSON_BENCHES.some((g) => Math.hypot(wx - g.wx, wy - g.wy) < 1.05) ||
-        SWING_STRUCTURES.some((s) => Math.hypot(wx - s.wx, wy - s.wy) < 1.15) ||
-        dryLeavesRef.current.some((l) => l.pickedAt === null && Math.hypot(wx - l.wx, wy - l.wy) < 0.7) ||
-        TREES_LIST.some(([tx, ty]) => Math.hypot(wx - tx, wy - ty) < 0.85);
+        (Math.abs(wx - cafeWx) < 0.62 && Math.abs(wy - cafeWy) < 0.62) ||
+        ((wx >= 1.15 && wx <= 3.08 && wy >= -11.15 && wy <= -9.15) || FISHING_PIER_SPOTS.some((s) => Math.hypot(wx - s.wx, wy - s.wy) < 0.42)) ||
+        Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 0.48 ||
+        Math.hypot(wx - BERINGIN_TREE_COORDS.wx, wy - BERINGIN_TREE_COORDS.wy) < 0.52 ||
+        Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy) < 0.38 ||
+        Math.hypot(wx - 0, wy - 6.15) < 0.42 ||
+        HOUSING_UNITS.some((h) => Math.hypot(wx - h.wx, wy - h.wy) < 0.52 || Math.hypot(wx - (h.wx + 0.75), wy - (h.wy + 0.25)) < 0.32) ||
+        ALL_TWO_PERSON_BENCHES.some((g) => Math.hypot(wx - g.wx, wy - g.wy) < 0.42) ||
+        SWING_STRUCTURES.some((s) => Math.hypot(wx - s.wx, wy - s.wy) < 0.45) ||
+        dryLeavesRef.current.some((l) => l.pickedAt === null && Math.hypot(wx - l.wx, wy - l.wy) < 0.38) ||
+        TREES_LIST.some(([tx, ty]) => Math.hypot(wx - tx, wy - ty) < 0.36) ||
+        Math.hypot(wx - BANYAN_TREEHOUSE_COORDS.wx, wy - BANYAN_TREEHOUSE_COORDS.wy) < 0.55 ||
+        Math.hypot(wx - BANYAN_BRANCH_FOOT_COORDS.wx, wy - BANYAN_BRANCH_FOOT_COORDS.wy) < 0.38;
 
       if (isOverInteractiveSpot) {
         canvas.style.cursor = 'pointer';
@@ -3978,7 +3996,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       let found: BuildingInfo | null = null;
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
-        if (Math.hypot(wx - bx, wy - by) < 1.8) {
+        if (Math.hypot(wx - bx, wy - by) < 0.65 || (Math.abs(wx - bx) < 0.55 && Math.abs(wy - by) < 0.55)) {
           found = b;
           break;
         }
@@ -4028,6 +4046,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     const render = (currentTime: number) => {
       animId = requestAnimationFrame(render);
+      // Hentikan proses render kanvas jika tab sedang diminimize / di latar belakang untuk hemat CPU & baterai
+      if (document.hidden) {
+        lastTime = currentTime;
+        return;
+      }
+
       const delta = Math.min((currentTime - lastTime) / 1000, 0.1);
       lastTime = currentTime;
       const elapsed = currentTime / 1000;
@@ -7633,67 +7657,100 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         ctx.lineTo(lhPt.x + lanW * 0.18, galY);
         ctx.stroke();
 
-        // Sweeping Lighthouse Beacon Beam Reaching All the Way to Masjid Al-Hikmah [5.45, -4.85]
-        // Rendered with a soft, translucent golden gradient so it reaches Masjid Al-Hikmah without disturbing/obscuring the map!
+        // Sweeping Lighthouse Beacon Rotating 360 Degrees Slowly with Balanced Light Dispersion
+        // Memutar 360 derajat secara perlahan dan seimbang pencaran sinarnya (twin opposing Fresnel beams 180° apart)
+        const rotationSpeed = 0.35; // Kecepatan putar perlahan (~18 detik per putaran penuh 360°)
+        const currentAngle = (elapsed * rotationSpeed) % (Math.PI * 2);
+        const beamAngles = [currentAngle, currentAngle + Math.PI]; // Sepasang sinar kembar yang seimbang 180° berlawanan
+        const beamReach = 250 * zRiv;
+        const beamHalfSpread = 0.125; // Sudut pencaran berkas cahaya yang proporsional dan seimbang (~14.3°)
+
+        ctx.save();
+
+        // Gambar sepasang sinar kembar mercusuar (Primary & Opposite Counter-Beam) dengan bentuk & intensitas yang identik dan seimbang
+        beamAngles.forEach((ang) => {
+          const cosA = Math.cos(ang);
+          const sinA = Math.sin(ang);
+
+          const endX1 = lhPt.x + Math.cos(ang - beamHalfSpread) * beamReach;
+          const endY1 = lanY + Math.sin(ang - beamHalfSpread) * beamReach;
+          const endX2 = lhPt.x + Math.cos(ang + beamHalfSpread) * beamReach;
+          const endY2 = lanY + Math.sin(ang + beamHalfSpread) * beamReach;
+          const endCenterX = lhPt.x + cosA * beamReach;
+          const endCenterY = lanY + sinA * beamReach;
+
+          // Lapisan 1: Berkas Cahaya Luar (Volumetric Outer Cone) dengan degradasi halus ke tepi
+          const beamGrad = ctx.createLinearGradient(lhPt.x, lanY, endCenterX, endCenterY);
+          beamGrad.addColorStop(0, isNight ? 'rgba(254, 240, 138, 0.45)' : 'rgba(254, 240, 138, 0.28)');
+          beamGrad.addColorStop(0.25, isNight ? 'rgba(253, 224, 71, 0.22)' : 'rgba(253, 224, 71, 0.13)');
+          beamGrad.addColorStop(0.65, isNight ? 'rgba(254, 240, 138, 0.08)' : 'rgba(254, 240, 138, 0.048)');
+          beamGrad.addColorStop(0.92, isNight ? 'rgba(254, 240, 138, 0.025)' : 'rgba(254, 240, 138, 0.015)');
+          beamGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+
+          ctx.fillStyle = beamGrad;
+          ctx.beginPath();
+          ctx.moveTo(lhPt.x, lanY);
+          ctx.lineTo(endX1, endY1);
+          ctx.lineTo(endX2, endY2);
+          ctx.closePath();
+          ctx.fill();
+
+          // Lapisan 2: Inti Berkas Cahaya Berdensitas Tinggi (High-Luminance Core Cone)
+          const coreHalfSpread = beamHalfSpread * 0.42;
+          const cEndX1 = lhPt.x + Math.cos(ang - coreHalfSpread) * beamReach;
+          const cEndY1 = lanY + Math.sin(ang - coreHalfSpread) * beamReach;
+          const cEndX2 = lhPt.x + Math.cos(ang + coreHalfSpread) * beamReach;
+          const cEndY2 = lanY + Math.sin(ang + coreHalfSpread) * beamReach;
+
+          const coreBeamGrad = ctx.createLinearGradient(lhPt.x, lanY, endCenterX, endCenterY);
+          coreBeamGrad.addColorStop(0, isNight ? 'rgba(255, 255, 255, 0.52)' : 'rgba(255, 255, 255, 0.35)');
+          coreBeamGrad.addColorStop(0.35, isNight ? 'rgba(254, 249, 195, 0.22)' : 'rgba(254, 249, 195, 0.14)');
+          coreBeamGrad.addColorStop(0.80, isNight ? 'rgba(254, 240, 138, 0.06)' : 'rgba(254, 240, 138, 0.035)');
+          coreBeamGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+
+          ctx.fillStyle = coreBeamGrad;
+          ctx.beginPath();
+          ctx.moveTo(lhPt.x, lanY);
+          ctx.lineTo(cEndX1, cEndY1);
+          ctx.lineTo(cEndX2, cEndY2);
+          ctx.closePath();
+          ctx.fill();
+
+          // Lapisan 3: Sinar Poros Tengah (Central Optical Spine) yang tajam dan elegan
+          ctx.strokeStyle = isNight ? 'rgba(255, 255, 255, 0.48)' : 'rgba(255, 255, 255, 0.28)';
+          ctx.lineWidth = 1.3 * zRiv;
+          ctx.beginPath();
+          ctx.moveTo(lhPt.x, lanY);
+          ctx.lineTo(lhPt.x + cosA * (beamReach * 0.88), lanY + sinA * (beamReach * 0.88));
+          ctx.stroke();
+        });
+
+        // Cahaya Pijar Pusat Lensa Fresnel Mercusuar (Glowing Lantern Flare)
+        const flareR = 13.5 * zRiv;
+        const flareGrad = ctx.createRadialGradient(lhPt.x, lanY, 1.2 * zRiv, lhPt.x, lanY, flareR);
+        flareGrad.addColorStop(0, '#ffffff');
+        flareGrad.addColorStop(0.28, 'rgba(254, 240, 138, 0.95)');
+        flareGrad.addColorStop(0.65, 'rgba(253, 224, 71, 0.42)');
+        flareGrad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+        ctx.fillStyle = flareGrad;
+        ctx.beginPath();
+        ctx.arc(lhPt.x, lanY, flareR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Kilau Emas Lembut di Kubah Masjid Al-Hikmah saat Salah Satu Sinar Mercusuar Menyapu Area Tersebut
         const masjidTargetPt = toScreen(5.45, -4.85, 22, camera.x, camera.y);
         const dxToMasjid = masjidTargetPt.x - lhPt.x;
         const dyToMasjid = masjidTargetPt.y - lanY;
-        const distToMasjid = Math.hypot(dxToMasjid, dyToMasjid);
         const baseAngleToMasjid = Math.atan2(dyToMasjid, dxToMasjid);
 
-        // Gentle sweeping oscillation centered around Masjid Al-Hikmah so the beam sweeps smoothly across the Masjid
-        const sweepOffset = Math.sin(elapsed * 0.72) * 0.15;
-        const primaryBeamAngle = baseAngleToMasjid + sweepOffset;
-        const beamReachToMasjid = Math.max(distToMasjid * 1.05, 190 * zRiv);
-        const beamHalfSpread = 0.11;
+        const normAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+        const diff1 = Math.abs(normAngle(currentAngle - baseAngleToMasjid));
+        const diff2 = Math.abs(normAngle((currentAngle + Math.PI) - baseAngleToMasjid));
+        const minMasjidDiff = Math.min(diff1, diff2);
+        const masjidSweep = Math.max(0, 1 - minMasjidDiff / 0.24);
 
-        ctx.save();
-        const endX1 = lhPt.x + Math.cos(primaryBeamAngle - beamHalfSpread) * beamReachToMasjid;
-        const endY1 = lanY + Math.sin(primaryBeamAngle - beamHalfSpread) * beamReachToMasjid;
-        const endX2 = lhPt.x + Math.cos(primaryBeamAngle + beamHalfSpread) * beamReachToMasjid;
-        const endY2 = lanY + Math.sin(primaryBeamAngle + beamHalfSpread) * beamReachToMasjid;
-        const endCenterX = lhPt.x + Math.cos(primaryBeamAngle) * beamReachToMasjid;
-        const endCenterY = lanY + Math.sin(primaryBeamAngle) * beamReachToMasjid;
-
-        const masjidBeamGrad = ctx.createLinearGradient(lhPt.x, lanY, endCenterX, endCenterY);
-        masjidBeamGrad.addColorStop(0, isNight ? 'rgba(254, 240, 138, 0.38)' : 'rgba(254, 240, 138, 0.25)');
-        masjidBeamGrad.addColorStop(0.35, isNight ? 'rgba(253, 224, 71, 0.16)' : 'rgba(253, 224, 71, 0.10)');
-        masjidBeamGrad.addColorStop(0.78, isNight ? 'rgba(254, 240, 138, 0.085)' : 'rgba(254, 240, 138, 0.055)');
-        masjidBeamGrad.addColorStop(0.95, isNight ? 'rgba(254, 240, 138, 0.055)' : 'rgba(254, 240, 138, 0.035)');
-        masjidBeamGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
-
-        ctx.fillStyle = masjidBeamGrad;
-        ctx.beginPath();
-        ctx.moveTo(lhPt.x, lanY);
-        ctx.lineTo(endX1, endY1);
-        ctx.lineTo(endX2, endY2);
-        ctx.closePath();
-        ctx.fill();
-
-        // Soft inner core ray along the center of the beam reaching Masjid Al-Hikmah
-        const coreSpread = 0.035;
-        const cEndX1 = lhPt.x + Math.cos(primaryBeamAngle - coreSpread) * beamReachToMasjid;
-        const cEndY1 = lanY + Math.sin(primaryBeamAngle - coreSpread) * beamReachToMasjid;
-        const cEndX2 = lhPt.x + Math.cos(primaryBeamAngle + coreSpread) * beamReachToMasjid;
-        const cEndY2 = lanY + Math.sin(primaryBeamAngle + coreSpread) * beamReachToMasjid;
-        const coreBeamGrad = ctx.createLinearGradient(lhPt.x, lanY, endCenterX, endCenterY);
-        coreBeamGrad.addColorStop(0, isNight ? 'rgba(255, 255, 255, 0.30)' : 'rgba(255, 255, 255, 0.18)');
-        coreBeamGrad.addColorStop(0.5, isNight ? 'rgba(254, 240, 138, 0.10)' : 'rgba(254, 240, 138, 0.065)');
-        coreBeamGrad.addColorStop(0.94, isNight ? 'rgba(254, 240, 138, 0.045)' : 'rgba(254, 240, 138, 0.03)');
-        coreBeamGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
-
-        ctx.fillStyle = coreBeamGrad;
-        ctx.beginPath();
-        ctx.moveTo(lhPt.x, lanY);
-        ctx.lineTo(cEndX1, cEndY1);
-        ctx.lineTo(cEndX2, cEndY2);
-        ctx.closePath();
-        ctx.fill();
-
-        // Subtle warm golden halo over Masjid Al-Hikmah when the beacon sweeps across it
-        const alignmentWithMasjid = Math.max(0, 1 - Math.abs(sweepOffset) / 0.15);
-        if (alignmentWithMasjid > 0.05) {
-          const haloR = 36 * zRiv;
+        if (masjidSweep > 0.02) {
+          const haloR = 38 * zRiv;
           const masjidHalo = ctx.createRadialGradient(
             masjidTargetPt.x,
             masjidTargetPt.y,
@@ -7702,7 +7759,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             masjidTargetPt.y,
             haloR
           );
-          const haloPeakAlpha = (isNight ? 0.14 : 0.09) * alignmentWithMasjid;
+          const haloPeakAlpha = (isNight ? 0.15 : 0.09) * masjidSweep;
           masjidHalo.addColorStop(0, `rgba(254, 240, 138, ${haloPeakAlpha.toFixed(3)})`);
           masjidHalo.addColorStop(0.6, `rgba(253, 224, 71, ${(haloPeakAlpha * 0.45).toFixed(3)})`);
           masjidHalo.addColorStop(1, 'rgba(254, 240, 138, 0)');
@@ -7712,24 +7769,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.fill();
         }
 
-        // Secondary shorter counter-beam sweeping gently over Danau Pusat
-        const secAng = primaryBeamAngle + Math.PI * 0.72;
-        const secReach = (isNight ? 95 : 68) * zRiv;
-        const secBx1 = lhPt.x + Math.cos(secAng - 0.16) * secReach;
-        const secBy1 = lanY + Math.sin(secAng - 0.16) * (secReach * 0.5);
-        const secBx2 = lhPt.x + Math.cos(secAng + 0.16) * secReach;
-        const secBy2 = lanY + Math.sin(secAng + 0.16) * (secReach * 0.5);
-        const secGrad = ctx.createRadialGradient(lhPt.x, lanY, 2.0 * zRiv, lhPt.x, lanY, secReach);
-        secGrad.addColorStop(0, isNight ? 'rgba(254, 240, 138, 0.35)' : 'rgba(254, 240, 138, 0.22)');
-        secGrad.addColorStop(0.5, isNight ? 'rgba(253, 224, 71, 0.12)' : 'rgba(254, 249, 195, 0.07)');
-        secGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
-        ctx.fillStyle = secGrad;
-        ctx.beginPath();
-        ctx.moveTo(lhPt.x, lanY);
-        ctx.lineTo(secBx1, secBy1);
-        ctx.lineTo(secBx2, secBy2);
-        ctx.closePath();
-        ctx.fill();
         ctx.restore();
 
         // Enlarged Grand Crimson Conical Cupola Dome Roof & Golden Lightning Finial Spire
@@ -8927,8 +8966,39 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         };
       };
 
-      // Render Each Item
+      // Render Each Item with frustum culling to skip off-screen rendering
+      const zCull = zoomLevelRef.current;
+      const cullMargin = 175 * zCull;
       drawItems.forEach((item) => {
+        // Optimasi Performa HP/Tab/Laptop: Lewati elemen di luar layar kanvas (Viewport Frustum Culling)
+        let testWx: number | null = null;
+        let testWy: number | null = null;
+        if ('wx' in item && typeof item.wx === 'number') {
+          testWx = item.wx;
+          testWy = item.wy;
+        } else if (item.type === 'building') {
+          testWx = item.info.position[0];
+          testWy = item.info.position[2];
+        } else if (item.type === 'avatar') {
+          testWx = item.data.wx;
+          testWy = item.data.wy;
+        } else if (item.type === 'cafe') {
+          testWx = cafeWx;
+          testWy = cafeWy;
+        }
+
+        if (testWx !== null && testWy !== null) {
+          const testPt = toScreen(testWx, testWy, 0, camera.x, camera.y);
+          if (
+            testPt.x < -cullMargin ||
+            testPt.x > width + cullMargin ||
+            testPt.y < -cullMargin ||
+            testPt.y > height + cullMargin
+          ) {
+            return;
+          }
+        }
+
         if (item.type === 'bench') {
           const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;

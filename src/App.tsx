@@ -20,6 +20,7 @@ import { StorageService } from './utils/storage.ts';
 import { evaluateBadges, calculateStudentLevel } from './utils/rules.ts';
 import { ThreeTownCanvas, BUILDINGS_INFO } from './components/ThreeTownCanvas.tsx';
 import { StudentWelcome } from './components/StudentWelcome.tsx';
+import { CloudTransition } from './components/CloudTransition.tsx';
 import { TeacherPinModal } from './components/TeacherPinModal.tsx';
 import { QuickNav2D } from './components/QuickNav2D.tsx';
 import {
@@ -547,7 +548,13 @@ export default function App() {
     }
   }, [student]);
 
-  // Handle Student / Guest Login (Students & Guests get 5 XP on login, Teachers get 10 XP)
+  // Animasi minimalis awan tertutup & terbuka saat perpindahan login ke kota
+  const [cloudPhase, setCloudPhase] = useState<'idle' | 'closing' | 'opening'>('idle');
+  const [cloudMessage, setCloudMessage] = useState<string>('Memasuki Refleksia City...');
+  const pendingStudentRef = useRef<Student | null>(null);
+  const pendingTeacherDestinationRef = useRef<string | null>(null);
+
+  // Handle Student / Guest Login dengan transisi awan lembut (Closing -> Midpoint -> Opening)
   const handleLoginStudent = (newStudent: Student) => {
     const loginXp = newStudent.isTeacher ? 10 : 5;
     const studentWithLoginXp: Student = {
@@ -555,25 +562,66 @@ export default function App() {
       points: loginXp,
       isGuest: Boolean(newStudent.isGuest),
     };
-    studentRef.current = studentWithLoginXp;
-    setStudent(studentWithLoginXp);
-    StorageService.setCurrentStudent(studentWithLoginXp);
-    if (!studentWithLoginXp.isGuest) {
-      StorageService.saveOrUpdateStudent(studentWithLoginXp);
+    pendingStudentRef.current = studentWithLoginXp;
+    pendingTeacherDestinationRef.current = null;
+    if (studentWithLoginXp.isGuest) {
+      setCloudMessage('Selamat Datang Tamu Refleksia City...');
+    } else if (studentWithLoginXp.isTeacher) {
+      setCloudMessage('Selamat Datang Bapak/Ibu Guru...');
+    } else {
+      setCloudMessage('Memasuki Refleksia City...');
     }
+    // Tutup awan dari kiri dan kanan
+    setCloudPhase('closing');
+  };
 
-    // Randomize missions on login
-    const randomMissions = getOrInitUserRandomMissions(studentWithLoginXp.id, true);
-    assignedMissionsRef.current = randomMissions;
-    setAssignedMissions(randomMissions);
-    completedMissionIdsRef.current = [];
-    setCompletedMissionIds([]);
-    saveCompletedMissionIds(studentWithLoginXp.id, []);
+  // Handle Teacher Login dengan transisi awan lembut (Closing -> Midpoint -> Opening)
+  const handleLoginTeacher = (teacherUser: Student, destination?: string) => {
+    pendingStudentRef.current = teacherUser;
+    pendingTeacherDestinationRef.current = destination || null;
+    setCloudMessage('Selamat Datang Bapak/Ibu Guru...');
+    setIsTeacherPinModalOpen(false);
+    // Tutup awan dari kiri dan kanan
+    setCloudPhase('closing');
+  };
 
-    // Record login town activity
-    if (!studentWithLoginXp.isGuest) {
-      StorageService.recordStudentActivity(studentWithLoginXp.id, 'login', 1);
+  const handleCloudMidpoint = () => {
+    if (pendingStudentRef.current) {
+      const studentWithLoginXp = pendingStudentRef.current;
+      studentRef.current = studentWithLoginXp;
+      setStudent(studentWithLoginXp);
+      StorageService.setCurrentStudent(studentWithLoginXp);
+      if (!studentWithLoginXp.isGuest) {
+        StorageService.saveOrUpdateStudent(studentWithLoginXp);
+      }
+
+      // Randomize missions on login
+      const randomMissions = getOrInitUserRandomMissions(studentWithLoginXp.id, true);
+      assignedMissionsRef.current = randomMissions;
+      setAssignedMissions(randomMissions);
+      completedMissionIdsRef.current = [];
+      setCompletedMissionIds([]);
+      saveCompletedMissionIds(studentWithLoginXp.id, []);
+
+      // Record login town activity
+      if (!studentWithLoginXp.isGuest) {
+        StorageService.recordStudentActivity(studentWithLoginXp.id, 'login', 1);
+      }
+
+      // Jika guru langsung menuju ke panel Ruang Guru
+      if (pendingTeacherDestinationRef.current === 'panel') {
+        setTeacherModalInitialTab('refleksi');
+        setIsTeacherModalOpen(true);
+      }
     }
+    // Buka awan ke kiri dan kanan memperlihatkan kota
+    setCloudPhase('opening');
+  };
+
+  const handleCloudComplete = () => {
+    setCloudPhase('idle');
+    pendingStudentRef.current = null;
+    pendingTeacherDestinationRef.current = null;
   };
 
   // Handle Logout
@@ -860,6 +908,14 @@ export default function App() {
           existingStudent={StorageService.getCurrentStudent()}
         />
 
+        {/* Minimalist Cloud Transition (Awan Tertutup & Terbuka) */}
+        <CloudTransition
+          phase={cloudPhase}
+          message={cloudMessage}
+          onMidpoint={handleCloudMidpoint}
+          onComplete={handleCloudComplete}
+        />
+
         {isTeacherPinModalOpen && (
           <TeacherPinModal
             onClose={() => setIsTeacherPinModalOpen(false)}
@@ -884,27 +940,12 @@ export default function App() {
                 isTeacher: true,
                 subject: teacherSubject,
               };
-              studentRef.current = teacherUser;
-              setStudent(teacherUser);
-              StorageService.setCurrentStudent(teacherUser);
-              StorageService.saveOrUpdateStudent(teacherUser);
-
-              const randomMissions = getOrInitUserRandomMissions(teacherUser.id, true);
-              assignedMissionsRef.current = randomMissions;
-              setAssignedMissions(randomMissions);
-              completedMissionIdsRef.current = [];
-              setCompletedMissionIds([]);
-              saveCompletedMissionIds(teacherUser.id, []);
 
               if (info?.name) {
                 setLoggedTeacherName(info.name);
               }
-              setIsTeacherPinModalOpen(false);
-
-              if (info?.destination === 'panel') {
-                setTeacherModalInitialTab('refleksi');
-                setIsTeacherModalOpen(true);
-              }
+              // Jalankan transisi awan lembut saat guru login
+              handleLoginTeacher(teacherUser, info?.destination);
             }}
             onOpenSettings={() => {
               setTeacherModalInitialTab('pengaturan');
@@ -969,6 +1010,14 @@ export default function App() {
           : 'bg-[#0c1527]'
       } select-none transition-colors duration-1000 ease-in-out`}
     >
+      {/* Minimalist Cloud Transition (Awan Terbuka saat memasuki kota) */}
+      <CloudTransition
+        phase={cloudPhase}
+        message={cloudMessage}
+        onMidpoint={handleCloudMidpoint}
+        onComplete={handleCloudComplete}
+      />
+
       {/* 2D Isometric Town Canvas */}
       <ThreeTownCanvas
         onSelectBuilding={handleSelectBuilding}
@@ -1385,27 +1434,11 @@ export default function App() {
               streakDays: 5,
               isTeacher: true,
             };
-            studentRef.current = teacherUser;
-            setStudent(teacherUser);
-            StorageService.setCurrentStudent(teacherUser);
-            StorageService.saveOrUpdateStudent(teacherUser);
-
-            const randomMissions = getOrInitUserRandomMissions(teacherUser.id, true);
-            assignedMissionsRef.current = randomMissions;
-            setAssignedMissions(randomMissions);
-            completedMissionIdsRef.current = [];
-            setCompletedMissionIds([]);
-            saveCompletedMissionIds(teacherUser.id, []);
-
-            if (teacherInfo?.name) {
-              setLoggedTeacherName(teacherInfo.name);
-            }
-            setIsTeacherPinModalOpen(false);
-            if (teacherInfo?.destination === 'panel') {
-              setTeacherModalInitialTab('refleksi');
-              setIsTeacherModalOpen(true);
-            }
-          }}
+              if (teacherInfo?.name) {
+                setLoggedTeacherName(teacherInfo.name);
+              }
+              handleLoginTeacher(teacherUser, teacherInfo?.destination);
+            }}
           onOpenSettings={() => {
             setTeacherModalInitialTab('pengaturan');
             setIsTeacherPinModalOpen(false);
