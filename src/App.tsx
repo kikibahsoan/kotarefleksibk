@@ -79,6 +79,11 @@ export default function App() {
       StorageService.saveOrUpdateStudent(updated);
       return updated;
     }
+    if (cur && cur.isGuest && (cur.points === undefined || cur.points === 5)) {
+      const updatedGuest: Student = { ...cur, points: 10 };
+      StorageService.setCurrentStudent(updatedGuest);
+      return updatedGuest;
+    }
     return cur;
   });
   const studentRef = useRef<Student | null>(student);
@@ -337,7 +342,7 @@ export default function App() {
   const handleAddPoints = useCallback(
     (amount: number, _reason?: string) => {
       const current = studentRef.current;
-      if (!current) return;
+      if (!current || current.isGuest) return;
       const newPoints = current.points + amount;
       const myReflections = reflections.filter((r) => r.studentId === current.id);
       const myMessages = messages.filter((m) => m.studentId === current.id);
@@ -381,7 +386,7 @@ export default function App() {
   const completeMissionIfActive = useCallback(
     (missionId: string) => {
       const current = studentRef.current;
-      if (!current) return;
+      if (!current || current.isGuest) return;
       const activeList = assignedMissionsRef.current;
       const completedList = completedMissionIdsRef.current;
 
@@ -414,6 +419,21 @@ export default function App() {
 
   const handleSelectBuilding = useCallback(
     (buildingId: BuildingId) => {
+      if (studentRef.current?.isGuest) {
+        sounds.playClick();
+        if (missionToastTimerRef.current) {
+          window.clearTimeout(missionToastTimerRef.current);
+        }
+        setMissionToast(
+          '📸 Mode Tamu (Hanya Melihat-lihat): Tamu tidak dapat masuk ke dalam gedung.'
+        );
+        missionToastTimerRef.current = window.setTimeout(() => {
+          setMissionToast(null);
+          missionToastTimerRef.current = null;
+        }, 4000);
+        return;
+      }
+
       if (buildingId === 'bank_materi' && !studentRef.current?.isTeacher) {
         sounds.playClick();
         if (missionToastTimerRef.current) {
@@ -445,7 +465,7 @@ export default function App() {
     [completeMissionIfActive]
   );
 
-  // Deduct points from student/teacher saldo automatically when used in town
+  // Deduct points from student/teacher/guest saldo automatically when used in town (e.g. ayunan)
   const handleDeductPoints = useCallback((amount: number, _reason?: string): boolean => {
     const current = studentRef.current;
     if (!current) return false;
@@ -556,7 +576,7 @@ export default function App() {
 
   // Handle Student / Guest Login dengan transisi awan lembut (Closing -> Midpoint -> Opening)
   const handleLoginStudent = (newStudent: Student) => {
-    const loginXp = newStudent.isTeacher ? 10 : 5;
+    const loginXp = newStudent.isTeacher || newStudent.isGuest ? 10 : 5;
     const studentWithLoginXp: Student = {
       ...newStudent,
       points: loginXp,
@@ -1116,7 +1136,7 @@ export default function App() {
                 {isMaster
                   ? '⏳'
                   : student.isGuest
-                  ? '📸'
+                  ? (student.gender === 'P' ? '🧕' : '👦')
                   : student.isTeacher
                   ? (student.gender === 'P' ? '👩‍🏫' : '👨‍🏫')
                   : student.gender === 'P'
@@ -1137,7 +1157,7 @@ export default function App() {
               )}
               {student.isGuest && (
                 <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[8.5px] font-extrabold bg-sky-500/25 text-sky-300 border border-sky-400/40 shrink-0">
-                  WARTAWAN • VIEW ONLY
+                  {student.gender === 'P' ? 'WARTAWATI • VIEW ONLY' : 'WARTAWAN • VIEW ONLY'}
                 </span>
               )}
 
@@ -1224,7 +1244,7 @@ export default function App() {
             {/* Notifikasi Misi Harian (Displayed right after Cuaca on Mobile & Desktop) */}
             <button
               type="button"
-              onClick={() => setActiveBuilding('balai_kota')}
+              onClick={() => handleSelectBuilding('balai_kota')}
               className="relative flex w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 rounded-full bg-[#121e2c]/68 hover:bg-[#1a293b]/80 backdrop-blur-md text-slate-200 hover:text-white border border-slate-600/50 hover:border-amber-400/60 shadow-lg items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
               title={`Notifikasi Misi Harian (${completedMissionIds.length}/${assignedMissions.length} Tuntas)`}
               aria-label="Notifikasi Misi Harian"

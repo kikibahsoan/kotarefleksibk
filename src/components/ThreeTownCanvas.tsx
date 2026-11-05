@@ -3450,7 +3450,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       }
 
       const canAccessWilderness = Boolean(
-        isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current
+        !isPlayerGuest && (isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current)
       );
 
       // 1f. Check Click directly on Pak @Sufri (gerbang kiri [-0.76, -7.32]) or Tiang Gerbang Kayu (radius diperkecil)
@@ -3475,6 +3475,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           tomi.speechTimer = 6.0;
           player.targetWx = 0.0;
           player.targetWy = player.wy > WILDERNESS_FENCE_WY ? -8.35 : -6.85;
+        } else if (isPlayerGuest) {
+          tomi.speechText = '🌲 Mohon maaf, akses Tamu hanya melihat-lihat kota dan tidak dapat masuk ke Hutan Refleksia! 📸🔒';
+          tomi.speechTimer = 6.5;
+          playerSpeechRef.current = {
+            text: '📸 Mode Tamu: Hanya melihat-lihat (Tidak bisa masuk Hutan Refleksia)',
+            expiresAt: Date.now() + 4500,
+          };
+          player.targetWx = 0.0;
+          player.targetWy = -7.08;
         } else {
           tomi.speechText = '🌲 Halo Nak! Siswa bisa masuk Hutan Refleksia dengan membayar tiket konservasi 5 XP di gerbang ya! 🎫🌱';
           tomi.speechTimer = 6.5;
@@ -3514,10 +3523,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setIsCafeMenuOpen(false);
         dismissedNearbySignatureRef.current = null;
         if (!canAccessWilderness) {
-          tomi.speechText = '🌲 Halo Nak! Untuk memancing di Sungai Refleksia, silakan bayar tiket masuk hutan 5 XP di gerbang ya! 🎫🌱';
+          tomi.speechText = isPlayerGuest
+            ? '🌲 Mohon maaf, akses Tamu hanya melihat-lihat kota dan tidak dapat masuk ke Hutan Refleksia! 📸🔒'
+            : '🌲 Halo Nak! Untuk memancing di Sungai Refleksia, silakan bayar tiket masuk hutan 5 XP di gerbang ya! 🎫🌱';
           tomi.speechTimer = 6.5;
           playerSpeechRef.current = {
-            text: '🎫 Menuju gerbang Hutan Refleksia (Tiket Masuk 5 XP)...',
+            text: isPlayerGuest
+              ? '📸 Mode Tamu: Hanya melihat-lihat (Tidak bisa masuk Hutan Refleksia)'
+              : '🎫 Menuju gerbang Hutan Refleksia (Tiket Masuk 5 XP)...',
             expiresAt: Date.now() + 4500,
           };
           player.targetWx = 0.0;
@@ -3760,10 +3773,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           player.targetWx = 0.0;
           player.targetWy = -7.08;
           player.isMoving = Math.hypot(player.wx - 0.0, player.wy - -7.08) > 0.08;
-          tomi.speechText = '🌲 Halo Nak! Untuk naik ke Rumah Pohon, silakan bayar tiket masuk Hutan Refleksia 5 XP di gerbang ya! 🎫🌱';
+          tomi.speechText = isPlayerGuest
+            ? '🌲 Mohon maaf, akses Tamu hanya melihat-lihat kota dan tidak dapat masuk ke Hutan Refleksia! 📸🔒'
+            : '🌲 Halo Nak! Untuk naik ke Rumah Pohon, silakan bayar tiket masuk Hutan Refleksia 5 XP di gerbang ya! 🎫🌱';
           tomi.speechTimer = 6.5;
           playerSpeechRef.current = {
-            text: '🎫 Menuju gerbang @Sufri untuk masuk Hutan Refleksia (-5 XP)...',
+            text: isPlayerGuest
+              ? '📸 Mode Tamu: Hanya melihat-lihat (Tidak bisa masuk Hutan Refleksia)'
+              : '🎫 Menuju gerbang @Sufri untuk masuk Hutan Refleksia (-5 XP)...',
             expiresAt: Date.now() + 4500,
           };
           clickRippleRef.current = { wx: 0.0, wy: -7.08, time: performance.now(), isRun };
@@ -3815,16 +3832,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       let targetX = Math.max(-8.15, Math.min(8.15, wx));
       let targetY = Math.max(-13.5, Math.min(8.15, wy));
 
-      // Jika belum punya akses Hutan Refleksia (Siswa belum bayar 5 XP) dan mengklik area di balik pagar (wy < -7.45),
-      // arahkan ke depan pintu gerbang yang dijaga @Sufri agar pop-up Tiket 5 XP muncul
+      // Jika belum punya akses Hutan Refleksia (Tamu atau Siswa belum bayar 5 XP) dan mengklik area di balik pagar (wy < -7.45),
+      // arahkan ke depan pintu gerbang yang dijaga @Sufri
       if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.18) {
         dismissedNearbySignatureRef.current = null;
         targetX = 0.0;
         targetY = -7.08;
-        tomi.speechText = '🌲 Halo Nak! Siswa bisa masuk Hutan Refleksia dengan membayar 5 XP di gerbang ini ya! 🎫🌱';
+        tomi.speechText = isPlayerGuest
+          ? '🌲 Mohon maaf, akses Tamu hanya melihat-lihat kota dan tidak dapat masuk ke Hutan Refleksia! 📸🔒'
+          : '🌲 Halo Nak! Siswa bisa masuk Hutan Refleksia dengan membayar 5 XP di gerbang ini ya! 🎫🌱';
         tomi.speechTimer = 6.5;
         playerSpeechRef.current = {
-          text: '🎫 Menuju gerbang Hutan Refleksia (Tiket Masuk 5 XP)...',
+          text: isPlayerGuest
+            ? '📸 Mode Tamu: Hanya melihat-lihat (Tidak bisa masuk Hutan Refleksia)'
+            : '🎫 Menuju gerbang Hutan Refleksia (Tiket Masuk 5 XP)...',
           expiresAt: Date.now() + 4500,
         };
       } else if (isSolidCollision(targetX, targetY, 0.08, canAccessWilderness)) {
@@ -4172,7 +4193,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.walkFrame = 0;
           } else {
             const canEnterWilderness = Boolean(
-              isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current
+              !isPlayerGuest && (isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current)
             );
             if (!canEnterWilderness && player.targetWy < WILDERNESS_FENCE_WY + 0.22) {
               player.targetWx = 0.0;
@@ -11899,7 +11920,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const pGuard = toScreen(-0.76, -7.32, 0, camera.x, camera.y);
           const z = zoomLevelRef.current;
           const canEnterGate = Boolean(
-            isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current
+            !isPlayerGuest && (isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current)
           );
           const distToGate = Math.hypot(player.wx - 0.0, player.wy - item.wy);
           const isGateOpen = canEnterGate && distToGate < 2.25;
@@ -16789,43 +16810,79 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.arc(pt.x, avY - 14.0 * z, 1.45 * z, 0, Math.PI);
             ctx.fill();
           } else if (isJournalistAvatar) {
-            // TAMU KOTA (WARTAWAN / REPORTER): Classic Brown Reporter Fedora Hat with Dark Hatband, White "PRESS" Ticket Card & Journalist Glasses
-            // Hair under fedora
-            ctx.fillStyle = '#1e293b';
-            ctx.beginPath();
-            ctx.arc(pt.x, avY - 20.5 * z, 5.1 * z, Math.PI, 0);
-            ctx.fill();
-            // Reporter Fedora Brim
-            ctx.fillStyle = '#78350f';
-            ctx.beginPath();
-            ctx.ellipse(pt.x, avY - 21.2 * z, 7.6 * z, 2.1 * z, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Reporter Fedora Crown
-            ctx.fillStyle = '#92400e';
-            ctx.beginPath();
-            ctx.roundRect(pt.x - 4.8 * z, avY - 25.8 * z, 9.6 * z, 4.8 * z, 1.8 * z);
-            ctx.fill();
-            // Dark Hatband Ribbon
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(pt.x - 4.8 * z, avY - 22.4 * z, 9.6 * z, 1.4 * z);
-            // Iconic White "PRESS" Ticket Card tucked into the Fedora Hatband!
-            ctx.save();
-            ctx.translate(pt.x + 2.8 * z, avY - 23.6 * z);
-            ctx.rotate(0.18);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(-1.8 * z, -1.8 * z, 3.6 * z, 2.6 * z);
-            ctx.fillStyle = '#dc2626';
-            ctx.fillRect(-1.4 * z, -1.1 * z, 2.8 * z, 0.8 * z);
-            ctx.restore();
-            // Journalist Glasses
-            ctx.strokeStyle = '#0f172a';
-            ctx.lineWidth = 0.9 * z;
-            ctx.strokeRect(pt.x - 4.0 * z, avY - 19.4 * z, 3.1 * z, 2.1 * z);
-            ctx.strokeRect(pt.x + 0.9 * z, avY - 19.4 * z, 3.1 * z, 2.1 * z);
-            ctx.beginPath();
-            ctx.moveTo(pt.x - 0.9 * z, avY - 18.4 * z);
-            ctx.lineTo(pt.x + 0.9 * z, avY - 18.4 * z);
-            ctx.stroke();
+            // TAMU KOTA (WARTAWAN / WARTAWATI):
+            if (isFemale) {
+              // WARTAWATI (FEMALE JOURNALIST): Stylish Hijab with "PRESS" Card Brooch Pin & Smart Journalist Glasses
+              ctx.fillStyle = '#0284c7'; // Elegant sky-blue journalist hijab
+              ctx.beginPath();
+              ctx.arc(pt.x, avY - 19.5 * z, 6.2 * z, 0, Math.PI * 2);
+              ctx.fill();
+              // Hijab drape over chest & shoulders
+              ctx.beginPath();
+              ctx.moveTo(pt.x - 6.2 * z, avY - 17.5 * z);
+              ctx.lineTo(pt.x + 6.2 * z, avY - 17.5 * z);
+              ctx.lineTo(pt.x + 7.2 * z, avY - 9.8 * z);
+              ctx.quadraticCurveTo(pt.x, avY - 7.5 * z, pt.x - 7.2 * z, avY - 9.8 * z);
+              ctx.closePath();
+              ctx.fill();
+              ctx.strokeStyle = '#38bdf8';
+              ctx.lineWidth = 1.0 * z;
+              ctx.stroke();
+
+              // Red & White "PRESS" Badge Brooch on Hijab
+              ctx.fillStyle = '#dc2626';
+              ctx.fillRect(pt.x + 2.5 * z, avY - 11.2 * z, 3.2 * z, 1.8 * z);
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(pt.x + 2.7 * z, avY - 11.0 * z, 2.8 * z, 0.6 * z);
+
+              // Journalist Glasses
+              ctx.strokeStyle = '#0f172a';
+              ctx.lineWidth = 0.9 * z;
+              ctx.strokeRect(pt.x - 4.0 * z, avY - 19.4 * z, 3.1 * z, 2.1 * z);
+              ctx.strokeRect(pt.x + 0.9 * z, avY - 19.4 * z, 3.1 * z, 2.1 * z);
+              ctx.beginPath();
+              ctx.moveTo(pt.x - 0.9 * z, avY - 18.4 * z);
+              ctx.lineTo(pt.x + 0.9 * z, avY - 18.4 * z);
+              ctx.stroke();
+            } else {
+              // WARTAWAN (MALE JOURNALIST): Classic Brown Reporter Fedora Hat with Dark Hatband, White "PRESS" Ticket Card & Journalist Glasses
+              // Hair under fedora
+              ctx.fillStyle = '#1e293b';
+              ctx.beginPath();
+              ctx.arc(pt.x, avY - 20.5 * z, 5.1 * z, Math.PI, 0);
+              ctx.fill();
+              // Reporter Fedora Brim
+              ctx.fillStyle = '#78350f';
+              ctx.beginPath();
+              ctx.ellipse(pt.x, avY - 21.2 * z, 7.6 * z, 2.1 * z, 0, 0, Math.PI * 2);
+              ctx.fill();
+              // Reporter Fedora Crown
+              ctx.fillStyle = '#92400e';
+              ctx.beginPath();
+              ctx.roundRect(pt.x - 4.8 * z, avY - 25.8 * z, 9.6 * z, 4.8 * z, 1.8 * z);
+              ctx.fill();
+              // Dark Hatband Ribbon
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(pt.x - 4.8 * z, avY - 22.4 * z, 9.6 * z, 1.4 * z);
+              // Iconic White "PRESS" Ticket Card tucked into the Fedora Hatband!
+              ctx.save();
+              ctx.translate(pt.x + 2.8 * z, avY - 23.6 * z);
+              ctx.rotate(0.18);
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(-1.8 * z, -1.8 * z, 3.6 * z, 2.6 * z);
+              ctx.fillStyle = '#dc2626';
+              ctx.fillRect(-1.4 * z, -1.1 * z, 2.8 * z, 0.8 * z);
+              ctx.restore();
+              // Journalist Glasses
+              ctx.strokeStyle = '#0f172a';
+              ctx.lineWidth = 0.9 * z;
+              ctx.strokeRect(pt.x - 4.0 * z, avY - 19.4 * z, 3.1 * z, 2.1 * z);
+              ctx.strokeRect(pt.x + 0.9 * z, avY - 19.4 * z, 3.1 * z, 2.1 * z);
+              ctx.beginPath();
+              ctx.moveTo(pt.x - 0.9 * z, avY - 18.4 * z);
+              ctx.lineTo(pt.x + 0.9 * z, avY - 18.4 * z);
+              ctx.stroke();
+            }
           } else if (isTeacherAvatar) {
             // Male Teacher: Smart side-parted hairstyle with glasses
             ctx.fillStyle = '#0f172a';
@@ -17285,7 +17342,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (isKikyTimeTraveler) {
             labelText = `⏳ @${av.handle}`;
           } else if (isJournalistAvatar) {
-            labelText = `📸 @${av.handle} • WARTAWAN`;
+            labelText = isFemale ? `📸 @${av.handle} • WARTAWATI` : `📸 @${av.handle} • WARTAWAN`;
           } else if (isTeacherAvatar) {
             labelText = `@${av.handle}`;
           } else if (item.isPlayer) {
@@ -20600,6 +20657,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   <button
                     onClick={() => {
                       const target = pendingConfirmation;
+                      if (isGuest) {
+                        sounds.playClick();
+                        setPendingConfirmation(null);
+                        showToast(
+                          '📸 Mode Tamu hanya melihat-lihat kota, tidak dapat masuk ke dalam gedung.',
+                          3800
+                        );
+                        if (target.type !== 'cafe') {
+                          onSelectBuildingRef.current(target.id as BuildingId);
+                        }
+                        return;
+                      }
                       if (target.id === 'bank_materi' && !isTeacher) {
                         sounds.playClick();
                         setPendingConfirmation(null);
@@ -20620,7 +20689,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     }}
                     className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] sm:text-[11px] font-bold shadow-sm border border-emerald-400/40 transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
                   >
-                    <span>{pendingConfirmation.id === 'bank_materi' && !isTeacher ? '🔒 Khusus Guru' : '🚪 Masuk'}</span>
+                    <span>
+                      {isGuest
+                        ? '🔒 Hanya Melihat'
+                        : pendingConfirmation.id === 'bank_materi' && !isTeacher
+                        ? '🔒 Khusus Guru'
+                        : '🚪 Masuk'}
+                    </span>
                   </button>
                   <button
                     onClick={() => {
@@ -20958,7 +21033,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                         <span>Pak @Sufri • Ahli Tanaman &amp; Pengepul</span>
                       </div>
                       <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
-                        {!isTeacher && !isMasterKikyRef.current && !hasPaidWildernessAccess
+                        {isGuest
+                          ? 'Gerbang Hutan Refleksia (Khusus Warga & Guru)'
+                          : !isTeacher && !isMasterKikyRef.current && !hasPaidWildernessAccess
                           ? 'Gerbang Hutan (5 XP) & Lapak Hasil Tas'
                           : totalSufriSellableXp > 0
                           ? `Hasil Tas: Senilai +${totalSufriSellableXp} XP`
@@ -20966,51 +21043,66 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       </h4>
                       <p className={`text-[9.5px] truncate leading-tight ${cafeToast ? 'text-amber-200 font-semibold' : 'text-emerald-100/90'}`}>
                         {cafeToast ||
-                          (totalSufriSellableXp > 0
+                          (isGuest
+                            ? 'Akses Tamu hanya melihat-lihat kota, tidak bisa masuk ke Hutan Refleksia'
+                            : totalSufriSellableXp > 0
                             ? `Di Tas: ${totalCaughtFishCount} Ikan & ${pickedApplesCount} Apel (+${totalSufriSellableXp} XP)`
                             : 'Beli: 7 Apel (2 XP) & Ikan Danau (2-6 XP)')}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    {!isTeacher && !isMasterKikyRef.current && !hasPaidWildernessAccess && (
+                    {isGuest ? (
                       <button
+                        type="button"
                         onClick={() => {
-                          const cost = 5;
-                          if (studentPoints < cost) {
-                            sounds.playClick();
-                            showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk masuk Hutan Refleksia.`, 3200);
-                            return;
-                          }
-                          const ok = onDeductPoints ? onDeductPoints(cost, 'Tiket Masuk Hutan Refleksia') : true;
-                          if (!ok) return;
-                          sounds.playOpenModal();
-                          hasPaidWildernessAccessRef.current = true;
-                          setHasPaidWildernessAccess(true);
-                          const sufriNpc = npcsRef.current.find((n) => n.id === 'sufri');
-                          if (sufriNpc) {
-                            sufriNpc.speechText =
-                              'Terima kasih 5 XP-nya Nak! Silakan masuk & memancing di Sungai Refleksia ya! 🌱🔓';
-                            sufriNpc.speechTimer = 6.5;
-                          }
-                          const p = playerRef.current;
-                          if (p) {
-                            p.targetWx = 0.0;
-                            p.targetWy = -8.45;
-                            p.isMoving = true;
-                            p.isRunning = false;
-                            p.speed = 0.88;
-                          }
-                          playerSpeechRef.current = {
-                            text: '🔓 Asyik! Masuk ke Hutan Refleksia (-5 XP)',
-                            expiresAt: Date.now() + 4000,
-                          };
-                          showToast('🌲 Tiket Hutan Refleksia aktif (-5 XP)! Silakan jelajahi hutan & sungai.', 3500);
+                          sounds.playClick();
+                          showToast('📸 Mode Tamu hanya melihat-lihat kota dan tidak dapat masuk ke Hutan Refleksia.', 3500);
                         }}
-                        className="py-1 px-2 rounded-lg bg-gradient-to-r from-emerald-600/95 to-teal-600/95 hover:from-emerald-500 hover:to-teal-500 text-white text-[10px] font-bold border border-emerald-300/50 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                        className="py-1 px-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-amber-200 text-[10px] font-bold border border-amber-400/40 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
                       >
-                        <span>🔓 -5 XP</span>
+                        <span>🔒 Hanya Melihat</span>
                       </button>
+                    ) : (
+                      !isTeacher && !isMasterKikyRef.current && !hasPaidWildernessAccess && (
+                        <button
+                          onClick={() => {
+                            const cost = 5;
+                            if (studentPoints < cost) {
+                              sounds.playClick();
+                              showToast(`⚠️ Saldo XP tidak cukup! Butuh ${cost} XP untuk masuk Hutan Refleksia.`, 3200);
+                              return;
+                            }
+                            const ok = onDeductPoints ? onDeductPoints(cost, 'Tiket Masuk Hutan Refleksia') : true;
+                            if (!ok) return;
+                            sounds.playOpenModal();
+                            hasPaidWildernessAccessRef.current = true;
+                            setHasPaidWildernessAccess(true);
+                            const sufriNpc = npcsRef.current.find((n) => n.id === 'sufri');
+                            if (sufriNpc) {
+                              sufriNpc.speechText =
+                                'Terima kasih 5 XP-nya Nak! Silakan masuk & memancing di Sungai Refleksia ya! 🌱🔓';
+                              sufriNpc.speechTimer = 6.5;
+                            }
+                            const p = playerRef.current;
+                            if (p) {
+                              p.targetWx = 0.0;
+                              p.targetWy = -8.45;
+                              p.isMoving = true;
+                              p.isRunning = false;
+                              p.speed = 0.88;
+                            }
+                            playerSpeechRef.current = {
+                              text: '🔓 Asyik! Masuk ke Hutan Refleksia (-5 XP)',
+                              expiresAt: Date.now() + 4000,
+                            };
+                            showToast('🌲 Tiket Hutan Refleksia aktif (-5 XP)! Silakan jelajahi hutan & sungai.', 3500);
+                          }}
+                          className="py-1 px-2 rounded-lg bg-gradient-to-r from-emerald-600/95 to-teal-600/95 hover:from-emerald-500 hover:to-teal-500 text-white text-[10px] font-bold border border-emerald-300/50 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                        >
+                          <span>🔓 -5 XP</span>
+                        </button>
+                      )
                     )}
                     {totalSufriSellableXp > 0 && (
                       <button

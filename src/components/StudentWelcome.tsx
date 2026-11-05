@@ -44,6 +44,7 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
   // Guest Login ("Tamu Kota") Modal State
   const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
   const [guestName, setGuestName] = useState('');
+  const [guestGender, setGuestGender] = useState<'L' | 'P'>('L');
   const [guestPassword, setGuestPassword] = useState('');
   const [showGuestPassword, setShowGuestPassword] = useState(false);
   const [guestError, setGuestError] = useState('');
@@ -148,14 +149,15 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'tamu';
 
+    const isFemaleGuest = guestGender === 'P';
     const guestStudent: Student = {
       id: `guest-${safeSlug}`,
       name: cleanName,
-      className: 'Tamu Kota (Wartawan)',
-      studentNumber: 'WARTAWAN-01',
+      className: isFemaleGuest ? 'Tamu Kota (Wartawati)' : 'Tamu Kota (Wartawan)',
+      studentNumber: isFemaleGuest ? 'WARTAWATI-01' : 'WARTAWAN-01',
       password: 'Ter1m4k4s1h',
-      gender: 'L',
-      points: 5,
+      gender: guestGender,
+      points: 10,
       badges: ['reflektor_pertama'],
       lastLogin: new Date().toISOString().slice(0, 10),
       streakDays: 1,
@@ -493,15 +495,17 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
             <div className="mb-4 p-3 rounded-2xl bg-slate-800/80 border border-slate-700/70 text-xs text-slate-300 space-y-1 relative z-10">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Avatar Khusus:</span>
-                <span className="font-bold text-amber-300">📸 Wartawan / Jurnalis Kota</span>
+                <span className="font-bold text-amber-300">
+                  {guestGender === 'P' ? '📸🧕 Wartawati Jurnalis' : '📸👦 Wartawan Jurnalis'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Hak Akses:</span>
-                <span className="font-bold text-sky-300">👁️ Hanya Melihat-lihat (View Only)</span>
+                <span className="font-bold text-sky-300">👁️ Melihat-lihat &amp; Akses Ayunan</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Modal XP Awal:</span>
-                <span className="font-bold text-emerald-300 font-mono">🪙 +5 XP</span>
+                <span className="text-slate-400">XP Awal:</span>
+                <span className="font-bold text-emerald-300 font-mono">🪙 10 XP (Bisa Berkurang)</span>
               </div>
             </div>
 
@@ -521,6 +525,39 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
                   placeholder="Ketik nama Anda..."
                   className="w-full px-3 py-2 bg-slate-950/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs sm:text-sm font-semibold"
                 />
+              </div>
+
+              {/* Pilihan Jenis Kelamin (Avatar Otomatis Mengikuti) */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">
+                  Jenis Kelamin (Pilihan Avatar)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGuestGender('L')}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer active:scale-95 ${
+                      guestGender === 'L'
+                        ? 'bg-sky-500/25 border-sky-400 text-sky-200 shadow-md shadow-sky-500/20 ring-1 ring-sky-400/50'
+                        : 'bg-slate-950/60 border-slate-700/80 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                    }`}
+                  >
+                    <span className="text-base">👦</span>
+                    <span>Laki-laki</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGuestGender('P')}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer active:scale-95 ${
+                      guestGender === 'P'
+                        ? 'bg-rose-500/25 border-rose-400 text-rose-200 shadow-md shadow-rose-500/20 ring-1 ring-rose-400/50'
+                        : 'bg-slate-950/60 border-slate-700/80 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                    }`}
+                  >
+                    <span className="text-base">🧕</span>
+                    <span>Wanita</span>
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -557,10 +594,12 @@ export const StudentWelcome: React.FC<StudentWelcomeProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 rounded-xl font-extrabold text-xs sm:text-sm bg-gradient-to-r from-sky-600 via-cyan-600 to-teal-600 hover:from-sky-500 hover:to-teal-500 text-white shadow-lg shadow-sky-600/30 transition flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-xl font-extrabold text-xs sm:text-sm bg-gradient-to-r from-sky-600 via-cyan-600 to-teal-600 hover:from-sky-500 hover:to-teal-500 text-white shadow-lg shadow-sky-600/30 transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
               >
                 <Camera className="w-4 h-4" />
-                <span>Masuk sebagai Tamu Kota (5 XP)</span>
+                <span>
+                  Masuk sebagai Tamu Kota ({guestGender === 'P' ? 'Wartawati' : 'Wartawan'} • 10 XP)
+                </span>
               </button>
             </form>
           </div>
