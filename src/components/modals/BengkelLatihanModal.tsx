@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { QuizQuestion, Student } from '../../types/index.ts';
+import { QuizQuestion, Student, LabDkvTestResult } from '../../types/index.ts';
 import { INITIAL_QUIZ } from '../../data/initialData.ts';
-import { X, CheckCircle, AlertCircle, ArrowRight, Award, Clock, RotateCcw, Zap, Shuffle } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, ArrowRight, Award, Clock, Zap, Shuffle, RefreshCw } from 'lucide-react';
 import { sounds } from '../../utils/audio.ts';
+import { StorageService } from '../../utils/storage.ts';
 
 interface BengkelLatihanModalProps {
   onClose: () => void;
@@ -249,9 +250,80 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
     }
   };
 
+  const [savedLabResults, setSavedLabResults] = useState<LabDkvTestResult[]>(() =>
+    StorageService.getLabDkvTestResults()
+  );
+  const [isSyncingSheet, setIsSyncingSheet] = useState<boolean>(false);
+  const roundSyncedRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    StorageService.fetchLabDkvTestResultsFromGAS()
+      .then((list) => {
+        if (mounted) setSavedLabResults(list);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const syncCompletedRoundToSpreadsheet = useCallback(() => {
+    if (roundSyncedRef.current === roundNumber) return;
+    roundSyncedRef.current = roundNumber;
+
+    const tierBreakdown = resultsHistory
+      .map((r, i) => `Jenjang ${i + 1}: ${r === 'correct' ? 'Benar' : r === 'timeout' ? 'Waktu Habis' : 'Kurang Tepat'}`)
+      .join(' | ');
+
+    const answersDetail = tieredQuestions
+      .map(
+        (q, i) =>
+          `[${i + 1}] ${q.materiTitle || `Jenjang ${i + 1}`}: ${
+            resultsHistory[i] === 'correct' ? 'BENAR (+1 XP)' : resultsHistory[i] === 'timeout' ? 'HABIS WAKTU (0 XP)' : 'SALAH (0 XP)'
+          }`
+      )
+      .join(' • ');
+
+    const primaryTitle =
+      tieredQuestions[0]?.materiTitle?.split(':')[0]?.trim() || 'Evaluasi Kompetensi Lab DKV & Tefa';
+
+    const newResult: LabDkvTestResult = {
+      id: `dkvtest-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      studentId: student.id,
+      studentName: student.name,
+      className: student.className || 'X DKV 2',
+      materiId: tieredQuestions[0]?.materiId || 'materi-bk-01',
+      materiTitle: primaryTitle,
+      roundNumber,
+      scoreCorrect: score,
+      totalQuestions: tieredQuestions.length || 5,
+      xpEarned: earnedXp,
+      tierBreakdown,
+      answersDetail,
+      createdAt: new Date().toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+      timestamp: Date.now(),
+    };
+
+    setIsSyncingSheet(true);
+    StorageService.saveLabDkvTestResult(newResult)
+      .then(() => {
+        setSavedLabResults(StorageService.getLabDkvTestResults());
+      })
+      .finally(() => {
+        setIsSyncingSheet(false);
+      });
+  }, [roundNumber, resultsHistory, tieredQuestions, student, score, earnedXp]);
+
   // Start a brand-new randomized set of 5 questions continuously
   const handleStartNextRandomSet = () => {
     sounds.playClick();
+    if (!isFinished && currentIndex === tieredQuestions.length - 1 && isAnswered) {
+      syncCompletedRoundToSpreadsheet();
+    }
     const currentIds = tieredQuestions.map((q) => q.id);
     const nextFive = pickRandomFiveQuestions(currentIds);
     const nextRound = roundNumber + 1;
@@ -280,7 +352,8 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
       setIsTimedOut(false);
       setRemainingMs(QUESTION_TIME_LIMIT_MS);
     } else {
-      // Completed 5 questions! Trigger mission completion and prepare next random round counter
+      // Completed 5 questions! Sync result to Spreadsheet and trigger mission completion
+      syncCompletedRoundToSpreadsheet();
       setIsFinished(true);
       const nextRound = roundNumber + 1;
       try {
@@ -534,6 +607,57 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
                   <div className="text-lg font-black text-amber-300 font-mono">🪙 {student.points} XP</div>
                 </div>
               </div>
+
+              {/* Spreadsheet Sync Status Badge for Hasil Tes Lab DKV */}
+              <div className="max-w-md mx-auto p-3 rounded-2xl bg-emerald-950/50 border border-emerald-500/40 flex items-center justify-between gap-2 text-left">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-extrabold text-emerald-300">
+                      {isSyncingSheet
+                        ? 'Menyinkronkan Hasil Tes ke Spreadsheet...'
+                        : 'Tersinkron Otomatis ke Google Spreadsheet'}
+                    </div>
+                    <div className="text-[10.5px] text-slate-300 truncate">
+                      Sheet: <code className="text-emerald-200 font-mono">Hasil_Tes_Lab_DKV</code> & Leaderboard Mingguan
+                    </div>
+                  </div>
+                </div>
+                {isSyncingSheet && <RefreshCw className="w-4 h-4 text-emerald-300 animate-spin shrink-0" />}
+              </div>
+
+              {/* Riwayat Hasil Tes Lab DKV Siswa */}
+              {savedLabResults.filter((r) => r.studentId === student.id).length > 0 && (
+                <div className="max-w-md mx-auto text-left p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-300 flex items-center justify-between">
+                    <span>📊 Riwayat Tes Lab DKV Kamu ({savedLabResults.filter((r) => r.studentId === student.id).length})</span>
+                    <span className="text-[10px] text-emerald-400 font-mono">Tersinkron Spreadsheet</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                    {savedLabResults
+                      .filter((r) => r.studentId === student.id)
+                      .slice(0, 5)
+                      .map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2 text-xs"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-bold text-white truncate">
+                              Paket #{item.roundNumber} • {item.materiTitle}
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate">{item.createdAt}</div>
+                          </div>
+                          <div className="shrink-0 text-right font-mono">
+                            <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/30 font-extrabold text-[11px]">
+                              {item.scoreCorrect}/{item.totalQuestions} (+{item.xpEarned} XP)
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2 max-w-md mx-auto">
                 <button

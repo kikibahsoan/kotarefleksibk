@@ -14,6 +14,7 @@ import { WeatherType, getWeatherTypeWita } from '../utils/weather.ts';
 import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
 import { X, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin, Megaphone, Mail, Send, Shuffle, ChevronLeft } from 'lucide-react';
 import { TownRulesModal } from './modals/TownRulesModal.tsx';
+import { WeeklyLeaderboardBalaiKota } from './WeeklyLeaderboardBalaiKota.tsx';
 import {
   INDONESIAN_FOLKLORE_COMICS,
   ART_DESIGN_MAGAZINES,
@@ -92,6 +93,9 @@ export const ANNOUNCEMENT_BOARD_COORDS = { wx: -1.55, wy: -3.45 };
 // Sudut Literasi Warga di Samping Balai Kota [wx: 2.35, wy: -6.15] (Di atas rumput hijau & agak jauh dari bangunan lainnya)
 export const LITERACY_CORNER_COORDS = { wx: 2.35, wy: -6.15 };
 
+// Koordinat Komandan Nawa (Penjaga Gerbang Selamat Datang) berdiri tegap lebih maju di depan Gapura Utama
+export const NAWA_GATEKEEPER_COORDS = { wx: -0.62, wy: 6.88 };
+
 export type EmoteType = 'love' | 'wave' | 'laugh' | 'dance' | 'thumbsup';
 
 export interface ActiveEmote {
@@ -104,7 +108,7 @@ export interface ActiveEmote {
 
 interface AvatarData {
   id: string;
-  role: 'siswa' | 'guru' | 'wartawan' | 'polisi' | 'petugas_kebersihan' | 'kurir' | 'barista' | 'penjaga_kota' | 'penjaga_lab' | 'penjaga_literasi' | 'penjaga_kolam' | 'pengawas' | 'kepala_balai';
+  role: 'siswa' | 'guru' | 'wartawan' | 'polisi' | 'petugas_kebersihan' | 'kurir' | 'barista' | 'penjaga_kota' | 'penjaga_lab' | 'penjaga_literasi' | 'penjaga_kolam' | 'pengawas' | 'kepala_balai' | 'penjaga_gerbang_utama';
   handle: string;
   name?: string;
   roleLabel: string;
@@ -1866,6 +1870,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const pendingBiteFishRef = useRef<LakeFishDef | null>(null);
   const caughtFishRef = useRef<LakeFishDef | null>(null);
   const [isSufriFishModalOpen, setIsSufriFishModalOpen] = useState(false);
+  const [isNawaGateModalOpen, setIsNawaGateModalOpen] = useState(false);
+  const [nawaGateTick, setNawaGateTick] = useState(0);
   const [isBagOpen, setIsBagOpen] = useState(false);
   const [fishInventory, setFishInventory] = useState<Record<LakeFishId, number>>(() => {
     try {
@@ -2989,7 +2995,36 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       speechTimer: 5.0,
     };
 
-    const npcs: AvatarData[] = [surya, malik, maUba, patra, tomi, sony];
+    // 7. Penjaga Gerbang Selamat Datang (Nawa) - Pria tegap berjiwa pemimpin dengan Topi Rimba Pramuka Cokelat, Kemeja Khaki 2 Saku, Celana Pendek Cokelat Tua Ber-Holster, Kaus Kaki Panjang Gelap & Sepatu Bot Lapangan
+    const initialNawaSpeeches = StorageService.getNawaDynamicSpeeches();
+    const nawa: AvatarData = {
+      id: 'nawa',
+      role: 'penjaga_gerbang_utama',
+      handle: 'nawa',
+      name: 'Nawa',
+      roleLabel: 'Penjaga Gerbang Utama',
+      wx: NAWA_GATEKEEPER_COORDS.wx,
+      wy: NAWA_GATEKEEPER_COORDS.wy,
+      targetWx: NAWA_GATEKEEPER_COORDS.wx,
+      targetWy: NAWA_GATEKEEPER_COORDS.wy,
+      anchorX: NAWA_GATEKEEPER_COORDS.wx,
+      anchorY: NAWA_GATEKEEPER_COORDS.wy,
+      wanderRadius: 0,
+      speed: 0,
+      shirtColor: '#c2b280', // Kemeja khaki lengan pendek dua saku
+      pantsColor: '#3e1e04', // Celana pendek cokelat tua
+      hairColor: '#1e293b',
+      gender: 'L',
+      isMoving: false,
+      pauseTimer: 99999,
+      walkFrame: 0,
+      facing: 'down-right',
+      speeches: initialNawaSpeeches,
+      speechText: initialNawaSpeeches[0],
+      speechTimer: 6.5,
+    };
+
+    const npcs: AvatarData[] = [surya, malik, maUba, patra, tomi, sony, nawa];
     npcsRef.current = npcs;
 
     // Cafe coordinates (Toko Roti & Kafe - Di ujung kota belakang Lab DKV)
@@ -3370,6 +3405,38 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         pendingBuildingId = null;
         // Reset lastTouchedIdRef so proximity check triggers the top pop-up once avatar is near Cafe
         lastTouchedIdRef.current = null;
+        return;
+      }
+
+      // 1b-0. Check Click directly on NPC Komandan Nawa (Penjaga Gerbang Selamat Datang [-0.62, 6.88])
+      const nawaDist = Math.hypot(wx - NAWA_GATEKEEPER_COORDS.wx, wy - NAWA_GATEKEEPER_COORDS.wy);
+      if (nawaDist < 0.52) {
+        sounds.playClick();
+        if (isSittingRef.current) {
+          setIsSitting(false);
+          setSittingSeat(null);
+        }
+        pendingSeatRef.current = null;
+        const freshSpeeches = StorageService.getNawaDynamicSpeeches(
+          Array.from(remotePlayersRef.current.values())
+        );
+        nawa.speeches = freshSpeeches;
+        nawa.speechText = freshSpeeches[0];
+        nawa.speechTimer = 7.5;
+        setNawaGateTick((t) => t + 1);
+        setIsNawaGateModalOpen(true);
+        player.targetWx = -0.15;
+        player.targetWy = 6.72;
+        player.isMoving = Math.hypot(player.wx - -0.15, player.wy - 6.72) > 0.08;
+        if (player.isMoving) {
+          player.isRunning = isRun;
+          player.speed = isRun ? 1.28 : 0.88;
+        }
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
+        pendingBuildingId = null;
+        lastTouchedIdRef.current = null;
+        setPendingConfirmation(null);
+        setIsCafeMenuOpen(false);
         return;
       }
 
@@ -4638,7 +4705,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         };
       } else if (
         Math.hypot(player.wx - TOWN_RULES_BOARD_COORDS.wx, player.wy - TOWN_RULES_BOARD_COORDS.wy) < 1.65 ||
-        Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55
+        Math.hypot(player.wx - 0, player.wy - 6.15) < 1.55 ||
+        Math.hypot(player.wx - NAWA_GATEKEEPER_COORDS.wx, player.wy - NAWA_GATEKEEPER_COORDS.wy) < 1.55
       ) {
         detectedNearby = { type: 'town_rules' };
       } else if (Math.hypot(player.wx - BERINGIN_TREE_COORDS.wx, player.wy - BERINGIN_TREE_COORDS.wy) < 1.75) {
@@ -4675,9 +4743,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // Update 6 Town NPCs (Patrol routes for Sony & Surya, Sudut Literasi invitations for Patra, Mayor greetings for Sony)
+      // Update 7 Town NPCs (Patrol routes for Sony & Surya, Sudut Literasi invitations for Patra, Mayor greetings for Sony, Gatekeeper login reports for Nawa)
       npcs.forEach((npc) => {
-        // Handle speech timer for Sony (Wali Kota menyapa warga) & Patra (Ibu Muslim mengajak warga baca di Sudut Literasi)
+        if (npc.role === 'penjaga_gerbang_utama') {
+          npc.speeches = StorageService.getNawaDynamicSpeeches(
+            Array.from(remotePlayersRef.current.values())
+          );
+        }
+        // Handle speech timer for Sony, Patra, Nawa, etc.
         if (npc.speeches && npc.speeches.length > 0) {
           if (npc.speechTimer && npc.speechTimer > 0) {
             npc.speechTimer -= delta;
@@ -8396,6 +8469,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             return benchGroup.wx + benchGroup.wy + 0.02;
           }
         }
+        if (avData.role === 'penjaga_gerbang_utama' || (avData.wy > WELCOME_GATE_COORDS.wy + 0.18 && Math.abs(avData.wx) < 1.25)) {
+          return Math.max(avData.wx + avData.wy, WELCOME_GATE_COORDS.wx + WELCOME_GATE_COORDS.wy + 0.72);
+        }
         return avData.wx + avData.wy;
       };
       function currentSeatIdOrDefault(s: BenchId) {
@@ -8410,7 +8486,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       });
 
       npcs.forEach((npc) => {
-        drawItems.push({ type: 'avatar', data: npc, isPlayer: false, depth: npc.wx + npc.wy });
+        drawItems.push({
+          type: 'avatar',
+          data: npc,
+          isPlayer: false,
+          depth: getAvatarRenderDepth(npc, false),
+        });
       });
 
       // Real-time Online Avatars from other devices
@@ -15821,6 +15902,46 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               ctx.fillRect(pt.x - 4 * z, avY + 1 * z + legSwing * 0.4, 3.5 * z, 2.4 * z);
               ctx.fillRect(pt.x + 0.5 * z, avY + 1 * z - legSwing * 0.4, 3.5 * z, 2.4 * z);
             }
+          } else if (av.role === 'penjaga_gerbang_utama') {
+            // NAWA (PENJAGA GERBANG SELAMAT DATANG): Celana Pendek Cokelat Tua + Lutut Tegap + Kaus Kaki Panjang Gelap + Sepatu Bot Lapangan 3D
+            // 1. Celana pendek cokelat tua (Dark brown field shorts above knee with 3D shading)
+            ctx.fillStyle = '#3e1e04';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 4.4 * z, avY - 6.2 * z, 4.0 * z, 3.2 * z, 0.8 * z);
+            ctx.roundRect(pt.x + 0.4 * z, avY - 6.2 * z, 4.0 * z, 3.2 * z, 0.8 * z);
+            ctx.fill();
+            // Shorts cuff highlight
+            ctx.fillStyle = '#5c2d06';
+            ctx.fillRect(pt.x - 4.3 * z, avY - 3.6 * z, 3.8 * z, 0.6 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY - 3.6 * z, 3.8 * z, 0.6 * z);
+
+            // 2. Exposed athletic knees (Kulit lutut tegap)
+            ctx.fillStyle = '#eab676';
+            ctx.fillRect(pt.x - 3.8 * z, avY - 3.0 * z + legSwing * 0.5, 3.0 * z, 1.3 * z);
+            ctx.fillRect(pt.x + 0.8 * z, avY - 3.0 * z - legSwing * 0.5, 3.0 * z, 1.3 * z);
+
+            // 3. Kaus kaki panjang gelap (Dark knee-high scout socks with ribbed top band)
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(pt.x - 3.9 * z, avY - 1.7 * z + legSwing, 3.2 * z, 2.6 * z);
+            ctx.fillRect(pt.x + 0.7 * z, avY - 1.7 * z - legSwing, 3.2 * z, 2.6 * z);
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(pt.x - 4.0 * z, avY - 1.8 * z + legSwing, 3.4 * z, 0.65 * z);
+            ctx.fillRect(pt.x + 0.6 * z, avY - 1.8 * z - legSwing, 3.4 * z, 0.65 * z);
+
+            // 4. Sepatu bot lapangan 3D (Sturdy dark leather field boots with thick lugged sole & laces)
+            ctx.fillStyle = '#291507';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 4.4 * z, avY + 0.6 * z + legSwing, 4.1 * z, 2.7 * z, 0.9 * z);
+            ctx.roundRect(pt.x + 0.5 * z, avY + 0.6 * z - legSwing, 4.1 * z, 2.7 * z, 0.9 * z);
+            ctx.fill();
+            // Boot laces & tongue highlight
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(pt.x - 3.2 * z, avY + 0.8 * z + legSwing, 1.6 * z, 1.3 * z);
+            ctx.fillRect(pt.x + 1.6 * z, avY + 0.8 * z - legSwing, 1.6 * z, 1.3 * z);
+            // Heavy black tactical lugged boot soles
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(pt.x - 4.5 * z, avY + 2.6 * z + legSwing, 4.3 * z, 0.95 * z);
+            ctx.fillRect(pt.x + 0.4 * z, avY + 2.6 * z - legSwing, 4.3 * z, 0.95 * z);
           } else {
             // Male Pants
             ctx.fillStyle = isTeacherAvatar ? '#1e293b' : resolvedPantsColor;
@@ -16082,6 +16203,83 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillRect(pt.x - 1.7 * z, avY - 10.5 * z, 3.4 * z, 3.8 * z);
             ctx.fillStyle = '#0284c7';
             ctx.fillRect(pt.x - 1.7 * z, avY - 10.5 * z, 3.4 * z, 1.3 * z);
+          } else if (av.role === 'penjaga_gerbang_utama') {
+            // NAWA (PENJAGA GERBANG UTAMA): Postur Pria Tegap Berjiwa Pemimpin, Kemeja Khaki Lengan Pendek Dua Saku + Sabuk Ber-Holster di Pinggang Kanan
+            // 1. Broad 3D shaded Khaki Shirt Torso (Kemeja khaki lengan pendek)
+            const torsoGrad = ctx.createLinearGradient(pt.x - 6.0 * z, avY - 14.5 * z, pt.x + 6.0 * z, avY - 5.5 * z);
+            torsoGrad.addColorStop(0, '#d5c799');
+            torsoGrad.addColorStop(0.5, '#c2b280');
+            torsoGrad.addColorStop(1, '#9e8c56');
+            ctx.fillStyle = torsoGrad;
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.9 * z, avY - 14.4 * z, 11.8 * z, 9.0 * z, 2.3 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#786636';
+            ctx.lineWidth = 0.75 * z;
+            ctx.stroke();
+
+            // Shoulder Epaulettes (Lidah bahu pemimpin tegas)
+            ctx.fillStyle = '#857240';
+            ctx.fillRect(pt.x - 5.7 * z, avY - 14.6 * z, 2.7 * z, 1.15 * z);
+            ctx.fillRect(pt.x + 3.0 * z, avY - 14.6 * z, 2.7 * z, 1.15 * z);
+
+            // Crisp Khaki Collar & V-Neck Undershirt + Center Button Placket
+            ctx.fillStyle = '#3e1e04';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 1.9 * z, avY - 14.3 * z);
+            ctx.lineTo(pt.x, avY - 11.8 * z);
+            ctx.lineTo(pt.x + 1.9 * z, avY - 14.3 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#a89660';
+            ctx.fillRect(pt.x - 0.55 * z, avY - 12.2 * z, 1.1 * z, 6.2 * z);
+
+            // Dua Saku Dada (Two Chest Pockets with Buttoned Flaps)
+            ctx.fillStyle = '#b09e68';
+            ctx.strokeStyle = '#705e30';
+            ctx.lineWidth = 0.65 * z;
+            // Left & Right chest pockets
+            ctx.fillRect(pt.x - 4.7 * z, avY - 12.2 * z, 3.3 * z, 3.2 * z);
+            ctx.strokeRect(pt.x - 4.7 * z, avY - 12.2 * z, 3.3 * z, 3.2 * z);
+            ctx.fillRect(pt.x + 1.4 * z, avY - 12.2 * z, 3.3 * z, 3.2 * z);
+            ctx.strokeRect(pt.x + 1.4 * z, avY - 12.2 * z, 3.3 * z, 3.2 * z);
+            // Pocket flaps
+            ctx.fillStyle = '#96844e';
+            ctx.fillRect(pt.x - 4.8 * z, avY - 12.4 * z, 3.5 * z, 1.05 * z);
+            ctx.fillRect(pt.x + 1.3 * z, avY - 12.4 * z, 3.5 * z, 1.05 * z);
+            // Brass pocket buttons
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(pt.x - 3.05 * z, avY - 11.8 * z, 0.5 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 3.05 * z, avY - 11.8 * z, 0.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Sabuk Kulit Cokelat Tua + Holster di Pinggang Kanan (Belt with Right-Hip Holster)
+            ctx.fillStyle = '#291507';
+            ctx.fillRect(pt.x - 6.0 * z, avY - 6.8 * z, 12.0 * z, 1.75 * z);
+            // Brass Belt Buckle
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x - 1.35 * z, avY - 6.95 * z, 2.7 * z, 2.0 * z);
+            ctx.fillStyle = '#291507';
+            ctx.fillRect(pt.x - 0.75 * z, avY - 6.55 * z, 1.5 * z, 1.2 * z);
+
+            // Holster di Pinggang Kanan Karakter (Right-hip leather holster pouch & strap)
+            const holsterX = pt.x - 6.3 * z;
+            const holsterY = avY - 6.5 * z;
+            ctx.fillStyle = '#1c0d04';
+            ctx.beginPath();
+            ctx.roundRect(holsterX, holsterY, 2.45 * z, 4.1 * z, 0.75 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 0.65 * z;
+            ctx.stroke();
+            // Holster flap & brass snap button
+            ctx.fillStyle = '#3e1e04';
+            ctx.fillRect(holsterX + 0.15 * z, holsterY, 2.15 * z, 1.45 * z);
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(holsterX + 1.2 * z, holsterY + 1.25 * z, 0.48 * z, 0, Math.PI * 2);
+            ctx.fill();
           } else {
             // Student Torso with distinct unique shirt color per student
             ctx.fillStyle = resolvedShirtColor;
@@ -16392,6 +16590,42 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 1.0 * z;
             ctx.stroke();
+          } else if (av.role === 'penjaga_gerbang_utama') {
+            // NAWA (PENJAGA GERBANG UTAMA): Lengan Kemeja Khaki Pendek + Otot Lengan Tegap Berjiwa Pemimpin
+            const breatheSway = Math.sin(elapsed * 2.8) * 0.45 * z;
+            // Short khaki sleeves (Lengan pendek khaki dengan lipatan manset)
+            ctx.fillStyle = '#c2b280';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 8.1 * z, avY - 14.1 * z, 2.5 * z, 3.6 * z, 0.9 * z);
+            ctx.roundRect(pt.x + 5.6 * z, avY - 14.1 * z + breatheSway * 0.3, 2.5 * z, 3.6 * z, 0.9 * z);
+            ctx.fill();
+            ctx.fillStyle = '#96844e';
+            ctx.fillRect(pt.x - 8.1 * z, avY - 11.1 * z, 2.5 * z, 0.7 * z);
+            ctx.fillRect(pt.x + 5.6 * z, avY - 11.1 * z + breatheSway * 0.3, 2.5 * z, 0.7 * z);
+
+            // Bare muscular forearms (Lengan bawah tegap)
+            ctx.fillStyle = '#eab676';
+            ctx.fillRect(pt.x - 7.8 * z, avY - 10.4 * z, 2.1 * z, 4.1 * z);
+            ctx.fillRect(pt.x + 5.7 * z, avY - 10.4 * z + breatheSway * 0.4, 2.1 * z, 4.1 * z);
+
+            // Hands (Tangan kanan memegang papan klip log gerbang / hormat pemimpin, tangan kiri siap di dekat sabuk/holster)
+            ctx.fillStyle = '#eab676';
+            ctx.beginPath();
+            ctx.arc(pt.x - 6.75 * z, avY - 6.0 * z, 1.35 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 6.75 * z, avY - 6.1 * z + breatheSway * 0.4, 1.35 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Papan Buku Tamu / Log Gerbang di tangan kiri-depan untuk mencatat warga login hari ini
+            const clipX = pt.x + 6.9 * z;
+            const clipY = avY - 7.2 * z + breatheSway * 0.4;
+            ctx.fillStyle = '#78350f';
+            ctx.beginPath();
+            ctx.roundRect(clipX - 1.6 * z, clipY - 2.2 * z, 3.6 * z, 4.5 * z, 0.6 * z);
+            ctx.fill();
+            ctx.fillStyle = '#fefce8';
+            ctx.fillRect(clipX - 1.1 * z, clipY - 1.5 * z, 2.6 * z, 3.3 * z);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(clipX - 0.6 * z, clipY - 2.3 * z, 1.6 * z, 0.7 * z);
           } else if (isDancingNow) {
             // DANCING ARMS: Alternating disco arm pump & groove
             const beat = (elapsed * 8) % (Math.PI * 2);
@@ -16809,6 +17043,121 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.beginPath();
             ctx.arc(pt.x, avY - 14.0 * z, 1.45 * z, 0, Math.PI);
             ctx.fill();
+          } else if (av.role === 'penjaga_gerbang_utama') {
+            // NAWA (PENJAGA GERBANG UTAMA): Gaya Animasi 3D, Ekspresi Tegas & Percaya Diri + Topi Rimba Pramuka Cokelat (Campaign Hat)
+            // 1. 3D Face Shading & Chiseled Leader Jawline
+            ctx.fillStyle = '#eab676';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 18.0 * z, 5.15 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Subtle 3D cheek/jaw contour
+            ctx.strokeStyle = 'rgba(120, 53, 15, 0.35)';
+            ctx.lineWidth = 0.75 * z;
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 17.8 * z, 4.95 * z, 0.18 * Math.PI, 0.82 * Math.PI);
+            ctx.stroke();
+
+            // 2. Ekspresi Tegas & Percaya Diri (Firm, Confident Leader Eyebrows, Sharp Eyes & Confident Smile)
+            // Thick angled leader eyebrows
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1.15 * z;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 3.6 * z, avY - 19.3 * z);
+            ctx.lineTo(pt.x - 1.1 * z, avY - 18.8 * z);
+            ctx.moveTo(pt.x + 3.6 * z, avY - 19.3 * z);
+            ctx.lineTo(pt.x + 1.1 * z, avY - 18.8 * z);
+            ctx.stroke();
+
+            // Sharp confident eyes with 3D white sclera & specular glint
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(pt.x - 2.15 * z, avY - 17.8 * z, 1.25 * z, 0.95 * z, 0, 0, Math.PI * 2);
+            ctx.ellipse(pt.x + 2.15 * z, avY - 17.8 * z, 1.25 * z, 0.95 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.05 * z, avY - 17.8 * z, 0.78 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 2.05 * z, avY - 17.8 * z, 0.78 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Bright 3D eye catchlight
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 2.4 * z, avY - 18.25 * z, 0.48 * z, 0.48 * z);
+            ctx.fillRect(pt.x + 1.7 * z, avY - 18.25 * z, 0.48 * z, 0.48 * z);
+
+            // Defined 3D nose bridge & confident leader smile
+            ctx.strokeStyle = '#9a5b25';
+            ctx.lineWidth = 0.75 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x, avY - 18.1 * z);
+            ctx.lineTo(pt.x - 0.35 * z, avY - 16.5 * z);
+            ctx.lineTo(pt.x + 0.35 * z, avY - 16.5 * z);
+            ctx.stroke();
+
+            // Firm, confident leader smirk/smile
+            ctx.strokeStyle = '#451a03';
+            ctx.lineWidth = 0.95 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 1.8 * z, avY - 15.2 * z);
+            ctx.quadraticCurveTo(pt.x + 0.2 * z, avY - 14.3 * z, pt.x + 2.1 * z, avY - 15.5 * z);
+            ctx.stroke();
+
+            // Neat short dark hair at temples under campaign hat
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 5.1 * z, avY - 21.0 * z, 1.3 * z, 2.3 * z);
+            ctx.fillRect(pt.x + 3.8 * z, avY - 21.0 * z, 1.3 * z, 2.3 * z);
+
+            // 3. Topi Rimba Pramuka Cokelat (Brown Scout Campaign Hat / Montana Peak Hat)
+            // Under-brim shadow
+            ctx.fillStyle = '#291507';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 20.6 * z, 8.8 * z, 2.35 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Wide flat circular Scout Campaign Hat Brim (Pinggiran lebar topi rimba pramuka cokelat)
+            const brimGrad = ctx.createLinearGradient(pt.x - 8.5 * z, avY - 21.5 * z, pt.x + 8.5 * z, avY - 20.5 * z);
+            brimGrad.addColorStop(0, '#4a2912');
+            brimGrad.addColorStop(0.5, '#6b3e1d');
+            brimGrad.addColorStop(1, '#3e210c');
+            ctx.fillStyle = brimGrad;
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 21.0 * z, 8.8 * z, 2.25 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#854d27';
+            ctx.lineWidth = 0.7 * z;
+            ctx.stroke();
+
+            // Iconic 4-Dented Montana Peak Crown (Mahkota Topi Rimba Pramuka Cokelat)
+            const crownGrad = ctx.createLinearGradient(pt.x - 5.0 * z, avY - 27.2 * z, pt.x + 5.0 * z, avY - 21.0 * z);
+            crownGrad.addColorStop(0, '#7c4722');
+            crownGrad.addColorStop(0.5, '#5c3317');
+            crownGrad.addColorStop(1, '#3b1f0c');
+            ctx.fillStyle = crownGrad;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5.1 * z, avY - 21.1 * z);
+            ctx.lineTo(pt.x - 3.8 * z, avY - 25.8 * z);
+            ctx.quadraticCurveTo(pt.x - 1.9 * z, avY - 24.8 * z, pt.x, avY - 26.8 * z);
+            ctx.quadraticCurveTo(pt.x + 1.9 * z, avY - 24.8 * z, pt.x + 3.8 * z, avY - 25.8 * z);
+            ctx.lineTo(pt.x + 5.1 * z, avY - 21.1 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // 3D Crown Pinch Indentations (Lekukan khas topi pramuka/campaign hat)
+            ctx.fillStyle = 'rgba(30, 14, 4, 0.48)';
+            ctx.beginPath();
+            ctx.ellipse(pt.x - 2.1 * z, avY - 24.2 * z, 1.25 * z, 1.55 * z, -0.25, 0, Math.PI * 2);
+            ctx.ellipse(pt.x + 2.1 * z, avY - 24.2 * z, 1.25 * z, 1.55 * z, 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Dark Leather Hatband & Golden Scout/Leader Emblem at Front Center
+            ctx.fillStyle = '#1c0d04';
+            ctx.fillRect(pt.x - 5.0 * z, avY - 22.3 * z, 10.0 * z, 1.35 * z);
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 21.65 * z, 1.35 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 0.55 * z;
+            ctx.stroke();
           } else if (isJournalistAvatar) {
             // TAMU KOTA (WARTAWAN / WARTAWATI):
             if (isFemale) {
@@ -17361,6 +17710,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             labelText = `@Sufri`;
           } else if (av.role === 'kepala_balai') {
             labelText = `@sony`;
+          } else if (av.role === 'penjaga_gerbang_utama') {
+            labelText = `🦅 @nawa • GERBANG`;
           }
 
           const tagFontPx = Math.max(
@@ -20841,21 +21192,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/35 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
-                      📋
+                      🦅
                     </div>
                     <div className="min-w-0">
                       <div className="text-[8.5px] font-bold tracking-wider uppercase text-amber-300 leading-none">
-                        Gapura Masuk Kota SMKN 2
+                        Gerbang Selamat Datang • Komandan Nawa
                       </div>
                       <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
-                        Papan Peraturan & Panduan
+                        Pos Gerbang Nawa & Panduan Kota
                       </h4>
                       <p className="text-[9.5px] truncate text-amber-100/85 leading-tight">
-                        Tata tertib kota & panduan aktivitas warga
+                        Cek siapa saja yang login hari ini & baca peraturan kota
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        sounds.playOpenModal();
+                        setNawaGateTick((t) => t + 1);
+                        setIsNawaGateModalOpen(true);
+                      }}
+                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600/95 to-teal-600/95 hover:from-emerald-500 hover:to-teal-500 text-white text-[10.5px] font-bold border border-emerald-300/50 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                      title="Lihat daftar warga yang masuk kota hari ini & terakhir masuk dari Komandan Nawa"
+                    >
+                      <span>🦅 Log Nawa</span>
+                    </button>
                     <button
                       onClick={() => {
                         sounds.playOpenModal();
@@ -20867,7 +21229,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       }}
                       className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 text-white text-[10.5px] font-bold border border-amber-400/45 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
                     >
-                      <span>📋 Baca</span>
+                      <span>📋 Peraturan</span>
                     </button>
                     <button
                       type="button"
@@ -21974,111 +22336,217 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   );
                 })()
               ) : (
-                /* KORAN REFLEKSIA CITY: INFO TERBARU TENTANG REFLEKSIA CITY */
-                <div className="space-y-3.5 animate-fade-in">
-                  {/* Newspaper Masthead */}
-                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 border-2 border-emerald-500/40 text-center space-y-1">
-                    <div className="flex items-center justify-between text-[10px] font-mono text-emerald-300 border-b border-emerald-500/30 pb-1">
-                      <span>EDISI TERBARU • KOTA REFLEKSIA</span>
-                      <span>HARIAN WARGA & PELAJAR DKV</span>
-                      <span>SMKN 2 GORONTALO</span>
-                    </div>
-                    <h4 className="text-lg sm:text-xl font-black tracking-tight text-white font-serif uppercase">
-                      🗞️ SUARA REFLEKSIA CITY
-                    </h4>
-                    <p className="text-[11px] text-emerald-200 font-medium">
-                      Informasi Terkini Pembangunan Kota, Aktivitas Literasi, Renovasi Lab DKV & Pengumuman Dewan Guru
-                    </p>
-                  </div>
+                /* KORAN REFLEKSIA CITY: INFO KOTA TERBARU & RANGKING SISWA TERAKTIF */
+                (() => {
+                  const gateReport = StorageService.getTodayCityEntries(
+                    Array.from(remotePlayersRef.current.values())
+                  );
+                  const topActiveStudents = StorageService.getStudents()
+                    .filter((s) => !s.isTeacher && !s.isGuest)
+                    .map((s) => {
+                      const st = StorageService.getStudentActivityStats(s);
+                      return {
+                        id: s.id,
+                        name: s.name,
+                        className: s.className,
+                        points: s.points || 0,
+                        totalActs: st.total || 0,
+                        reflections: st.reflections || 0,
+                        quizzes: st.quizzes || 0,
+                        missions: st.missions || 0,
+                      };
+                    })
+                    .sort((a, b) => {
+                      if (b.points !== a.points) return b.points - a.points;
+                      return b.totalActs - a.totalActs;
+                    })
+                    .slice(0, 6);
 
-                  {/* Visual Newspaper Headline Illustration + Lead Story */}
-                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 items-center">
-                    <div className="sm:col-span-2 h-36 rounded-xl overflow-hidden border border-emerald-500/30 bg-slate-900">
-                      <svg viewBox="0 0 280 170" className="w-full h-full">
-                        <rect width="280" height="170" fill="#0f172a" />
-                        {/* City Skyline & Lab DKV Atom Icon */}
-                        <rect x="24" y="68" width="52" height="82" rx="4" fill="#1e293b" stroke="#38bdf8" strokeWidth="1.5" />
-                        <rect x="88" y="52" width="64" height="98" rx="4" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
-                        <rect x="164" y="64" width="90" height="86" rx="4" fill="#1e293b" stroke="#10b981" strokeWidth="1.5" />
-                        {/* Moving Atom symbol above Lab DKV in illustration */}
-                        <ellipse cx="120" cy="28" rx="22" ry="8" fill="none" stroke="#38bdf8" strokeWidth="1.8" transform="rotate(-25 120 28)" />
-                        <ellipse cx="120" cy="28" rx="22" ry="8" fill="none" stroke="#fde047" strokeWidth="1.8" transform="rotate(25 120 28)" />
-                        <circle cx="120" cy="28" r="4" fill="#ffffff" />
-                        <rect x="98" y="64" width="44" height="12" rx="3" fill="#090d16" stroke="#38bdf8" strokeWidth="1" />
-                        <text x="120" y="73" fill="#38bdf8" fontSize="7" fontWeight="900" textAnchor="middle">LAB DKV</text>
-                        <rect x="0" y="148" width="280" height="22" fill="#065f46" />
-                      </svg>
-                    </div>
-                    <div className="sm:col-span-3 space-y-1.5">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-black border border-emerald-500/30">
-                        BERITA UTAMA REFLEKSIA CITY
-                      </span>
-                      <h5 className="text-sm sm:text-base font-black text-white leading-snug">
-                        Wajah Baru Gedung Lab DKV Minimalis Modern dengan Ikon Logo Atom Berputar di Puncak Atap!
-                      </h5>
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        Pemerintah Kota Refleksia resmi merampungkan renovasi gedung <strong>Lab DKV</strong> dengan gaya arsitektur studio kreatif minimalis modern berlapis kaca tirai dan instalasi <strong>Logo Atom Bergerak</strong> di bagian atas gedung. Seluruh papan nama utama kota—mulai dari <strong>ON AIR</strong> di Studio, <strong>POS KILAT</strong>, <strong>LAB DKV</strong>, hingga <strong>POHON JURNAL</strong>—kini tampil makin presisi dan rapi.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Latest Teacher Announcement Live Feed */}
-                  <div className="p-3 rounded-2xl bg-amber-950/35 border border-amber-500/40 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
-                        <Megaphone className="w-3.5 h-3.5" /> Kutipan Papan Pengumuman Balai Kota Terbaru
-                      </span>
-                      <span className="text-[10px] font-mono text-amber-200/80">
-                        {teacherAnnouncements[0]?.createdAt || 'Hari Ini'}
-                      </span>
-                    </div>
-                    <p className="text-xs font-semibold text-amber-100">
-                      “{teacherAnnouncements[0]?.content || 'Selamat datang di Kota Refleksia! Mari aktif menulis refleksi, menjaga keasrian kota, dan berlatih kuis di Lab DKV.'}”
-                    </p>
-                    <div className="text-[10px] text-amber-300/90 font-bold">
-                      — {teacherAnnouncements[0]?.teacherName || 'Dewan Guru DKV'}
-                    </div>
-                  </div>
-
-                  {/* 4 Columns of Latest Refleksia City Updates */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
-                      <div className="text-xs font-extrabold text-cyan-300">
-                        🌳 Sudut Literasi & Taman Rumput Samping Balai Kota
+                  return (
+                    <div className="space-y-3.5 animate-fade-in">
+                      {/* Newspaper Masthead */}
+                      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 border-2 border-emerald-500/40 text-center space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-mono text-emerald-300 border-b border-emerald-500/30 pb-1">
+                          <span>EDISI TERBARU • {gateReport.dateDisplay.toUpperCase()}</span>
+                          <span>HARIAN WARGA & PELAJAR DKV</span>
+                          <span>SMKN 2 GORONTALO</span>
+                        </div>
+                        <h4 className="text-lg sm:text-xl font-black tracking-tight text-white font-serif uppercase">
+                          🗞️ SUARA REFLEKSIA CITY
+                        </h4>
+                        <p className="text-[11px] text-emerald-200 font-medium">
+                          Rangking Siswa Teraktif, Laporan Gerbang Utama Nawa, Info Kota Terbaru & Pengumuman Dewan Guru
+                        </p>
                       </div>
-                      <p className="text-[11px] text-slate-300">
-                        Sudut Literasi Warga bersama Ibu Patra kini hadir di hamparan rumput hijau sebelah timur Balai Kota, dilengkapi bangku taman yang nyaman serta koleksi 15 Komik Cerita Rakyat Nusantara.
-                      </p>
-                    </div>
 
-                    <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
-                      <div className="text-xs font-extrabold text-rose-300">
-                        📮 Kotak Surat Kecil di Setiap Wisma Siswa & Guru
-                      </div>
-                      <p className="text-[11px] text-slate-300">
-                        Warga kini dapat mengirimkan masukan, ide kreatif, dan saran langsung melalui Kotak Surat Kecil di depan Wisma Siswa 1–4 maupun Wisma Guru 1–2 yang otomatis tersinkron ke Google Spreadsheet. ({wismaSuggestions.length} saran tercatat).
-                      </p>
-                    </div>
+                      {/* RANGKING SISWA TERAKTIF & LEADERBOARD MINGGUAN */}
+                      <div className="p-3.5 rounded-2xl bg-gradient-to-br from-slate-950 via-emerald-950/35 to-slate-900 border border-emerald-500/40 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/25 pb-2">
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                              🏆 RANGKING SISWA TERAKTIF KOTA REFLEKSIA (LIVE UPDATE)
+                            </span>
+                            <h5 className="text-xs sm:text-sm font-black text-white mt-0.5">
+                              Daftar Pelajar DKV Paling Aktif Berdasarkan Capaian XP & Aktivitas Belajar
+                            </h5>
+                          </div>
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-[10px] font-mono font-bold">
+                            Sinkron Spreadsheet v3.0
+                          </span>
+                        </div>
 
-                    <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
-                      <div className="text-xs font-extrabold text-amber-300">
-                        🔥 Kehangatan Api Unggun & Bangku Taman Rumput
-                      </div>
-                      <p className="text-[11px] text-slate-300">
-                        Area Api Unggun beserta bangku kayu hangat di atas hamparan rumput barat daya menjadi titik favorit siswa untuk duduk berdiskusi santai sambil menikmati suasana sore dan malam Kota Refleksia.
-                      </p>
-                    </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {topActiveStudents.map((stu, idx) => (
+                            <div
+                              key={stu.id}
+                              className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+                                idx === 0
+                                  ? 'bg-amber-500/15 border-amber-400/50'
+                                  : idx === 1
+                                  ? 'bg-slate-800/80 border-slate-500/50'
+                                  : idx === 2
+                                  ? 'bg-orange-950/40 border-orange-500/40'
+                                  : 'bg-slate-900/80 border-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div
+                                  className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${
+                                    idx === 0
+                                      ? 'bg-amber-400 text-slate-950'
+                                      : idx === 1
+                                      ? 'bg-slate-300 text-slate-950'
+                                      : idx === 2
+                                      ? 'bg-amber-600 text-white'
+                                      : 'bg-slate-800 text-slate-300 border border-slate-700'
+                                  }`}
+                                >
+                                  #{idx + 1}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-xs font-extrabold text-white truncate">
+                                    {stu.name}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 truncate">
+                                    {stu.className} • {stu.reflections} Refleksi • {stu.quizzes} Kuis • {stu.missions} Misi
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="text-xs font-black text-amber-300 font-mono">
+                                  {stu.points} XP
+                                </div>
+                                <div className="text-[9.5px] text-emerald-300 font-semibold">
+                                  {stu.totalActs} Aktivitas
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
 
-                    <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
-                      <div className="text-xs font-extrabold text-emerald-300">
-                        📌 Pohon Beringin Jurnal & Masjid Al-Hikmah
+                        {/* Embedded Weekly Leaderboard 7 Hari Terakhir */}
+                        <div className="pt-1">
+                          <WeeklyLeaderboardBalaiKota currentStudentName={studentName} compact />
+                        </div>
                       </div>
-                      <p className="text-[11px] text-slate-300">
-                        Tercatat sudah <strong>{stickyNotes.length} catatan refleksi warga</strong> tertempel di Pohon Jurnal belakang Balai Kota, sementara Masjid Al-Hikmah di hulu sungai ramai dikunjungi untuk belajar Iqro (Jilid 1–6) dan Tuntunan Sholat.
-                      </p>
+
+                      {/* Visual Newspaper Headline Illustration + Lead Story */}
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 items-center">
+                        <div className="sm:col-span-2 h-36 rounded-xl overflow-hidden border border-emerald-500/30 bg-slate-900">
+                          <svg viewBox="0 0 280 170" className="w-full h-full">
+                            <rect width="280" height="170" fill="#0f172a" />
+                            {/* City Skyline & Lab DKV Atom Icon */}
+                            <rect x="24" y="68" width="52" height="82" rx="4" fill="#1e293b" stroke="#38bdf8" strokeWidth="1.5" />
+                            <rect x="88" y="52" width="64" height="98" rx="4" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
+                            <rect x="164" y="64" width="90" height="86" rx="4" fill="#1e293b" stroke="#10b981" strokeWidth="1.5" />
+                            {/* Moving Atom symbol above Lab DKV in illustration */}
+                            <ellipse cx="120" cy="28" rx="22" ry="8" fill="none" stroke="#38bdf8" strokeWidth="1.8" transform="rotate(-25 120 28)" />
+                            <ellipse cx="120" cy="28" rx="22" ry="8" fill="none" stroke="#fde047" strokeWidth="1.8" transform="rotate(25 120 28)" />
+                            <circle cx="120" cy="28" r="4" fill="#ffffff" />
+                            <rect x="98" y="64" width="44" height="12" rx="3" fill="#090d16" stroke="#38bdf8" strokeWidth="1" />
+                            <text x="120" y="73" fill="#38bdf8" fontSize="7" fontWeight="900" textAnchor="middle">LAB DKV</text>
+                            <rect x="0" y="148" width="280" height="22" fill="#065f46" />
+                          </svg>
+                        </div>
+                        <div className="sm:col-span-3 space-y-1.5">
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-black border border-emerald-500/30">
+                            INFO KOTA TERBARU • BERITA UTAMA
+                          </span>
+                          <h5 className="text-sm sm:text-base font-black text-white leading-snug">
+                            Komandan Nawa Jaga Gerbang Selamat Datang & Saluran Radio 99.9 FM "Malam Tenang" Resmi Mengudara!
+                          </h5>
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            Gerbang Selamat Datang Kota Refleksia kini dijaga oleh <strong>Komandan Nawa</strong> (bertopi rimba pramuka cokelat & kemeja khaki dua saku) yang mencatat setiap warga yang login hari ini. Hari ini tercatat <strong>{gateReport.todayEntries.length} warga</strong> telah memasuki kota{gateReport.lastEntry ? `, dengan warga terakhir masuk: ${gateReport.lastEntry.studentName} (${gateReport.lastEntry.enteredAtTime})` : ''}!
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Latest Teacher Announcement Live Feed */}
+                      <div className="p-3 rounded-2xl bg-amber-950/35 border border-amber-500/40 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                            <Megaphone className="w-3.5 h-3.5" /> Kutipan Papan Pengumuman Balai Kota Terbaru
+                          </span>
+                          <span className="text-[10px] font-mono text-amber-200/80">
+                            {teacherAnnouncements[0]?.createdAt || 'Hari Ini'}
+                          </span>
+                        </div>
+                        <p className="text-xs font-semibold text-amber-100">
+                          “{teacherAnnouncements[0]?.content || 'Selamat datang di Kota Refleksia! Mari aktif menulis refleksi, menjaga keasrian kota, dan berlatih kuis di Lab DKV.'}”
+                        </p>
+                        <div className="text-[10px] text-amber-300/90 font-bold">
+                          — {teacherAnnouncements[0]?.teacherName || 'Dewan Guru DKV'}
+                        </div>
+                      </div>
+
+                      {/* 4 Columns of Latest Refleksia City Updates */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                          <div className="text-xs font-extrabold text-amber-300">
+                            🦅 Laporan Pos Gerbang Selamat Datang (Nawa)
+                          </div>
+                          <p className="text-[11px] text-slate-300">
+                            Hari ini ({gateReport.dateDisplay}) tercatat <strong>{gateReport.todayEntries.length} warga</strong> masuk kota:{' '}
+                            {gateReport.todayEntries
+                              .slice(0, 5)
+                              .map((e) => e.studentName)
+                              .join(', ') || 'Belum ada'}{' '}
+                            {gateReport.lastEntry
+                              ? `• Terakhir masuk: ${gateReport.lastEntry.studentName} (${gateReport.lastEntry.enteredAtTime}).`
+                              : ''}
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                          <div className="text-xs font-extrabold text-cyan-300">
+                            📻 Radio 99.9 FM "Malam Tenang dari Antent"
+                          </div>
+                          <p className="text-[11px] text-slate-300">
+                            Saluran radio favorit warga 99.9 FM kini memutar musik instrumen tenang <em>Malam Tenang dari Antent</em> secara berulang (loop otomatis) menemani siswa menulis refleksi dan mengerjakan kuis.
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                          <div className="text-xs font-extrabold text-emerald-300">
+                            🌳 Jurnal Harian Pohon Beringin (Edisi Hari Ini)
+                          </div>
+                          <p className="text-[11px] text-slate-300">
+                            Pohon Beringin kini menampilkan <strong>Info Jurnal Hari Ini</strong> pada tampilan awal serta dilengkapi fitur <strong>Baca Catatan Warga ({stickyNotes.length} catatan tersimpan)</strong> yang tersinkron ke Spreadsheet.
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                          <div className="text-xs font-extrabold text-rose-300">
+                            📊 Sinkronisasi Penuh Spreadsheet v3.0 & Papan Panduan Baru
+                          </div>
+                          <p className="text-[11px] text-slate-300">
+                            Seluruh data Refleksi Siswa, Pesan Kantor Pos, Hasil Tes Lab DKV, Hasil Podcast Studio ON AIR, Kotak Saran Wisma ({wismaSuggestions.length} saran), dan Leaderboard Mingguan telah tersinkronisasi penuh.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()
               )}
             </div>
 
@@ -22097,6 +22565,180 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           </div>
         </div>
       )}
+
+      {/* NAWA GATEKEEPER TODAY LOGIN REPORT MODAL (Pos Penjaga Gerbang Selamat Datang) */}
+      {isNawaGateModalOpen &&
+        (() => {
+          void nawaGateTick;
+          const gateReport = StorageService.getTodayCityEntries(
+            Array.from(remotePlayersRef.current.values())
+          );
+          return (
+            <div
+              className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-fade-in"
+              onClick={() => setIsNawaGateModalOpen(false)}
+            >
+              <div
+                className="bg-[#121e2c] border-2 border-amber-500/50 rounded-3xl w-full max-w-2xl p-5 sm:p-6 shadow-2xl text-white flex flex-col max-h-[90vh] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-slate-700/80 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-700 via-amber-600 to-yellow-500 border border-amber-300/60 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                      🦅
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                          Pos Gerbang Selamat Datang
+                        </span>
+                        <span className="text-[10px] font-mono text-emerald-300 font-bold">
+                          📅 {gateReport.dateDisplay}
+                        </span>
+                      </div>
+                      <h3 className="text-base sm:text-lg font-black text-white mt-0.5">
+                        Komandan Nawa • Laporan Warga Masuk Kota Hari Ini
+                      </h3>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsNawaGateModalOpen(false)}
+                    className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="mt-4 space-y-4 overflow-y-auto pr-1 flex-1">
+                  {/* Nawa Speech Card */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/70 via-slate-900 to-slate-900 border border-amber-500/40 flex items-start gap-3">
+                    <div className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs font-black shrink-0">
+                      @nawa
+                    </div>
+                    <p className="text-xs text-slate-200 leading-relaxed">
+                      “Salam tegas dan percaya diri! Saya <strong>Nawa</strong>, Penjaga Gerbang Selamat Datang Kota Refleksia. Tugas saya mencatat dan memberitahukan <strong>siapa saja yang login atau masuk ke kota hari ini</strong> serta <strong>siapa warga yang terakhir kali melintasi gerbang masuk</strong>.”
+                    </p>
+                  </div>
+
+                  {/* Highlight: Warga Terakhir Masuk ke Kota */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-teal-950/60 to-slate-900 border-2 border-emerald-400/50 shadow-md">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                      <span>🔔 WARGA TERAKHIR MASUK KE KOTA REFLEKSIA</span>
+                    </div>
+                    {gateReport.lastEntry ? (
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-sm sm:text-base font-black text-white">
+                            {gateReport.lastEntry.studentName}
+                          </div>
+                          <div className="text-xs text-emerald-200 font-semibold">
+                            {gateReport.lastEntry.className} •{' '}
+                            {gateReport.lastEntry.role === 'guru'
+                              ? '👨‍🏫 Guru'
+                              : gateReport.lastEntry.role === 'tamu'
+                              ? '📸 Tamu Kota'
+                              : '🎒 Siswa Warga Kota'}
+                          </div>
+                        </div>
+                        <div className="px-3 py-1.5 rounded-xl bg-emerald-500/25 border border-emerald-300/40 text-emerald-100 font-mono text-xs font-black">
+                          ⏰ Masuk Pukul {gateReport.lastEntry.enteredAtTime}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-300 mt-1">
+                        Belum ada data warga yang tercatat masuk hari ini.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Daftar Lengkap Warga yang Login / Masuk Hari Ini */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs sm:text-sm font-extrabold text-amber-300 uppercase tracking-wider">
+                        📋 Daftar Warga yang Login / Masuk Kota Hari Ini ({gateReport.todayEntries.length} Warga)
+                      </h4>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Urutan Terbaru di Atas
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {gateReport.todayEntries.map((entry, idx) => (
+                        <div
+                          key={entry.id}
+                          className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                            idx === 0
+                              ? 'bg-emerald-950/40 border-emerald-500/50'
+                              : 'bg-slate-900/85 border-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-7 h-7 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${
+                                idx === 0
+                                  ? 'bg-emerald-500 text-slate-950'
+                                  : 'bg-slate-800 text-amber-300 border border-slate-700'
+                              }`}
+                            >
+                              {idx + 1}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs sm:text-sm font-black text-white truncate">
+                                  {entry.studentName}
+                                </span>
+                                {idx === 0 && (
+                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950">
+                                    Terakhir Masuk
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400 truncate">
+                                {entry.className}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-xs font-mono font-bold text-amber-300">
+                              {entry.enteredAtTime}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {entry.dateDisplay}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsNawaGateModalOpen(false);
+                      setIsTownRulesModalOpen(true);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-amber-600/25 hover:bg-amber-600/40 border border-amber-400/40 text-amber-200 font-bold text-xs transition cursor-pointer"
+                  >
+                    📋 Buka Papan Peraturan & Panduan Kota
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsNawaGateModalOpen(false)}
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-md transition cursor-pointer"
+                  >
+                    Siap Komandan Nawa!
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       {/* TOWN RULES & ACTIVITIES GUIDE MODAL (Gapura Awal Masuk) */}
       {isTownRulesModalOpen && (
@@ -22231,8 +22873,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               </div>
             )}
 
-            {/* Daftar Pengumuman Guru dari Data Pesan Sistem */}
-            <div className="space-y-2.5 overflow-y-auto pr-1 flex-1">
+            {/* Daftar Pengumuman Guru & Leaderboard Mingguan Balai Kota */}
+            <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+              <WeeklyLeaderboardBalaiKota currentStudentName={studentName} compact />
+
+              <div className="text-xs font-extrabold text-amber-300 pt-1 flex items-center gap-1.5">
+                <Megaphone className="w-3.5 h-3.5 text-amber-400" />
+                <span>Pengumuman & Arahan Guru Terbaru</span>
+              </div>
               {teacherAnnouncements.map((ann, idx) => (
                 <div
                   key={ann.id}

@@ -12,6 +12,10 @@ import {
   BankMateriEntry,
   WismaSuggestion,
   TeacherAnnouncement,
+  LabDkvTestResult,
+  WeeklyXpLogEntry,
+  WeeklyLeaderboardCitizen,
+  CityEntryLogEntry,
 } from '../types/index.ts';
 import {
   INITIAL_MATERI,
@@ -40,6 +44,9 @@ const STORAGE_KEYS = {
   BANK_MATERI: 'kota_refleksi_bank_materi',
   DELETED_BANK_MATERI: 'kota_refleksi_deleted_bank_materi',
   WISMA_SUGGESTIONS: 'kota_refleksi_wisma_suggestions',
+  LAB_DKV_RESULTS: 'kota_refleksi_lab_dkv_results',
+  WEEKLY_XP_LOGS: 'kota_refleksi_weekly_xp_logs',
+  CITY_ENTRY_LOGS: 'kota_refleksi_city_entry_logs',
 };
 
 const INITIAL_BANK_MATERI: BankMateriEntry[] = [
@@ -1836,6 +1843,906 @@ export const StorageService = {
     this.setWismaSuggestions(merged);
     return merged;
   },
+
+  // ==========================================================================
+  // HASIL TES DI LAB DKV & TEFA (TERSINKRON KE SPREADSHEET: Hasil_Tes_Lab_DKV)
+  // ==========================================================================
+  getLabDkvTestResults(): LabDkvTestResult[] {
+    const items = safeGet<LabDkvTestResult[]>(STORAGE_KEYS.LAB_DKV_RESULTS, []);
+    return Array.isArray(items) ? items : [];
+  },
+
+  setLabDkvTestResults(items: LabDkvTestResult[]): void {
+    const map = new Map<string, LabDkvTestResult>();
+    (items || []).forEach((it) => {
+      if (it && it.id) map.set(it.id, it);
+    });
+    const sorted = Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    safeSet(STORAGE_KEYS.LAB_DKV_RESULTS, sorted.slice(0, 200));
+  },
+
+  async saveLabDkvTestResult(result: LabDkvTestResult): Promise<void> {
+    const current = this.getLabDkvTestResults();
+    const updated = [result, ...current.filter((r) => r.id !== result.id)];
+    this.setLabDkvTestResults(updated);
+
+    // 1. Catat perolehan XP ke log mingguan (7 hari terakhir) untuk Leaderboard Mingguan Balai Kota
+    if (result.xpEarned > 0) {
+      await this.logWeeklyXpGain({
+        studentId: result.studentId,
+        studentName: result.studentName,
+        className: result.className,
+        xpEarned: result.xpEarned,
+        activityType: 'tes_lab_dkv',
+        description: `Tes Lab DKV (${result.materiTitle}) • Skor ${result.scoreCorrect}/${result.totalQuestions}`,
+      });
+    }
+
+    // 2. Kirim ke Sheet khusus 'Hasil_Tes_Lab_DKV' pada Google Apps Script v3.0
+    await this.syncWithGAS('save_lab_dkv_test', {
+      testResult: result,
+    });
+
+    // 3. Kirim juga ke submit_reflection bertanda [HASIL_TES_LAB_DKV] agar langsung tersimpan di Data_Refleksi_Siswa / Refleksi_Siswa
+    //    meskipun deployment Apps Script lama belum sempat di-update ke v3.0
+    const fallbackReflection: Reflection = {
+      id: `labdkv-${result.id}`,
+      studentId: result.studentId,
+      studentName: result.studentName,
+      studentNumber: 'HASIL_TES_LAB_DKV',
+      className: result.className || 'X DKV 2',
+      materiId: result.materiId || 'materi-lab-dkv',
+      materiTitle: `[HASIL_TES_LAB_DKV] ${result.materiTitle} • Paket #${result.roundNumber} (${result.scoreCorrect}/${result.totalQuestions} Benar • +${result.xpEarned} XP)`,
+      scale: Math.max(1, Math.min(5, result.scoreCorrect || 1)),
+      moodEmoji: result.scoreCorrect >= 4 ? '🏆' : result.scoreCorrect >= 3 ? '🛠️' : '📝',
+      answers: {
+        understood: `Skor Tes Lab DKV: ${result.scoreCorrect} dari ${result.totalQuestions} Soal Benar (+${result.xpEarned} XP) | Paket #${result.roundNumber}`,
+        difficult: `Rincian Jenjang 1-5: ${result.tierBreakdown}`,
+        actionPlan: result.answersDetail || `Menyelesaikan evaluasi berjenjang materi "${result.materiTitle}" di Lab DKV & Tefa.`,
+        findings: JSON.stringify(result),
+        customAnswers: {
+          Kategori: 'HASIL_TES_LAB_DKV',
+          Skor_Benar: String(result.scoreCorrect),
+          Total_Soal: String(result.totalQuestions),
+          XP_Diperoleh: String(result.xpEarned),
+          Rincian_Jenjang: result.tierBreakdown,
+        },
+      },
+      createdAt: result.createdAt,
+    };
+
+    await this.syncWithGAS('submit_reflection', {
+      reflection: fallbackReflection,
+    });
+
+    try {
+      window.dispatchEvent(new CustomEvent('kota_refleksi_lab_dkv_updated', { detail: updated }));
+    } catch {}
+  },
+
+  async fetchLabDkvTestResultsFromGAS(): Promise<LabDkvTestResult[]> {
+    const map = new Map<string, LabDkvTestResult>();
+    this.getLabDkvTestResults().forEach((item) => {
+      if (item && item.id) map.set(item.id, item);
+    });
+
+    const settings = this.getSettings();
+    if (settings.gasWebAppUrl && settings.gasWebAppUrl.startsWith('http')) {
+      try {
+        const url = new URL(settings.gasWebAppUrl);
+        url.searchParams.set('action', 'get_data');
+        url.searchParams.set('_t', String(Date.now()));
+        const gasRes = await fetch(url.toString(), {
+          method: 'GET',
+          redirect: 'follow',
+          cache: 'no-store',
+        });
+        if (gasRes.ok) {
+          const resData = await gasRes.json();
+          // A. Dari array labDkvResults (Sheet 'Hasil_Tes_Lab_DKV' GAS v3.0)
+          if (Array.isArray(resData.labDkvResults)) {
+            resData.labDkvResults.forEach((item: any, idx: number) => {
+              if (item && (item.id || item.studentName)) {
+                const rec: LabDkvTestResult = {
+                  id: String(item.id || `labdkv-sheet-${idx}`),
+                  studentId: String(item.studentId || 'std-sheet'),
+                  studentName: String(item.studentName || 'Siswa DKV'),
+                  className: String(item.className || 'X DKV 2'),
+                  materiId: String(item.materiId || 'materi-bk-01'),
+                  materiTitle: String(item.materiTitle || 'Evaluasi Lab DKV'),
+                  roundNumber: Number(item.roundNumber) || 1,
+                  scoreCorrect: Number(item.scoreCorrect) || 0,
+                  totalQuestions: Number(item.totalQuestions) || 5,
+                  xpEarned: Number(item.xpEarned ?? item.scoreCorrect) || 0,
+                  tierBreakdown: String(item.tierBreakdown || ''),
+                  answersDetail: String(item.answersDetail || ''),
+                  createdAt: String(item.createdAt || 'Hari ini'),
+                  timestamp: Number(item.timestamp) || parseChatTimestamp(item.createdAt) || Date.now() - idx * 30000,
+                };
+                map.set(rec.id, rec);
+              }
+            });
+          }
+
+          // B. Dari refleksi bertanda [HASIL_TES_LAB_DKV]
+          if (Array.isArray(resData.reflections)) {
+            resData.reflections.forEach((r: Reflection, idx: number) => {
+              const isLabTest =
+                (r.id && String(r.id).startsWith('labdkv-')) ||
+                (r.materiTitle && String(r.materiTitle).includes('[HASIL_TES_LAB_DKV]')) ||
+                r.studentNumber === 'HASIL_TES_LAB_DKV';
+              if (isLabTest) {
+                try {
+                  if (r.answers?.findings && r.answers.findings.startsWith('{')) {
+                    const parsed: LabDkvTestResult = JSON.parse(r.answers.findings);
+                    if (parsed && parsed.id) {
+                      map.set(parsed.id, parsed);
+                      return;
+                    }
+                  }
+                } catch {}
+                const cleanId = String(r.id).replace(/^labdkv-/, '');
+                const score = Number(r.answers?.customAnswers?.['Skor_Benar'] ?? r.scale) || 0;
+                const xp = Number(r.answers?.customAnswers?.['XP_Diperoleh'] ?? score) || 0;
+                const rec: LabDkvTestResult = {
+                  id: cleanId,
+                  studentId: r.studentId,
+                  studentName: r.studentName,
+                  className: r.className || 'X DKV 2',
+                  materiId: r.materiId || 'materi-bk-01',
+                  materiTitle: String(r.materiTitle || 'Tes Lab DKV')
+                    .replace('[HASIL_TES_LAB_DKV]', '')
+                    .trim(),
+                  roundNumber: 1,
+                  scoreCorrect: score,
+                  totalQuestions: 5,
+                  xpEarned: xp,
+                  tierBreakdown: r.answers?.difficult || '',
+                  answersDetail: r.answers?.actionPlan || '',
+                  createdAt: r.createdAt || 'Hari ini',
+                  timestamp: parseChatTimestamp(r.createdAt) || Date.now() - idx * 30000,
+                };
+                map.set(rec.id, rec);
+              }
+            });
+          }
+        }
+      } catch {}
+    }
+
+    const merged = Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    this.setLabDkvTestResults(merged);
+    return merged;
+  },
+
+  // ==========================================================================
+  // LOG XP MINGGUAN & LEADERBOARD MINGGUAN BALAI KOTA (7 HARI TERAKHIR DARI SPREADSHEET)
+  // ==========================================================================
+  getWeeklyXpLogs(): WeeklyXpLogEntry[] {
+    const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - FOURTEEN_DAYS;
+    const raw = safeGet<WeeklyXpLogEntry[]>(STORAGE_KEYS.WEEKLY_XP_LOGS, []);
+    const valid = (Array.isArray(raw) ? raw : []).filter(
+      (item) => item && item.id && (item.timestamp || 0) >= cutoff
+    );
+    return valid;
+  },
+
+  setWeeklyXpLogs(items: WeeklyXpLogEntry[]): void {
+    const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - FOURTEEN_DAYS;
+    const map = new Map<string, WeeklyXpLogEntry>();
+    (items || []).forEach((it) => {
+      if (it && it.id && (it.timestamp || 0) >= cutoff) {
+        map.set(it.id, it);
+      }
+    });
+    const sorted = Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    safeSet(STORAGE_KEYS.WEEKLY_XP_LOGS, sorted.slice(0, 500));
+  },
+
+  async logWeeklyXpGain(params: {
+    studentId: string;
+    studentName: string;
+    className: string;
+    xpEarned: number;
+    activityType: WeeklyXpLogEntry['activityType'];
+    description: string;
+  }): Promise<void> {
+    if (!params.studentId || params.xpEarned <= 0) return;
+    if (params.studentId.startsWith('teacher-') || params.studentId.startsWith('guest-')) return;
+
+    const now = Date.now();
+    const entry: WeeklyXpLogEntry = {
+      id: `xplog-${now}-${Math.random().toString(36).slice(2, 6)}`,
+      studentId: params.studentId,
+      studentName: params.studentName,
+      className: params.className || 'X DKV 2',
+      xpEarned: params.xpEarned,
+      activityType: params.activityType,
+      description: params.description,
+      createdAt: new Date(now).toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+      timestamp: now,
+    };
+
+    const current = this.getWeeklyXpLogs();
+    this.setWeeklyXpLogs([entry, ...current]);
+
+    // Sync to Google Spreadsheet Sheet 'Log_XP_Mingguan' (GAS v3.0)
+    await this.syncWithGAS('log_xp_gain', {
+      xpLog: entry,
+    });
+  },
+
+  /**
+   * Menghitung & menarik Top 5 Warga dengan perolehan XP terbanyak dalam 7 hari terakhir
+   * menggunakan data langsung dari Google Spreadsheet (Log_XP_Mingguan, Data_Refleksi_Siswa,
+   * Hasil_Tes_Lab_DKV, Studio_On_Air_Podcast, Jurnal_Pohon_Beringin, Pesan_Kantor_Pos, Pasar_Prestasi_Siswa)
+   * yang digabung dengan aktivitas 7 hari terakhir.
+   */
+  async fetchWeeklyLeaderboardFromSpreadsheet(): Promise<{
+    top5: WeeklyLeaderboardCitizen[];
+    syncedFromSheet: boolean;
+    spreadsheetName: string;
+    lastUpdated: string;
+  }> {
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const cutoff7Days = now - SEVEN_DAYS_MS;
+
+    const allStudents = this.getStudents().filter((s) => !s.isTeacher && !s.isGuest);
+    const studentByIdOrName = (id?: string, name?: string): Student | undefined => {
+      if (id) {
+        const byId = allStudents.find((s) => s.id === id);
+        if (byId) return byId;
+      }
+      if (name) {
+        const clean = name.trim().toLowerCase();
+        const byName = allStudents.find((s) => s.name.trim().toLowerCase() === clean);
+        if (byName) return byName;
+      }
+      return undefined;
+    };
+
+    interface AggregatedWeekly {
+      studentId: string;
+      studentName: string;
+      className: string;
+      gender: string;
+      totalXp: number;
+      weeklyXp: number;
+      weeklyActivitiesCount: number;
+      breakdown: {
+        refleksi: number;
+        tesLabDkv: number;
+        podcast: number;
+        misi: number;
+        lainnya: number;
+      };
+      lastActivityText: string;
+      lastTimestamp: number;
+      seenEventKeys: Set<string>;
+    }
+
+    const aggMap = new Map<string, AggregatedWeekly>();
+
+    const ensureCitizen = (id: string, name: string, className?: string): AggregatedWeekly => {
+      const matched = studentByIdOrName(id, name);
+      const canonicalId = matched?.id || id || `std-${name.toLowerCase().replace(/\s+/g, '-')}`;
+      let entry = aggMap.get(canonicalId);
+      if (!entry) {
+        entry = {
+          studentId: canonicalId,
+          studentName: matched?.name || name || 'Warga DKV',
+          className: matched?.className || className || 'X DKV 2',
+          gender: matched?.gender || 'L',
+          totalXp: matched?.points || 0,
+          weeklyXp: 0,
+          weeklyActivitiesCount: 0,
+          breakdown: {
+            refleksi: 0,
+            tesLabDkv: 0,
+            podcast: 0,
+            misi: 0,
+            lainnya: 0,
+          },
+          lastActivityText: 'Aktif di Kota Refleksia minggu ini',
+          lastTimestamp: 0,
+          seenEventKeys: new Set<string>(),
+        };
+        aggMap.set(canonicalId, entry);
+      } else if (matched && matched.points > entry.totalXp) {
+        entry.totalXp = matched.points;
+      }
+      return entry;
+    };
+
+    const addWeeklyEvent = (params: {
+      eventKey: string;
+      studentId: string;
+      studentName: string;
+      className?: string;
+      xp: number;
+      category: 'refleksi' | 'tesLabDkv' | 'podcast' | 'misi' | 'lainnya';
+      label: string;
+      timestamp: number;
+    }) => {
+      if (!params.studentName || params.xp <= 0) return;
+      if (
+        params.studentId.startsWith('teacher-') ||
+        params.studentId.startsWith('guest-') ||
+        params.studentName.toLowerCase().includes('guru')
+      ) {
+        return;
+      }
+      if (params.timestamp < cutoff7Days) return;
+
+      const citizen = ensureCitizen(params.studentId, params.studentName, params.className);
+      if (citizen.seenEventKeys.has(params.eventKey)) return;
+      citizen.seenEventKeys.add(params.eventKey);
+
+      citizen.weeklyXp += params.xp;
+      citizen.weeklyActivitiesCount += 1;
+      citizen.breakdown[params.category] += params.xp;
+
+      if (params.timestamp >= citizen.lastTimestamp) {
+        citizen.lastTimestamp = params.timestamp;
+        citizen.lastActivityText = params.label;
+      }
+    };
+
+    let syncedFromSheet = false;
+    let spreadsheetName = 'Google Spreadsheet Kota Refleksia';
+
+    // 1. Tarik data langsung dari Google Spreadsheet (doGet?action=get_data)
+    const settings = this.getSettings();
+    if (settings.gasWebAppUrl && settings.gasWebAppUrl.startsWith('http')) {
+      try {
+        const url = new URL(settings.gasWebAppUrl);
+        url.searchParams.set('action', 'get_data');
+        url.searchParams.set('_t', String(Date.now()));
+
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          redirect: 'follow',
+          cache: 'no-store',
+        });
+
+        if (response.ok) {
+          const resData = await response.json();
+          syncedFromSheet = true;
+          if (resData.spreadsheet) {
+            spreadsheetName = String(resData.spreadsheet);
+          }
+
+          // A. Log_XP_Mingguan dari Spreadsheet (GAS v3.0)
+          if (Array.isArray(resData.xpLogs)) {
+            resData.xpLogs.forEach((log: any, idx: number) => {
+              const ts = Number(log.timestamp) || parseChatTimestamp(log.createdAt) || now - idx * 30000;
+              const actType = String(log.activityType || '');
+              const cat: 'refleksi' | 'tesLabDkv' | 'podcast' | 'misi' | 'lainnya' =
+                actType === 'refleksi'
+                  ? 'refleksi'
+                  : actType === 'tes_lab_dkv'
+                  ? 'tesLabDkv'
+                  : actType === 'podcast'
+                  ? 'podcast'
+                  : actType === 'misi'
+                  ? 'misi'
+                  : 'lainnya';
+              addWeeklyEvent({
+                eventKey: `xplog-${log.id || `${log.studentId}-${ts}`}`,
+                studentId: String(log.studentId || ''),
+                studentName: String(log.studentName || ''),
+                className: String(log.className || ''),
+                xp: Number(log.xpEarned) || 1,
+                category: cat,
+                label: String(log.description || 'Aktivitas Mingguan Spreadsheet'),
+                timestamp: ts,
+              });
+            });
+          }
+
+          // B. Hasil_Tes_Lab_DKV dari Spreadsheet (GAS v3.0)
+          if (Array.isArray(resData.labDkvResults)) {
+            resData.labDkvResults.forEach((t: any, idx: number) => {
+              const ts = Number(t.timestamp) || parseChatTimestamp(t.createdAt) || now - idx * 45000;
+              const xp = Number(t.xpEarned ?? t.scoreCorrect) || 1;
+              addWeeklyEvent({
+                eventKey: `labdkv-${t.id || `${t.studentId}-${ts}`}`,
+                studentId: String(t.studentId || ''),
+                studentName: String(t.studentName || ''),
+                className: String(t.className || ''),
+                xp,
+                category: 'tesLabDkv',
+                label: `Tes Lab DKV: ${t.materiTitle || 'Evaluasi 5 Jenjang'} (+${xp} XP)`,
+                timestamp: ts,
+              });
+            });
+          }
+
+          // C. Studio_On_Air_Podcast / Hasil_Podcast_Siswa dari Spreadsheet
+          if (Array.isArray(resData.podcasts)) {
+            resData.podcasts.forEach((p: any, idx: number) => {
+              const ts = Number(p.timestamp) || parseChatTimestamp(p.createdAt) || now - idx * 60000;
+              addWeeklyEvent({
+                eventKey: `pod-${p.id || `${p.studentId}-${ts}`}`,
+                studentId: String(p.studentId || ''),
+                studentName: String(p.studentName || ''),
+                className: String(p.className || ''),
+                xp: Number(p.xpEarned) || 2,
+                category: 'podcast',
+                label: `Podcast ON AIR: ${p.materiTitle || 'Dialog Refleksi AI'}`,
+                timestamp: ts,
+              });
+            });
+          }
+
+          // D. Data_Refleksi_Siswa / Refleksi_Siswa dari Spreadsheet
+          if (Array.isArray(resData.reflections)) {
+            resData.reflections.forEach((r: Reflection, idx: number) => {
+              if (!r || !r.studentName) return;
+              const titleStr = String(r.materiTitle || '');
+              if (titleStr.includes('[BANK_MATERI_AI]') || r.studentNumber === 'BANK_MATERI_AI') {
+                return;
+              }
+
+              const ts = parseChatTimestamp(r.createdAt) || now - idx * 60000;
+
+              // Jika baris refleksi adalah [PASAR_PRESTASI], sinkronkan statistik mingguan dari Spreadsheet
+              if (
+                (r.id && String(r.id).startsWith('prestasi-')) ||
+                titleStr.includes('[PASAR_PRESTASI]') ||
+                r.studentNumber === 'PASAR_PRESTASI'
+              ) {
+                const pts = Number(r.answers?.customAnswers?.['points']) || 0;
+                const citizen = ensureCitizen(r.studentId, r.studentName, r.className);
+                if (pts > citizen.totalXp) citizen.totalXp = pts;
+                return;
+              }
+
+              // Jika baris refleksi adalah [HASIL_TES_LAB_DKV]
+              if (
+                (r.id && String(r.id).startsWith('labdkv-')) ||
+                titleStr.includes('[HASIL_TES_LAB_DKV]') ||
+                r.studentNumber === 'HASIL_TES_LAB_DKV'
+              ) {
+                const cleanId = String(r.id).replace(/^labdkv-/, '');
+                const xp = Number(r.answers?.customAnswers?.['XP_Diperoleh'] ?? r.scale) || 1;
+                addWeeklyEvent({
+                  eventKey: `labdkv-${cleanId}`,
+                  studentId: r.studentId,
+                  studentName: r.studentName,
+                  className: r.className,
+                  xp,
+                  category: 'tesLabDkv',
+                  label: `Tes Lab DKV (${r.scale}/5 Benar • +${xp} XP)`,
+                  timestamp: ts,
+                });
+                return;
+              }
+
+              // Jika baris refleksi adalah [PODCAST_MENARA_MENTOR]
+              if (
+                (r.id && String(r.id).startsWith('pod-')) ||
+                titleStr.includes('[PODCAST_MENARA_MENTOR]') ||
+                r.studentNumber === 'PODCAST'
+              ) {
+                addWeeklyEvent({
+                  eventKey: `pod-${r.id}`,
+                  studentId: r.studentId,
+                  studentName: r.studentName,
+                  className: r.className,
+                  xp: 2,
+                  category: 'podcast',
+                  label: `Podcast Studio ON AIR: ${titleStr.replace('[PODCAST_MENARA_MENTOR]', '').trim()}`,
+                  timestamp: ts,
+                });
+                return;
+              }
+
+              // Jika baris refleksi adalah [JURNAL_POHON_BERINGIN]
+              if (
+                (r.id && String(r.id).startsWith('pohon-')) ||
+                titleStr.includes('[JURNAL_POHON_BERINGIN]') ||
+                r.studentNumber === 'POHON_JURNAL'
+              ) {
+                addWeeklyEvent({
+                  eventKey: `pohon-${r.id}`,
+                  studentId: r.studentId,
+                  studentName: r.studentName,
+                  className: r.className,
+                  xp: 1,
+                  category: 'refleksi',
+                  label: 'Jurnal Harian Pohon Beringin (+1 XP)',
+                  timestamp: ts,
+                });
+                return;
+              }
+
+              // Refleksi Siswa reguler di Data_Refleksi_Siswa
+              addWeeklyEvent({
+                eventKey: `ref-${r.id}`,
+                studentId: r.studentId,
+                studentName: r.studentName,
+                className: r.className,
+                xp: 2,
+                category: 'refleksi',
+                label: `Refleksi: ${titleStr || 'Pusat Refleksi Kota'}`,
+                timestamp: ts,
+              });
+            });
+          }
+
+          // E. Pesan_Kantor_Pos / Pesan_Guru dari Spreadsheet
+          if (Array.isArray(resData.messages)) {
+            resData.messages.forEach((m: Message, idx: number) => {
+              if (!m || !m.studentName || String(m.studentId).startsWith('teacher-')) return;
+              const ts = parseChatTimestamp(m.createdAt) || now - idx * 90000;
+              addWeeklyEvent({
+                eventKey: `msg-${m.id}`,
+                studentId: m.studentId,
+                studentName: m.studentName,
+                className: m.className,
+                xp: 1,
+                category: 'lainnya',
+                label: 'Kirim Surat Konsultasi di Kantor Pos (+1 XP)',
+                timestamp: ts,
+              });
+            });
+          }
+
+          // F. Pasar_Prestasi_Siswa dari Spreadsheet (Rekap XP 7 Hari Terakhir)
+          if (Array.isArray(resData.pasarPrestasi)) {
+            resData.pasarPrestasi.forEach((row: any) => {
+              if (!row || !row.name) return;
+              const citizen = ensureCitizen(String(row.id || ''), String(row.name), String(row.className || ''));
+              const sheetPts = Number(row.points) || 0;
+              if (sheetPts > citizen.totalXp) {
+                citizen.totalXp = sheetPts;
+              }
+              const st = row.activityStats || {};
+              const reflCount = Number(st.reflections) || 0;
+              const quizCount = Number(st.quizzes) || 0;
+              const missionCount = Number(st.missions) || 0;
+              const msgCount = Number(st.messages) || 0;
+              const computed7DayXp = Math.max(
+                Number(row.weeklyXp) || 0,
+                reflCount * 2 + quizCount * 3 + missionCount * 2 + msgCount
+              );
+              if (computed7DayXp > citizen.weeklyXp) {
+                citizen.weeklyXp = computed7DayXp;
+                citizen.weeklyActivitiesCount = Math.max(
+                  citizen.weeklyActivitiesCount,
+                  reflCount + quizCount + missionCount + msgCount
+                );
+                citizen.breakdown.refleksi = Math.max(citizen.breakdown.refleksi, reflCount * 2);
+                citizen.breakdown.tesLabDkv = Math.max(citizen.breakdown.tesLabDkv, quizCount * 3);
+                citizen.breakdown.misi = Math.max(citizen.breakdown.misi, missionCount * 2);
+                citizen.breakdown.lainnya = Math.max(citizen.breakdown.lainnya, msgCount);
+              }
+            });
+          }
+        }
+      } catch (e) {
+        // Fallback ke cache lokal yang tersinkron
+      }
+    }
+
+    // 2. Gabungkan dengan data lokal 7 hari terakhir (Log XP Mingguan, Hasil Tes Lab DKV, Refleksi, Pesan Kantor Pos)
+    this.getWeeklyXpLogs().forEach((log) => {
+      const cat: 'refleksi' | 'tesLabDkv' | 'podcast' | 'misi' | 'lainnya' =
+        log.activityType === 'refleksi'
+          ? 'refleksi'
+          : log.activityType === 'tes_lab_dkv'
+          ? 'tesLabDkv'
+          : log.activityType === 'podcast'
+          ? 'podcast'
+          : log.activityType === 'misi'
+          ? 'misi'
+          : 'lainnya';
+      addWeeklyEvent({
+        eventKey: `xplog-${log.id}`,
+        studentId: log.studentId,
+        studentName: log.studentName,
+        className: log.className,
+        xp: log.xpEarned,
+        category: cat,
+        label: log.description,
+        timestamp: log.timestamp,
+      });
+    });
+
+    this.getLabDkvTestResults().forEach((t) => {
+      addWeeklyEvent({
+        eventKey: `labdkv-${t.id}`,
+        studentId: t.studentId,
+        studentName: t.studentName,
+        className: t.className,
+        xp: t.xpEarned || t.scoreCorrect || 1,
+        category: 'tesLabDkv',
+        label: `Tes Lab DKV: ${t.materiTitle} (${t.scoreCorrect}/${t.totalQuestions} Benar)`,
+        timestamp: t.timestamp,
+      });
+    });
+
+    this.getReflections().forEach((r) => {
+      const ts = parseChatTimestamp(r.createdAt);
+      addWeeklyEvent({
+        eventKey: `ref-${r.id}`,
+        studentId: r.studentId,
+        studentName: r.studentName,
+        className: r.className,
+        xp: 2,
+        category: 'refleksi',
+        label: `Refleksi: ${r.materiTitle || 'Pusat Refleksi'}`,
+        timestamp: ts,
+      });
+    });
+
+    this.getMessages().forEach((m) => {
+      if (String(m.studentId).startsWith('teacher-')) return;
+      const ts = parseChatTimestamp(m.createdAt);
+      addWeeklyEvent({
+        eventKey: `msg-${m.id}`,
+        studentId: m.studentId,
+        studentName: m.studentName,
+        className: m.className,
+        xp: 1,
+        category: 'lainnya',
+        label: 'Surat Konsultasi Kantor Pos (+1 XP)',
+        timestamp: ts,
+      });
+    });
+
+    // 3. Pastikan seluruh warga aktif terdata dengan capaian XP 7 hari terakhir
+    allStudents.forEach((s) => {
+      const citizen = ensureCitizen(s.id, s.name, s.className);
+      const stats = this.getStudentActivityStats(s);
+      const estimatedWeeklyXp =
+        (stats.reflections || 0) * 2 +
+        (stats.quizzes || 0) * 3 +
+        (stats.missions || 0) * 2 +
+        (stats.messages || 0) * 1 +
+        (stats.chats || 0) * 1;
+
+      if (citizen.weeklyXp < estimatedWeeklyXp) {
+        citizen.weeklyXp = estimatedWeeklyXp;
+        citizen.weeklyActivitiesCount = Math.max(citizen.weeklyActivitiesCount, stats.total || 1);
+        citizen.breakdown.refleksi = Math.max(citizen.breakdown.refleksi, (stats.reflections || 0) * 2);
+        citizen.breakdown.tesLabDkv = Math.max(citizen.breakdown.tesLabDkv, (stats.quizzes || 0) * 3);
+        citizen.breakdown.misi = Math.max(citizen.breakdown.misi, (stats.missions || 0) * 2);
+        citizen.breakdown.lainnya = Math.max(
+          citizen.breakdown.lainnya,
+          (stats.messages || 0) + (stats.chats || 0)
+        );
+        if (citizen.lastTimestamp === 0) {
+          citizen.lastActivityText = `Tuntas ${stats.reflections} Refleksi, ${stats.quizzes} Tes Lab DKV & ${stats.missions} Misi Kota`;
+        }
+      }
+    });
+
+    const sortedCitizens = Array.from(aggMap.values())
+      .sort((a, b) => {
+        if (b.weeklyXp !== a.weeklyXp) return b.weeklyXp - a.weeklyXp;
+        if (b.totalXp !== a.totalXp) return b.totalXp - a.totalXp;
+        return b.weeklyActivitiesCount - a.weeklyActivitiesCount;
+      })
+      .slice(0, 5)
+      .map((item, idx): WeeklyLeaderboardCitizen => ({
+        rank: idx + 1,
+        studentId: item.studentId,
+        studentName: item.studentName,
+        className: item.className,
+        gender: item.gender,
+        weeklyXp: item.weeklyXp,
+        totalXp: item.totalXp,
+        weeklyActivitiesCount: item.weeklyActivitiesCount,
+        breakdown: item.breakdown,
+        lastActivityText: item.lastActivityText,
+      }));
+
+    return {
+      top5: sortedCitizens,
+      syncedFromSheet,
+      spreadsheetName,
+      lastUpdated: new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+  },
+
+  // ============================================================================
+  // POS GERBANG SELAMAT DATANG — LOG WARGA MASUK KOTA HARI INI (KOMANDAN NAWA)
+  // ============================================================================
+  getTodayWitaDateMeta(now = new Date()): { dateKey: string; dateDisplay: string; timeWita: string } {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Makassar',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now); // YYYY-MM-DD
+    const dateDisplay = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Makassar',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(now);
+    const timeWita =
+      new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Makassar',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(now) + ' WITA';
+    return { dateKey: parts, dateDisplay, timeWita };
+  },
+
+  recordCityEntry(student: Student | null | undefined): CityEntryLogEntry | null {
+    if (!student || !student.name) return null;
+    const now = new Date();
+    const { dateKey, dateDisplay, timeWita } = this.getTodayWitaDateMeta(now);
+    const allLogs = safeGet<CityEntryLogEntry[]>(STORAGE_KEYS.CITY_ENTRY_LOGS, []);
+
+    const role: 'siswa' | 'guru' | 'tamu' = student.isTeacher
+      ? 'guru'
+      : student.isGuest
+      ? 'tamu'
+      : 'siswa';
+
+    const newEntry: CityEntryLogEntry = {
+      id: `entry-${student.id || student.name}-${now.getTime()}`,
+      studentId: student.id || student.name,
+      studentName: student.name,
+      className: student.className || (role === 'guru' ? 'Dewan Guru' : role === 'tamu' ? 'Tamu Kota' : 'Warga DKV'),
+      gender: student.gender,
+      role,
+      enteredAtTime: timeWita,
+      dateKey,
+      dateDisplay,
+      timestamp: now.getTime(),
+    };
+
+    // Simpan 1 entri terbaru per warga untuk hari yang sama namun perbarui timestamp jika login ulang
+    const filtered = allLogs.filter(
+      (item) =>
+        !(
+          item.dateKey === dateKey &&
+          (item.studentId === newEntry.studentId ||
+            item.studentName.trim().toLowerCase() === newEntry.studentName.trim().toLowerCase())
+        )
+    );
+
+    const updated = [newEntry, ...filtered].slice(0, 120);
+    safeSet(STORAGE_KEYS.CITY_ENTRY_LOGS, updated);
+    try {
+      window.dispatchEvent(new CustomEvent('city-entry-updated', { detail: updated }));
+    } catch {}
+    return newEntry;
+  },
+
+  getTodayCityEntries(extraOnlinePlayers?: Array<{ id?: string; name?: string; role?: string; gender?: string }>): {
+    todayEntries: CityEntryLogEntry[];
+    lastEntry: CityEntryLogEntry | null;
+    dateDisplay: string;
+  } {
+    const now = new Date();
+    const { dateKey, dateDisplay, timeWita } = this.getTodayWitaDateMeta(now);
+    const isoToday = now.toISOString().slice(0, 10);
+
+    const storedLogs = safeGet<CityEntryLogEntry[]>(STORAGE_KEYS.CITY_ENTRY_LOGS, []);
+    const byNameMap = new Map<string, CityEntryLogEntry>();
+
+    // 1. Masukkan log masuk eksplisit hari ini
+    storedLogs
+      .filter((item) => item.dateKey === dateKey || item.dateKey === isoToday)
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .forEach((item) => {
+        const key = item.studentName.trim().toLowerCase();
+        if (!byNameMap.has(key)) {
+          byNameMap.set(key, item);
+        }
+      });
+
+    // 2. Pastikan pengguna yang sedang login saat ini selalu tercatat masuk hari ini
+    const curUser = this.getCurrentStudent();
+    if (curUser && curUser.name) {
+      const key = curUser.name.trim().toLowerCase();
+      if (!byNameMap.has(key)) {
+        const created = this.recordCityEntry(curUser);
+        if (created) {
+          byNameMap.set(key, created);
+        }
+      }
+    }
+
+    // 3. Gabungkan dengan pemain online di kota (jika ada dari realtime presence)
+    if (Array.isArray(extraOnlinePlayers)) {
+      extraOnlinePlayers.forEach((p, idx) => {
+        const pName = (p.name || '').trim();
+        if (!pName) return;
+        const key = pName.toLowerCase();
+        if (!byNameMap.has(key)) {
+          byNameMap.set(key, {
+            id: `online-${p.id || key}`,
+            studentId: p.id || key,
+            studentName: pName,
+            className: p.role === 'guru' ? 'Dewan Guru' : p.role === 'wartawan' ? 'Tamu Kota' : 'Warga Kota Online',
+            gender: p.gender,
+            role: p.role === 'guru' ? 'guru' : p.role === 'wartawan' ? 'tamu' : 'siswa',
+            enteredAtTime: timeWita,
+            dateKey,
+            dateDisplay,
+            timestamp: now.getTime() - (idx + 1) * 30000,
+          });
+        }
+      });
+    }
+
+    // 4. Gabungkan dengan data siswa yang lastLogin-nya hari ini
+    const allStudents = this.getStudents();
+    allStudents.forEach((s, idx) => {
+      if (!s.name) return;
+      const sLast = String(s.lastLogin || '');
+      if (sLast === dateKey || sLast === isoToday || sLast.includes(dateDisplay)) {
+        const key = s.name.trim().toLowerCase();
+        if (!byNameMap.has(key)) {
+          byNameMap.set(key, {
+            id: `student-today-${s.id}`,
+            studentId: s.id,
+            studentName: s.name,
+            className: s.className || 'Warga DKV',
+            gender: s.gender,
+            role: s.isTeacher ? 'guru' : s.isGuest ? 'tamu' : 'siswa',
+            enteredAtTime: 'Hari Ini (WITA)',
+            dateKey,
+            dateDisplay,
+            timestamp: now.getTime() - 180000 - idx * 60000,
+          });
+        }
+      }
+    });
+
+    const todayEntries = Array.from(byNameMap.values()).sort((a, b) => b.timestamp - a.timestamp);
+    const lastEntry = todayEntries.length > 0 ? todayEntries[0] : null;
+
+    return {
+      todayEntries,
+      lastEntry,
+      dateDisplay,
+    };
+  },
+
+  getNawaDynamicSpeeches(extraOnlinePlayers?: Array<{ id?: string; name?: string; role?: string; gender?: string }>): string[] {
+    const { todayEntries, lastEntry, dateDisplay } = this.getTodayCityEntries(extraOnlinePlayers);
+    if (todayEntries.length === 0) {
+      return [
+        `🦅 Siap komando! Saya Nawa, Penjaga Gerbang Selamat Datang Kota Refleksia (${dateDisplay}).`,
+        '🦅 Belum ada warga lain yang tercatat melintasi gerbang hari ini. Mari awali aktivitas belajarmu!',
+        '🦅 Pastikan kamu membaca Papan Peraturan & Panduan Kota di sebelah kanan gerbang sebelum menjelajah!',
+      ];
+    }
+
+    const namesPreview = todayEntries
+      .slice(0, 5)
+      .map((e) => e.studentName)
+      .join(', ');
+    const moreCount = todayEntries.length > 5 ? ` (+${todayEntries.length - 5} warga lainnya)` : '';
+    const lastInfo = lastEntry
+      ? `${lastEntry.studentName} (${lastEntry.className}) pukul ${lastEntry.enteredAtTime}`
+      : '-';
+
+    return [
+      `🦅 Salam tegas! Saya Nawa, Penjaga Gerbang Utama. Hari ini (${dateDisplay}) tercatat ${todayEntries.length} warga masuk kota: ${namesPreview}${moreCount}!`,
+      `🦅 Laporan Gerbang: Warga TERAKHIR yang baru saja masuk ke Kota Refleksia adalah ${lastInfo}!`,
+      `🦅 Daftar hadir gerbang hari ini (${todayEntries.length} warga): ${namesPreview}${moreCount}. Klik saya untuk melihat Buku Tamu Gerbang lengkap!`,
+    ];
+  },
 };
+
 
 

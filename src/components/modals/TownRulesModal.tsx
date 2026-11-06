@@ -34,182 +34,159 @@ export const TownRulesModal: React.FC<TownRulesModalProps> = ({ onClose, student
   const townRules = [
     {
       no: 1,
-      title: 'Kejujuran & Orisinalitas Refleksi',
-      desc: 'Tuliskan catatan refleksi belajar di Taman Refleksi, Jurnal Harian Pohon Beringin, maupun sesi obrolan Podcast di Studio ON AIR murni dari hasil pemikiran dan pengalaman pribadimu sendiri.',
-      icon: '✍️',
-      color: 'from-amber-500/20 to-amber-600/10 border-amber-500/40 text-amber-300',
+      title: 'Lapor Kehadiran di Gerbang Selamat Datang Bersama Nawa',
+      desc: 'Setiap warga (Siswa, Guru, maupun Tamu) yang login otomatis tercatat di Buku Tamu Gerbang Selamat Datang yang dijaga oleh Komandan Nawa (bertopi rimba pramuka cokelat). Sapa atau klik Nawa untuk mengetahui siapa saja warga yang masuk kota hari ini dan siapa yang terakhir masuk.',
+      icon: '🦅',
+      color: 'from-amber-500/20 to-yellow-600/10 border-amber-500/40 text-amber-300',
     },
     {
       no: 2,
-      title: 'Etika & Kesantunan Berkomunikasi',
-      desc: 'Seluruh warga wajib bertutur kata sopan, santun, dan saling membangun baik di Obrolan Ruang Kelas, Monumen Warga, apresiasi catatan Pohon Beringin, maupun surat ke Guru di Kantor Pos.',
+      title: 'Kejujuran & Orisinalitas Refleksi (Tersinkron Spreadsheet v3.0)',
+      desc: 'Tuliskan refleksi di Pusat Refleksi (Data_Refleksi_Siswa), Jurnal Harian Pohon Beringin (tampilan awal khusus Hari Ini & arsip Baca Catatan Warga), Kuis Lab DKV, serta Podcast Studio ON AIR murni dari hasil pemikiran dan pengalaman pribadimu sendiri.',
+      icon: '✍️',
+      color: 'from-emerald-500/20 to-teal-600/10 border-emerald-500/40 text-emerald-300',
+    },
+    {
+      no: 3,
+      title: 'Etika & Kesantunan Berkomunikasi di Seluruh Area Kota',
+      desc: 'Seluruh warga wajib bertutur kata sopan, santun, dan saling membangun di Obrolan Ruang Kelas, Monumen Air Mancur, Kotak Saran Wisma Guru, apresiasi catatan Pohon Beringin, maupun Surat Konsultasi ke Guru di Kantor Pos.',
       icon: '🤝',
       color: 'from-blue-500/20 to-cyan-600/10 border-blue-500/40 text-blue-300',
     },
     {
-      no: 3,
-      title: 'Menjaga Kelestarian, Kebersihan & Keasrian Kota',
-      desc: 'Rawat lingkungan kota bersama: siram pohon 3x (-1 XP/siram) hingga berbuah apel segar lalu petik (+2 XP), pungut daun kering yang gugur di taman (tiap 5 dari 10 daun = +1 XP), serta tertib memancing dan membaca.',
-      icon: '🌱',
-      color: 'from-emerald-500/20 to-teal-600/10 border-emerald-500/40 text-emerald-300',
-    },
-    {
       no: 4,
-      title: 'Komitmen Belajar, Podcast AI & 5 Misi Harian',
-      desc: 'Hadir setiap hari di Refleksia City untuk menjaga streak belajar, berdiskusi santai bersama Host AI Mentor di Studio ON AIR, mengerjakan kuis Lab DKV, dan menuntaskan 5 misi harian Balai Kota.',
-      icon: '🔥',
-      color: 'from-orange-500/20 to-red-600/10 border-orange-500/40 text-orange-300',
+      title: 'Menjaga Kelestarian Lingkungan & Hutan Refleksia',
+      desc: 'Rawat lingkungan kota: siram pohon 3x (-1 XP/siram) hingga berbuah apel merah segar (+2 XP saat dipetik), pungut daun kering (tiap 5 daun = +1 XP), serta kunjungi Hutan Refleksia & Rumah Pohon Beringin melalui loket tiket Pak @Sufri (-5 XP).',
+      icon: '🌱',
+      color: 'from-lime-500/20 to-emerald-600/10 border-lime-500/40 text-lime-300',
     },
     {
       no: 5,
-      title: 'Sportivitas & Kolaborasi Apresiasi Warga',
-      desc: 'Papan Peringkat di Pasar Prestasi dan catatan di Pohon Beringin adalah sarana motivasi positif bersama. Saling beri tanda Suka (❤️) dan dukung capaian rekan siswa DKV SMKN 2 Gorontalo.',
+      title: 'Kompetisi Sehat di Leaderboard Mingguan & Koran Sudut Literasi',
+      desc: 'Keaktifan XP 7 hari terakhir ditampilkan secara live di Leaderboard Mingguan Balai Kota dan Rangking Siswa Teraktif pada Koran Harian di Sudut Literasi. Semangat berlomba secara sehat dan saling mendukung!',
       icon: '🏆',
       color: 'from-purple-500/20 to-pink-600/10 border-purple-500/40 text-purple-300',
+    },
+    {
+      no: 6,
+      title: 'Aturan Khusus Mode Tamu Kota (Wartawan / Wartawati)',
+      desc: 'Pengunjung Mode Tamu memilih gender Laki-laki (Wartawan) atau Wanita (Wartawati) dengan modal awal 10 XP. Tamu dapat berkeliling melihat kota dan menaiki Ayunan (-1 XP), namun tidak dapat masuk ke gedung belajar atau Hutan Refleksia.',
+      icon: '📸',
+      color: 'from-orange-500/20 to-red-600/10 border-orange-500/40 text-orange-300',
     },
   ];
 
   const studentActivities = [
     {
-      title: 'Belajar Baca Iqro (1–6) & Tuntunan Sholat di Masjid Al-Hikmah',
-      desc: 'Kunjungi Masjid Al-Hikmah di samping kolam awal aliran sungai untuk belajar membaca Iqro Jilid 1 s.d. 6 lengkap dengan audio makhraj/tajwid & latihan baris, serta panduan 13 gerakan & bacaan Tuntunan Sholat, Niat 5 Waktu, dan Wudhu (+1 XP per jilid/amalan)!',
-      icon: '🕌',
-      badge: 'Iqro 1-6 & Sholat • +XP',
+      title: 'Pos Penjaga Gerbang Selamat Datang (Komandan Nawa)',
+      desc: 'Temui Nawa di depan Gerbang Selamat Datang (bertopi rimba pramuka cokelat, kemeja khaki dua saku, celana pendek cokelat tua ber-holster, kaus kaki panjang gelap & sepatu bot lapangan). Klik Nawa untuk melihat daftar warga yang login hari ini dan warga terakhir yang masuk ke kota!',
+      icon: '🦅',
+      badge: 'Log Masuk Hari Ini',
+    },
+    {
+      title: 'Koran Sudut Literasi: Rangking Siswa Teraktif & Info Kota Terbaru',
+      desc: 'Duduk atau buka Sudut Literasi bersama Ibu @Patra untuk membaca Koran Harian Refleksia City yang kini memuat Rangking Siswa Teraktif (Top XP & Leaderboard Mingguan), Info Kota Terbaru, Komik Cerita Rakyat, dan Majalah Desain DKV!',
+      icon: '📰',
+      badge: 'Koran & Ranking',
+    },
+    {
+      title: 'Jurnal Harian Pohon Beringin (Tampilan Awal Hari Ini & Baca Catatan Warga)',
+      desc: 'Buka Pohon Beringin untuk melihat tampilan awal khusus "📅 Info Jurnal Hari Ini", beralih ke tab "🌳 Baca Catatan Warga" untuk membaca seluruh arsip refleksi teman-temanmu, atau tempel catatan harianmu sendiri (+1 XP, tersinkron ke Spreadsheet)!',
+      icon: '🌳',
+      badge: 'Hari Ini • +1 XP',
+    },
+    {
+      title: 'Leaderboard Mingguan Balai Kota (Top 5 Warga 7 Hari Terakhir)',
+      desc: 'Pantau 5 warga dengan perolehan XP terbanyak dalam 7 hari terakhir di Balai Kota lengkap dengan rincian XP Refleksi, Tes Lab DKV, Podcast, dan Misi Harian yang tersinkronisasi langsung dengan Google Spreadsheet.',
+      icon: '🏛️',
+      badge: 'Top 5 Mingguan',
+    },
+    {
+      title: 'Radio Kota 99.9 FM "Malam Tenang dari Antent" & Musik 5 Waktu',
+      desc: 'Putar saluran favorit 99.9 FM "Malam Tenang dari Antent" yang berputar berulang (loop otomatis) serta mendukung link Google Drive pribadimu, atau pilih saluran musik lo-fi sesuai 5 waktu WITA di bagian atas layar.',
+      icon: '📻',
+      badge: '99.9 FM Loop',
     },
     {
       title: 'Siaran Podcast Interaktif di Studio ON AIR (Menara Mentor)',
-      desc: 'Ngobrol santai bersama Host AI Mentor cewek yang ramah (bersuara otomatis & bisa dijawab lewat mikrofon suara atau ketikan) membahas materi yang dikuasai, area yang perlu diperkuat, saran AI, pertanyaan pemantik, hingga rencana belajar. Selesai podcast dapat +3 XP & terekam di Spreadsheet!',
+      desc: 'Ngobrol santai bersama Host AI Mentor membahas materi yang dikuasai, area yang perlu diperkuat, saran AI, pertanyaan pemantik, hingga rencana belajar. Selesai podcast dapat +3 XP & otomatis terekam ke sheet Hasil_Podcast!',
       icon: '🎙️',
       badge: 'Suara AI • +3 XP',
     },
     {
-      title: 'Menyiram Pohon (3x) & Memetik Buah Apel Segar',
-      desc: 'Pohon belum berbuah saat baru login. Dekati pohon dan siram 3 kali (-1 XP per siraman). Saat siraman ke-3, pohon mengeluarkan buah apel merah segar yang bisa dipetik untuk mendapatkan +2 XP!',
-      icon: '🍎',
-      badge: 'Petik Apel • +2 XP',
+      title: 'Kuis 5 Jenjang & Tantangan di Lab DKV',
+      desc: 'Masuk ke gedung Lab DKV berlogo Atom bergerak untuk mengerjakan kuis berjenjang (Jenjang 1 Dasar s.d. Jenjang 5 Kreasi). Setiap jawaban benar meraih +1 XP dan hasilnya otomatis tersinkron ke sheet Hasil_Tes_Lab_DKV.',
+      icon: '⚛️',
+      badge: 'Lab DKV • +1 XP/Soal',
     },
     {
-      title: 'Peduli Lingkungan: Memungut 10 Daun Kering',
-      desc: 'Terdapat 10 daun kering yang tersebar alami di area kota (kota tetap tampak bersih). Klik atau dekati daun kering untuk memungutnya—setiap terkumpul 5 daun kering otomatis mendapat +1 XP!',
-      icon: '🍂',
-      badge: '5 Daun = +1 XP',
-    },
-    {
-      title: 'Jurnal Harian Sticky Note di Pohon Beringin',
-      desc: 'Dekati Pohon Beringin di belakang Balai Kota untuk menempelkan Sticky Note refleksi harianmu (+1 XP). Tersimpan di Spreadsheet sehingga bisa dilihat dan disukai (❤️) oleh seluruh warga kota!',
-      icon: '🌳',
-      badge: 'Spreadsheet • +1 XP',
-    },
-    {
-      title: 'Menulis Refleksi Materi di Taman Refleksi',
-      desc: 'Pilih materi pelajaran dan skala pemahaman (1–5), tuliskan rangkuman materi, hal menarik, serta kesulitan belajarmu. Dapatkan +1 XP otomatis setiap mengirimkan refleksi!',
+      title: 'Menulis Refleksi Materi di Pusat Refleksi',
+      desc: 'Pilih materi pelajaran dan skala pemahaman (1–5), tuliskan refleksi belajarmu, dan dapatkan umpan balik instan serta +1 XP otomatis yang langsung tersinkron ke sheet Data_Refleksi_Siswa!',
       icon: '🌍',
       badge: 'Refleksi • +1 XP',
     },
     {
-      title: 'Kuis & Tantangan di Lab DKV',
-      desc: 'Masuk ke gedung Lab DKV berlogo Atom bergerak untuk menguji pemahaman materi kejuruan dan berpikir komputasional melalui kuis interaktif (+1 XP tiap jawaban benar).',
-      icon: '⚛️',
-      badge: 'Kuis • +1 XP/Soal',
+      title: 'Hutan Refleksia, Rumah Pohon Beringin & Tiket Pak @Sufri',
+      desc: 'Beli tiket masuk Hutan Refleksia (-5 XP) di Pos Penjaga Hutan Pak @Sufri untuk menjelajahi pepohonan rimbun, memetik apel hutan, serta naik ke Rumah Pohon Beringin untuk menikmati panorama kota dari ketinggian!',
+      icon: '🏡',
+      badge: 'Tiket Hutan -5 XP',
     },
     {
-      title: 'Memancing Interaktif di Dermaga Kolam Timur',
-      desc: 'Mulai memancing (-3 XP) dengan animasi melempar joran ke kolam. Saat umpan bergoyang, klik tombol interaktif "🎣 Angkat Pancing!" untuk menangkap ikan unik atau botol pesan bijak!',
-      icon: '🎣',
-      badge: 'Lempar & Angkat',
+      title: 'Belajar Baca Iqro (1–6) & Tuntunan Sholat di Masjid Al-Hikmah',
+      desc: 'Kunjungi Masjid Al-Hikmah untuk belajar membaca Iqro Jilid 1 s.d. 6 lengkap dengan audio makhraj/tajwid, serta panduan 13 gerakan & bacaan Tuntunan Sholat, Niat 5 Waktu, dan Wudhu (+1 XP per jilid/amalan)!',
+      icon: '🕌',
+      badge: 'Iqro 1-6 & Sholat',
     },
     {
-      title: 'Belajar Mandiri & Baca Modul di Perpustakaan',
-      desc: 'Pelajari modul Berpikir Komputasional, dasar Desain Komunikasi Visual, serta bahan ajar terbaru dari guru pembimbing, lalu lanjutkan ke refleksi materi.',
-      icon: '📚',
-      badge: 'Modul Belajar',
+      title: 'Menyiram Pohon (3x), Petik Apel (+2 XP) & Pungut Daun Kering',
+      desc: 'Siram pohon 3 kali (-1 XP/siram) hingga berbuah apel merah segar (+2 XP saat dipetik), serta pungut daun kering yang gugur di taman (setiap 5 daun kering otomatis mendapat +1 XP)!',
+      icon: '🍎',
+      badge: 'Alam • +XP',
     },
     {
-      title: 'Menuntaskan 5 Misi Harian di Balai Kota',
-      desc: 'Cek 5 misi acak harianmu di Balai Kota (mengunjungi gedung, kuis, refleksi, atau menyapa di obrolan). Setiap misi tuntas langsung menambah XP otomatis ke saldomu!',
-      icon: '🏛️',
-      badge: 'Misi Otomatis',
-    },
-    {
-      title: 'Beli Kopi, Roti & Eskrim di Kafe Warga',
-      desc: 'Kunjungi Toko Roti & Kafe untuk membeli Kopi Hangat (-2 XP, 90 dtk), Roti Panggang (-1 XP, 60 dtk), atau Eskrim (-1 XP, 30 dtk) yang langsung dipegang oleh avatarmu sambil jalan-jalan!',
-      icon: '☕',
-      badge: 'Item Dipegang',
-    },
-    {
-      title: 'Membaca di Sudut Literasi Bersama Ibu Patra',
-      desc: 'Duduk santai di bangku Sudut Literasi (-1 XP) untuk membaca Komik Edukasi DKV, Majalah Seni & Tipografi, atau Koran Harian Warga Kora.',
-      icon: '📖',
-      badge: 'Komik & Majalah',
-    },
-    {
-      title: 'Bangku Taman (2 Orang), Api Unggun & Ayunan',
-      desc: 'Duduk santai berdua bersama teman di Bangku Air Mancur, hangatkan tubuh di Bangku Api Unggun pojok kota, atau naik Ayunan Relaksasi (-1 XP) sambil berbincang.',
+      title: 'Memancing Interaktif, Kafe Warga, Api Unggun & Ayunan',
+      desc: 'Memancing di Dermaga Kolam Timur (-3 XP), beli Kopi/Roti/Eskrim di Kafe Warga, duduk bersama teman di Bangku Taman & Api Unggun, atau naik Ayunan Relaksasi (-1 XP, juga bisa diakses Tamu Kota!).',
       icon: '🎠',
       badge: 'Santai & Ayunan',
     },
     {
-      title: 'Menu Ekspresi Avatar (Radial Emotes) & Radio 5 Waktu',
-      desc: 'Klik avatarmu sendiri untuk Joget Musik (🎵), Suka (❤️), Tertawa (😂), atau Lambai (👋), serta nyalakan Radio Kota di atas layar yang memutar musik sesuai 5 waktu WITA.',
-      icon: '🎵',
-      badge: 'Emote & Radio',
-    },
-    {
-      title: 'Obrolan Kota (24 Jam) & Radar Warga Online',
-      desc: 'Mengobrol langsung dengan teman di panel Obrolan bawah layar atau Monumen Air Mancur, serta klik nama teman pada daftar Warga Online di kiri atas untuk menghampirinya.',
-      icon: '⛲',
-      badge: 'Chat & Radar',
-    },
-    {
-      title: 'Pasar Prestasi & Kantor Pos Kilat',
-      desc: 'Pantau Leaderboard XP tertinggi, galeri lencana, & Dewan Guru di Pasar Prestasi (terekam di Spreadsheet), atau kirim pesan konsultasi privat ke Guru di Kantor Pos.',
-      icon: '🏆',
-      badge: 'Peringkat & Pos',
+      title: 'Pasar Prestasi, Kantor Pos Kilat & Kotak Saran Wisma Guru',
+      desc: 'Cek Kartu Warga & Leaderboard di Pasar Prestasi, kirim surat konsultasi ke Guru di Kantor Pos (tersinkron ke Pesan_Kantor_Pos), atau sampaikan ide di Kotak Saran depan Wisma Guru.',
+      icon: '📮',
+      badge: 'Pos & Aspirasi',
     },
   ];
 
   const teacherActivities = [
     {
-      title: 'Monitoring Refleksi, Jurnal Beringin & Riwayat Podcast AI',
-      desc: 'Memantau seluruh catatan refleksi siswa X DKV 2 & X DKV 3, catatan Sticky Note Pohon Beringin, serta transkrip hasil obrolan Podcast Studio ON AIR yang tersinkronisasi dengan Spreadsheet.',
+      title: 'Bank Materi Guru & Distribusi Otomatis ke 9 Gedung Kota',
+      desc: 'Buka gedung Bank Materi Guru untuk menginput Tujuan Pembelajaran (TP) & Materi Esensial. Sistem AI otomatis menyusun modul Perpustakaan, pertanyaan Refleksi, topik Podcast, misi Balai Kota, dan kuis 5 jenjang Lab DKV!',
+      icon: '🏦',
+      badge: 'Bank Materi AI',
+    },
+    {
+      title: 'Monitoring Sinkronisasi Google Spreadsheet v3.0 Lengkap',
+      desc: 'Memantau seluruh aktivitas warga yang tersinkron otomatis ke Google Spreadsheet: Data_Refleksi_Siswa, Pesan_Kantor_Pos, Hasil_Tes_Lab_DKV, Hasil_Podcast, Jurnal_Pohon_Beringin, Leaderboard Mingguan (Log_XP_Mingguan), dan Pasar_Prestasi.',
       icon: '📊',
-      badge: 'Sinkron Spreadsheet',
+      badge: 'Spreadsheet v3.0',
     },
     {
-      title: 'Memberikan Umpan Balik (Feedback) & Evaluasi',
-      desc: 'Menuliskan catatan apresiasi, komentar bimbingan, dan evaluasi langsung yang dapat dibaca siswa serta memantau ketercapaian langkah rencana belajar.',
-      icon: '✍️',
-      badge: 'Umpan Balik',
+      title: 'Papan Pengumuman Guru di Halaman Balai Kota',
+      desc: 'Menulis pengumuman resmi penting, info kelas, atau misi baru di Papan Pengumuman Guru samping Balai Kota yang juga otomatis tampil di Berita Utama Koran Sudut Literasi.',
+      icon: '📢',
+      badge: 'Pengumuman Kota',
     },
     {
-      title: 'Membalas Surat & Konsultasi Siswa di Kantor Pos',
-      desc: 'Menjawab pertanyaan dan konsultasi belajar yang dikirimkan secara personal oleh siswa melalui loket Kantor Pos Kilat.',
+      title: 'Memberikan Umpan Balik (Feedback) & Membalas Surat Kantor Pos',
+      desc: 'Memberikan apresiasi dan evaluasi pada refleksi siswa, membalas surat konsultasi di Kantor Pos Kilat, serta membaca aspirasi warga pada Kotak Saran Wisma Guru.',
       icon: '📬',
-      badge: 'Respon Siswa',
+      badge: 'Bimbingan Guru',
     },
     {
-      title: 'Mengelola Materi & Modul Baru di Perpustakaan',
-      desc: 'Mengunggah bahan ajar baru, modul berpikir komputasional, referensi karya desain DKV, dan tujuan pembelajaran kota.',
-      icon: '📚',
-      badge: 'Kelola Modul',
-    },
-    {
-      title: 'Mengawasi Capaian Prestasi & Papan Peringkat',
-      desc: 'Memantau perkembangan poin XP, keaktifan misi harian, dan lencana prestasi siswa di Pasar Prestasi secara real-time.',
-      icon: '🏆',
-      badge: 'Apresiasi XP',
-    },
-    {
-      title: 'Pengaturan Kota & Sinkronisasi Google Spreadsheet 2.6',
-      desc: 'Mengonfigurasi tautan Google Apps Script Spreadsheet (merekam Refleksi, Jurnal Pohon Beringin, Podcast Studio ON AIR, dan Pasar Prestasi) serta PIN Guru.',
-      icon: '⚙️',
-      badge: 'Spreadsheet 2.6',
-    },
-    {
-      title: 'Berinteraksi Langsung di Dunia Virtual',
-      desc: 'Menjelajahi Refleksia City dengan avatar Guru Pembimbing atau Master Guru Penjelajah Waktu untuk menyapa dan memotivasi siswa secara langsung.',
-      icon: '🏛️',
-      badge: 'Avatar Guru',
+      title: 'Memantau Kehadiran Gerbang Utama (Nawa) & Leaderboard Mingguan',
+      desc: 'Melihat daftar siswa yang login hari ini melalui laporan Komandan Nawa di Gerbang Selamat Datang serta mengevaluasi Top 5 warga teraktif 7 hari terakhir di Balai Kota.',
+      icon: '🦅',
+      badge: 'Pantau Kehadiran',
     },
   ];
 
@@ -223,16 +200,16 @@ export const TownRulesModal: React.FC<TownRulesModalProps> = ({ onClose, student
               📋
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg sm:text-xl font-extrabold font-display leading-tight">
-                  Papan Peraturan & Panduan Kota
+                  Papan Peraturan & Panduan Kota (Edisi Terbaru)
                 </h2>
                 <span className="text-[10px] uppercase font-black tracking-wider bg-black/25 text-emerald-200 px-2 py-0.5 rounded-full border border-emerald-300/30">
-                  Gapura Utama
+                  Gapura Utama • v3.0
                 </span>
               </div>
               <p className="text-xs text-emerald-100 font-medium">
-                Pedoman Tata Tertib, Seluruh Aktivitas Terbaru Siswa, dan Peran Guru di Refleksia City
+                Pedoman Tata Tertib, Pos Penjaga Gerbang Nawa, Aktivitas Siswa, & Sinkronisasi Spreadsheet Kota Refleksia
               </p>
             </div>
           </div>
@@ -263,7 +240,7 @@ export const TownRulesModal: React.FC<TownRulesModalProps> = ({ onClose, student
             }`}
           >
             <ScrollText className="w-4 h-4" />
-            <span>Peraturan & Etika Kota (5 Prinsip)</span>
+            <span>Peraturan & Etika Kota ({townRules.length} Prinsip)</span>
           </button>
 
           <button
@@ -306,14 +283,14 @@ export const TownRulesModal: React.FC<TownRulesModalProps> = ({ onClose, student
             <div className="space-y-4 animate-fade-in">
               <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900/60 to-slate-900/60 border border-emerald-500/30 flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-xl">
-                  🏛️
+                  🦅
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm text-white">
                     Selamat Datang di Gerbang Utama Kota Refleksia!
                   </h3>
                   <p className="text-xs text-slate-200 mt-0.5 leading-relaxed">
-                    Refleksia City adalah ekosistem belajar digital interaktif untuk siswa Desain Komunikasi Visual (DKV) SMKN 2 Gorontalo. Jelajahi seluruh fasilitas kota, kumpulkan XP melalui aktivitas belajar & kepedulian lingkungan, serta jaga selalu ketertiban bersama.
+                    Di depan Gerbang Selamat Datang, <strong>Komandan Nawa</strong> siap menyambut dan mencatat setiap warga yang masuk hari ini. Baca panduan terbaru di bawah ini sebelum menjelajahi gedung belajar, Hutan Refleksia, Sudut Literasi, dan Pohon Beringin!
                   </p>
                 </div>
               </div>

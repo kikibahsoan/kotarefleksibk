@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { lofiMusic, RadioStationMeta, RadioChannel, RADIO_CHANNELS, TimePeriod } from '../utils/lofiAudio.ts';
-import { Radio, Volume2, VolumeX, Sparkles, ExternalLink, Music, Disc, Check, Loader2, X } from 'lucide-react';
+import { lofiMusic, RadioStationMeta, RadioChannel, TimePeriod } from '../utils/lofiAudio.ts';
+import { Radio, Volume2, VolumeX, Sparkles, ExternalLink, Music, Disc, Check, Loader2, X, Repeat, Link2 } from 'lucide-react';
 
 export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePeriod }) => {
   const [isPlaying, setIsPlaying] = useState(() => lofiMusic.getIsPlaying());
@@ -9,6 +9,9 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
   const [stationMeta, setStationMeta] = useState<RadioStationMeta>(() => lofiMusic.getStationInfo());
   const [showTuner, setShowTuner] = useState(false);
   const [isRriConnecting, setIsRriConnecting] = useState(() => lofiMusic.getIsRriConnecting());
+  const [customDriveInput, setCustomDriveInput] = useState(() => lofiMusic.getCustomDriveUrl());
+  const [showDriveInput, setShowDriveInput] = useState(false);
+  const [driveSavedNotice, setDriveSavedNotice] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,6 +71,14 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
     lofiMusic.setVolume(newVol);
   };
 
+  const handleSaveDriveLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    lofiMusic.setCustomDriveUrl(customDriveInput);
+    setDriveSavedNotice(true);
+    setTimeout(() => setDriveSavedNotice(false), 2200);
+  };
+
   // Station list for manual switching
   const STATIONS_LIST: {
     id: RadioChannel;
@@ -86,6 +97,14 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
       icon: '📻',
       badge: 'Live Streaming',
       externalUrl: 'https://onlineradiobox.com/id/rripro1gorontalo/?cs=id.rripro1gorontalo&played=1',
+    },
+    {
+      id: 'malam_tenang',
+      label: 'Malam Tenang dari Antent',
+      sublabel: 'Ambient Loop • Antent (Hope to See You Again)',
+      freq: '99.9 FM',
+      icon: '🌙',
+      badge: 'Loop 99.9 FM',
     },
     {
       id: 'ghibli',
@@ -107,7 +126,7 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
 
   return (
     <div className="relative pointer-events-auto" ref={dropdownRef}>
-      {/* Radio Trigger Pill Button (Icon Radar + Icon Pilihan: 📻 Radio, 🍃 Daun Jatuh, ☕ Kopi) */}
+      {/* Radio Trigger Pill Button (Icon Radar + Icon Pilihan: 📻 Radio, 🌙 Malam Tenang, 🍃 Daun Jatuh, ☕ Kopi) */}
       <div className="flex items-center">
         <button
           onClick={handleTogglePlay}
@@ -137,14 +156,14 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
                 )}
               </div>
 
-              {/* Station icon badge (📻 Radio, 🍃 Daun Jatuh, ☕ Kopi) */}
+              {/* Station icon badge */}
               <span className="text-xs sm:text-sm leading-none drop-shadow-sm">{stationMeta.icon}</span>
             </>
           ) : (
             <>
               {/* Radar Icon (Off) */}
               <Radio className="w-3.5 h-3.5 text-slate-300 group-hover:text-amber-300 transition" />
-              {/* Station icon badge (📻 Radio, 🍃 Daun Jatuh, ☕ Kopi) */}
+              {/* Station icon badge */}
               <span className="text-xs sm:text-sm leading-none drop-shadow-sm opacity-90">{stationMeta.icon}</span>
             </>
           )}
@@ -156,7 +175,7 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
               setShowTuner((prev) => !prev);
             }}
             className="text-[10px] text-slate-300 hover:text-white px-0.5 py-0.5 rounded transition"
-            title="Pilih Saluran Manual (📻 RRI Gorontalo, 🍃 Ghibli, ☕ Lo-Fi) / Atur Suara"
+            title="Pilih Saluran Manual (📻 RRI Gorontalo, 🌙 Malam Tenang 99.9 FM, 🍃 Ghibli, ☕ Lo-Fi) / Atur Suara"
           >
             ▾
           </span>
@@ -165,7 +184,7 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
 
       {/* FLOATING RADIO TUNER & MANUAL CHANNEL SELECTOR */}
       {showTuner && (
-        <div className="absolute right-0 top-11 z-50 bg-[#0d1622]/95 backdrop-blur-xl border border-amber-500/50 rounded-2xl p-3.5 shadow-[0_15px_45px_rgba(0,0,0,0.85)] flex flex-col gap-3 w-[290px] sm:w-[320px] animate-fade-in-up text-left">
+        <div className="absolute right-0 top-11 z-50 bg-[#0d1622]/95 backdrop-blur-xl border border-amber-500/50 rounded-2xl p-3.5 shadow-[0_15px_45px_rgba(0,0,0,0.85)] flex flex-col gap-3 w-[300px] sm:w-[340px] animate-fade-in-up text-left">
           {/* Header */}
           <div className="flex items-center justify-between pb-2 border-b border-slate-700/60">
             <div className="flex items-center gap-1.5">
@@ -267,6 +286,69 @@ export const LofiAudioControl: React.FC<{ timePeriod?: TimePeriod }> = ({ timePe
                           '101.8 FM Live'
                         )}
                       </span>
+                    </div>
+                  )}
+
+                  {/* Special info & Drive Link option for 99.9 FM Malam Tenang dari Antent */}
+                  {st.id === 'malam_tenang' && (
+                    <div
+                      className="mt-2 pt-1.5 border-t border-slate-800/90 flex flex-col gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="inline-flex items-center gap-1 text-[9.5px] text-indigo-300 font-semibold">
+                          <Repeat className="w-2.5 h-2.5 text-amber-400" />
+                          <span>Loop Otomatis • Antent</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowDriveInput((prev) => !prev)}
+                          className="inline-flex items-center gap-1 text-[9.5px] text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/30 px-1.5 py-0.5 rounded transition cursor-pointer"
+                          title="Atur tautan Google Drive kustom untuk saluran 99.9 FM"
+                        >
+                          <Link2 className="w-2.5 h-2.5" />
+                          <span>{customDriveInput ? 'Link Drive Aktif' : 'Tautan Drive'}</span>
+                        </button>
+                      </div>
+
+                      {showDriveInput && (
+                        <form onSubmit={handleSaveDriveLink} className="flex flex-col gap-1.5 pt-1">
+                          <input
+                            type="text"
+                            value={customDriveInput}
+                            onChange={(e) => setCustomDriveInput(e.target.value)}
+                            placeholder="Tempel link Google Drive MP3 (opsional)..."
+                            className="w-full px-2 py-1 rounded-lg bg-slate-950/90 border border-slate-700 text-[10px] text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                          />
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="text-[9px] text-slate-400">
+                              {driveSavedNotice
+                                ? '✅ Link disimpan (otomatis loop)'
+                                : 'Kosongkan untuk audio bawaan Antent'}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {customDriveInput && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCustomDriveInput('');
+                                    lofiMusic.setCustomDriveUrl('');
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[9px] text-slate-300 cursor-pointer"
+                                >
+                                  Reset
+                                </button>
+                              )}
+                              <button
+                                type="submit"
+                                className="px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[9.5px] cursor-pointer"
+                              >
+                                Simpan
+                              </button>
+                            </div>
+                          </div>
+                        </form>
+                      )}
                     </div>
                   )}
 

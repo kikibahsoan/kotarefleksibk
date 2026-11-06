@@ -404,6 +404,14 @@ export default function App() {
       const awardedXp = foundMission.xp || 1;
       handleAddPoints(awardedXp, foundMission.title);
       StorageService.recordStudentActivity(current.id, 'mission', 1);
+      StorageService.logWeeklyXpGain({
+        studentId: current.id,
+        studentName: current.name,
+        className: current.className,
+        xpEarned: awardedXp,
+        activityType: 'misi',
+        description: `Misi Tuntas: ${foundMission.title}`,
+      });
 
       if (missionToastTimerRef.current) {
         window.clearTimeout(missionToastTimerRef.current);
@@ -605,12 +613,20 @@ export default function App() {
     setCloudPhase('closing');
   };
 
+  // Pastikan warga yang sedang aktif di sesi ini tercatat oleh Penjaga Gerbang Nawa
+  useEffect(() => {
+    if (student && student.name) {
+      StorageService.recordCityEntry(student);
+    }
+  }, [student?.id, student?.name]);
+
   const handleCloudMidpoint = () => {
     if (pendingStudentRef.current) {
       const studentWithLoginXp = pendingStudentRef.current;
       studentRef.current = studentWithLoginXp;
       setStudent(studentWithLoginXp);
       StorageService.setCurrentStudent(studentWithLoginXp);
+      StorageService.recordCityEntry(studentWithLoginXp);
       if (!studentWithLoginXp.isGuest) {
         StorageService.saveOrUpdateStudent(studentWithLoginXp);
       }
@@ -674,16 +690,25 @@ export default function App() {
     StorageService.addReflection(newReflection);
     StorageService.addFeedback(newFeedback);
 
-    // Sync to Google Apps Script if URL is configured
+    // Sync to Google Apps Script (Sheet: Data_Refleksi_Siswa & Refleksi_Siswa)
     StorageService.syncWithGAS('submit_reflection', {
       reflection: newReflection,
       feedback: newFeedback,
+      targetSheet: 'Data_Refleksi_Siswa',
     });
 
     // Complete reflection mission (+1 XP automatic) or update badges
     const current = studentRef.current;
     if (current) {
       StorageService.recordStudentActivity(current.id, 'reflection', 1);
+      StorageService.logWeeklyXpGain({
+        studentId: current.id,
+        studentName: current.name,
+        className: current.className,
+        xpEarned: 1,
+        activityType: 'refleksi',
+        description: `Refleksi Siswa: ${newReflection.materiTitle || 'Pusat Refleksi'}`,
+      });
       const hasReflectionMission =
         assignedMissionsRef.current.some((m) => m.id === 'm_refleksi') &&
         !completedMissionIdsRef.current.includes('m_refleksi');
@@ -696,7 +721,7 @@ export default function App() {
         if (missionToastTimerRef.current) {
           window.clearTimeout(missionToastTimerRef.current);
         }
-        setMissionToast('🌍 Refleksi terkirim di Pusat Refleksi! (+1 Poin otomatis masuk ke saldo!)');
+        setMissionToast('🌍 Refleksi terkirim & tersinkron ke Data_Refleksi_Siswa! (+1 Poin masuk ke saldo!)');
         missionToastTimerRef.current = window.setTimeout(() => {
           setMissionToast(null);
           missionToastTimerRef.current = null;
@@ -793,8 +818,19 @@ export default function App() {
     StorageService.addMessage(newMsg);
     StorageService.recordStudentActivity(current.id, 'message', 1);
 
-    // Sync to Google Apps Script
-    StorageService.syncWithGAS('send_message', { message: newMsg });
+    // Sync to Google Apps Script (Sheet: Pesan_Kantor_Pos & Pesan_Guru)
+    StorageService.syncWithGAS('send_message', {
+      message: newMsg,
+      targetSheet: 'Pesan_Kantor_Pos',
+    });
+    StorageService.logWeeklyXpGain({
+      studentId: current.id,
+      studentName: current.name,
+      className: current.className,
+      xpEarned: 1,
+      activityType: 'kantor_pos',
+      description: 'Kirim Surat Konsultasi di Kantor Pos',
+    });
 
     // Complete Kantor Pos mission (+1 XP automatic) if assigned
     const hasPosMission =
@@ -1367,6 +1403,7 @@ export default function App() {
           messages={messages}
           student={student}
           onSendMessage={handleSendMessage}
+          onSyncMessages={(synced) => setMessages(synced)}
         />
       )}
 

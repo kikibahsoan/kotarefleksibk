@@ -323,4 +323,74 @@ export interface TeacherAnnouncement {
   timestamp: number;
 }
 
+export interface LabDkvTestResult {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  materiId: string;
+  materiTitle: string;
+  roundNumber: number;
+  scoreCorrect: number;
+  totalQuestions: number;
+  xpEarned: number;
+  tierBreakdown: string;
+  answersDetail?: string;
+  createdAt: string;
+  timestamp: number;
+}
+
+export interface WeeklyXpLogEntry {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  xpEarned: number;
+  activityType:
+    | 'refleksi'
+    | 'tes_lab_dkv'
+    | 'podcast'
+    | 'kantor_pos'
+    | 'misi'
+    | 'jurnal_pohon'
+    | 'aktivitas_kota';
+  description: string;
+  createdAt: string;
+  timestamp: number;
+}
+
+export interface WeeklyLeaderboardCitizen {
+  rank: number;
+  studentId: string;
+  studentName: string;
+  className: string;
+  gender?: string;
+  weeklyXp: number;
+  totalXp: number;
+  weeklyActivitiesCount: number;
+  breakdown: {
+    refleksi: number;
+    tesLabDkv: number;
+    podcast: number;
+    misi: number;
+    lainnya: number;
+  };
+  lastActivityText: string;
+}
+
+export interface CityEntryLogEntry {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  gender?: string;
+  role: 'siswa' | 'guru' | 'tamu';
+  enteredAtTime: string; // e.g., "08.15 WITA"
+  dateKey: string;       // e.g., "2026-11-06" (WITA date)
+  dateDisplay: string;   // e.g., "6 November 2026"
+  timestamp: number;
+}
+
+
+
 

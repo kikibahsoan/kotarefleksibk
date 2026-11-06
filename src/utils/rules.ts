@@ -472,14 +472,17 @@ function doGet(e) {
 
   var result = {
     status: "Online",
-    version: "2.0",
+    version: "3.0",
     app: "Kota Refleksi SMK",
     spreadsheet: ss.getName(),
     time: new Date().toISOString(),
     reflections: [],
     feedbacks: [],
     messages: [],
-    chats: []
+    chats: [],
+    labDkvResults: [],
+    podcasts: [],
+    xpLogs: []
   };
 
   try {
@@ -611,6 +614,82 @@ function doGet(e) {
           timestamp: new Date(cTimeStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
           createdAt: cTimeStr || new Date().toISOString()
         });
+      }
+    }
+
+    // 4. Baca Hasil_Tes_Lab_DKV
+    var labSheet = ss.getSheetByName('Hasil_Tes_Lab_DKV');
+    if (labSheet && labSheet.getLastRow() > 1) {
+      var labRows = labSheet.getDataRange().getValues();
+      for (var l = 1; l < labRows.length; l++) {
+        var lr = labRows[l];
+        if (!lr[0]) continue;
+        result.labDkvResults.push({
+          id: String(lr[0]),
+          studentId: String(lr[1] || ''),
+          studentName: String(lr[2] || ''),
+          className: String(lr[3] || ''),
+          materiId: String(lr[4] || ''),
+          materiTitle: String(lr[5] || ''),
+          roundNumber: Number(lr[6]) || 1,
+          scoreCorrect: Number(lr[7]) || 0,
+          totalQuestions: Number(lr[8]) || 5,
+          xpEarned: Number(lr[9]) || 0,
+          tierBreakdown: String(lr[10] || ''),
+          answersDetail: String(lr[11] || ''),
+          createdAt: String(lr[12] || ''),
+          timestamp: Number(lr[13]) || Date.now()
+        });
+      }
+    }
+
+    // 5. Baca Hasil_Podcast_Siswa / Studio_On_Air_Podcast
+    var podSheet = ss.getSheetByName('Hasil_Podcast_Siswa') || ss.getSheetByName('Studio_On_Air_Podcast');
+    if (podSheet && podSheet.getLastRow() > 1) {
+      var podRows = podSheet.getDataRange().getValues();
+      for (var p = 1; p < podRows.length; p++) {
+        var prRow = podRows[p];
+        if (!prRow[0]) continue;
+        result.podcasts.push({
+          id: String(prRow[0]),
+          studentId: String(prRow[1] || ''),
+          studentName: String(prRow[2] || ''),
+          className: String(prRow[3] || ''),
+          materiId: String(prRow[4] || ''),
+          materiTitle: String(prRow[5] || ''),
+          sudahDikuasai: String(prRow[6] || ''),
+          perluDiperkuat: String(prRow[7] || ''),
+          jawabanPemantikSiswa: String(prRow[10] || ''),
+          apresiasiHost: String(prRow[12] || ''),
+          transcriptText: String(prRow[13] || ''),
+          createdAt: String(prRow[14] || ''),
+          timestamp: Number(prRow[15]) || Date.now()
+        });
+      }
+    }
+
+    // 6. Baca Log_XP_Mingguan (7 Hari Terakhir)
+    var xpSheet = ss.getSheetByName('Log_XP_Mingguan');
+    if (xpSheet && xpSheet.getLastRow() > 1) {
+      var xpRows = xpSheet.getDataRange().getValues();
+      var cutoff7Days = Date.now() - (7 * 24 * 3600 * 1000);
+      for (var x = 1; x < xpRows.length; x++) {
+        var xr = xpRows[x];
+        if (!xr[0]) continue;
+        var xTs = Number(xr[8]) || Date.now();
+        if (xTs >= cutoff7Days) {
+          result.xpLogs.push({
+            id: String(xr[0]),
+            studentId: String(xr[1] || ''),
+            studentName: String(xr[2] || ''),
+            className: String(xr[3] || ''),
+            xpEarned: Number(xr[4]) || 1,
+            activityType: String(xr[5] || 'aktivitas_kota'),
+            description: String(xr[6] || ''),
+            createdAt: String(xr[7] || ''),
+            timestamp: xTs
+          });
+        }
       }
     }
 
@@ -788,6 +867,81 @@ function doPost(e) {
         cMsg.content || ''
       ]);
       result.message = "Obrolan monumen warga berhasil dicatat di Spreadsheet!";
+
+    } else if (action === 'save_lab_dkv_test') {
+      var tRes = requestData.testResult || {};
+      var headersLab = [
+        'ID Hasil Tes', 'ID Siswa', 'Nama Siswa', 'Kelas', 'ID Materi', 'Topik Materi',
+        'Paket Acak Ke', 'Skor Benar', 'Total Soal', 'XP Diperoleh',
+        'Rincian Jenjang 1-5', 'Detail Jawaban', 'Waktu Tes', 'Timestamp'
+      ];
+      var labDkvSheet = getOrCreateSheet('Hasil_Tes_Lab_DKV', headersLab, '#0284C7');
+      labDkvSheet.appendRow([
+        tRes.id || '',
+        tRes.studentId || '',
+        tRes.studentName || 'Siswa DKV',
+        tRes.className || 'X DKV',
+        tRes.materiId || '',
+        tRes.materiTitle || 'Evaluasi Lab DKV',
+        Number(tRes.roundNumber) || 1,
+        Number(tRes.scoreCorrect) || 0,
+        Number(tRes.totalQuestions) || 5,
+        Number(tRes.xpEarned) || 0,
+        tRes.tierBreakdown || '',
+        tRes.answersDetail || '',
+        tRes.createdAt || new Date().toLocaleString('id-ID'),
+        tRes.timestamp || Date.now()
+      ]);
+      result.message = "Hasil Tes Lab DKV berhasil dicatat di Spreadsheet!";
+
+    } else if (action === 'save_podcast_episode') {
+      var ep = requestData.episode || {};
+      var headersPod = [
+        'ID Episode', 'ID Siswa', 'Nama Siswa', 'Kelas', 'ID Materi', 'Judul Materi',
+        'Hal Sudah Dikuasai', 'Area Perlu Diperkuat', 'Saran Konkret AI',
+        'Pertanyaan Pemantik AI', 'Jawaban Pemantik Siswa', 'Rencana Belajar Siswa',
+        'Apresiasi Host AI', 'Transkrip Lengkap Podcast (Teks)', 'Tanggal', 'Timestamp'
+      ];
+      var podTarget = getOrCreateSheet('Hasil_Podcast_Siswa', headersPod, '#7C3AED');
+      podTarget.appendRow([
+        ep.id || '',
+        ep.studentId || '',
+        ep.studentName || 'Siswa DKV',
+        ep.className || 'X DKV',
+        ep.materiId || '',
+        ep.materiTitle || '',
+        ep.sudahDikuasai || '',
+        ep.perluDiperkuat || '',
+        JSON.stringify(ep.saranKonkretAI || []),
+        ep.pertanyaanPemantikAI || '',
+        ep.jawabanPemantikSiswa || '',
+        JSON.stringify(ep.rencanaBelajarSiswa || []),
+        ep.apresiasiHost || '',
+        ep.transcriptText || '',
+        ep.createdAt || new Date().toLocaleDateString('id-ID'),
+        ep.timestamp || Date.now()
+      ]);
+      result.message = "Hasil Podcast Siswa berhasil dicatat di Spreadsheet!";
+
+    } else if (action === 'log_xp_gain') {
+      var xpLog = requestData.xpLog || {};
+      var headersXp = [
+        'ID Log', 'ID Siswa', 'Nama Siswa', 'Kelas',
+        'XP Diperoleh', 'Jenis Aktivitas', 'Deskripsi Aktivitas', 'Waktu', 'Timestamp'
+      ];
+      var xpTarget = getOrCreateSheet('Log_XP_Mingguan', headersXp, '#D97706');
+      xpTarget.appendRow([
+        xpLog.id || '',
+        xpLog.studentId || '',
+        xpLog.studentName || '',
+        xpLog.className || 'X DKV',
+        Number(xpLog.xpEarned) || 1,
+        xpLog.activityType || 'aktivitas_kota',
+        xpLog.description || '',
+        xpLog.createdAt || new Date().toLocaleString('id-ID'),
+        xpLog.timestamp || Date.now()
+      ]);
+      result.message = "Log XP Mingguan berhasil dicatat di Spreadsheet!";
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))

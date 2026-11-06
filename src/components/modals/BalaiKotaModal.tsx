@@ -3,6 +3,7 @@ import { X, CheckCircle2, Award, Target, Sparkles, Shuffle } from 'lucide-react'
 import { sounds } from '../../utils/audio';
 import { BuildingId } from '../../types/index.ts';
 import { StorageService } from '../../utils/storage.ts';
+import { WeeklyLeaderboardBalaiKota } from '../WeeklyLeaderboardBalaiKota.tsx';
 
 export interface TownMissionDef {
   id: string;
@@ -172,7 +173,7 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
                   Pusat Kota Refleksia
                 </span>
-                <span className="text-xs text-slate-400">Daftar Misi Warga</span>
+                <span className="text-xs text-slate-400">Leaderboard Mingguan & Misi Warga</span>
               </div>
               <h2 className="text-xl font-black text-white font-['Outfit']">Balai Kota Refleksia</h2>
             </div>
@@ -204,6 +205,11 @@ export const BalaiKotaModal: React.FC<BalaiKotaModalProps> = ({
               <div className="text-lg font-black text-amber-300 font-mono">🪙 {studentXp} XP</div>
             </div>
           </div>
+        </div>
+
+        {/* LEADERBOARD MINGGUAN BALAI KOTA (Top 5 Warga 7 Hari Terakhir dari Spreadsheet) */}
+        <div className="mt-5">
+          <WeeklyLeaderboardBalaiKota currentStudentName={studentName} />
         </div>
 
         {/* Randomized Missions List (No Manual Claim Button) */}

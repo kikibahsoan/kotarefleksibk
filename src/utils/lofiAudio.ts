@@ -1,12 +1,13 @@
 // Web Audio API Radio & Multi-Station Music Synthesizer for Refleksia City
 // Saluran Radio:
 // 1. RRI Pro 1 Gorontalo (101.8 FM) - Live Stream Siaran Radio Gorontalo (Otomatis Pertama)
-// 2. Musik Seperti Ghibli (89.5 FM) - Akustik Piano & String Nostalgia Khas Joe Hisaishi / Studio Ghibli
-// 3. Lo-Fi Kota Refleksia (104.2 FM) - Musik Santai 5 Waktu WITA
+// 2. Malam Tenang dari Antent (99.9 FM) - Ambient Loop (Antent - Hope to See You Again / Link Drive)
+// 3. Musik Seperti Ghibli (89.5 FM) - Akustik Piano & String Nostalgia Khas Joe Hisaishi / Studio Ghibli
+// 4. Lo-Fi Kota Refleksia (104.2 FM) - Musik Santai 5 Waktu WITA
 
 export type TimePeriod = 'subuh' | 'pagi' | 'siang' | 'sore' | 'malam';
 
-export type RadioChannel = 'rri_gorontalo' | 'ghibli' | 'lofi_wita';
+export type RadioChannel = 'rri_gorontalo' | 'malam_tenang' | 'ghibli' | 'lofi_wita';
 
 export interface RadioStationMeta {
   channel: RadioChannel;
@@ -21,6 +22,29 @@ export interface RadioStationMeta {
   bpm?: number;
 }
 
+export const DEFAULT_MALAM_TENANG_AUDIO_URL = '/assets/aistudio/hope_to_see_you_again_5c4357d9.mp3';
+const CUSTOM_DRIVE_URL_STORAGE_KEY = 'kota_refleksi_radio_999_drive_url';
+
+/**
+ * Converts a standard Google Drive sharing link (e.g. https://drive.google.com/file/d/FILE_ID/view?usp=sharing)
+ * into a direct streamable URL, or returns the original URL if it's already a direct audio URL.
+ */
+export function resolveDriveAudioUrl(rawUrl: string): string {
+  const trimmed = (rawUrl || '').trim();
+  if (!trimmed) return DEFAULT_MALAM_TENANG_AUDIO_URL;
+
+  // Match /file/d/<ID> or id=<ID>
+  const fileMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileMatch && fileMatch[1]) {
+    return `https://docs.google.com/uc?export=download&id=${fileMatch[1]}`;
+  }
+  const idParamMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idParamMatch && idParamMatch[1] && trimmed.includes('drive.google.com')) {
+    return `https://docs.google.com/uc?export=download&id=${idParamMatch[1]}`;
+  }
+  return trimmed;
+}
+
 export const RADIO_CHANNELS: Record<RadioChannel, RadioStationMeta> = {
   rri_gorontalo: {
     channel: 'rri_gorontalo',
@@ -31,6 +55,15 @@ export const RADIO_CHANNELS: Record<RadioChannel, RadioStationMeta> = {
     description: 'Siaran langsung radio publik RRI Pro 1 Gorontalo secara live',
     streamUrl: 'https://stream-node1.rri.co.id/streaming/15/9115/rrigorontalopro1.mp3',
     externalUrl: 'https://onlineradiobox.com/id/rripro1gorontalo/?cs=id.rripro1gorontalo&played=1',
+  },
+  malam_tenang: {
+    channel: 'malam_tenang',
+    stationName: 'Malam Tenang dari Antent',
+    tagline: 'Ambient Loop • Antent (99.9 FM)',
+    frequency: '99.9 FM',
+    icon: '🌙',
+    description: 'Alunan musik Malam Tenang dari Antent yang diputar berulang (loop) menemani suasana refleksi kota',
+    streamUrl: DEFAULT_MALAM_TENANG_AUDIO_URL,
   },
   ghibli: {
     channel: 'ghibli',
@@ -153,6 +186,11 @@ class RadioAndMusicEngine {
   private rriAudio: HTMLAudioElement | null = null;
   private isRriConnecting: boolean = false;
 
+  // HTML5 Audio Element for 99.9 FM Malam Tenang dari Antent (Looped)
+  private malamTenangAudio: HTMLAudioElement | null = null;
+  private customDriveUrl: string = '';
+  private isUsingFallbackAudio: boolean = false;
+
   // Tape crackle for Lo-Fi
   private crackleSource: AudioBufferSourceNode | null = null;
   private crackleGain: GainNode | null = null;
@@ -253,6 +291,11 @@ class RadioAndMusicEngine {
 
   constructor() {
     this.currentPeriod = getTimePeriodWita();
+    if (typeof window !== 'undefined') {
+      try {
+        this.customDriveUrl = localStorage.getItem(CUSTOM_DRIVE_URL_STORAGE_KEY) || '';
+      } catch {}
+    }
   }
 
   private initContext() {
@@ -323,6 +366,115 @@ class RadioAndMusicEngine {
       } catch {}
       this.isRriConnecting = false;
     }
+  }
+
+  // -------------------------------------------------------------
+  // 99.9 FM MALAM TENANG DARI ANTENT (CONTINUOUS LOOP + DRIVE LINK)
+  // -------------------------------------------------------------
+  private startMalamTenangLoop() {
+    if (typeof window === 'undefined') return;
+
+    const targetSrc = this.customDriveUrl
+      ? resolveDriveAudioUrl(this.customDriveUrl)
+      : DEFAULT_MALAM_TENANG_AUDIO_URL;
+
+    if (!this.malamTenangAudio) {
+      this.malamTenangAudio = new Audio();
+      this.malamTenangAudio.preload = 'auto';
+      this.malamTenangAudio.loop = true;
+
+      // Ensure seamless loop even if a browser doesn't trigger native loop on custom streams
+      this.malamTenangAudio.addEventListener('ended', () => {
+        if (this.isPlaying && this.activeChannel === 'malam_tenang' && this.malamTenangAudio) {
+          this.malamTenangAudio.currentTime = 0;
+          this.malamTenangAudio.play().catch(() => {});
+        }
+      });
+
+      // Automatic fallback to built-in Antent MP3 if a custom Google Drive link hits CORS/stream limits
+      this.malamTenangAudio.addEventListener('error', () => {
+        if (
+          this.malamTenangAudio &&
+          this.malamTenangAudio.src &&
+          !this.malamTenangAudio.src.endsWith(DEFAULT_MALAM_TENANG_AUDIO_URL)
+        ) {
+          this.isUsingFallbackAudio = true;
+          this.malamTenangAudio.src = DEFAULT_MALAM_TENANG_AUDIO_URL;
+          this.malamTenangAudio.loop = true;
+          if (this.isPlaying && this.activeChannel === 'malam_tenang') {
+            this.malamTenangAudio.play().catch(() => {});
+          }
+          this.notify();
+        }
+      });
+    }
+
+    this.malamTenangAudio.loop = true;
+    this.malamTenangAudio.volume = this.volume;
+
+    const currentAttrSrc = this.malamTenangAudio.getAttribute('src');
+    if (currentAttrSrc !== targetSrc) {
+      this.isUsingFallbackAudio = false;
+      this.malamTenangAudio.src = targetSrc;
+    }
+
+    this.malamTenangAudio.play().catch(() => {
+      // Fallback to local asset if custom URL fails on play()
+      if (this.malamTenangAudio && targetSrc !== DEFAULT_MALAM_TENANG_AUDIO_URL) {
+        this.isUsingFallbackAudio = true;
+        this.malamTenangAudio.src = DEFAULT_MALAM_TENANG_AUDIO_URL;
+        this.malamTenangAudio.loop = true;
+        this.malamTenangAudio.play().catch(() => {});
+      }
+      this.notify();
+    });
+  }
+
+  private stopMalamTenangLoop() {
+    if (this.malamTenangAudio) {
+      try {
+        this.malamTenangAudio.pause();
+      } catch {}
+    }
+  }
+
+  public setCustomDriveUrl(url: string) {
+    this.customDriveUrl = (url || '').trim();
+    this.isUsingFallbackAudio = false;
+    if (typeof window !== 'undefined') {
+      try {
+        if (this.customDriveUrl) {
+          localStorage.setItem(CUSTOM_DRIVE_URL_STORAGE_KEY, this.customDriveUrl);
+        } else {
+          localStorage.removeItem(CUSTOM_DRIVE_URL_STORAGE_KEY);
+        }
+      } catch {}
+    }
+    if (this.malamTenangAudio) {
+      const nextSrc = this.customDriveUrl
+        ? resolveDriveAudioUrl(this.customDriveUrl)
+        : DEFAULT_MALAM_TENANG_AUDIO_URL;
+      this.malamTenangAudio.src = nextSrc;
+      this.malamTenangAudio.loop = true;
+      if (this.isPlaying && this.activeChannel === 'malam_tenang') {
+        this.malamTenangAudio.play().catch(() => {
+          if (this.malamTenangAudio && nextSrc !== DEFAULT_MALAM_TENANG_AUDIO_URL) {
+            this.isUsingFallbackAudio = true;
+            this.malamTenangAudio.src = DEFAULT_MALAM_TENANG_AUDIO_URL;
+            this.malamTenangAudio.play().catch(() => {});
+          }
+        });
+      }
+    }
+    this.notify();
+  }
+
+  public getCustomDriveUrl(): string {
+    return this.customDriveUrl;
+  }
+
+  public getIsUsingFallbackAudio(): boolean {
+    return this.isUsingFallbackAudio;
   }
 
   // -------------------------------------------------------------
@@ -482,8 +634,8 @@ class RadioAndMusicEngine {
   private tick() {
     if (!this.isPlaying || !this.ctx) return;
 
-    if (this.activeChannel === 'rri_gorontalo') {
-      // Stream is played via HTML5 Audio
+    if (this.activeChannel === 'rri_gorontalo' || this.activeChannel === 'malam_tenang') {
+      // Stream / Loop is played via HTML5 Audio
       return;
     }
 
@@ -596,6 +748,9 @@ class RadioAndMusicEngine {
     if (this.activeChannel === 'rri_gorontalo') {
       return RADIO_CHANNELS.rri_gorontalo;
     }
+    if (this.activeChannel === 'malam_tenang') {
+      return RADIO_CHANNELS.malam_tenang;
+    }
     if (this.activeChannel === 'ghibli') {
       return RADIO_CHANNELS.ghibli;
     }
@@ -617,9 +772,14 @@ class RadioAndMusicEngine {
     this.isPlaying = true;
 
     if (this.activeChannel === 'rri_gorontalo') {
+      this.stopMalamTenangLoop();
       this.startRriStream();
+    } else if (this.activeChannel === 'malam_tenang') {
+      this.stopRriStream();
+      this.startMalamTenangLoop();
     } else {
       this.stopRriStream();
+      this.stopMalamTenangLoop();
       this.initContext();
       if (this.activeChannel === 'lofi_wita') {
         this.startTapeCrackle();
@@ -637,6 +797,7 @@ class RadioAndMusicEngine {
   private stopInternal() {
     this.isPlaying = false;
     this.stopRriStream();
+    this.stopMalamTenangLoop();
     if (this.timerId !== null) {
       clearTimeout(this.timerId);
       this.timerId = null;
@@ -651,6 +812,9 @@ class RadioAndMusicEngine {
     }
     if (this.rriAudio) {
       this.rriAudio.volume = this.volume;
+    }
+    if (this.malamTenangAudio) {
+      this.malamTenangAudio.volume = this.volume;
     }
     this.notify();
   }

@@ -130,10 +130,23 @@ export function mergePodcastList(
  */
 export async function syncPodcastEpisodeToSpreadsheet(episode: PodcastEpisodeRecord): Promise<void> {
   try {
-    // 1. Kirim action khusus save_podcast_episode
-    storage.syncWithGAS('save_podcast_episode', { episode });
+    // 1. Catat perolehan XP mingguan untuk Leaderboard Mingguan Balai Kota
+    await storage.logWeeklyXpGain({
+      studentId: episode.studentId || 'std-anon',
+      studentName: episode.studentName || 'Siswa DKV',
+      className: episode.className || 'X DKV 2',
+      xpEarned: 2,
+      activityType: 'podcast',
+      description: `Podcast Studio ON AIR: ${episode.materiTitle}`,
+    });
 
-    // 2. Kirim juga ke submit_reflection dengan penanda [PODCAST_MENARA_MENTOR] agar langsung tercatat rapi sebagai teks di Google Spreadsheet v2.0 tanpa perlu deploy ulang!
+    // 2. Kirim action khusus save_podcast_episode (Menyimpan ke Sheet: Hasil_Podcast_Siswa & Studio_On_Air_Podcast pada GAS v3.0)
+    await storage.syncWithGAS('save_podcast_episode', {
+      episode,
+      targetSheet: 'Hasil_Podcast_Siswa',
+    });
+
+    // 3. Kirim juga ke submit_reflection dengan penanda [PODCAST_MENARA_MENTOR] agar langsung tercatat rapi di Data_Refleksi_Siswa / Refleksi_Siswa!
     const reflectionPayload: Reflection = {
       id: episode.id.startsWith('pod-') ? episode.id : `pod-${episode.id}`,
       studentId: episode.studentId || 'std-anon',

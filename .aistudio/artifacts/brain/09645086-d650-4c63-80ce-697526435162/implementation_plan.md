@@ -1,170 +1,122 @@
-# Rencana Implementasi: Sinkronisasi Multi-Device, Efek Siram Pohon Apel, & 4 Bangku Air Mancur
+# Arena Cerdas Cermat Balai Kota (Refleksia Grand Quiz Battle)
 
-Peningkatan fitur interaktif dan visual pada Kota Refleksia SMK Negeri 2 Gorontalo, mencakup sinkronisasi pergerakan avatar online antarperangkat, visual efek siram pohon dan buah apel yang memudar otomatis, serta penambahan 4 bangku taman di sekeliling air mancur dengan posisi duduk yang presisi.
+Fitur permainan kelompok interaktif realtime di Balai Kota dan Alun-alun Pusat Refleksia City yang mempertemukan tim siswa dalam kuis serentak bertema Desain Komunikasi Visual (DKV), dipandu langsung oleh Guru atau otomatis oleh Wali Kota @Sony.
 
-## User Review & Critical Decisions
+### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Keputusan yang telah dikonfirmasi bersama pengguna:
-> 1. **Siklus Apel Pohon**: Setelah disiram air dengan efek partikel percikan, buah apel merah ranum akan muncul di dahan pohon dan otomatis memudar perlahan (*fade-out*) setelah 8 detik hingga pohon kembali normal.
-> 2. **Bangku Air Mancur**: Tersedia 4 bangku di sekeliling air mancur pusat (Utara, Selatan, Timur, Barat). Saat diklik, avatar akan berjalan mendekati bangku lalu duduk menghadap ke pusat air mancur dengan pose duduk yang pas dan rapi di atas bangku.
+> Berdasarkan jawaban klarifikasi yang telah dikonfirmasi, permainan kelompok dirancang dengan ketentuan utama:
+> - **Jenis Permainan**: Cerdas Cermat Tim seputar kompetensi dan kreativitas DKV.
+> - **Sistem Bermain**: Realtime serentak yang dapat dipandu langsung oleh Guru (Host/Juri) atau berjalan otomatis oleh Wali Kota @Sony.
+> - **Arena Pusat**: Balai Kota dan Panggung Alun-alun Utama.
+
+- **Keputusan Terkonfirmasi 1**: Sistem Tim berbasis Kelas (Tim X DKV 2 vs Tim X DKV 3) atau Pemilihan Kubu Tim Bebas (Tim Cyan vs Tim Amber) saat sesi dibuka di Balai Kota.
+- **Keputusan Terkonfirmasi 2**: Peran Tamu Kota (Wartawan) adalah sebagai Penonton & Peliput Berita Resmi (dapat melihat jalannya kuis dan papan skor tanpa mengganggu jalannya perlombaan).
+- **Rekomendasi Default**: Guru memiliki kontrol penuh (Mulai Ronde, Jeda, Verifikasi Jawaban, Beri Poin Bonus), namun kuis juga dilengkapi Mode Otomatis jika Guru sedang tidak memimpin sesi.
 
 ---
 
-## 1. Overview & Core Concept
+### 1. Overview & Core Concept
 
-1. **Sinkronisasi Multi-Device yang Handal**:
-   - Memastikan dua atau lebih pengguna yang membuka aplikasi di perangkat/tab berbeda dapat melihat avatar satu sama lain secara langsung di peta 15x15.
-   - Avatar perangkat lain akan muncul (*spawn*) dari salah satu dari 4 sudut terluar peta dengan efek teleportasi portal, bergerak halus mengikuti arah dan koordinat tujuan, serta menghilang seketika saat perangkat lain ditutup/offline.
-2. **Interaksi Siram Pohon & Apel**:
-   - Saat avatar berada di dekat pohon dan memilih aksi siram: muncul semprotan partikel tetesan air melengkung ke mahkota pohon, diiringi audio air dan visual riak air di tanah.
-   - Buah apel merah ranum muncul di dahan, bergoyang lembut, dan setelah 6-8 detik memudar secara halus (*opacity transition*) sebelum hilang.
-3. **4 Bangku Taman di Sekeliling Air Mancur**:
-   - Menambahkan 4 bangku kayu berbingkai besi elegan mengitari air mancur monumen warga di arah mata angin (Utara, Timur, Selatan, Barat).
-   - Memperbaiki kalkulasi offset rendering avatar saat duduk (`isSitting`) agar tubuh avatar duduk tepat di atas kayu dudukan, dengan kaki terlipat wajar dan arah pandang menghadap ke air mancur.
+- **Apa yang Dibangun**: Sebuah modul arena kompetisi cerdas cermat kelompok *"Refleksia Grand Quiz Battle"* yang terintegrasi di Balai Kota dan Alun-alun Pusat. Siswa bergabung ke dalam tim, menekan tombol bel (buzzer) secara realtime, dan menjawab soal-soal DKV dalam batas waktu serentak.
+- **Target Pengguna**: Siswa SMK jurusan DKV (sebagai kontestan tim), Guru DKV / Master kikybahsoan (sebagai Host / Pemandu Kuis), dan Tamu / Wartawan (sebagai penonton dan peliput skor).
+- **Nilai Utama**: Membangun kolaborasi dan antusiasme belajar siswa dalam suasana kota virtual yang hidup, meriah, dan kompetitif secara sehat.
 
 ---
 
-## 2. User Experience & Visual Design
+### 2. User Experience & Visual Design
 
-### A. Alur Interaksi Duduk di Bangku Air Mancur
+- **Alur Pengguna**:
+  1. **Akses Masuk**: Siswa atau Guru mendekati Balai Kota atau mengklik podium panggung Alun-alun untuk membuka antarmuka arena Cerdas Cermat.
+  2. **Lobi Pembagian Tim**: Siswa memilih tim (Tim Cyan / Tim Amber atau DKV 2 / DKV 3) dan siap di podium masing-masing.
+  3. **Mulai Pertandingan**: Guru (atau sistem otomatis dipandu Wali Kota @Sony) membunyikan bel tanda babak dimulai.
+  4. **Babak Pertandingan**:
+     - *Babak 1 (Pilihan Ganda Cepat)*: Semua tim menjawab serentak dalam waktu 20 detik.
+     - *Babak 2 (Rebutan Buzzer)*: Tim yang menekan bel tercepat mendapat hak menjawab pertama.
+     - *Babak 3 (Tebak Istilah DKV & Estafet)*: Pertanyaan poin ganda untuk penentuan juara.
+  5. **Selebrasi & Penganugerahan XP**: Pengumuman tim pemenang dengan efek confetti meriah, piala virtual, dan pembagian reward poin XP otomatis.
+
+- **Identitas Visual & Tema**:
+  - *Gaya Desain*: Panggung kuis megah berlatar arsitektur Balai Kota Refleksia dengan aksen emas (`#F59E0B`), biru langit (`#0284C7`), dan emerald (`#10B981`).
+  - *Tipografi*: Display elegan dan tegas menggunakan font sans tebal dengan angka tabular (`tabular-nums`) untuk timer hitung mundur dan skor tim.
+  - *Pencahayaan & Efek*: Efek sorot lampu podium kuis, tombol buzzer bersinar saat ditekan, serta animasi ticker papan skor di Alun-alun.
+
+- **Umpan Balik Interaktif**:
+  - Efek suara bel kuis (*chime buzzer*), efek detak timer detik-detik terakhir, dan suara perayaan kemenangan.
+  - Indikator visual jelas ketika tim sedang menekan bel atau waktu habis.
+
+---
+
+### 3. Key Product Decisions & Trade-Offs
+
+- **Keputusan 1: Integrasi dengan Bank Soal DKV yang Sudah Ada**
+  - *Pendekatan*: Memanfaatkan bank materi dan kuis DKV yang telah dihasilkan Guru di Bengkel Latihan dan Bank Materi AI, ditambah paket soal cerdas cermat khusus.
+  - *Alasan*: Materi selalu relevan dengan kurikulum SMK DKV dan tidak memerlukan input soal ulang yang memberatkan Guru.
+
+- **Keputusan 2: Arsitektur Realtime Hybrid (WebSocket Mesh + Server Authority)**
+  - *Pendekatan*: Sinkronisasi status bel buzzer, timer, dan skor menggunakan jaringan *Realtime Presence Mesh* yang sudah berjalan di Refleksia City, dengan Express API sebagai penyimpan riwayat pertandingan.
+  - *Alasan*: Latensi sangat rendah (<50ms) antar perangkat laptop, tablet, dan HP tanpa memerlukan infrastruktur server eksternal tambahan.
+
+- **Keputusan 3: Penanganan Khusus untuk Mode Tamu (Wartawan)**
+  - *Pendekatan*: Tamu tetap memiliki status *View Only*—dapat menyaksikan jalannya pertandingan langsung di Balai Kota dan melihat papan skor tanpa tombol menjawab soal.
+  - *Alasan*: Menjaga integritas kompetisi siswa sekaligus konsisten dengan peran jurnalis tamu yang telah ditetapkan.
+
+---
+
+### 4. Technical Architecture & Data Strategy
+
 ```
-[Klik Bangku Air Mancur] ──► [Avatar Berjalan ke Bangku] ──► [Duduk Sempurna Menghadap Air Mancur]
-                                                                        │
-[Klik Sembarang Tanah/Peta] ◄──────────────────────────────────────────┘
-(Avatar Bangkit & Berjalan)
+┌────────────────────────────────────────────────────────────────────────┐
+│                        BALAI KOTA & ALUN-ALUN                          │
+│                                                                        │
+│  ┌──────────────────┐    ┌────────────────────┐    ┌────────────────┐  │
+│  │   Podium Tim A   │    │  Panggung Host /   │    │  Podium Tim B  │  │
+│  │   (Buzzer & UI)  │    │  Juri (@Sony/Guru) │    │  (Buzzer & UI) │  │
+│  └────────┬─────────┘    └─────────┬──────────┘    └────────┬───────┘  │
+│           │                        │                        │          │
+└───────────┼────────────────────────┼────────────────────────┼──────────┘
+            │                        │                        │           
+            ▼                        ▼                        ▼           
+┌────────────────────────────────────────────────────────────────────────┐
+│                 CERDAS CERMAT REALTIME CONTROLLER                      │
+│                                                                        │
+│   • State Mesin: LOBBY ──► QUESTION_ACTIVE ──► BUZZER_LOCKED           │
+│                  ▲                                  │                  │
+│                  └─────── ROUND_RESULT ◄────────────┘                  │
+│   • Timer Countdown Engine (15s / 20s)                                 │
+│   • Buzzer Lockout Arbiter (Penentu tim pertama menekan bel)           │
+│   • Auto-Score Calculator & XP Distributor                             │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │                                     
+                   ┌────────────────┴────────────────┐                    
+                   ▼                                 ▼                    
+┌─────────────────────────────────────┐  ┌───────────────────────────────┐
+│       REALTIME PRESENCE MESH        │  │       STORAGE & SPREADSHEET   │
+│  • WSS MQTT Event Broadcast         │  │  • Riwayat Juara Balai Kota   │
+│  • Local BroadcastChannel           │  │  • Poin XP Siswa & Leaderboard│
+│  • Express SSE Stream Fallback      │  │  • Sinkronisasi GAS           │
+└─────────────────────────────────────┘  └───────────────────────────────┘
 ```
-- **Bangku Air Mancur**:
-  - **Bangku Utara** `(0.0, -1.35)`: Menghadap ke bawah/selatan (ke air mancur).
-  - **Bangku Selatan** `(0.0, 1.35)`: Menghadap ke atas/utara (ke air mancur).
-  - **Bangku Timur** `(1.35, 0.0)`: Menghadap ke kiri/barat (ke air mancur).
-  - **Bangku Barat** `(-1.35, 0.0)`: Menghadap ke kanan/timur (ke air mancur).
-- **Visual Duduk**: Kaki ditekuk ke bawah tanpa ayunan langkah, posisi pinggul dan torso bersandar tepat di atas bantalan kayu bangku.
 
-### B. Alur Siram Pohon & Buah Apel
-- **Detik 0 - 1.5**: Avatar menghadap pohon, partikel semprotan air berkilau (*water droplet arcs*) memancar dari tangan/alat siram ke dedaunan pohon, disertai efek tetesan air jatuh ke tanah.
-- **Detik 1.5 - 6.0**: Pohon menjadi hijau segar bercahaya, 6 buah apel merah ranum muncul di ranting pohon dengan kilauan cahaya.
-- **Detik 6.0 - 8.0**: Buah apel perlahan-lahan memudar (*fade-out alpha 1.0 -> 0.0*) hingga kembali ke kondisi pohon asri biasa.
-
-### C. Alur Sinkronisasi Multi-Device
-```
-[Perangkat A: Klik Tujuan]
-       │
-       ▼
-[Broadcast Instan + POST /api/presence/heartbeat]
-       │
-       ▼
-[Server Online State Map] ──► [Perangkat B: Heartbeat Update (1000ms / Broadcast 0ms)]
-                                        │
-                                        ▼
-                  [Perangkat B Merender Avatar A Bergerak Real-Time]
-```
+- **Entitas Data Utama**:
+  - `QuizBattleRoom`: ID ruangan, status ronde, daftar peserta per tim, soal aktif, sisa waktu timer.
+  - `TeamScore`: Akumulasi poin tim, waktu respons rata-rata, riwayat jawaban benar.
+  - `BuzzerEvent`: Timestamp milidetik tim yang menekan bel pertama untuk hak menjawab.
 
 ---
 
-## 3. Key Technical Decisions & Data Strategy
+### 5. Tahapan Eksekusi Pembangunan
 
-### A. Arsitektur Komponen & Sinkronisasi
-```
-┌────────────────────────────────────────────────────────┐
-│                      server.ts                         │
-│  - onlinePlayersMap: Map<id, ServerOnlinePlayer>       │
-│  - POST /api/presence/heartbeat (Simpan & kirim others)│
-│  - POST /api/presence/leave (Hapus saat unload)        │
-│  - purgeInactivePlayers() interval 3s (timeout 10s)    │
-└───────────────────────────▲────────────────────────────┘
-                            │ HTTP & BroadcastChannel
-┌───────────────────────────┴────────────────────────────┐
-│               ThreeTownCanvas.tsx                      │
-│  - playerRef: Avatar lokal pemain                      │
-│  - remotePlayersRef: Map remote avatars                │
-│  - MAP_CORNERS: 4 sudut spawn (ujung platform)         │
-│  - FOUNTAIN_BENCHES: 4 bangku di sekeliling air mancur │
-│  - wateredTrees: Map<treeIndex, { time, progress }>   │
-│  - Render loop: Canvas 2D isometric depth sorting      │
-└────────────────────────────────────────────────────────┘
-```
-
-### B. Perbaikan Khusus pada Sinkronisasi Multi-Device
-1. **Pemisahan Sesi Unik**:
-   - `clientDeviceId` dihasilkan secara persisten di `sessionStorage` (`kota_device_uuid`).
-   - `mySessionId = ${role}_${handle}_${deviceId}` memastikan 2 perangkat atau 2 tab dengan akun yang sama/berbeda tidak pernah saling menimpa data di server.
-2. **Pemberitahuan Posisi Instan**:
-   - Selain timer 1000ms, setiap kali pemain mengeklik lokasi berjalan di kanvas, `sendHeartbeatRef.current?.()` langsung dieksekusi secara instan, menyiarkan koordinat target `targetWx, targetWy` melalui `BroadcastChannel` (0ms delay) dan backend API.
-3. **Interpolasi Posisi Halus**:
-   - Jika jarak pemain remote terhadap target kecil (< 4.5 tile), posisi diperbarui dengan interpolasi `speed * delta` sehingga terlihat animasi kaki berjalan dan menghadap arah tujuan.
-   - Jika terjadi disconnect/teleportasi jauh (> 4.5 tile), koordinat di-snap agar tidak berjalan menembus dinding selamanya.
-
----
-
-## 4. Langkah-Langkah Pengerjaan
-
-1. **Bangku Air Mancur & Pose Duduk**:
-   - Definisikan 4 bangku air mancur: `fountain_north`, `fountain_south`, `fountain_east`, `fountain_west` pada radius 1.35 dari pusat air mancur `(0, 0)`.
-   - Update `drawItems` untuk merender ke-4 bangku dengan orientasi isometrik yang sesuai.
-   - Sempurnakan logika pose duduk `isSitting`:
-     - Hitung offset `avY` dan arah hadap (`facing`) avatar secara otomatis sesuai bangku yang diduduki sehingga menghadap ke pusat air mancur.
-     - Sediakan interaksi klik bangku yang menggerakkan avatar ke titik bangku dan langsung mengaktifkan pose duduk.
-
-2. **Efek Air Siram Pohon & Buah Apel 8 Detik**:
-   - Tambahkan state `waterSprayEffects`: array animasi partikel tetesan air yang memancar ke pohon saat tombol siram ditekan.
-   - Tambahkan state waktu penyiraman pohon `treeWateredAt: Record<number, number>`.
-   - Di render loop pohon:
-     - Jika pohon sedang dalam durasi 8 detik setelah disiram:
-       - Render partikel air memancar pada detik 0 - 1.5.
-       - Render buah apel merah ranum dengan transparansi dinamis (`alpha = 1.0` pada detik 0-6, dan `alpha = (8 - elapsed) / 2` pada detik 6-8).
-     - Setelah lewat 8 detik, apel hilang secara bersih dan pohon kembali normal.
-
-3. **Optimasi Sinkronisasi Multi-Device**:
-   - Verifikasi endpoint `/api/presence/heartbeat` dan pembersihan offline di `server.ts`.
-   - Pastikan setiap avatar remote memiliki lencana nama `@handle 🟢`, status gerak `walkFrame`, dan terhapus saat offline.
-   - Uji kompilasi dengan `compile_applet` dan `lint_applet`.
-
----
-
-## 5. Fitur Cuaca Dinamis Refleksia City (Cerah, Berawan, Hujan Ringan, Salju)
-- **4 Tipe Cuaca**:
-  1. `cerah`: Langit hangat bergradasi cerah, sinar matahari, awan tipis melayang.
-  2. `berawan`: Langit teduh keabu-abuan, awan lembut berarak tebal meredupkan pencahayaan kota.
-  3. `hujan`: Langit kelabu kebiruan sejuk, rumput dan trotoar berpenampilan basah, rintik hujan transparan berkecepatan dinamis (`rainDrops`) serta riak air melingkar (`rainRipples`) di tanah.
-  4. `salju`: Langit lavender-slate pucat, rumput dan jalanan berbalut lapisan salju putih halus, partikel keping salju melayang meliuk lembut (`snowFlakes`).
-- **Sistem Otomatis & Manual**:
-  - Cuaca berganti secara acak otomatis setiap ~95 detik dengan notifikasi pop-up elegan.
-  - Terdapat tombol pil cuaca interaktif di header atas (`bg-[#121e2c]/68 backdrop-blur-md`) dengan menu dropdown untuk memilih cuaca secara langsung atau menyalakan/mematikan pergantian otomatis (`Otomatis: ON/OFF`).
-
----
-
-## 6. Ekosistem & Lanskap Alam Baru (Selesai Dikerjakan)
-- [x] **Gradasi Warna Tanah Maps & Kaki Gunung**:
-  - Interpolasi warna petak rumput utara (`gy <= -9.5`) secara bertahap menuju tanah lembap dan batuan kaki gunung (`#274426` / `#122316`).
-  - Apron kaki bukit menggunakan *multi-stop isometric linear gradient* (4 perhentian warna) dan batuan lereng (*scree boulders*) sehingga transisi gunung dan tanah menyatu alami tanpa pembatas kaku.
-- [x] **Perahu Kayu Tradisional & Pencari Ikan di Danau**:
-  - Sampan kayu jati tradisional mengapung di danau dengan fisika goyangan air (*bobbing* dan riak melingkar).
-  - Dilengkapi lentera kuningan haluan, dayung kayu, keranjang ikan anyaman, serta nelayan berpakaian indigo mengenakan caping bambu.
-  - Memegang joran bambu melengkung dengan senar pancing halus dan pelampung dwi-warna merah-putih yang berkedut saat ada tarikan ikan.
-- [x] **Burung Bangau & Ikan di Sungai**:
-  - Kawanan ikan air tawar (emas, perak, sian) berenang menyusuri aliran sungai dengan kibasan ekor dinamis dan kilau sisik.
-  - Burung bangau putih (*Ardea alba*) dengan siklus 20 detik: singgah di bebatuan dangkal mematuk ikan, kepakan sayap lepas landas menanjak, terbang melayang anggun menyusuri sungai, serta menukik mendarat kembali.
-- [x] **Satwa di Hutan Belantara**:
-  - 2 Rusa dewasa: Rusa jantan dewasa dengan tanduk bercabang megah (*stag*) dan rusa betina merumput tenang (*doe*).
-  - Tupai hutan berekor lebat melengkung yang duduk memakan biji pohon ek.
-  - Kelinci hutan (*cottontail*) dengan telinga panjang tegak yang melompat dan menggoyangkan hidung.
-  - Burung hutan yang berjalan acak (*ground bird*) di bawah pepohonan dengan langkah kaki bergantian dan anggukan kepala khas saat mematuk biji-bijian.
-
----
-
-## 7. Pemulihan Tanah Hutan Hijau & Bersemak + Jalan Memancing Alami (Selesai Dikerjakan)
-- [x] **Perbaikan Tanah Hitam Menjadi 100% Hijau**:
-  - Menghilangkan interpolasi warna tanah humus hitam/gelap (`#274426` & `#122316`) pada petak hutan utara.
-  - Mengubah warna dasar rumput hutan (`wildernessGrassColor` & `wildernessGrassAltColor`) menjadi hijau zamrud segar (`#15803d` / `#16a34a` di siang hari, dan `#0d5336` / `#0f603e` di malam hari), tanpa ada area yang menjadi hitam atau abu-abu gelap.
-  - Mengubah gradien landasan kaki gunung (*apron*) dan bantalan lumut kaki bukit menjadi 100% hijau asri.
-- [x] **Semua Tanah di Hutan Hijau dan Bersemak**:
-  - Menambahkan generator semak bertingkat (*procedural multi-tiered forest shrubs*) `drawForestBush` dengan daun berlapis dan highlight hijau muda (`#4ade80`).
-  - Merender 3-4 rumpun rumput bergoyang dan 2-3 semak lebat di setiap petak tanah hutan belantara (`gy <= -7`).
-- [x] **Hanya Jalan Menuju Tempat Memancing (Banyak Rumput)**:
-  - Menghapus semua jalan aspal/paving lurus lama di hutan belantara.
-  - Satu-satunya jalan di hutan belantara adalah jalan setapak alami berliku dari gerbang hutan `[0, -7]` menuju dermaga memancing danau `[2, -10]`.
-  - Jalan setapak dicat dengan warna tanah alami berumput dan ditumbuhi lebat rumpun rumput serta bunga semanggi liar (*overgrown with lush grass tufts & clovers*), sehingga menyatu indah dengan lantai hutan.
-
-
-
+1. **Pembuatan Komponen Arena Cerdas Cermat**:
+   - Merancang modal dan antarmuka panggung kuis interaktif di Balai Kota (`CerdasCermatModal.tsx`).
+   - Menyediakan tampilan podium untuk Tim A, Tim B, dan Panggung Juri Guru/Wali Kota Sony.
+2. **Implementasi Logika Buzzer & Timer Realtime**:
+   - Menghubungkan event bel kuis serentak dengan jaminan penentu tercepat (*lockout arbiter*).
+   - Sinkronisasi timer mundur serentak untuk semua pemain di perangkat masing-masing.
+3. **Panel Kontrol Pemandu Guru**:
+   - Tombol kontrol kuis untuk Guru: Mulai Ronde, Lanjut Soal, Beri Poin Bonus Tim, atau Mode Panduan Otomatis Wali Kota Sony.
+4. **Pemberian Reward & Papan Juara Alun-alun**:
+   - Integrasi perolehan poin XP tim ke profil siswa yang menang.
+   - Papan rekapitulasi juara cerdas cermat di Balai Kota.
+5. **Verifikasi & Pengujian Antar Perangkat**:
+   - Memastikan responsivitas dan ringannya rendering di Laptop, Tablet, dan HP.

@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi peningkatan Kota Refleksia:\n1. Penyempurnaan sinkronisasi avatar multi-device real-time (posisi, pergerakan halus, spawn di 4 sudut peta, dan status offline).\n2. Efek semprotan air saat pohon disiram serta kemunculan buah apel yang memudar perlahan selama 8 detik.\n3. Pembuatan 4 bangku mengelilingi air mancur pusat lengkap dengan pose duduk yang presisi menghadap ke air mancur.",
-  "updatedAt":  "2026-10-29T09:33:46.132470533Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Rencana implementasi Arena Cerdas Cermat Balai Kota (Refleksia Grand Quiz Battle) berbasis realtime serentak di Balai Kota dan Alun-alun Pusat yang dipandu Guru atau Wali Kota Sony untuk siswa kelas DKV.",
+  "updatedAt": "2026-11-05T13:38:23.561350338Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

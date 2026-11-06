@@ -87,20 +87,23 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // 3. Aksi Lengkap Semua Data v2.8 (Refleksi, Feedback, Pesan, Obrolan Warga, Jurnal Pohon Beringin, Studio ON AIR Podcast, Pasar Prestasi, Bank Materi Guru AI & Kotak Saran Wisma)
+  // 3. Aksi Lengkap Semua Data v3.0 (Refleksi, Feedback, Pesan Kantor Pos, Obrolan Warga, Jurnal Pohon Beringin, Podcast, Hasil Tes Lab DKV, Leaderboard Mingguan 7 Hari, Pasar Prestasi, Bank Materi Guru AI & Kotak Saran Wisma)
   var reflections = getReflections(ss);
   var feedbacks = getFeedbacks(ss);
   var messages = getMessages(ss);
   var chats = getPublicChats(ss);
   var stickyNotes = getStickyNotes(ss);
   var podcasts = getPodcasts(ss);
+  var labDkvResults = getLabDkvResults(ss);
+  var xpLogs = getWeeklyXpLogs(ss);
+  var weeklyLeaderboard = getWeeklyLeaderboardTop5(ss, xpLogs, reflections, labDkvResults, podcasts, messages);
   var pasarPrestasi = getPasarPrestasi(ss);
   var bankMateri = getBankMateri(ss);
   var wismaSuggestions = getWismaSuggestions(ss);
 
   return ContentService.createTextOutput(JSON.stringify({
     success: true,
-    version: "2.8",
+    version: "3.0",
     spreadsheet: ss.getName(),
     reflections: reflections,
     feedbacks: feedbacks,
@@ -108,6 +111,9 @@ function doGet(e) {
     chats: chats,
     stickyNotes: stickyNotes,
     podcasts: podcasts,
+    labDkvResults: labDkvResults,
+    xpLogs: xpLogs,
+    weeklyLeaderboard: weeklyLeaderboard,
     pasarPrestasi: pasarPrestasi,
     bankMateri: bankMateri,
     wismaSuggestions: wismaSuggestions,
@@ -132,6 +138,14 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "submit_reflection") {
       saveReflection(ss, data.reflection, data.feedback);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_lab_dkv_test") {
+      saveLabDkvTestResult(ss, data.testResult);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "log_xp_gain") {
+      saveWeeklyXpLog(ss, data.xpLog);
       return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "save_sticky_note") {
@@ -266,12 +280,12 @@ function purgeOldChats(sheet) {
 }
 
 // -------------------------------------------------------------
-// MANAJEMEN REFLEKSI & FEEDBACK SISWA
+// MANAJEMEN DATA_REFLEKSI_SISWA & FEEDBACK MENTOR (v3.0)
 // -------------------------------------------------------------
 function getOrCreateReflectionSheet(ss) {
-  var sheet = ss.getSheetByName("Refleksi_Siswa");
+  var sheet = ss.getSheetByName("Data_Refleksi_Siswa");
   if (!sheet) {
-    sheet = ss.insertSheet("Refleksi_Siswa");
+    sheet = ss.insertSheet("Data_Refleksi_Siswa");
     sheet.appendRow([
       "ID Refleksi", "ID Siswa", "Nama Siswa", "Kelas", "Nomor Absen",
       "ID Materi", "Judul Materi", "Skala Pemahaman (1-5)", "Mood Emoji",
@@ -287,8 +301,7 @@ function getOrCreateReflectionSheet(ss) {
 function saveReflection(ss, ref, fb) {
   if (!ref || !ref.id) return;
   var sheet = getOrCreateReflectionSheet(ss);
-  
-  sheet.appendRow([
+  var rowData = [
     ref.id,
     ref.studentId || "",
     ref.studentName || "",
@@ -304,44 +317,84 @@ function saveReflection(ss, ref, fb) {
     (ref.answers && ref.answers.actionPlan) || "",
     JSON.stringify((ref.answers && ref.answers.customAnswers) || {}),
     ref.createdAt || new Date().toLocaleString("id-ID")
-  ]);
+  ];
+  sheet.appendRow(rowData);
+
+  // Sinkron juga ke Refleksi_Siswa jika sheet lama tersebut sudah ada
+  var legacySheet = ss.getSheetByName("Refleksi_Siswa");
+  if (legacySheet) {
+    legacySheet.appendRow(rowData);
+  }
 
   if (fb && fb.id) {
     saveFeedback(ss, fb);
   }
 }
 
-function getReflections(ss) {
-  var sheet = ss.getSheetByName("Refleksi_Siswa");
-  if (!sheet) return [];
+function readReflectionRowsFromSheet(sheet, list, seenIds) {
+  if (!sheet) return;
   var rows = sheet.getDataRange().getValues();
-  if (rows.length <= 1) return [];
+  if (rows.length <= 1) return;
 
-  var list = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
-    var custom = {};
-    try { custom = JSON.parse(r[13]); } catch(e) {}
-    list.push({
-      id: String(r[0]),
-      studentId: String(r[1]),
-      studentName: String(r[2]),
-      className: String(r[3]),
-      studentNumber: String(r[4]),
-      materiId: String(r[5]),
-      materiTitle: String(r[6]),
-      scale: Number(r[7]) || 4,
-      moodEmoji: String(r[8] || "😊"),
-      answers: {
-        understood: String(r[9] || ""),
-        difficult: String(r[10] || ""),
-        findings: String(r[11] || ""),
-        actionPlan: String(r[12] || ""),
-        customAnswers: custom
-      },
-      createdAt: String(r[14])
-    });
+    if (!r[0]) continue;
+    var idStr = String(r[0]);
+    if (seenIds[idStr]) continue;
+    seenIds[idStr] = true;
+
+    // Deteksi format kolom Data_Refleksi_Siswa v3.0 (15 kolom dengan ID di r[0]) vs v1.0
+    if (r.length >= 15) {
+      var custom = {};
+      try { custom = JSON.parse(r[13]); } catch(e) {}
+      list.push({
+        id: idStr,
+        studentId: String(r[1]),
+        studentName: String(r[2]),
+        className: String(r[3]),
+        studentNumber: String(r[4]),
+        materiId: String(r[5]),
+        materiTitle: String(r[6]),
+        scale: Number(r[7]) || 4,
+        moodEmoji: String(r[8] || "😊"),
+        answers: {
+          understood: String(r[9] || ""),
+          difficult: String(r[10] || ""),
+          findings: String(r[11] || ""),
+          actionPlan: String(r[12] || ""),
+          customAnswers: custom
+        },
+        createdAt: String(r[14])
+      });
+    } else {
+      var customLegacy = {};
+      try { customLegacy = JSON.parse(r[11] || "{}"); } catch(e) {}
+      list.push({
+        id: String(r[1] || idStr),
+        studentId: String(r[2] || ""),
+        studentName: String(r[3] || ""),
+        className: String(r[4] || ""),
+        materiId: "materi-1",
+        materiTitle: String(r[5] || ""),
+        scale: Number(r[6]) || 4,
+        moodEmoji: String(r[7] || "😊"),
+        answers: {
+          understood: String(r[8] || ""),
+          difficult: String(r[9] || ""),
+          actionPlan: String(r[10] || ""),
+          customAnswers: customLegacy
+        },
+        createdAt: String(r[0] || "")
+      });
+    }
   }
+}
+
+function getReflections(ss) {
+  var list = [];
+  var seenIds = {};
+  readReflectionRowsFromSheet(ss.getSheetByName("Data_Refleksi_Siswa"), list, seenIds);
+  readReflectionRowsFromSheet(ss.getSheetByName("Refleksi_Siswa"), list, seenIds);
   return list;
 }
 
@@ -400,55 +453,84 @@ function parseJsonList(val) {
   }
 }
 
-function saveMessage(ss, msg) {
-  var sheet = ss.getSheetByName("Pesan_Guru");
+// -------------------------------------------------------------
+// MANAJEMEN PESAN_KANTOR_POS & PESAN_GURU (v3.0)
+// -------------------------------------------------------------
+function getOrCreateMessageSheet(ss) {
+  var sheet = ss.getSheetByName("Pesan_Kantor_Pos");
   if (!sheet) {
-    sheet = ss.insertSheet("Pesan_Guru");
+    sheet = ss.insertSheet("Pesan_Kantor_Pos");
     sheet.appendRow(["ID Pesan", "ID Siswa", "Nama Siswa", "Kelas", "Isi Pesan", "Status", "Balasan Guru", "Waktu Kirim", "Waktu Balas"]);
     sheet.setFrozenRows(1);
   }
-  sheet.appendRow([
-    msg.id, msg.studentId, msg.studentName, msg.className, msg.content,
-    msg.status || "unread", msg.teacherReply || "", msg.createdAt || "", ""
-  ]);
+  return sheet;
 }
 
-function getMessages(ss) {
-  var sheet = ss.getSheetByName("Pesan_Guru");
-  if (!sheet) return [];
-  var rows = sheet.getDataRange().getValues();
-  if (rows.length <= 1) return [];
+function saveMessage(ss, msg) {
+  if (!msg || !msg.id) return;
+  var sheet = getOrCreateMessageSheet(ss);
+  var rowData = [
+    msg.id, msg.studentId || "", msg.studentName || "", msg.className || "", msg.content || "",
+    msg.status || "unread", msg.teacherReply || "", msg.createdAt || new Date().toLocaleString("id-ID"), msg.repliedAt || ""
+  ];
+  sheet.appendRow(rowData);
 
-  var list = [];
+  var legacySheet = ss.getSheetByName("Pesan_Guru");
+  if (legacySheet) {
+    legacySheet.appendRow(rowData);
+  }
+}
+
+function readMessageRowsFromSheet(sheet, list, seenIds) {
+  if (!sheet) return;
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return;
+
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
+    if (!r[0]) continue;
+    var idCandidate = String(r[0]);
+    if (seenIds[idCandidate]) continue;
+    seenIds[idCandidate] = true;
+
     list.push({
-      id: String(r[0]),
-      studentId: String(r[1]),
-      studentName: String(r[2]),
-      className: String(r[3]),
-      content: String(r[4]),
-      status: String(r[5]) || "unread",
+      id: idCandidate,
+      studentId: String(r[1] || ""),
+      studentName: String(r[2] || ""),
+      className: String(r[3] || ""),
+      content: String(r[4] || ""),
+      status: String(r[5] || "unread"),
       teacherReply: String(r[6] || ""),
-      createdAt: String(r[7]),
+      createdAt: String(r[7] || ""),
       repliedAt: String(r[8] || "")
     });
   }
+}
+
+function getMessages(ss) {
+  var list = [];
+  var seenIds = {};
+  readMessageRowsFromSheet(ss.getSheetByName("Pesan_Kantor_Pos"), list, seenIds);
+  readMessageRowsFromSheet(ss.getSheetByName("Pesan_Guru"), list, seenIds);
   return list;
 }
 
-function saveMessageReply(ss, msgId, reply, repliedAt) {
-  var sheet = ss.getSheetByName("Pesan_Guru");
+function updateReplyInSheet(sheet, msgId, reply, repliedAt) {
   if (!sheet) return;
   var rows = sheet.getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]) === String(msgId)) {
+    if (String(rows[i][0]) === String(msgId) || String(rows[i][1]) === String(msgId)) {
       sheet.getRange(i + 1, 6).setValue("replied");
       sheet.getRange(i + 1, 7).setValue(reply);
       sheet.getRange(i + 1, 9).setValue(repliedAt || new Date().toLocaleString("id-ID"));
       break;
     }
   }
+}
+
+function saveMessageReply(ss, msgId, reply, repliedAt) {
+  updateReplyInSheet(ss.getSheetByName("Pesan_Kantor_Pos"), msgId, reply, repliedAt);
+  updateReplyInSheet(ss.getSheetByName("Pesan_Guru"), msgId, reply, repliedAt);
 }
 
 // -------------------------------------------------------------
@@ -537,12 +619,12 @@ function getStickyNotes(ss) {
 }
 
 // -------------------------------------------------------------
-// MANAJEMEN STUDIO ON AIR PODCAST (MENARA MENTOR KOTA - v2.6)
+// MANAJEMEN HASIL PODCAST SISWA & STUDIO ON AIR PODCAST (v3.0)
 // -------------------------------------------------------------
 function getOrCreatePodcastSheet(ss) {
-  var sheet = ss.getSheetByName("Studio_On_Air_Podcast");
+  var sheet = ss.getSheetByName("Hasil_Podcast_Siswa") || ss.getSheetByName("Studio_On_Air_Podcast");
   if (!sheet) {
-    sheet = ss.insertSheet("Studio_On_Air_Podcast");
+    sheet = ss.insertSheet("Hasil_Podcast_Siswa");
     sheet.appendRow([
       "ID Episode", "ID Siswa", "Nama Siswa", "Kelas", "ID Materi", "Judul Materi",
       "Hal Sudah Dikuasai", "Area Perlu Diperkuat", "Saran Konkret AI",
@@ -563,7 +645,7 @@ function savePodcastEpisode(ss, ep) {
       return;
     }
   }
-  sheet.appendRow([
+  var rowData = [
     ep.id,
     ep.studentId || "",
     ep.studentName || "Siswa DKV",
@@ -580,20 +662,28 @@ function savePodcastEpisode(ss, ep) {
     ep.transcriptText || "",
     ep.createdAt || new Date().toLocaleDateString("id-ID"),
     ep.timestamp || Date.now()
-  ]);
+  ];
+  sheet.appendRow(rowData);
+
+  // Simpan juga ke Studio_On_Air_Podcast jika terpisah
+  var altSheet = ss.getSheetByName("Studio_On_Air_Podcast");
+  if (altSheet && altSheet.getName() !== sheet.getName()) {
+    altSheet.appendRow(rowData);
+  }
 }
 
-function getPodcasts(ss) {
-  var sheet = ss.getSheetByName("Studio_On_Air_Podcast");
-  if (!sheet) return [];
+function readPodcastRowsFromSheet(sheet, list, seenIds) {
+  if (!sheet) return;
   var rows = sheet.getDataRange().getValues();
-  if (rows.length <= 1) return [];
-  var list = [];
+  if (rows.length <= 1) return;
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
     if (!r[0] || !r[5]) continue;
+    var idStr = String(r[0]);
+    if (seenIds[idStr]) continue;
+    seenIds[idStr] = true;
     list.push({
-      id: String(r[0]),
+      id: idStr,
       studentId: String(r[1]),
       studentName: String(r[2]),
       className: String(r[3]),
@@ -611,7 +701,160 @@ function getPodcasts(ss) {
       timestamp: Number(r[15]) || Date.now()
     });
   }
+}
+
+function getPodcasts(ss) {
+  var list = [];
+  var seenIds = {};
+  readPodcastRowsFromSheet(ss.getSheetByName("Hasil_Podcast_Siswa"), list, seenIds);
+  readPodcastRowsFromSheet(ss.getSheetByName("Studio_On_Air_Podcast"), list, seenIds);
   return list;
+}
+
+// -------------------------------------------------------------
+// MANAJEMEN HASIL TES DI LAB DKV (Hasil_Tes_Lab_DKV - v3.0)
+// -------------------------------------------------------------
+function getOrCreateLabDkvSheet(ss) {
+  var sheet = ss.getSheetByName("Hasil_Tes_Lab_DKV");
+  if (!sheet) {
+    sheet = ss.insertSheet("Hasil_Tes_Lab_DKV");
+    sheet.appendRow([
+      "ID Hasil Tes", "ID Siswa", "Nama Siswa", "Kelas", "ID Materi", "Topik Materi",
+      "Paket Acak Ke", "Skor Benar", "Total Soal", "XP Diperoleh",
+      "Rincian Jenjang 1-5", "Detail Jawaban", "Waktu Tes", "Timestamp"
+    ]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function saveLabDkvTestResult(ss, res) {
+  if (!res || !res.id) return;
+  var sheet = getOrCreateLabDkvSheet(ss);
+  sheet.appendRow([
+    res.id,
+    res.studentId || "",
+    res.studentName || "Siswa DKV",
+    res.className || "X DKV",
+    res.materiId || "",
+    res.materiTitle || "Evaluasi Lab DKV",
+    Number(res.roundNumber) || 1,
+    Number(res.scoreCorrect) || 0,
+    Number(res.totalQuestions) || 5,
+    Number(res.xpEarned) || 0,
+    res.tierBreakdown || "",
+    res.answersDetail || "",
+    res.createdAt || new Date().toLocaleString("id-ID"),
+    res.timestamp || Date.now()
+  ]);
+}
+
+function getLabDkvResults(ss) {
+  var sheet = ss.getSheetByName("Hasil_Tes_Lab_DKV");
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0]) continue;
+    list.push({
+      id: String(r[0]),
+      studentId: String(r[1] || ""),
+      studentName: String(r[2] || ""),
+      className: String(r[3] || ""),
+      materiId: String(r[4] || ""),
+      materiTitle: String(r[5] || ""),
+      roundNumber: Number(r[6]) || 1,
+      scoreCorrect: Number(r[7]) || 0,
+      totalQuestions: Number(r[8]) || 5,
+      xpEarned: Number(r[9]) || 0,
+      tierBreakdown: String(r[10] || ""),
+      answersDetail: String(r[11] || ""),
+      createdAt: String(r[12] || ""),
+      timestamp: Number(r[13]) || Date.now()
+    });
+  }
+  return list;
+}
+
+// -------------------------------------------------------------
+// MANAJEMEN LOG XP MINGGUAN & LEADERBOARD MINGGUAN BALAI KOTA (7 HARI TERAKHIR - v3.0)
+// -------------------------------------------------------------
+function getOrCreateWeeklyXpSheet(ss) {
+  var sheet = ss.getSheetByName("Log_XP_Mingguan");
+  if (!sheet) {
+    sheet = ss.insertSheet("Log_XP_Mingguan");
+    sheet.appendRow([
+      "ID Log", "ID Siswa", "Nama Siswa", "Kelas",
+      "XP Diperoleh", "Jenis Aktivitas", "Deskripsi Aktivitas", "Waktu", "Timestamp"
+    ]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function saveWeeklyXpLog(ss, xpLog) {
+  if (!xpLog || !xpLog.id) return;
+  var sheet = getOrCreateWeeklyXpSheet(ss);
+  sheet.appendRow([
+    xpLog.id,
+    xpLog.studentId || "",
+    xpLog.studentName || "",
+    xpLog.className || "X DKV",
+    Number(xpLog.xpEarned) || 1,
+    xpLog.activityType || "aktivitas_kota",
+    xpLog.description || "",
+    xpLog.createdAt || new Date().toLocaleString("id-ID"),
+    xpLog.timestamp || Date.now()
+  ]);
+}
+
+function getWeeklyXpLogs(ss) {
+  var sheet = ss.getSheetByName("Log_XP_Mingguan");
+  if (!sheet) return [];
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+  var cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0]) continue;
+    var ts = Number(r[8]) || Date.now();
+    if (ts >= cutoff) {
+      list.push({
+        id: String(r[0]),
+        studentId: String(r[1] || ""),
+        studentName: String(r[2] || ""),
+        className: String(r[3] || ""),
+        xpEarned: Number(r[4]) || 1,
+        activityType: String(r[5] || "aktivitas_kota"),
+        description: String(r[6] || ""),
+        createdAt: String(r[7] || ""),
+        timestamp: ts
+      });
+    }
+  }
+  return list;
+}
+
+function getWeeklyLeaderboardTop5(ss, xpLogs, reflections, labDkvResults, podcasts, messages) {
+  var map = {};
+  var addXp = function(id, name, cls, xp) {
+    if (!name || xp <= 0) return;
+    var key = id || name.toLowerCase();
+    if (!map[key]) {
+      map[key] = { studentId: id || key, studentName: name, className: cls || "X DKV", weeklyXp: 0, weeklyActivitiesCount: 0 };
+    }
+    map[key].weeklyXp += Number(xp) || 0;
+    map[key].weeklyActivitiesCount += 1;
+  };
+  (xpLogs || []).forEach(function(l) { addXp(l.studentId, l.studentName, l.className, l.xpEarned); });
+  (labDkvResults || []).forEach(function(t) { addXp(t.studentId, t.studentName, t.className, t.xpEarned || t.scoreCorrect || 1); });
+  (podcasts || []).forEach(function(p) { addXp(p.studentId, p.studentName, p.className, 2); });
+  var arr = Object.keys(map).map(function(k) { return map[k]; });
+  arr.sort(function(a, b) { return b.weeklyXp - a.weeklyXp; });
+  return arr.slice(0, 5);
 }
 
 // -------------------------------------------------------------
@@ -1556,9 +1799,9 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
                     <Code2 className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-extrabold text-white">Kode Skrip Google Apps Script (v2.6)</h4>
+                    <h4 className="text-sm font-extrabold text-white">Kode Skrip Google Apps Script (v3.0)</h4>
                     <p className="text-[11px] text-slate-300">
-                      Skrip resmi untuk Google Spreadsheet agar mendukung Studio ON AIR Podcast, Pasar Prestasi, Jurnal Pohon Beringin, Obrolan Warga & Refleksi 4F
+                      Skrip resmi untuk Google Spreadsheet: mendukung Leaderboard Mingguan Balai Kota (7 Hari Terakhir), Pesan_Kantor_Pos, Data_Refleksi_Siswa, Hasil_Tes_Lab_DKV & Hasil_Podcast_Siswa
                     </p>
                   </div>
                 </div>

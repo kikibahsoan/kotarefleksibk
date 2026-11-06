@@ -517,10 +517,12 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
   const currentCitizenName = student?.name || 'Warga Refleksia';
 
   const [notes, setNotes] = useState<DailyJournalStickyNote[]>(() => getStoredStickyNotes());
-  // Default to board so citizen immediately reads all other citizens' journals!
-  const [activeTab, setActiveTab] = useState<'board' | 'write'>('board');
+  // Tampilan awal hanya menampilkan Info Jurnal Hari Ini saja, dilengkapi tombol Baca Catatan Warga
+  const [activeTab, setActiveTab] = useState<'today' | 'board' | 'write'>('today');
   const [filterClass, setFilterClass] = useState<'all' | 'mine' | 'dkv2' | 'dkv3' | 'guru'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const todayDisplayStr = useMemo(() => formatTanggalBulanTahun(undefined, Date.now()), []);
 
   const [content, setContent] = useState('');
   const [mood, setMood] = useState('😊');
@@ -647,7 +649,13 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
     };
   }, []);
 
-  // Filtered notes based on filterClass and search query
+  // Catatan khusus HARI INI saja untuk tampilan awal Info Jurnal Harian Pohon Beringin
+  const todayNotes = useMemo(() => {
+    const todayStr = formatTanggalBulanTahun(undefined, Date.now());
+    return notes.filter((n) => formatTanggalBulanTahun(n.date, n.timestamp) === todayStr);
+  }, [notes]);
+
+  // Filtered notes based on filterClass and search query (untuk tab Baca Catatan Warga)
   const filteredNotes = useMemo(() => {
     return notes.filter((n) => {
       // 1. Class / Mine filter
@@ -763,7 +771,7 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
     setTimeout(() => {
       setIsSuccess(false);
       setContent('');
-      setActiveTab('board');
+      setActiveTab('today');
     }, 1000);
   };
 
@@ -895,9 +903,23 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
           </div>
         </div>
 
-        {/* Tab switcher: Papan Catatan Warga (Default) vs Tulis Catatan Baru */}
+        {/* Tab switcher: Tampilan Awal Info Jurnal Hari Ini vs Baca Catatan Warga vs Tulis Jurnal Harian */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                sounds.playClick();
+                setActiveTab('today');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === 'today'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>📅 Info Jurnal Hari Ini ({todayNotes.length})</span>
+            </button>
             <button
               onClick={() => {
                 sounds.playClick();
@@ -927,19 +949,229 @@ export const JurnalHarianModal: React.FC<JurnalHarianModalProps> = ({
             </button>
           </div>
 
-          {activeTab === 'board' && (
-            <button
-              onClick={() => {
-                sounds.playClick();
-                setActiveTab('write');
-              }}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
-            >
-              <Pin className="w-3.5 h-3.5" />
-              <span>Tempel Catatanmu</span>
-            </button>
+          {(activeTab === 'today' || activeTab === 'board') && (
+            <div className="flex items-center gap-2">
+              {activeTab === 'today' && (
+                <button
+                  onClick={() => {
+                    sounds.playClick();
+                    setActiveTab('board');
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/40 text-emerald-200 font-extrabold text-xs shadow-sm flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
+                >
+                  <span>🌳 Baca Catatan Warga ({notes.length})</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  sounds.playClick();
+                  setActiveTab('write');
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
+              >
+                <Pin className="w-3.5 h-3.5" />
+                <span>Tempel Catatanmu</span>
+              </button>
+            </div>
           )}
         </div>
+
+        {/* Tab 0 (Tampilan Awal): Info Jurnal Harian Pohon Beringin — HANYA HARI INI SAJA */}
+        {activeTab === 'today' && (
+          <div className="mt-4 flex-1 space-y-4">
+            {/* Banner Info Hari Ini */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-emerald-950/90 via-teal-950/80 to-slate-900/90 p-4 rounded-2xl border border-emerald-400/30 shadow-md">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/25 border border-emerald-400/40 text-emerald-200 text-[10px] font-black uppercase tracking-wider">
+                    📅 EDISI HARI INI • {todayDisplayStr}
+                  </span>
+                  <span className="text-[11px] text-amber-300 font-bold">
+                    {todayNotes.length} Catatan Warga Hari Ini
+                  </span>
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed">
+                  Tampilan awal ini khusus menampilkan <strong>Jurnal Harian Pohon Beringin untuk Hari Ini ({todayDisplayStr})</strong>. Ingin melihat seluruh arsip refleksi warga? Klik tombol <strong>🌳 Baca Catatan Warga</strong>.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playClick();
+                    setActiveTab('board');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-md transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>🌳 Baca Catatan Warga ({notes.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playClick();
+                    setActiveTab('write');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow-md transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Pin className="w-3.5 h-3.5" />
+                  <span>✍️ Tulis Jurnal Hari Ini (+1 XP)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Tree Corkboard Display (Khusus Hari Ini) */}
+            <div className="p-4 sm:p-6 rounded-3xl bg-gradient-to-b from-[#24130b] via-[#1a0d07] to-[#100703] border-2 border-amber-900/60 shadow-[inset_0_6px_28px_rgba(0,0,0,0.85)] relative min-h-[380px]">
+              <div className="flex items-center justify-between px-3.5 py-2 mb-4 rounded-xl bg-gradient-to-r from-amber-950/90 via-amber-900/50 to-amber-950/90 border border-amber-600/30 shadow-inner">
+                <span className="text-[10.5px] font-extrabold tracking-widest uppercase text-amber-300 flex items-center gap-2">
+                  <span>📅 INFO JURNAL HARIAN POHON BERINGIN • KHUSUS HARI INI ({todayDisplayStr.toUpperCase()})</span>
+                </span>
+                <span className="text-[10px] font-mono font-bold text-amber-200">
+                  {todayNotes.length} HARI INI
+                </span>
+              </div>
+
+              {todayNotes.length === 0 ? (
+                <div className="py-16 text-center text-slate-300 text-xs space-y-4">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-3xl shadow-inner">
+                    🌱
+                  </div>
+                  <div className="space-y-1 max-w-md mx-auto">
+                    <p className="font-black text-white text-sm">
+                      Belum Ada Catatan yang Ditempel Hari Ini ({todayDisplayStr})
+                    </p>
+                    <p className="text-slate-400 text-xs leading-relaxed">
+                      Jadilah warga pertama yang menempelkan jurnal harian di Pohon Beringin hari ini, atau buka seluruh arsip catatan warga Kota Refleksia!
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        sounds.playClick();
+                        setActiveTab('write');
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow-lg transition active:scale-95 cursor-pointer"
+                    >
+                      ✍️ Tulis Jurnal Hari Ini Sekarang (+1 XP)
+                    </button>
+                    <button
+                      onClick={() => {
+                        sounds.playClick();
+                        setActiveTab('board');
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-lg transition active:scale-95 cursor-pointer"
+                    >
+                      🌳 Baca Catatan Warga ({notes.length} Catatan)
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+                    {todayNotes.map((note, idx) => {
+                      const cObj = COLOR_MAP[note.color] || COLOR_MAP.yellow;
+                      const isLiked =
+                        likedNoteIds.includes(note.id) ||
+                        Boolean(note.likedBy?.includes(currentCitizenId));
+                      const isMyOwn =
+                        (student?.id && note.studentId === student.id) ||
+                        (student?.name && note.studentName.toLowerCase() === student.name.toLowerCase());
+                      const rotations = ['rotate-[-1.2deg]', 'rotate-[1.2deg]', 'rotate-[-0.8deg]', 'rotate-[1.5deg]', 'rotate-[-1.5deg]'];
+                      const rot = rotations[idx % rotations.length];
+                      const likedNames = Array.isArray(note.likedByNames) ? note.likedByNames : [];
+
+                      return (
+                        <div
+                          key={note.id}
+                          className={`p-4 rounded-2xl border-2 ${cObj.bg} ${cObj.shadow} shadow-lg transition-all hover:scale-102 hover:shadow-2xl hover:z-20 relative flex flex-col justify-between ${rot}`}
+                        >
+                          <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-5.5 h-5.5 rounded-full bg-gradient-to-tr from-rose-600 to-red-400 border border-white/80 shadow-md flex items-center justify-center text-[10px] text-white">
+                            📌
+                          </div>
+
+                          <div>
+                            <div className="flex items-start justify-between border-b border-black/15 pb-2 mb-2.5 gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${cObj.tag}`}>
+                                    {note.className || 'Siswa DKV'}
+                                  </span>
+                                  <span className="text-[9px] font-black uppercase bg-amber-600 text-white px-1.5 py-0.5 rounded shadow-xs">
+                                    Hari Ini
+                                  </span>
+                                  {isMyOwn && (
+                                    <span className="text-[9px] font-black uppercase bg-emerald-600 text-white px-1.5 py-0.5 rounded shadow-xs">
+                                      Catatan Kamu
+                                    </span>
+                                  )}
+                                </div>
+                                <h4 className="text-xs sm:text-[13px] font-black text-slate-950 mt-1 leading-snug">
+                                  {note.studentName}
+                                </h4>
+                              </div>
+                              <span className="text-2xl shrink-0 drop-shadow-sm p-1 rounded-xl bg-black/5" title={`Mood: ${note.mood}`}>
+                                {note.mood}
+                              </span>
+                            </div>
+
+                            <p className="text-xs sm:text-[12.5px] leading-relaxed font-medium text-slate-900 whitespace-pre-wrap break-words min-h-[48px]">
+                              "{note.content}"
+                            </p>
+                          </div>
+
+                          <div className="mt-3.5 pt-2 border-t border-black/15 flex items-center justify-between text-[10.5px]">
+                            <span className="opacity-80 font-semibold flex items-center gap-1 text-slate-900">
+                              <Calendar className="w-3 h-3 opacity-65 shrink-0" />
+                              <span>{formatTanggalBulanTahun(note.date, note.timestamp)}</span>
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleLike(note.id)}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-extrabold transition active:scale-95 cursor-pointer shadow-xs ${
+                                isLiked
+                                  ? 'bg-rose-500 text-white shadow-rose-500/30'
+                                  : 'bg-black/10 hover:bg-rose-500/20 text-slate-900'
+                              }`}
+                              title={
+                                likedNames.length > 0
+                                  ? `Disukai oleh: ${likedNames.join(', ')}`
+                                  : isLiked
+                                  ? 'Batalkan suka'
+                                  : 'Sukai catatan warga ini'
+                              }
+                            >
+                              <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-white animate-bounce' : 'text-rose-600'}`} />
+                              <span className="text-[11px] font-mono">
+                                {note.likes || 0}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Tombol bawah untuk membaca seluruh catatan warga */}
+                  <div className="pt-3 border-t border-amber-700/30 flex flex-wrap items-center justify-between gap-3">
+                    <span className="text-xs text-amber-200/90 font-semibold">
+                      🌳 Terdapat total <strong>{notes.length} catatan refleksi warga</strong> di batang Pohon Beringin.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        setActiveTab('board');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-md transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>🌳 Baca Semua Catatan Warga ({notes.length})</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Tab 1: Papan Sticky Notes Seluruh Warga (Semua catatan warga terbaca jelas!) */}
         {activeTab === 'board' && (
