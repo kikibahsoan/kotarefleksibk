@@ -16,6 +16,10 @@ import {
   WeeklyXpLogEntry,
   WeeklyLeaderboardCitizen,
   CityEntryLogEntry,
+  CityCreatorState,
+  CreatorBuildingItem,
+  CreatorIdeaItem,
+  CreatorMissionSubmission,
 } from '../types/index.ts';
 import {
   INITIAL_MATERI,
@@ -28,6 +32,11 @@ import {
   INITIAL_SETTINGS,
   INITIAL_PUBLIC_CHAT,
 } from '../data/initialData.ts';
+import {
+  CITY_BUILDINGS_GOVERNANCE,
+  sanitizeStudentInputText,
+  isBuildingLockedByTeacher,
+} from './aturanBakuKota.ts';
 
 const STORAGE_KEYS = {
   CURRENT_USER: 'kota_refleksi_current_user',
@@ -47,6 +56,7 @@ const STORAGE_KEYS = {
   LAB_DKV_RESULTS: 'kota_refleksi_lab_dkv_results',
   WEEKLY_XP_LOGS: 'kota_refleksi_weekly_xp_logs',
   CITY_ENTRY_LOGS: 'kota_refleksi_city_entry_logs',
+  CREATOR_CITY_STATE: 'kota_refleksi_creator_city_state',
 };
 
 const INITIAL_BANK_MATERI: BankMateriEntry[] = [
@@ -408,6 +418,14 @@ export const StorageService = {
       safeSet(STORAGE_KEYS.MATERI, INITIAL_MATERI);
       return INITIAL_MATERI;
     }
+    // Pastikan 6 materi awal gedung Pusat Kota baru otomatis tergabung tanpa menghapus materi lama
+    const existingIds = new Set(items.map((m) => m.id));
+    const missingSeeds = INITIAL_MATERI.filter((seed) => !existingIds.has(seed.id));
+    if (missingSeeds.length > 0) {
+      const merged = [...items, ...missingSeeds];
+      safeSet(STORAGE_KEYS.MATERI, merged);
+      return merged;
+    }
     return items;
   },
 
@@ -435,6 +453,13 @@ export const StorageService = {
     if (!items || items.length === 0 || !items.some((tp) => tp.id.startsWith('tp-bk-'))) {
       safeSet(STORAGE_KEYS.OBJECTIVES, INITIAL_OBJECTIVES);
       return INITIAL_OBJECTIVES;
+    }
+    const existingIds = new Set(items.map((tp) => tp.id));
+    const missingObjectives = INITIAL_OBJECTIVES.filter((seed) => !existingIds.has(seed.id));
+    if (missingObjectives.length > 0) {
+      const merged = [...items, ...missingObjectives];
+      safeSet(STORAGE_KEYS.OBJECTIVES, merged);
+      return merged;
     }
     return items;
   },
@@ -946,8 +971,10 @@ export const StorageService = {
   },
 
   addMessage(msg: Message): void {
+    const { cleanText } = sanitizeStudentInputText(msg.content);
+    const cleanMsg: Message = { ...msg, content: cleanText };
     const items = this.getMessages();
-    this.setMessages([msg, ...items]);
+    this.setMessages([cleanMsg, ...items]);
   },
 
   updateMessage(msg: Message): void {
@@ -1093,9 +1120,11 @@ export const StorageService = {
   },
 
   async addPublicChatMessage(msg: PublicChatMessage): Promise<void> {
+    const { cleanText } = sanitizeStudentInputText(msg.content);
+    const sanitizedMsg: PublicChatMessage = { ...msg, content: cleanText };
     const items = this.getPublicChatMessages();
     const map = new Map<string, PublicChatMessage>();
-    map.set(msg.id, msg);
+    map.set(sanitizedMsg.id, sanitizedMsg);
     items.forEach((m) => {
       if (m && m.id && !map.has(m.id)) {
         map.set(m.id, m);
@@ -1109,14 +1138,14 @@ export const StorageService = {
       fetch('/api/chat/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(msg),
+        body: JSON.stringify(sanitizedMsg),
       }).catch(() => {});
     } catch (e) {
       // safe fallback
     }
 
     // 2. Sync to Google Spreadsheet immediately so all students on all devices receive it
-    this.syncWithGAS('send_public_chat', { message: msg });
+    this.syncWithGAS('send_public_chat', { message: sanitizedMsg });
   },
 
   reportChatMessage(msgId: string): void {
@@ -1237,9 +1266,53 @@ export const StorageService = {
       const hasChats = Array.isArray(resData.chats);
 
       if (hasReflections || hasMessages || hasChats) {
+        // Check if there is a synced Master Creator Studio state in reflections
+        if (hasReflections) {
+          const creatorRows = (resData.reflections as Reflection[]).filter(
+            (r) =>
+              r &&
+              (r.id === 'creator-city-state-v1' ||
+                r.studentNumber === 'CREATOR_CITY_STATE' ||
+                (r.materiTitle && String(r.materiTitle).includes('[CREATOR_CITY_STATE]')))
+          );
+          if (creatorRows.length > 0) {
+            // Find highest version
+            let latestState: CityCreatorState | null = null;
+            creatorRows.forEach((row) => {
+              if (row.answers?.findings) {
+                try {
+                  const parsed = JSON.parse(row.answers.findings) as CityCreatorState;
+                  if (
+                    parsed &&
+                    typeof parsed.version === 'number' &&
+                    (!latestState || parsed.version > latestState.version)
+                  ) {
+                    latestState = parsed;
+                  }
+                } catch {}
+              }
+            });
+            if (latestState) {
+              const currentLocal = this.getCreatorCityState();
+              if ((latestState as CityCreatorState).version >= currentLocal.version) {
+                safeSet(STORAGE_KEYS.CREATOR_CITY_STATE, latestState);
+                try {
+                  window.dispatchEvent(
+                    new CustomEvent('kota_refleksi_creator_state_updated', { detail: latestState })
+                  );
+                } catch {}
+              }
+            }
+          }
+        }
+
         const deletedIds = new Set(this.getDeletedReflectionIds());
         const validReflections = (resData.reflections || []).filter(
-          (r: Reflection) => !deletedIds.has(r.id)
+          (r: Reflection) =>
+            !deletedIds.has(r.id) &&
+            r.id !== 'creator-city-state-v1' &&
+            r.studentNumber !== 'CREATOR_CITY_STATE' &&
+            !(r.materiTitle && String(r.materiTitle).includes('[CREATOR_CITY_STATE]'))
         );
         const validFeedbacks = (resData.feedbacks || []).filter(
           (f: MentorFeedback) => !deletedIds.has(f.reflectionId)
@@ -2741,6 +2814,306 @@ export const StorageService = {
       `🦅 Laporan Gerbang: Warga TERAKHIR yang baru saja masuk ke Kota Refleksia adalah ${lastInfo}!`,
       `🦅 Daftar hadir gerbang hari ini (${todayEntries.length} warga): ${namesPreview}${moreCount}. Klik saya untuk melihat Buku Tamu Gerbang lengkap!`,
     ];
+  },
+
+  syncCityBuildingsToSpreadsheet(): void {
+    const buildingsPayload = Object.values(CITY_BUILDINGS_GOVERNANCE).map((b) => ({
+      id: b.id,
+      name: b.name,
+      wx: b.wx,
+      wy: b.wy,
+      zone: b.zone,
+      category: b.category,
+      description: b.shortDescription,
+      learningObjective: b.learningObjective,
+      capacity: b.capacity,
+      openingHours: b.openingHours,
+      status: isBuildingLockedByTeacher(b.id) ? 'Terkunci' : 'Terbuka',
+      updatedAt: new Date().toLocaleString('id-ID'),
+    }));
+    this.syncWithGAS('sync_city_buildings', { buildings: buildingsPayload });
+  },
+
+  // ==========================================================================
+  // MASTER CREATOR STUDIO (KIKYBAHSOAN) — REALTIME & CLOUD PERSISTENCE
+  // ==========================================================================
+  getCreatorCityState(): CityCreatorState {
+    const defaultState: CityCreatorState = {
+      version: 1,
+      updatedAt: new Date().toLocaleString('id-ID'),
+      updatedBy: 'kikybahsoan',
+      customBuildings: [],
+      existingOverrides: {},
+      npcConfigs: {},
+      customProps: [],
+      customAnimals: [],
+      terrainTiles: {},
+      customFences: [],
+    };
+    const saved = safeGet<CityCreatorState>(STORAGE_KEYS.CREATOR_CITY_STATE, defaultState);
+    if (!saved || typeof saved !== 'object') return defaultState;
+    return {
+      version: typeof saved.version === 'number' ? saved.version : 1,
+      updatedAt: saved.updatedAt || defaultState.updatedAt,
+      updatedBy: saved.updatedBy || 'kikybahsoan',
+      customBuildings: Array.isArray(saved.customBuildings) ? saved.customBuildings : [],
+      existingOverrides:
+        saved.existingOverrides && typeof saved.existingOverrides === 'object'
+          ? saved.existingOverrides
+          : {},
+      npcConfigs:
+        saved.npcConfigs && typeof saved.npcConfigs === 'object' ? saved.npcConfigs : {},
+      customProps: Array.isArray(saved.customProps) ? saved.customProps : [],
+      customAnimals: Array.isArray(saved.customAnimals) ? saved.customAnimals : [],
+      terrainTiles:
+        saved.terrainTiles && typeof saved.terrainTiles === 'object' ? saved.terrainTiles : {},
+      customFences: Array.isArray(saved.customFences) ? saved.customFences : [],
+    };
+  },
+
+  async saveCreatorCityState(
+    nextState: CityCreatorState,
+    options?: { syncCloud?: boolean; broadcast?: boolean }
+  ): Promise<CityCreatorState> {
+    const cleanState: CityCreatorState = {
+      ...nextState,
+      version: Math.max((nextState.version || 1) + 1, Date.now()),
+      updatedAt: new Date().toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+      updatedBy: nextState.updatedBy || 'kikybahsoan',
+      customBuildings: Array.isArray(nextState.customBuildings) ? nextState.customBuildings : [],
+      existingOverrides: nextState.existingOverrides || {},
+      npcConfigs: nextState.npcConfigs || {},
+      customProps: Array.isArray(nextState.customProps) ? nextState.customProps : [],
+      customAnimals: Array.isArray(nextState.customAnimals) ? nextState.customAnimals : [],
+      terrainTiles:
+        nextState.terrainTiles && typeof nextState.terrainTiles === 'object'
+          ? nextState.terrainTiles
+          : {},
+      customFences: Array.isArray(nextState.customFences) ? nextState.customFences : [],
+    };
+
+    safeSet(STORAGE_KEYS.CREATOR_CITY_STATE, cleanState);
+
+    if (options?.broadcast !== false) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('kota_refleksi_creator_state_updated', { detail: cleanState })
+        );
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('kota_refleksi_channel');
+          bc.postMessage({ type: 'creator_city_updated', data: cleanState });
+          bc.close();
+        }
+      } catch {}
+    }
+
+    if (options?.syncCloud !== false) {
+      const payloadReflection: Reflection = {
+        id: 'creator-city-state-v1',
+        studentId: 'master-kikybahsoan',
+        studentName: 'Master Creator (kikybahsoan)',
+        studentNumber: 'CREATOR_CITY_STATE',
+        className: 'Master Studio Kota Refleksia',
+        materiId: 'creator-city-state',
+        materiTitle: `[CREATOR_CITY_STATE] Tata Kota & Fasilitas (${cleanState.customBuildings.length} Bangunan Baru • v${cleanState.version})`,
+        scale: 5,
+        moodEmoji: '🏗️',
+        answers: {
+          understood: `Tata Kota diperbarui oleh ${cleanState.updatedBy} pada ${cleanState.updatedAt}`,
+          difficult: `Bangunan Baru: ${cleanState.customBuildings.length} | Override Objek: ${Object.keys(cleanState.existingOverrides).length} | Konfigurasi NPC: ${Object.keys(cleanState.npcConfigs).length}`,
+          actionPlan: 'Sinkronisasi otomatis tata kota ke seluruh warga Kota Refleksia',
+          findings: JSON.stringify(cleanState),
+        },
+        createdAt: cleanState.updatedAt,
+      };
+      await this.syncWithGAS('submit_reflection', { reflection: payloadReflection });
+      await this.syncWithGAS('save_creator_city_state', { creatorCityState: cleanState });
+    }
+
+    return cleanState;
+  },
+
+  async fetchCreatorCityStateFromCloud(): Promise<CityCreatorState> {
+    const local = this.getCreatorCityState();
+    const settings = this.getSettings();
+    if (!settings.gasWebAppUrl || !settings.gasWebAppUrl.startsWith('http')) {
+      return local;
+    }
+    try {
+      const url = new URL(settings.gasWebAppUrl);
+      url.searchParams.set('action', 'get_data');
+      url.searchParams.set('_t', String(Date.now()));
+      const res = await fetch(url.toString(), {
+        method: 'GET',
+        redirect: 'follow',
+        cache: 'no-store',
+      });
+      if (!res.ok) return local;
+      const data = await res.json();
+      let remoteCandidate: CityCreatorState | null = null;
+
+      if (data.creatorCityState && typeof data.creatorCityState === 'object') {
+        remoteCandidate = data.creatorCityState as CityCreatorState;
+      }
+
+      if (Array.isArray(data.reflections)) {
+        data.reflections.forEach((r: Reflection) => {
+          const isCreatorRow =
+            r &&
+            (r.id === 'creator-city-state-v1' ||
+              r.studentNumber === 'CREATOR_CITY_STATE' ||
+              (r.materiTitle && String(r.materiTitle).includes('[CREATOR_CITY_STATE]')));
+          if (isCreatorRow && r.answers?.findings) {
+            try {
+              const parsed = JSON.parse(r.answers.findings) as CityCreatorState;
+              if (
+                parsed &&
+                typeof parsed.version === 'number' &&
+                (!remoteCandidate || parsed.version > remoteCandidate.version)
+              ) {
+                remoteCandidate = parsed;
+              }
+            } catch {}
+          }
+        });
+      }
+
+      if (remoteCandidate && remoteCandidate.version > local.version) {
+        safeSet(STORAGE_KEYS.CREATOR_CITY_STATE, remoteCandidate);
+        try {
+          window.dispatchEvent(
+            new CustomEvent('kota_refleksi_creator_state_updated', { detail: remoteCandidate })
+          );
+        } catch {}
+        return remoteCandidate;
+      }
+    } catch {}
+    return local;
+  },
+
+  async submitCreatorBuildingIdea(
+    buildingId: string,
+    idea: Omit<CreatorIdeaItem, 'id' | 'votes' | 'votedBy' | 'createdAt'>
+  ): Promise<CityCreatorState> {
+    const state = this.getCreatorCityState();
+    const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    const newIdea: CreatorIdeaItem = {
+      id: `idea-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+      authorId: idea.authorId,
+      authorName: idea.authorName,
+      className: idea.className,
+      content: sanitizeStudentInputText(idea.content).cleanText,
+      votes: 1,
+      votedBy: [idea.authorId],
+      createdAt: nowStr,
+    };
+    const updatedBuildings = state.customBuildings.map((b) => {
+      if (b.id !== buildingId) return b;
+      const existingIdeas = Array.isArray(b.templateData.ideas) ? b.templateData.ideas : [];
+      return {
+        ...b,
+        templateData: {
+          ...b.templateData,
+          ideas: [newIdea, ...existingIdeas],
+        },
+      };
+    });
+    return this.saveCreatorCityState({ ...state, customBuildings: updatedBuildings });
+  },
+
+  async voteCreatorBuildingIdea(
+    buildingId: string,
+    ideaId: string,
+    voterId: string
+  ): Promise<CityCreatorState> {
+    const state = this.getCreatorCityState();
+    const updatedBuildings = state.customBuildings.map((b) => {
+      if (b.id !== buildingId) return b;
+      const existingIdeas = Array.isArray(b.templateData.ideas) ? b.templateData.ideas : [];
+      const nextIdeas = existingIdeas.map((item) => {
+        if (item.id !== ideaId) return item;
+        const votedSet = new Set(item.votedBy || []);
+        if (votedSet.has(voterId)) {
+          votedSet.delete(voterId);
+        } else {
+          votedSet.add(voterId);
+        }
+        return {
+          ...item,
+          votedBy: Array.from(votedSet),
+          votes: votedSet.size,
+        };
+      });
+      return {
+        ...b,
+        templateData: {
+          ...b.templateData,
+          ideas: nextIdeas,
+        },
+      };
+    });
+    return this.saveCreatorCityState({ ...state, customBuildings: updatedBuildings });
+  },
+
+  async submitCreatorBuildingMission(
+    buildingId: string,
+    submission: Omit<CreatorMissionSubmission, 'id' | 'createdAt'>
+  ): Promise<CityCreatorState> {
+    const state = this.getCreatorCityState();
+    const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    const newSub: CreatorMissionSubmission = {
+      id: `msub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+      studentId: submission.studentId,
+      studentName: submission.studentName,
+      className: submission.className,
+      responseText: sanitizeStudentInputText(submission.responseText).cleanText,
+      createdAt: nowStr,
+    };
+    const updatedBuildings = state.customBuildings.map((b) => {
+      if (b.id !== buildingId) return b;
+      const prev = Array.isArray(b.templateData.submissions) ? b.templateData.submissions : [];
+      return {
+        ...b,
+        templateData: {
+          ...b.templateData,
+          submissions: [newSub, ...prev.slice(0, 49)],
+        },
+      };
+    });
+    return this.saveCreatorCityState({ ...state, customBuildings: updatedBuildings });
+  },
+
+  async recordCreatorBuildingQuizScore(
+    buildingId: string,
+    entry: { studentId: string; studentName: string; score: number }
+  ): Promise<CityCreatorState> {
+    const state = this.getCreatorCityState();
+    const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+    const updatedBuildings = state.customBuildings.map((b) => {
+      if (b.id !== buildingId) return b;
+      const prev = Array.isArray(b.templateData.highScores) ? b.templateData.highScores : [];
+      const filtered = prev.filter((h) => h.studentId !== entry.studentId);
+      const merged = [
+        ...filtered,
+        {
+          studentId: entry.studentId,
+          studentName: entry.studentName,
+          score: entry.score,
+          date: nowStr,
+        },
+      ].sort((a, b) => b.score - a.score);
+      return {
+        ...b,
+        templateData: {
+          ...b.templateData,
+          highScores: merged.slice(0, 15),
+        },
+      };
+    });
+    return this.saveCreatorCityState({ ...state, customBuildings: updatedBuildings });
   },
 };
 

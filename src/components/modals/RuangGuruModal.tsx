@@ -184,6 +184,10 @@ function doPost(e) {
       saveMessageReply(ss, data.messageId, data.reply, data.repliedAt);
       return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
         .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "sync_city_buildings") {
+      saveCityBuildingsSheet(ss, data.buildings);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
 
     return ContentService.createTextOutput(JSON.stringify({ success: true, message: "Aksi berhasil diproses" }))
@@ -191,6 +195,40 @@ function doPost(e) {
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function saveCityBuildingsSheet(ss, buildings) {
+  if (!Array.isArray(buildings)) return;
+  var sheet = ss.getSheetByName("Data_Bangunan_Kota");
+  if (!sheet) {
+    sheet = ss.insertSheet("Data_Bangunan_Kota");
+    sheet.appendRow([
+      "ID Bangunan", "Nama Bangunan", "Posisi X", "Posisi Y",
+      "Jenis / Zona", "Kategori", "Deskripsi & Fungsi", "Tujuan Belajar",
+      "Kapasitas", "Jam Operasional", "Status", "Waktu Update"
+    ]);
+    sheet.setFrozenRows(1);
+  }
+  if (sheet.getLastRow() > 1) {
+    sheet.deleteRows(2, sheet.getLastRow() - 1);
+  }
+  for (var i = 0; i < buildings.length; i++) {
+    var b = buildings[i] || {};
+    sheet.appendRow([
+      b.id || "",
+      b.name || "",
+      Number(b.wx) || 0,
+      Number(b.wy) || 0,
+      b.zone || "Pusat Kota",
+      b.category || "",
+      b.description || "",
+      b.learningObjective || "",
+      Number(b.capacity) || 35,
+      b.openingHours || "06.00 - 22.00 WITA",
+      b.status || "Terbuka",
+      b.updatedAt || new Date().toLocaleString("id-ID")
+    ]);
   }
 }
 

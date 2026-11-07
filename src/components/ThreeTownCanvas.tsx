@@ -6,6 +6,13 @@ import {
   DailyJournalStickyNote,
   WismaSuggestion,
   TeacherAnnouncement,
+  CityCreatorState,
+  CreatorBuildingItem,
+  CreatorNpcConfig,
+  CreatorPropItem,
+  CreatorAnimalItem,
+  CreatorFenceItem,
+  CreatorTerrainType,
 } from '../types/index.ts';
 import { StorageService } from '../utils/storage.ts';
 import { sounds } from '../utils/audio.ts';
@@ -14,6 +21,30 @@ import { WeatherType, getWeatherTypeWita } from '../utils/weather.ts';
 import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
 import { X, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin, Megaphone, Mail, Send, Shuffle, ChevronLeft } from 'lucide-react';
 import { TownRulesModal } from './modals/TownRulesModal.tsx';
+import {
+  CreatorStudioFloatingDock,
+  CreatorBuildingCitizenModal,
+  CreatorSelectedTarget,
+  StockModelDefinition,
+  CreatorPropCatalogEntry,
+  CreatorAnimalCatalogEntry,
+  CreatorFenceCatalogEntry,
+  createDefaultBuildingFromStock,
+  createDefaultPropItem,
+  createDefaultAnimalItem,
+  createDefaultFenceItem,
+  EXISTING_CITY_OBJECTS_CATALOG,
+  DEFAULT_CITY_NPCS_CATALOG,
+} from './modals/CreatorStudioModal.tsx';
+import {
+  drawCustomCreatorBuilding3D,
+  drawCustomCreatorProp3D,
+  computeCreatorAnimalLivePose,
+  drawCustomCreatorAnimal3D,
+  drawCustomCreatorTerrainTile,
+  drawCustomCreatorFence3D,
+  drawCreatorStudioMapGizmos,
+} from '../utils/creatorStudioRenderer.ts';
 import { WeeklyLeaderboardBalaiKota } from './WeeklyLeaderboardBalaiKota.tsx';
 import {
   INDONESIAN_FOLKLORE_COMICS,
@@ -79,7 +110,18 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'masjid', name: 'Masjid Al-Hikmah', tagline: 'Belajar Iqro (1-6) & Tuntunan Sholat', position: [5.45, 0, -4.85], color: 0x10b981, icon: '🕌' },
   { id: 'bank_materi', name: 'Bank Materi Guru', tagline: 'Khusus Guru • Input TP, Materi Esensial & Generate AI', position: [-5.35, 0, -4.85], color: 0x6366f1, icon: '🏦' },
   { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
+  { id: 'pencakar_langit', name: 'Gedung Pencakar Langit', tagline: 'Refleksia Timur • Tantangan Karier & Cita-cita Masa Depan', position: [14.0, 0, -10.5], color: 0x0284c7, icon: '🏙️' },
+  { id: 'bandara', name: 'Bandara Refleksia Timur', tagline: 'Gerbang Udara • Landasan Pacu, Pesawat Terbang & Target Masa Depan', position: [10.8, 0, -11.8], color: 0x38bdf8, icon: '✈️' },
 ];
+
+export const DEFAULT_BUILDINGS_SNAPSHOT = BUILDINGS_INFO.map((b) => ({
+  id: b.id,
+  name: b.name,
+  tagline: b.tagline,
+  icon: b.icon,
+  wx: b.position[0],
+  wy: b.position[2],
+}));
 
 // Papan Peraturan & Panduan Aktivitas di Dekat Gapura Awal Masuk [wx: 1.45, wy: 5.95]
 export const TOWN_RULES_BOARD_COORDS = { wx: 1.45, wy: 5.95 };
@@ -95,6 +137,9 @@ export const LITERACY_CORNER_COORDS = { wx: 2.35, wy: -6.15 };
 
 // Koordinat Komandan Nawa (Penjaga Gerbang Selamat Datang) berdiri tegap lebih maju di depan Gapura Utama
 export const NAWA_GATEKEEPER_COORDS = { wx: -0.62, wy: 6.88 };
+
+// Koordinat Lapak Refleksia (Toko Roti & Kafe)
+export const CAFE_COORDS = { wx: 4.65, wy: 4.55 };
 
 export type EmoteType = 'love' | 'wave' | 'laugh' | 'dance' | 'thumbsup';
 
@@ -258,14 +303,25 @@ export const TREES_LIST: [number, number][] = [
   [1.72, -1.72],
   [-1.72, 1.72],
   [1.72, 1.72],
+// Far Bank of the River (East side, wx: 8.8 .. 18.2, expanded +8 grid sideways after the river)
+  [9.8, -10.5], // North end near green hills and mountains
+  [9.3, -7.5],  // Upper far bank (autumn orange)
+  [10.2, -4.5], // Upper-mid far bank (green)
+  [11.8, -2.6], // North grove on side expansion (autumn orange)
+  [14.2, -3.2], // Eastern meadow grove (green)
+  [16.4, -1.5], // Far eastern border grove (autumn orange)
+  [12.2, 2.6],  // South-east grove on side expansion (autumn orange)
+  [15.1, 3.2],  // South-east far lawn grove (green)
+  [9.3, 5.2],   // Lower far bank (green)
+  [10.1, 7.2],  // South cliff corner of far bank (autumn orange)
 ];
 
 // =============================================================
-// PERLUASAN PETA 6 KOTAK KE BELAKANG POHON REFLEKSI (wy: -8.5 -> -14.5)
-// Hutan Belantara Lebat (Pohon Beringin Besar), Gunung Api Tidur Berdanau Kawah,
-// Air Terjun Gunung Hidup, PLTA Mikro & Mercusuar Danau Pusat Sungai
+// PERLUASAN PETA KE SAMPING SETELAH SUNGAI (wx: 8.5 -> 18.5, +8 grid ke samping timur)
+// Wilayah Baru Seberang Sungai Timur yang Luas, Rapi, Terhubung Jembatan & Berbatu Mengerucut
 // =============================================================
-export const NORTH_EXPANSION_TILES = 6; // +6 kotak ke utara di belakang Pohon Refleksi
+export const NORTH_EXPANSION_TILES = 6; // +6 kotak ke utara di pegunungan (wy: -8.5 s/d -14.5)
+export const EAST_EXPANSION_TILES = 8; // +8 grid ke samping setelah sungai (gx: 9..18, wx: 8.5 s/d 18.5)
 export const DANAU_PUSAT_COORDS = { wx: 4.55, wy: -10.45 };
 // Area Dermaga Pemancingan (4 titik memancing di atas papan kayu dermaga, tidak terlalu di ujung agar pasti di atas dermaga & tidak menumpuk)
 export interface FishingPierSpotDef {
@@ -539,8 +595,8 @@ export const STREET_LAMPS_LIST: [number, number][] = [
 ];
 
 export interface EntryConfirmation {
-  type: 'building' | 'cafe';
-  id: BuildingId | 'cafe';
+  type: 'building' | 'cafe' | 'creator_building';
+  id: BuildingId | 'cafe' | string;
   name: string;
   tagline: string;
   icon: string;
@@ -575,6 +631,10 @@ export const SOLID_BUILDING_OBSTACLES: SolidObstacle[] = [
   { minWx: 4.65, maxWx: 6.25, minWy: -5.65, maxWy: -4.05 },
   // Gedung Bank Materi Guru (Di sisi Barat Laut simetris dengan Masjid)
   { minWx: -6.15, maxWx: -4.55, minWy: -5.65, maxWy: -4.05 },
+  // Kompleks Gedung Pencakar Langit Berjejeran di Refleksia Timur
+  { minWx: 11.2, maxWx: 16.8, minWy: -10.9, maxWy: -9.9 },
+  // Terminal & Menara ATC Bandara Refleksia Timur
+  { minWx: 9.8, maxWx: 11.8, minWy: -12.6, maxWy: -11.5 },
 ];
 
 // Pagar Minimalis Pembatas Hutan Belantara & Danau Pusat (Membentang dari ujung barat hutan hingga ujung timur danau pusat)
@@ -623,13 +683,15 @@ export const isSolidCollision = (
   padding: number = 0.16,
   allowWildernessAccess: boolean = true
 ): boolean => {
-  // Expanded Island edges: wx from -8.2 to +8.2, wy from -14.2 (North +6 tiles) to +8.2
-  if (wx < -8.2 + padding || wx > 8.2 - padding || wy < -14.2 + padding || wy > 8.2 - padding) {
+  // Overall Map boundaries:
+  // West limit wx: -8.15, South limit wy: +8.15, North limit wy: -13.95
+  // Refleksia Timur extends eastward to wx: 18.20 (tiles end at 18.5, keeping avatar safely on footing)
+  if (wx < -8.15 + padding || wy < -13.95 + padding || wy > 8.15 - padding || wx > 18.20 - padding) {
     return true;
   }
 
-  // Steep Northern Mountain Range rock face (Gunung Tinggi at wy < -11.82)
-  if (wy < -11.82 + padding) {
+  // Steep Northern Mountain Range rock face & peaks (Gunung Tinggi between wy: -14.4 .. -11.82, wx <= 7.0)
+  if (wx <= 7.0 && wy >= -14.4 - padding && wy <= -11.82 + padding) {
     return true;
   }
 
@@ -643,13 +705,13 @@ export const isSolidCollision = (
   }
 
   // Hanya Guru atau Siswa yang sudah membayar tiket 5 XP yang bisa masuk melewati Gerbang Hutan Refleksia (wy < -7.62)
-  if (!allowWildernessAccess && wy < WILDERNESS_FENCE_WY + 0.08 + padding) {
+  if (!allowWildernessAccess && wy < WILDERNESS_FENCE_WY + 0.08 + padding && wx <= 6.82) {
     return true;
   }
 
-  // Danau Pusat / Sungai Refleksia water basin (wx: 1.85 .. 7.15, wy: -12.25 .. -8.78)
+  // Danau Pusat / Sungai Refleksia water basin (wx: 1.85 .. 6.82, wy: -12.25 .. -8.78)
   // Leaves the extra-large fishing pier extending out to ujung dermaga (wx: 2.76, wy: -10.86) walkable
-  if (wx > 1.85 - padding && wy < -8.78 + padding) {
+  if (wx > 1.85 - padding && wx <= 6.82 && wy < -8.78 + padding) {
     // Dermaga pemancingan kayu besar hingga ke ujung dermaga di tepi Sungai Refleksia
     if (wx >= 1.05 - padding && wx <= 3.12 + padding && wy >= -11.22 - padding && wy <= -9.12 + padding) {
       return false;
@@ -657,9 +719,12 @@ export const isSolidCollision = (
     return true;
   }
 
-  // Long Flowing River behind Studio ON AIR (wx > 6.82, except across the wooden river bridge at |wy| < 0.75)
-  if (wx > 6.82 - padding && Math.abs(wy) >= 0.72) {
-    return true;
+  // Long Flowing River channel between Main Town and Far Bank (wx: 6.82 .. 8.28)
+  // ONLY the single wooden footbridge near the front at |wy| < 0.72 allows crossing over the river!
+  if (wx > 6.82 - padding && wx < 8.28 + padding) {
+    if (Math.abs(wy) >= 0.72) {
+      return true;
+    }
   }
 
   // Central Fountain pool (Air Mancur Pusat)
@@ -667,8 +732,29 @@ export const isSolidCollision = (
     return true;
   }
 
+  // Custom Creator Fences with active collision
+  for (const fence of ACTIVE_CUSTOM_FENCES) {
+    if (!fence.hasCollision) continue;
+    const len = Math.max(1, fence.lengthTiles || 1);
+    if (fence.axis === 'x') {
+      const minX = fence.wx - 0.1 - padding;
+      const maxX = fence.wx + len + 0.1 + padding;
+      if (wx >= minX && wx <= maxX && Math.abs(wy - fence.wy) < 0.12 + padding) {
+        return true;
+      }
+    } else {
+      const minY = fence.wy - 0.1 - padding;
+      const maxY = fence.wy + len + 0.1 + padding;
+      if (wy >= minY && wy <= maxY && Math.abs(wx - fence.wx) < 0.12 + padding) {
+        return true;
+      }
+    }
+  }
+
   return false;
 };
+
+let ACTIVE_CUSTOM_FENCES: CreatorFenceItem[] = [];
 
 interface Firefly {
   treeIndex: number;
@@ -1175,6 +1261,32 @@ export const isSwingSeatId = (seatId?: string | null): seatId is SwingSeatDef['i
 // Gapura Selamat Datang di Ujung Selatan Peta [wx: 0, wy: 6.15]
 export const WELCOME_GATE_COORDS = { wx: 0, wy: 6.15 };
 
+// Default snapshots for Master Creator Studio overrides & reset
+export const DEFAULT_TREES_SNAPSHOT: [number, number][] = TREES_LIST.map(([wx, wy]) => [wx, wy]);
+export const DEFAULT_CAMPFIRE_SNAPSHOT = { wx: CAMPFIRE_COORDS.wx, wy: CAMPFIRE_COORDS.wy };
+export const DEFAULT_BENCHES_SNAPSHOT = ALL_TWO_PERSON_BENCHES.map((g) => ({
+  groupId: g.groupId,
+  wx: g.wx,
+  wy: g.wy,
+  seat0Wx: g.seats[0].wx,
+  seat0Wy: g.seats[0].wy,
+  seat1Wx: g.seats[1].wx,
+  seat1Wy: g.seats[1].wy,
+}));
+export const DEFAULT_SWINGS_SNAPSHOT = SWING_STRUCTURES.map((s) => ({
+  id: s.id,
+  wx: s.wx,
+  wy: s.wy,
+}));
+export const DEFAULT_SWING_SEATS_SNAPSHOT = REFLECTION_SWINGS.map((s) => ({
+  id: s.id,
+  structId: s.structId,
+  structWx: s.structWx,
+  structWy: s.structWy,
+  wx: s.wx,
+  wy: s.wy,
+}));
+
 export interface TreeWaterCycle {
   count: number; // 0, 1, 2, or 3
   lastWateredTime: number; // performance.now()
@@ -1376,6 +1488,369 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     toWy: number;
     startTime: number;
   } | null>(null);
+
+  // =============================================================
+  // MASTER CREATOR STUDIO (KIKYBAHSOAN) — STATE, REFS & REALTIME WORLD SYNC
+  // =============================================================
+  const [creatorState, setCreatorState] = useState<CityCreatorState>(() =>
+    StorageService.getCreatorCityState()
+  );
+  const creatorStateRef = useRef<CityCreatorState>(creatorState);
+  creatorStateRef.current = creatorState;
+
+  const [isCreatorStudioOpen, setIsCreatorStudioOpen] = useState<boolean>(false);
+  const isCreatorStudioOpenRef = useRef<boolean>(false);
+  isCreatorStudioOpenRef.current = isCreatorStudioOpen;
+
+  const [creatorSelectedTarget, setCreatorSelectedTarget] = useState<CreatorSelectedTarget>(null);
+  const creatorSelectedTargetRef = useRef<CreatorSelectedTarget>(null);
+  creatorSelectedTargetRef.current = creatorSelectedTarget;
+
+  const [creatorSnapToGrid, setCreatorSnapToGrid] = useState<boolean>(true);
+  const creatorSnapToGridRef = useRef<boolean>(true);
+  creatorSnapToGridRef.current = creatorSnapToGrid;
+
+  const [placingStockModel, setPlacingStockModel] = useState<StockModelDefinition | null>(null);
+  const placingStockModelRef = useRef<StockModelDefinition | null>(null);
+  placingStockModelRef.current = placingStockModel;
+
+  const [placingPropEntry, setPlacingPropEntry] = useState<CreatorPropCatalogEntry | null>(null);
+  const placingPropEntryRef = useRef<CreatorPropCatalogEntry | null>(null);
+  placingPropEntryRef.current = placingPropEntry;
+
+  const [placingAnimalEntry, setPlacingAnimalEntry] = useState<CreatorAnimalCatalogEntry | null>(null);
+  const placingAnimalEntryRef = useRef<CreatorAnimalCatalogEntry | null>(null);
+  placingAnimalEntryRef.current = placingAnimalEntry;
+
+  const [activeTerrainBrush, setActiveTerrainBrush] = useState<CreatorTerrainType | 'eraser' | null>(null);
+  const activeTerrainBrushRef = useRef<CreatorTerrainType | 'eraser' | null>(null);
+  activeTerrainBrushRef.current = activeTerrainBrush;
+
+  const [placingFenceEntry, setPlacingFenceEntry] = useState<CreatorFenceCatalogEntry | null>(null);
+  const placingFenceEntryRef = useRef<CreatorFenceCatalogEntry | null>(null);
+  placingFenceEntryRef.current = placingFenceEntry;
+
+  const [recordingPatrolNpcId, setRecordingPatrolNpcId] = useState<string | null>(null);
+  const recordingPatrolNpcIdRef = useRef<string | null>(null);
+  recordingPatrolNpcIdRef.current = recordingPatrolNpcId;
+
+  const [activeCreatorBuildingModal, setActiveCreatorBuildingModal] =
+    useState<CreatorBuildingItem | null>(null);
+
+  const creatorHoverGhostRef = useRef<{ wx: number; wy: number } | null>(null);
+  const creatorDraggingRef = useRef<CreatorSelectedTarget>(null);
+  const creatorJustDraggedRef = useRef<boolean>(false);
+  const isPaintingTerrainRef = useRef<boolean>(false);
+
+  const applyCreatorStateToWorld = (state: CityCreatorState) => {
+    if (!state) return;
+    const overrides = state.existingOverrides || {};
+
+    // Update active custom fences for collision detection
+    ACTIVE_CUSTOM_FENCES = state.customFences || [];
+
+    // 1. Apply Existing Building position/name/tagline/icon overrides in-place
+    BUILDINGS_INFO.forEach((b) => {
+      const def = DEFAULT_BUILDINGS_SNAPSHOT.find((d) => d.id === b.id);
+      const ov = overrides[b.id];
+      if (ov && def) {
+        b.position[0] = ov.wx;
+        b.position[2] = ov.wy;
+        b.name = ov.customName || def.name;
+        b.tagline = ov.customTagline || def.tagline;
+        b.icon = ov.customIcon || def.icon;
+      } else if (def) {
+        b.position[0] = def.wx;
+        b.position[2] = def.wy;
+        b.name = def.name;
+        b.tagline = def.tagline;
+        b.icon = def.icon;
+      }
+    });
+
+    // 2. Apply Public Facility & Campfire coordinate overrides in-place
+    const applyFacilityCoord = (
+      id: string,
+      targetObj: { wx: number; wy: number },
+      defWx: number,
+      defWy: number
+    ) => {
+      const ov = overrides[id];
+      if (ov) {
+        targetObj.wx = ov.wx;
+        targetObj.wy = ov.wy;
+      } else {
+        targetObj.wx = defWx;
+        targetObj.wy = defWy;
+      }
+    };
+    applyFacilityCoord('cafe', CAFE_COORDS, 4.65, 4.55);
+    applyFacilityCoord('beringin', BERINGIN_TREE_COORDS, -2.95, -5.85);
+    applyFacilityCoord('literacy_corner', LITERACY_CORNER_COORDS, 2.35, -6.15);
+    applyFacilityCoord('announcement_board', ANNOUNCEMENT_BOARD_COORDS, -1.55, -3.45);
+    applyFacilityCoord('rules_board', TOWN_RULES_BOARD_COORDS, 1.45, 5.95);
+    applyFacilityCoord(
+      'campfire',
+      CAMPFIRE_COORDS,
+      DEFAULT_CAMPFIRE_SNAPSHOT.wx,
+      DEFAULT_CAMPFIRE_SNAPSHOT.wy
+    );
+
+    // 2B. Apply Existing Trees coordinate overrides in-place
+    TREES_LIST.forEach((treeCoord, idx) => {
+      const def = DEFAULT_TREES_SNAPSHOT[idx];
+      if (!def) return;
+      const ov = overrides[`tree_${idx}`];
+      if (ov) {
+        treeCoord[0] = ov.wx;
+        treeCoord[1] = ov.wy;
+      } else {
+        treeCoord[0] = def[0];
+        treeCoord[1] = def[1];
+      }
+    });
+
+    // 2C. Apply Existing Benches coordinate overrides in-place (translating both bench and seats)
+    ALL_TWO_PERSON_BENCHES.forEach((benchGroup) => {
+      const def = DEFAULT_BENCHES_SNAPSHOT.find((d) => d.groupId === benchGroup.groupId);
+      if (!def) return;
+      const ov = overrides[benchGroup.groupId];
+      const targetWx = ov ? ov.wx : def.wx;
+      const targetWy = ov ? ov.wy : def.wy;
+      const dx = targetWx - def.wx;
+      const dy = targetWy - def.wy;
+      benchGroup.wx = targetWx;
+      benchGroup.wy = targetWy;
+      benchGroup.seats[0].wx = def.seat0Wx + dx;
+      benchGroup.seats[0].wy = def.seat0Wy + dy;
+      benchGroup.seats[1].wx = def.seat1Wx + dx;
+      benchGroup.seats[1].wy = def.seat1Wy + dy;
+    });
+
+    // 2D. Apply Existing Swings coordinate overrides in-place (translating both swing structure and seats)
+    SWING_STRUCTURES.forEach((st) => {
+      const def = DEFAULT_SWINGS_SNAPSHOT.find((d) => d.id === st.id);
+      if (!def) return;
+      const ov = overrides[st.id];
+      const targetWx = ov ? ov.wx : def.wx;
+      const targetWy = ov ? ov.wy : def.wy;
+      const dx = targetWx - def.wx;
+      const dy = targetWy - def.wy;
+      st.wx = targetWx;
+      st.wy = targetWy;
+
+      REFLECTION_SWINGS.forEach((seat) => {
+        if (seat.structId !== st.id) return;
+        const seatDef = DEFAULT_SWING_SEATS_SNAPSHOT.find((sd) => sd.id === seat.id);
+        if (!seatDef) return;
+        seat.structWx = targetWx;
+        seat.structWy = targetWy;
+        seat.wx = seatDef.wx + dx;
+        seat.wy = seatDef.wy + dy;
+      });
+    });
+
+    // 3. Apply NPC Configurations & Custom NPCs to npcsRef.current in-place
+    const npcList = npcsRef.current;
+    if (Array.isArray(npcList) && npcList.length > 0) {
+      const npcConfigs = state.npcConfigs || {};
+
+      // Remove custom NPCs that were deleted
+      for (let i = npcList.length - 1; i >= 0; i--) {
+        const n = npcList[i];
+        if (n.id.startsWith('npc-custom-') && !npcConfigs[n.id]) {
+          npcList.splice(i, 1);
+        }
+      }
+
+      // Update default 7 NPCs
+      DEFAULT_CITY_NPCS_CATALOG.forEach((defNpc) => {
+        const target = npcList.find((n) => n.id === defNpc.id);
+        if (!target) return;
+        const cfg = npcConfigs[defNpc.id] || defNpc;
+        target.name = cfg.name;
+        target.roleLabel = cfg.role;
+        target.gender = cfg.gender;
+        target.shirtColor = cfg.shirtColor;
+        target.pantsColor = cfg.pantsColor;
+        target.hairColor = cfg.hairColor;
+        target.anchorX = cfg.homeWx;
+        target.anchorY = cfg.homeWy;
+        if (Array.isArray(cfg.speeches) && cfg.speeches.length > 0) {
+          target.speeches = cfg.speeches;
+        }
+        if (defNpc.id === 'nawa') {
+          NAWA_GATEKEEPER_COORDS.wx = cfg.homeWx;
+          NAWA_GATEKEEPER_COORDS.wy = cfg.homeWy;
+        }
+
+        if (cfg.movementMode === 'static') {
+          target.speed = 0;
+          target.wanderRadius = 0;
+          target.patrolWaypoints = undefined;
+          target.isMoving = false;
+          target.wx = cfg.homeWx;
+          target.wy = cfg.homeWy;
+          target.targetWx = cfg.homeWx;
+          target.targetWy = cfg.homeWy;
+        } else if (cfg.movementMode === 'wander') {
+          target.speed = cfg.speed || 0.65;
+          target.wanderRadius = cfg.wanderRadius || 1.5;
+          target.patrolWaypoints = undefined;
+          if (Math.hypot(target.wx - cfg.homeWx, target.wy - cfg.homeWy) > (cfg.wanderRadius || 1.5) + 1.5) {
+            target.wx = cfg.homeWx;
+            target.wy = cfg.homeWy;
+          }
+        } else if (cfg.movementMode === 'patrol') {
+          target.speed = cfg.speed || 0.85;
+          const wps =
+            Array.isArray(cfg.patrolWaypoints) && cfg.patrolWaypoints.length > 0
+              ? cfg.patrolWaypoints.map((p) => [p.wx, p.wy] as [number, number])
+              : [[cfg.homeWx, cfg.homeWy] as [number, number]];
+          target.patrolWaypoints = wps;
+        }
+      });
+
+      // Add or update custom NPCs
+      Object.values(npcConfigs).forEach((cfg) => {
+        if (!cfg.isCustom) return;
+        let existing = npcList.find((n) => n.id === cfg.id);
+        if (!existing) {
+          existing = {
+            id: cfg.id,
+            role: 'penjaga_kota',
+            handle: cfg.id,
+            name: cfg.name,
+            roleLabel: cfg.role,
+            wx: cfg.homeWx,
+            wy: cfg.homeWy,
+            targetWx: cfg.homeWx,
+            targetWy: cfg.homeWy,
+            anchorX: cfg.homeWx,
+            anchorY: cfg.homeWy,
+            wanderRadius: cfg.wanderRadius || 1.6,
+            speed: cfg.movementMode === 'static' ? 0 : cfg.speed || 0.65,
+            shirtColor: cfg.shirtColor,
+            pantsColor: cfg.pantsColor,
+            hairColor: cfg.hairColor,
+            gender: cfg.gender,
+            isMoving: false,
+            pauseTimer: 1.5,
+            walkFrame: 0,
+            facing: 'down-right',
+            speeches: cfg.speeches,
+            speechText: cfg.speeches?.[0],
+            speechTimer: 4.5,
+          };
+          npcList.push(existing);
+        }
+        existing.name = cfg.name;
+        existing.roleLabel = cfg.role;
+        existing.gender = cfg.gender;
+        existing.shirtColor = cfg.shirtColor;
+        existing.pantsColor = cfg.pantsColor;
+        existing.hairColor = cfg.hairColor;
+        existing.anchorX = cfg.homeWx;
+        existing.anchorY = cfg.homeWy;
+        existing.speeches = cfg.speeches;
+        if (cfg.movementMode === 'static') {
+          existing.speed = 0;
+          existing.wanderRadius = 0;
+          existing.patrolWaypoints = undefined;
+          existing.isMoving = false;
+          existing.wx = cfg.homeWx;
+          existing.wy = cfg.homeWy;
+        } else if (cfg.movementMode === 'wander') {
+          existing.speed = cfg.speed || 0.65;
+          existing.wanderRadius = cfg.wanderRadius || 1.6;
+          existing.patrolWaypoints = undefined;
+        } else if (cfg.movementMode === 'patrol') {
+          existing.speed = cfg.speed || 0.8;
+          existing.patrolWaypoints =
+            Array.isArray(cfg.patrolWaypoints) && cfg.patrolWaypoints.length > 0
+              ? cfg.patrolWaypoints.map((p) => [p.wx, p.wy] as [number, number])
+              : [[cfg.homeWx, cfg.homeWy] as [number, number]];
+        }
+      });
+    }
+  };
+
+  const applyCreatorStateToWorldRef = useRef(applyCreatorStateToWorld);
+  applyCreatorStateToWorldRef.current = applyCreatorStateToWorld;
+
+  const handleUpdateCreatorState = (nextState: CityCreatorState) => {
+    const stamped: CityCreatorState = {
+      ...nextState,
+      updatedAt: new Date().toISOString(),
+      updatedBy: 'kikybahsoan',
+    };
+    setCreatorState(stamped);
+    creatorStateRef.current = stamped;
+    applyCreatorStateToWorld(stamped);
+    StorageService.saveCreatorCityState(stamped);
+  };
+
+  const handleSaveCreatorStateToCity = async () => {
+    const stamped: CityCreatorState = {
+      ...creatorStateRef.current,
+      updatedAt: new Date().toISOString(),
+      updatedBy: 'kikybahsoan',
+    };
+    setCreatorState(stamped);
+    creatorStateRef.current = stamped;
+    applyCreatorStateToWorld(stamped);
+    await StorageService.saveCreatorCityState(stamped);
+    sounds.playRewardXp();
+    showToast('🏛️ Perubahan Kota berhasil disimpan & disinkronkan ke seluruh warga!', 3500);
+  };
+
+  useEffect(() => {
+    applyCreatorStateToWorld(creatorState);
+    // Keep activeCreatorBuildingModal synced if open
+    if (activeCreatorBuildingModal) {
+      const updatedModalB = creatorState.customBuildings.find(
+        (b) => b.id === activeCreatorBuildingModal.id
+      );
+      if (updatedModalB) {
+        setActiveCreatorBuildingModal(updatedModalB);
+      }
+    }
+  }, [creatorState]);
+
+  useEffect(() => {
+    let isMounted = true;
+    StorageService.fetchCreatorCityStateFromCloud().then((remote) => {
+      if (isMounted && remote) {
+        setCreatorState(remote);
+      }
+    });
+
+    const handleCustomEvent = (e: Event) => {
+      const custom = e as CustomEvent<CityCreatorState>;
+      if (custom.detail && isMounted) {
+        setCreatorState(custom.detail);
+      }
+    };
+    window.addEventListener('kota_refleksi_creator_state_updated', handleCustomEvent);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        bc = new BroadcastChannel('kota_refleksi_channel');
+        bc.onmessage = (ev) => {
+          if (ev.data?.type === 'creator_city_updated' && ev.data.data && isMounted) {
+            setCreatorState(ev.data.data);
+          }
+        };
+      }
+    } catch {}
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('kota_refleksi_creator_state_updated', handleCustomEvent);
+      if (bc) bc.close();
+    };
+  }, []);
 
   // =============================================================
   // MASJID AL-HIKMAH: INFO ADZAN DI ATAS MASJID (HANYA TAMPIL 10 MENIT SETELAH WAKTU SHOLAT PER 5 WAKTUNYA)
@@ -1597,6 +2072,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     const autumnSet = new Set(indices.slice(0, Math.max(16, Math.round(TREES_LIST.length * 0.42))));
     autumnSet.add(TREES_LIST.length - 1);
     autumnSet.add(TREES_LIST.length - 3);
+    autumnSet.add(TREES_LIST.length - 4);
+    autumnSet.add(TREES_LIST.length - 6);
+    autumnSet.delete(TREES_LIST.length - 2);
+    autumnSet.delete(TREES_LIST.length - 5);
+    autumnSet.delete(TREES_LIST.length - 7);
     autumnSet.add(12);
     autumnSet.add(13);
 
@@ -3026,10 +3506,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     const npcs: AvatarData[] = [surya, malik, maUba, patra, tomi, sony, nawa];
     npcsRef.current = npcs;
+    applyCreatorStateToWorldRef.current(creatorStateRef.current);
 
-    // Cafe coordinates (Toko Roti & Kafe - Di ujung kota belakang Lab DKV)
-    const cafeWx = 4.65;
-    const cafeWy = 4.55;
+    // Cafe coordinates (Toko Roti & Kafe - Di ujung kota belakang Lab DKV, mutable via CAFE_COORDS)
+    let cafeWx = CAFE_COORDS.wx;
+    let cafeWy = CAFE_COORDS.wy;
 
     // -----------------------------------------------------------
     // SKY & WEATHER ELEMENTS (4 Cuaca: Normal, Berawan, Hujan Ringan, Salju)
@@ -3311,7 +3792,210 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     };
 
     const handlePointerAction = (clientX: number, clientY: number, isRun: boolean = false) => {
+      if (creatorJustDraggedRef.current) {
+        creatorJustDraggedRef.current = false;
+        return;
+      }
+
       const { sx, sy, wx, wy } = getPointerWorldPos(clientX, clientY);
+
+      // 0-CREATOR: If Master Creator Studio is open, handle placing stock model, props, animals, fences, terrain brush, or recording NPC patrol waypoints
+      if (isCreatorStudioOpenRef.current) {
+        const snapVal = (v: number) =>
+          creatorSnapToGridRef.current ? Math.round(v * 2) / 2 : Math.round(v * 20) / 20;
+
+        if (activeTerrainBrushRef.current) {
+          const brush = activeTerrainBrushRef.current;
+          const gx = Math.max(-8, Math.min(18, Math.round(wx)));
+          const gy = Math.max(-14, Math.min(8, Math.round(wy)));
+          const key = `${gx},${gy}`;
+          const nextTiles = { ...(creatorStateRef.current.terrainTiles || {}) };
+          if (brush === 'eraser') {
+            delete nextTiles[key];
+          } else {
+            nextTiles[key] = { gx, gy, terrainType: brush };
+          }
+          const nextState: CityCreatorState = {
+            ...creatorStateRef.current,
+            terrainTiles: nextTiles,
+          };
+          creatorStateRef.current = nextState;
+          setCreatorState(nextState);
+          sounds.playClick();
+          return;
+        }
+
+        if (placingStockModelRef.current) {
+          const stock = placingStockModelRef.current;
+          const placeWx = Math.max(-7.8, Math.min(18.0, snapVal(wx)));
+          const placeWy = Math.max(-13.5, Math.min(7.8, snapVal(wy)));
+          const newB = createDefaultBuildingFromStock(stock, placeWx, placeWy);
+          const nextState: CityCreatorState = {
+            ...creatorStateRef.current,
+            customBuildings: [...creatorStateRef.current.customBuildings, newB],
+          };
+          creatorStateRef.current = nextState;
+          setCreatorState(nextState);
+          setCreatorSelectedTarget({ kind: 'custom_building', id: newB.id });
+          setPlacingStockModel(null);
+          creatorHoverGhostRef.current = null;
+          sounds.playClick();
+          return;
+        }
+
+        if (placingPropEntryRef.current) {
+          const entry = placingPropEntryRef.current;
+          const placeWx = Math.max(-7.8, Math.min(18.0, snapVal(wx)));
+          const placeWy = Math.max(-13.5, Math.min(7.8, snapVal(wy)));
+          const newProp = createDefaultPropItem(entry, placeWx, placeWy);
+          const nextState: CityCreatorState = {
+            ...creatorStateRef.current,
+            customProps: [...(creatorStateRef.current.customProps || []), newProp],
+          };
+          creatorStateRef.current = nextState;
+          setCreatorState(nextState);
+          setCreatorSelectedTarget({ kind: 'custom_prop', id: newProp.id });
+          sounds.playClick();
+          return;
+        }
+
+        if (placingAnimalEntryRef.current) {
+          const entry = placingAnimalEntryRef.current;
+          const placeWx = Math.max(-7.8, Math.min(18.0, snapVal(wx)));
+          const placeWy = Math.max(-13.5, Math.min(7.8, snapVal(wy)));
+          const newAnimal = createDefaultAnimalItem(entry, placeWx, placeWy);
+          const nextState: CityCreatorState = {
+            ...creatorStateRef.current,
+            customAnimals: [...(creatorStateRef.current.customAnimals || []), newAnimal],
+          };
+          creatorStateRef.current = nextState;
+          setCreatorState(nextState);
+          setCreatorSelectedTarget({ kind: 'custom_animal', id: newAnimal.id });
+          sounds.playClick();
+          return;
+        }
+
+        if (placingFenceEntryRef.current) {
+          const entry = placingFenceEntryRef.current;
+          const placeWx = Math.max(-7.8, Math.min(18.0, snapVal(wx)));
+          const placeWy = Math.max(-13.5, Math.min(7.8, snapVal(wy)));
+          const newFence = createDefaultFenceItem(entry, placeWx, placeWy);
+          const nextState: CityCreatorState = {
+            ...creatorStateRef.current,
+            customFences: [...(creatorStateRef.current.customFences || []), newFence],
+          };
+          creatorStateRef.current = nextState;
+          setCreatorState(nextState);
+          applyCreatorStateToWorldRef.current(nextState);
+          setCreatorSelectedTarget({ kind: 'custom_fence', id: newFence.id });
+          sounds.playClick();
+          return;
+        }
+
+        if (recordingPatrolNpcIdRef.current) {
+          const npcId = recordingPatrolNpcIdRef.current;
+          const wpWx = Math.max(-7.8, Math.min(18.0, snapVal(wx)));
+          const wpWy = Math.max(-13.5, Math.min(7.8, snapVal(wy)));
+          const curState = creatorStateRef.current;
+          const baseNpc =
+            curState.npcConfigs[npcId] ||
+            DEFAULT_CITY_NPCS_CATALOG.find((n) => n.id === npcId);
+          if (baseNpc) {
+            const nextWps = [...(baseNpc.patrolWaypoints || []), { wx: wpWx, wy: wpWy }];
+            const updatedNpc = {
+              ...baseNpc,
+              movementMode: 'patrol' as const,
+              patrolWaypoints: nextWps,
+            };
+            const nextState: CityCreatorState = {
+              ...curState,
+              npcConfigs: {
+                ...curState.npcConfigs,
+                [npcId]: updatedNpc,
+              },
+            };
+            creatorStateRef.current = nextState;
+            setCreatorState(nextState);
+            applyCreatorStateToWorldRef.current(nextState);
+            sounds.playClick();
+          }
+          return;
+        }
+      }
+
+      // 0-CUSTOM-PROP: Check click on Custom Creator Props (Benches, Swings, Campfires)
+      for (const cp of creatorStateRef.current.customProps || []) {
+        if (Math.hypot(wx - cp.wx, wy - cp.wy) < 0.45 * (cp.scale || 1)) {
+          sounds.playClick();
+          if (isCreatorStudioOpenRef.current) {
+            setCreatorSelectedTarget({ kind: 'custom_prop', id: cp.id });
+          }
+          if (cp.propCategory === 'bench' || cp.propCategory === 'swing') {
+            player.targetWx = cp.wx;
+            player.targetWy = cp.wy;
+            player.isMoving = Math.hypot(player.wx - cp.wx, player.wy - cp.wy) > 0.08;
+            if (!player.isMoving) {
+              setIsSitting(true);
+            } else {
+              pendingSeatRef.current = {
+                seatId: 'fountain_1_a',
+                facingDir: cp.facing || 'down-right',
+                targetX: cp.wx,
+                targetY: cp.wy,
+              };
+            }
+            return;
+          }
+          if (cp.propCategory === 'campfire') {
+            const standWx = cp.wx + 0.55;
+            const standWy = cp.wy + 0.35;
+            player.targetWx = standWx;
+            player.targetWy = standWy;
+            player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
+            showToast(`🔥 Menghangatkan diri di dekat ${cp.name}`, 2500);
+            return;
+          }
+        }
+      }
+
+      // 0-CUSTOM-BUILDING: Check click on Custom Creator Buildings
+      for (const cb of creatorStateRef.current.customBuildings) {
+        const sc = Math.max(0.6, cb.scale || 1.0);
+        const cbDist = Math.hypot(wx - cb.wx, wy - cb.wy);
+        const cbPt = toScreen(cb.wx, cb.wy, 0, camera.x, camera.y);
+        const zCur = zoomLevelRef.current;
+        const isScreenHit =
+          Math.abs(sx - cbPt.x) < 42 * zCur * sc &&
+          sy >= cbPt.y - 88 * zCur * sc &&
+          sy <= cbPt.y + 24 * zCur * sc;
+
+        if (cbDist < 0.72 * sc || isScreenHit) {
+          sounds.playClick();
+          if (isCreatorStudioOpenRef.current) {
+            setCreatorSelectedTarget({ kind: 'custom_building', id: cb.id });
+          }
+          if (isSittingRef.current) {
+            setIsSitting(false);
+            setSittingSeat(null);
+          }
+          pendingSeatRef.current = null;
+          const standWx = cb.wx;
+          const standWy = cb.wy + 0.65 * sc;
+          if (Math.hypot(player.wx - cb.wx, player.wy - cb.wy) < 1.85 || isRun) {
+            setActiveCreatorBuildingModal(cb);
+          }
+          player.targetWx = standWx;
+          player.targetWy = standWy;
+          player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
+          if (player.isMoving) {
+            player.isRunning = isRun;
+            player.speed = isRun ? 1.28 : 0.88;
+          }
+          clickRippleRef.current = { wx: standWx, wy: standWy, time: performance.now(), isRun };
+          lastTouchedIdRef.current = null;
+          return;
+        }
+      }
 
       // 0. Check Click on Player Avatar -> Open/Toggle 5-Reaction Circular Menu (Joget, Jempol, Suka, Tertawa, Lambai)
       // Only trigger if clicking directly on player's body/sprite (tight radius)
@@ -3775,7 +4459,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       for (const b of BUILDINGS_INFO) {
         const [bx, , by] = b.position;
         const dist = Math.hypot(wx - bx, wy - by);
-        const isDirectHit = dist < 0.65 || (Math.abs(wx - bx) < 0.55 && Math.abs(wy - by) < 0.55);
+        let isDirectHit = dist < 0.65 || (Math.abs(wx - bx) < 0.55 && Math.abs(wy - by) < 0.55);
+        if (b.id === 'pencakar_langit') {
+          const bPt = toScreen(bx, by, 0, camera.x, camera.y);
+          const isScreenHit = Math.abs(sx - bPt.x) < 85 * z && sy >= bPt.y - 165 * z && sy <= bPt.y + 30 * z;
+          const isWorldHit = wx >= 10.8 && wx <= 17.2 && wy >= -11.8 && wy <= -8.2;
+          isDirectHit = isDirectHit || isScreenHit || isWorldHit;
+        } else if (b.id === 'bandara') {
+          const bPt = toScreen(bx, by, 0, camera.x, camera.y);
+          const isScreenHit = Math.abs(sx - bPt.x) < 65 * z && sy >= bPt.y - 105 * z && sy <= bPt.y + 30 * z;
+          const isWorldHit = wx >= 8.8 && wx <= 12.2 && wy >= -13.2 && wy <= -10.5;
+          isDirectHit = isDirectHit || isScreenHit || isWorldHit;
+        }
         if (isDirectHit) {
           sounds.playClick();
           if (isSittingRef.current) {
@@ -3802,6 +4497,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           } else if (b.id === 'bank_materi') {
             player.targetWx = -4.35;
             player.targetWy = -4.65;
+          } else if (b.id === 'pencakar_langit') {
+            player.targetWx = 14.0;
+            player.targetWy = -8.5;
+          } else if (b.id === 'bandara') {
+            player.targetWx = 10.8;
+            player.targetWy = -10.9;
           } else {
             player.targetWx = bx * 0.68;
             player.targetWy = by * 0.68;
@@ -3896,12 +4597,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         setSittingSeat(null);
       }
       pendingSeatRef.current = null;
-      let targetX = Math.max(-8.15, Math.min(8.15, wx));
-      let targetY = Math.max(-13.5, Math.min(8.15, wy));
+      let targetX = Math.max(-8.05, Math.min(18.15, wx));
+      let targetY = Math.max(-13.85, Math.min(8.05, wy));
 
-      // Jika belum punya akses Hutan Refleksia (Tamu atau Siswa belum bayar 5 XP) dan mengklik area di balik pagar (wy < -7.45),
+      // Jika belum punya akses Hutan Refleksia (Tamu atau Siswa belum bayar 5 XP) dan mengklik area di balik pagar (wy < -7.45) di sisi barat sungai (targetX <= 6.85),
       // arahkan ke depan pintu gerbang yang dijaga @Sufri
-      if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.18) {
+      if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.18 && targetX <= 6.85) {
         dismissedNearbySignatureRef.current = null;
         targetX = 0.0;
         targetY = -7.08;
@@ -4049,21 +4750,290 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       sendHeartbeatRef.current?.();
     };
 
+    let creatorDragStartPos: { x: number; y: number } | null = null;
+
+    const findCreatorTargetAt = (wx: number, wy: number): CreatorSelectedTarget => {
+      // 1. Check Custom Props (Trees, Benches, Swings, Campfire)
+      for (const cp of creatorStateRef.current.customProps || []) {
+        if (Math.hypot(wx - cp.wx, wy - cp.wy) < 0.55 * (cp.scale || 1)) {
+          return { kind: 'custom_prop', id: cp.id };
+        }
+      }
+      // 2. Check Custom Animals
+      for (const ca of creatorStateRef.current.customAnimals || []) {
+        if (Math.hypot(wx - ca.homeWx, wy - ca.homeWy) < 0.65) {
+          return { kind: 'custom_animal', id: ca.id };
+        }
+      }
+      // 3. Check Custom Fences
+      for (const cf of creatorStateRef.current.customFences || []) {
+        const len = Math.max(1, cf.lengthTiles || 1);
+        const midX = cf.axis === 'x' ? cf.wx + len * 0.5 : cf.wx;
+        const midY = cf.axis === 'y' ? cf.wy + len * 0.5 : cf.wy;
+        if (Math.hypot(wx - cf.wx, wy - cf.wy) < 0.65 || Math.hypot(wx - midX, wy - midY) < 0.75) {
+          return { kind: 'custom_fence', id: cf.id };
+        }
+      }
+      // 4. Check Custom Buildings
+      for (const cb of creatorStateRef.current.customBuildings) {
+        if (Math.hypot(wx - cb.wx, wy - cb.wy) < 0.85 * (cb.scale || 1)) {
+          return { kind: 'custom_building', id: cb.id };
+        }
+      }
+      // 5. Check NPCs
+      for (const npc of npcsRef.current) {
+        if (Math.hypot(wx - npc.wx, wy - npc.wy) < 0.68) {
+          return { kind: 'npc', id: npc.id };
+        }
+      }
+      // 6. Check Existing Campfire, Swings & Benches
+      if (
+        !creatorStateRef.current.existingOverrides?.['campfire']?.isHidden &&
+        Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 0.55
+      ) {
+        return { kind: 'existing_object', id: 'campfire' };
+      }
+      for (const st of SWING_STRUCTURES) {
+        if (
+          !creatorStateRef.current.existingOverrides?.[st.id]?.isHidden &&
+          Math.hypot(wx - st.wx, wy - st.wy) < 0.62
+        ) {
+          return { kind: 'existing_object', id: st.id };
+        }
+      }
+      for (const bg of ALL_TWO_PERSON_BENCHES) {
+        if (
+          !creatorStateRef.current.existingOverrides?.[bg.groupId]?.isHidden &&
+          Math.hypot(wx - bg.wx, wy - bg.wy) < 0.52
+        ) {
+          return { kind: 'existing_object', id: bg.groupId };
+        }
+      }
+      // 7. Check Existing Trees
+      for (let tIdx = 0; tIdx < TREES_LIST.length; tIdx++) {
+        const treeId = `tree_${tIdx}`;
+        if (creatorStateRef.current.existingOverrides?.[treeId]?.isHidden) continue;
+        const [tx, ty] = TREES_LIST[tIdx];
+        if (Math.hypot(wx - tx, wy - ty) < 0.48) {
+          return { kind: 'existing_object', id: treeId };
+        }
+      }
+      // 8. Check Public Facilities
+      const facChecks: Array<{ id: string; wx: number; wy: number }> = [
+        { id: 'cafe', wx: CAFE_COORDS.wx, wy: CAFE_COORDS.wy },
+        { id: 'beringin', wx: BERINGIN_TREE_COORDS.wx, wy: BERINGIN_TREE_COORDS.wy },
+        { id: 'literacy_corner', wx: LITERACY_CORNER_COORDS.wx, wy: LITERACY_CORNER_COORDS.wy },
+        { id: 'announcement_board', wx: ANNOUNCEMENT_BOARD_COORDS.wx, wy: ANNOUNCEMENT_BOARD_COORDS.wy },
+        { id: 'rules_board', wx: TOWN_RULES_BOARD_COORDS.wx, wy: TOWN_RULES_BOARD_COORDS.wy },
+      ];
+      for (const f of facChecks) {
+        if (Math.hypot(wx - f.wx, wy - f.wy) < 0.82) {
+          return { kind: 'existing_object', id: f.id };
+        }
+      }
+      // 9. Check Existing Buildings
+      for (const b of BUILDINGS_INFO) {
+        if (Math.hypot(wx - b.position[0], wy - b.position[2]) < 1.15) {
+          return { kind: 'existing_object', id: b.id };
+        }
+      }
+      return null;
+    };
+
+    const onCreatorMouseDown = (e: MouseEvent) => {
+      if (!isCreatorStudioOpenRef.current) return;
+      if (activeTerrainBrushRef.current) {
+        isPaintingTerrainRef.current = true;
+        const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
+        const brush = activeTerrainBrushRef.current;
+        const gx = Math.max(-8, Math.min(18, Math.round(wx)));
+        const gy = Math.max(-14, Math.min(8, Math.round(wy)));
+        const key = `${gx},${gy}`;
+        const nextTiles = { ...(creatorStateRef.current.terrainTiles || {}) };
+        if (brush === 'eraser') {
+          delete nextTiles[key];
+        } else {
+          nextTiles[key] = { gx, gy, terrainType: brush };
+        }
+        creatorStateRef.current = { ...creatorStateRef.current, terrainTiles: nextTiles };
+        return;
+      }
+      if (
+        placingStockModelRef.current ||
+        placingPropEntryRef.current ||
+        placingAnimalEntryRef.current ||
+        placingFenceEntryRef.current ||
+        recordingPatrolNpcIdRef.current
+      ) {
+        return;
+      }
+      const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
+      const hit = findCreatorTargetAt(wx, wy);
+      if (hit) {
+        creatorDraggingRef.current = hit;
+        creatorDragStartPos = { x: e.clientX, y: e.clientY };
+        setCreatorSelectedTarget(hit);
+        canvas.style.cursor = 'grabbing';
+      }
+    };
+
+    const onCreatorMouseUp = (e: MouseEvent) => {
+      if (isPaintingTerrainRef.current) {
+        isPaintingTerrainRef.current = false;
+        creatorJustDraggedRef.current = true;
+        setCreatorState({ ...creatorStateRef.current });
+        return;
+      }
+      if (creatorDraggingRef.current) {
+        const movedPx = creatorDragStartPos
+          ? Math.hypot(e.clientX - creatorDragStartPos.x, e.clientY - creatorDragStartPos.y)
+          : 0;
+        creatorDraggingRef.current = null;
+        creatorDragStartPos = null;
+        canvas.style.cursor = 'grab';
+        if (movedPx > 5) {
+          creatorJustDraggedRef.current = true;
+          setCreatorState({ ...creatorStateRef.current });
+        }
+      }
+    };
+
     let lastPointerMoveTime = 0;
     const onPointerMove = (e: MouseEvent) => {
       const now = performance.now();
-      if (now - lastPointerMoveTime < 28) return;
+      if (now - lastPointerMoveTime < 22) return;
       lastPointerMoveTime = now;
 
       const { wx, wy } = getPointerWorldPos(e.clientX, e.clientY);
 
+      // Creator Studio Live Dragging, Terrain Brush Painting & Placement Ghost Preview
+      if (isCreatorStudioOpenRef.current) {
+        if (activeTerrainBrushRef.current) {
+          const gx = Math.max(-8, Math.min(18, Math.round(wx)));
+          const gy = Math.max(-14, Math.min(8, Math.round(wy)));
+          creatorHoverGhostRef.current = { wx: gx, wy: gy };
+          canvas.style.cursor = 'crosshair';
+          if (isPaintingTerrainRef.current) {
+            const brush = activeTerrainBrushRef.current;
+            const key = `${gx},${gy}`;
+            const curTiles = creatorStateRef.current.terrainTiles || {};
+            if (brush === 'eraser') {
+              if (curTiles[key]) {
+                const nextTiles = { ...curTiles };
+                delete nextTiles[key];
+                creatorStateRef.current = { ...creatorStateRef.current, terrainTiles: nextTiles };
+              }
+            } else if (curTiles[key]?.terrainType !== brush) {
+              const nextTiles = { ...curTiles, [key]: { gx, gy, terrainType: brush } };
+              creatorStateRef.current = { ...creatorStateRef.current, terrainTiles: nextTiles };
+            }
+          }
+          return;
+        }
+
+        const snapVal = (v: number) =>
+          creatorSnapToGridRef.current ? Math.round(v * 2) / 2 : Math.round(v * 20) / 20;
+        const clampedWx = Math.max(-7.8, Math.min(18.0, snapVal(wx)));
+        const clampedWy = Math.max(-13.5, Math.min(7.8, snapVal(wy)));
+
+        if (
+          placingStockModelRef.current ||
+          placingPropEntryRef.current ||
+          placingAnimalEntryRef.current ||
+          placingFenceEntryRef.current
+        ) {
+          creatorHoverGhostRef.current = { wx: clampedWx, wy: clampedWy };
+          canvas.style.cursor = 'crosshair';
+          return;
+        } else {
+          creatorHoverGhostRef.current = null;
+        }
+
+        const dragTarget = creatorDraggingRef.current;
+        if (dragTarget) {
+          const cur = creatorStateRef.current;
+          if (dragTarget.kind === 'custom_building') {
+            const nextBuildings = cur.customBuildings.map((b) =>
+              b.id === dragTarget.id ? { ...b, wx: clampedWx, wy: clampedWy } : b
+            );
+            creatorStateRef.current = { ...cur, customBuildings: nextBuildings };
+          } else if (dragTarget.kind === 'custom_prop') {
+            const nextProps = (cur.customProps || []).map((p) =>
+              p.id === dragTarget.id ? { ...p, wx: clampedWx, wy: clampedWy } : p
+            );
+            creatorStateRef.current = { ...cur, customProps: nextProps };
+          } else if (dragTarget.kind === 'custom_animal') {
+            const nextAnimals = (cur.customAnimals || []).map((a) =>
+              a.id === dragTarget.id ? { ...a, homeWx: clampedWx, homeWy: clampedWy } : a
+            );
+            creatorStateRef.current = { ...cur, customAnimals: nextAnimals };
+          } else if (dragTarget.kind === 'custom_fence') {
+            const nextFences = (cur.customFences || []).map((f) =>
+              f.id === dragTarget.id ? { ...f, wx: clampedWx, wy: clampedWy } : f
+            );
+            creatorStateRef.current = { ...cur, customFences: nextFences };
+            applyCreatorStateToWorldRef.current(creatorStateRef.current);
+          } else if (dragTarget.kind === 'existing_object') {
+            const meta = EXISTING_CITY_OBJECTS_CATALOG.find((m) => m.id === dragTarget.id);
+            if (meta) {
+              const prevOv = cur.existingOverrides[meta.id] || {
+                id: meta.id,
+                objectCategory: meta.objectCategory,
+                wx: meta.defaultWx,
+                wy: meta.defaultWy,
+                customName: meta.defaultName,
+                customTagline: meta.defaultTagline,
+                customIcon: meta.defaultIcon,
+              };
+              const nextOverrides = {
+                ...cur.existingOverrides,
+                [meta.id]: { ...prevOv, wx: clampedWx, wy: clampedWy },
+              };
+              creatorStateRef.current = { ...cur, existingOverrides: nextOverrides };
+              applyCreatorStateToWorldRef.current(creatorStateRef.current);
+            }
+          } else if (dragTarget.kind === 'npc') {
+            const defNpc = DEFAULT_CITY_NPCS_CATALOG.find((n) => n.id === dragTarget.id);
+            const prevNpc = cur.npcConfigs[dragTarget.id] || defNpc;
+            if (prevNpc) {
+              const nextNpcs = {
+                ...cur.npcConfigs,
+                [dragTarget.id]: {
+                  ...prevNpc,
+                  wx: clampedWx,
+                  wy: clampedWy,
+                  homeWx: clampedWx,
+                  homeWy: clampedWy,
+                },
+              };
+              creatorStateRef.current = { ...cur, npcConfigs: nextNpcs };
+              applyCreatorStateToWorldRef.current(creatorStateRef.current);
+              const liveNpc = npcsRef.current.find((n) => n.id === dragTarget.id);
+              if (liveNpc) {
+                liveNpc.wx = clampedWx;
+                liveNpc.wy = clampedWy;
+                liveNpc.targetWx = clampedWx;
+                liveNpc.targetWy = clampedWy;
+              }
+            }
+          }
+          canvas.style.cursor = 'grabbing';
+          return;
+        }
+      }
+
       const isOverPlayer =
         Math.hypot(wx - player.wx, wy - player.wy) < 0.42 ||
-        npcs.some((n) => Math.hypot(wx - n.wx, wy - n.wy) < 0.42) ||
+        npcsRef.current.some((n) => Math.hypot(wx - n.wx, wy - n.wy) < 0.42) ||
         Array.from(remotePlayersRef.current.values()).some((r) => Math.hypot(wx - r.wx, wy - r.wy) < 0.42);
+
+      const isOverCustomBuilding = creatorStateRef.current.customBuildings.some(
+        (cb) => Math.hypot(wx - cb.wx, wy - cb.wy) < 0.75 * (cb.scale || 1)
+      );
 
       const isOverInteractiveSpot =
         isOverPlayer ||
+        isOverCustomBuilding ||
         (Math.abs(wx - cafeWx) < 0.62 && Math.abs(wy - cafeWy) < 0.62) ||
         ((wx >= 1.15 && wx <= 3.08 && wy >= -11.15 && wy <= -9.15) || FISHING_PIER_SPOTS.some((s) => Math.hypot(wx - s.wx, wy - s.wy) < 0.42)) ||
         Math.hypot(wx - CAMPFIRE_COORDS.wx, wy - CAMPFIRE_COORDS.wy) < 0.48 ||
@@ -4079,7 +5049,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         Math.hypot(wx - BANYAN_BRANCH_FOOT_COORDS.wx, wy - BANYAN_BRANCH_FOOT_COORDS.wy) < 0.38;
 
       if (isOverInteractiveSpot) {
-        canvas.style.cursor = 'pointer';
+        canvas.style.cursor = isCreatorStudioOpenRef.current ? 'grab' : 'pointer';
         if (hoveredBuildingRef !== null) {
           hoveredBuildingRef = null;
           setHoveredBuilding(null);
@@ -4100,9 +5070,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         hoveredBuildingRef = found;
         setHoveredBuilding(found);
       }
-      canvas.style.cursor = found ? 'pointer' : 'default';
+      canvas.style.cursor = found ? (isCreatorStudioOpenRef.current ? 'grab' : 'pointer') : 'default';
     };
 
+    canvas.addEventListener('mousedown', onCreatorMouseDown);
+    window.addEventListener('mouseup', onCreatorMouseUp);
     canvas.addEventListener('click', onPointerDown);
     canvas.addEventListener('dblclick', onDblClick);
     canvas.addEventListener('mousemove', onPointerMove);
@@ -4158,6 +5130,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       lastTime = currentTime;
       const elapsed = currentTime / 1000;
       beaconBlink += delta * 4;
+      cafeWx = CAFE_COORDS.wx;
+      cafeWy = CAFE_COORDS.wy;
 
       // Smoothly interpolate weather weights for dynamic fade-in and fade-out (~1.2s crossfade)
       const activeTargetWeather = weatherTypeRef.current || 'normal';
@@ -4262,16 +5236,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const canEnterWilderness = Boolean(
               !isPlayerGuest && (isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current)
             );
-            if (!canEnterWilderness && player.targetWy < WILDERNESS_FENCE_WY + 0.22) {
+            if (!canEnterWilderness && player.targetWy < WILDERNESS_FENCE_WY + 0.22 && player.targetWx <= 6.85) {
               player.targetWx = 0.0;
               player.targetWy = -7.08;
             }
 
             // Route Guru smoothly through the central gate on the road behind Pohon Refleksi (wx: 0, wy: -7.62) guarded by @tomi
+            // SANGAT PENTING: Pagar pembatas hutan ini HANYA berada di sisi barat kota lama (wx <= 6.82)
+            // dan TIDAK ADA di kawasan Refleksia Timur! Avatar di Refleksia Timur bebas bergerak ke utara ke gedung pencakar langit.
+            const isWestCityMovement = player.wx <= 6.85 && player.targetWx <= 6.85;
             const isCrossingFenceNorth =
-              player.wy > WILDERNESS_FENCE_WY - 0.16 && player.targetWy < WILDERNESS_FENCE_WY - 0.16;
+              isWestCityMovement &&
+              player.wy > WILDERNESS_FENCE_WY - 0.16 &&
+              player.targetWy < WILDERNESS_FENCE_WY - 0.16;
             const isCrossingFenceSouth =
-              player.wy < WILDERNESS_FENCE_WY + 0.16 && player.targetWy > WILDERNESS_FENCE_WY + 0.16;
+              isWestCityMovement &&
+              player.wy < WILDERNESS_FENCE_WY + 0.16 &&
+              player.targetWy > WILDERNESS_FENCE_WY + 0.16;
             let activeTargetWx = player.targetWx;
             let activeTargetWy = player.targetWy;
             if (canEnterWilderness && (isCrossingFenceNorth || isCrossingFenceSouth)) {
@@ -4281,6 +5262,31 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               } else {
                 activeTargetWx = 0.0;
                 activeTargetWy = isCrossingFenceNorth ? WILDERNESS_FENCE_WY - 0.24 : WILDERNESS_FENCE_WY + 0.24;
+              }
+            }
+
+            // Route avatar smoothly across the single wooden footbridge over the river at wy = 0.0 (spanning wx: 6.82..8.28)
+            const needsCrossBridgeEast = player.wx < 8.55 && player.targetWx >= 8.25;
+            const needsCrossBridgeWest = player.wx > 6.65 && player.targetWx <= 6.85;
+            if (needsCrossBridgeEast) {
+              if (player.wx < 6.55) {
+                // Tahap 1: Sejajarkan ke pintu masuk jembatan sisi barat
+                activeTargetWx = 6.55;
+                activeTargetWy = 0.0;
+              } else {
+                // Tahap 2: Menyeberangi jembatan lurus di wy = 0.0 sampai tiba di daratan timur
+                activeTargetWx = 8.65;
+                activeTargetWy = 0.0;
+              }
+            } else if (needsCrossBridgeWest) {
+              if (player.wx > 8.55) {
+                // Tahap 1: Sejajarkan ke pintu masuk jembatan sisi timur
+                activeTargetWx = 8.55;
+                activeTargetWy = 0.0;
+              } else {
+                // Tahap 2: Menyeberangi jembatan lurus di wy = 0.0 sampai tiba di daratan barat
+                activeTargetWx = 6.45;
+                activeTargetWy = 0.0;
               }
             }
 
@@ -4355,11 +5361,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 player.isMoving = false;
                 player.isRunning = false;
                 player.speed = 0.88;
-                player.walkFrame = 0;
               }
             }
           }
           }
+
+          // Safety clamp: avatar can NEVER step off the ground tiles into the void
+          player.wx = Math.max(-8.15, Math.min(18.15, player.wx));
+          player.wy = Math.max(-13.90, Math.min(8.10, player.wy));
 
           if (player.isMoving) {
             const faceDx = player.targetWx - player.wx;
@@ -4512,10 +5521,29 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const [bx, , by] = b.position;
             // Avoid triggering Balai Kota when walking behind it toward Pohon Beringin
             if (b.id === 'balai_kota' && player.wy < -4.65) continue;
-            const bDist = Math.hypot(player.wx - bx, player.wy - by);
-            const threshold = b.id === 'monumen_warga' ? 1.45 : 1.75;
-            if (bDist < threshold) {
+            let isNear = false;
+            if (b.id === 'pencakar_langit') {
+              isNear = player.wx >= 10.5 && player.wx <= 17.5 && player.wy >= -11.5 && player.wy <= -7.5;
+            } else if (b.id === 'bandara') {
+              isNear = player.wx >= 8.5 && player.wx <= 13.0 && player.wy >= -13.5 && player.wy <= -9.8;
+            } else {
+              const bDist = Math.hypot(player.wx - bx, player.wy - by);
+              const threshold = b.id === 'monumen_warga' ? 1.45 : 1.75;
+              isNear = bDist < threshold;
+            }
+            if (isNear) {
               touchedBuilding = b;
+              break;
+            }
+          }
+        }
+
+        let touchedCreatorBuilding: CreatorBuildingItem | null = null;
+        if (!touchedBuilding && !isNearBeringinSpot && !isNearRulesSpot && !isNearAnnBoardSpot && !isNearWismaSpot && !isNearLiteracySpot) {
+          for (const cb of creatorStateRef.current.customBuildings || []) {
+            const cbDist = Math.hypot(player.wx - cb.wx, player.wy - cb.wy);
+            if (cbDist < 1.65 * (cb.scale || 1)) {
+              touchedCreatorBuilding = cb;
               break;
             }
           }
@@ -4539,6 +5567,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               icon: '☕',
             });
           }
+        } else if (touchedCreatorBuilding) {
+          if (lastTouchedIdRef.current !== touchedCreatorBuilding.id) {
+            lastTouchedIdRef.current = touchedCreatorBuilding.id;
+            sounds.playClick();
+            setPendingConfirmation({
+              type: 'creator_building',
+              id: touchedCreatorBuilding.id,
+              name: touchedCreatorBuilding.name,
+              tagline: touchedCreatorBuilding.tagline,
+              icon: touchedCreatorBuilding.icon,
+            });
+          }
         } else if (touchedBuilding) {
           if (lastTouchedIdRef.current !== touchedBuilding.id) {
             lastTouchedIdRef.current = touchedBuilding.id;
@@ -4559,10 +5599,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (prevId === 'cafe') {
             if (cafeDist > 2.05) away = true;
           } else {
-            const prevB = BUILDINGS_INFO.find((b) => b.id === prevId);
-            if (prevB) {
-              const d = Math.hypot(player.wx - prevB.position[0], player.wy - prevB.position[2]);
-              if (d > 2.15 || (prevB.id === 'balai_kota' && player.wy < -4.65)) away = true;
+            const prevCb = (creatorStateRef.current.customBuildings || []).find((c) => c.id === prevId);
+            if (prevCb) {
+              if (Math.hypot(player.wx - prevCb.wx, player.wy - prevCb.wy) > 2.05 * (prevCb.scale || 1)) {
+                away = true;
+              }
+            } else {
+              const prevB = BUILDINGS_INFO.find((b) => b.id === prevId);
+              if (prevB) {
+                if (prevB.id === 'pencakar_langit') {
+                  if (player.wx < 9.8 || player.wx > 18.2 || player.wy < -12.2 || player.wy > -7.0) away = true;
+                } else if (prevB.id === 'bandara') {
+                  if (player.wx < 8.0 || player.wx > 13.5 || player.wy < -14.0 || player.wy > -9.2) away = true;
+                } else {
+                  const d = Math.hypot(player.wx - prevB.position[0], player.wy - prevB.position[2]);
+                  if (d > 2.15 || (prevB.id === 'balai_kota' && player.wy < -4.65)) away = true;
+                }
+              }
             }
           }
           if (away) {
@@ -5214,30 +6267,113 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       }
 
       // ---------------------------------------------------------
-      // 2. ISOMETRIC PLATFORM (+6 NORTHERN EXPANSION), POLYGONAL TAPERING BROWN CLIFF,
+      // 2. ISOMETRIC PLATFORM (+8 EASTERN SIDEWAYS EXPANSION), POLYGONAL TAPERING BROWN CLIFF,
       //    GUNUNG TINGGI BERPEPOHONAN, HUTAN BELANTARA, DANAU PUSAT & LONG FLOWING RIVER
       // ---------------------------------------------------------
-      const GRID_RADIUS = 8; // -8 to +8 base tiles, expanded +6 northward to -14
-      const northGridMin = -GRID_RADIUS - NORTH_EXPANSION_TILES; // -14
+      const GRID_RADIUS = 8; // -8 to +8 base tiles
+      const northGridMin = -GRID_RADIUS - NORTH_EXPANSION_TILES; // -14 (behind mountains)
       const edgeLim = GRID_RADIUS + 0.5; // 8.5
       const northEdgeLim = northGridMin - 0.5; // -14.5
-      const rightEdgeSpan = edgeLim - northEdgeLim; // 23.0 tiles along eastern cliff
+      const farBankEdgeLim = 18.5; // Tepat di ujung luar grid Refleksia Timur (gx: 9..18, wx: 8.5 s/d 18.5)
+      const farBankEdgeSpan = edgeLim - northEdgeLim; // 23.0 tiles along far bank eastern cliff
 
       // ---------------------------------------------------------
-      // 2A. BONGKAHAN BATU TEBING POLIGONAL BERSUDUT MERUNCING KE BAWAH
+      // 2A. BONGKAHAN BATU TEBING POLIGONAL BERSUDUT MENGERUCUT KE BAWAH
       //     (Tekstur Tanah & Batuan Geometris Warna Cokelat di Bawah Peta
-      //      + Animasi Melayang Halus / Floating Mengikuti Tema Awan)
+      //      Berbentuk Kerucut Terbalik Meruncing Tajam / Mengerucut ke Bawah
+      //      + EFEK MENGAPUNG / FLOATING SKY-ISLAND DENGAN AWAN BAWAH & BAYANGAN TANAH)
       // ---------------------------------------------------------
       ctx.save();
       const zCliff = zoomLevelRef.current;
 
-      // Slow, gentle floating/breathing wave for the lower cliff mass (sky-island levitation effect)
-      const cliffFloatBase = Math.sin(elapsed * 1.25) * 4.8;
-      const cliffSwayX = Math.cos(elapsed * 0.95) * 0.08;
-      const cliffSwayY = Math.sin(elapsed * 0.95) * 0.08;
+      // Solid, stationary base for the lower cliff mass (no floating/bobbing motion per user request)
+      const cliffFloatBase = 0;
+      const cliffSwayX = 0;
+      const cliffSwayY = 0;
 
       // Helper to project 3D cliff vertices (wx, wy, negative altitude)
       const cPt = (wx: number, wy: number, alt: number) => toScreen(wx, wy, alt, camera.x, camera.y);
+
+      // --- EFEK PULAU MELAYANG: Bayangan Statis Pulau di Bawah (Distant Island Ground Shadow) ---
+      // Menjangkau seluruh bentang pulau melayang (wx: -8.5..18.5, wy: -14.5..8.5)
+      {
+        const shadowCenter = toScreen(5.0, -3.0, -420, camera.x, camera.y);
+        const shadowPulse = 1.0;
+
+        // 1A. Outer Broad Ambient Falloff Shadow (covers entire expanded island footprint)
+        ctx.fillStyle = isNight ? 'rgba(2, 6, 23, 0.28)' : 'rgba(15, 23, 42, 0.18)';
+        ctx.beginPath();
+        ctx.ellipse(
+          shadowCenter.x,
+          shadowCenter.y + 45 * zCliff,
+          360 * zCliff * shadowPulse,
+          130 * zCliff * shadowPulse,
+          -0.12,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+
+        // 1B. Mid-Level Island Silhouette Shadow
+        ctx.fillStyle = isNight ? 'rgba(2, 6, 23, 0.45)' : 'rgba(15, 23, 42, 0.30)';
+        ctx.beginPath();
+        ctx.ellipse(
+          shadowCenter.x,
+          shadowCenter.y + 40 * zCliff,
+          255 * zCliff * shadowPulse,
+          92 * zCliff * shadowPulse,
+          -0.12,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+
+        // 1C. Inner Darker Shadow Core directly beneath the central conical needle tip
+        ctx.fillStyle = isNight ? 'rgba(2, 6, 23, 0.62)' : 'rgba(15, 23, 42, 0.46)';
+        ctx.beginPath();
+        ctx.ellipse(
+          shadowCenter.x,
+          shadowCenter.y + 35 * zCliff,
+          125 * zCliff * shadowPulse,
+          46 * zCliff * shadowPulse,
+          -0.12,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+
+      // --- EFEK MENGAPUNG 2: Gumpalan Awan Melayang Mengelilingi Batu Tebing Bawah (Floating Ethereal Cloud Strata) ---
+      // Menyelimuti seluruh tepian bawah tebing: Barat, Selatan, Refleksia Timur, Belakang Gunung/Gedung, & Puncak Kerucut Bawah
+      {
+        const underClouds = [
+          // Awan Latar Belakang Jauh di Utara Belakang Pegunungan (Ambient background haze behind mountains)
+          { wx: 1.5, wy: -13.8, alt: -270, rx: 96, ry: 32, spd: 0.25, phase: 4.1 },
+          { wx: -6.5, wy: -11.5, alt: -230, rx: 86, ry: 29, spd: 0.27, phase: 2.8 },
+          { wx: 12.5, wy: -13.5, alt: -240, rx: 88, ry: 28, spd: 0.21, phase: 1.2 },
+        ];
+
+        for (const uc of underClouds) {
+          const driftX = Math.sin(elapsed * uc.spd + uc.phase) * 16 * zCliff;
+          const driftY = Math.cos(elapsed * (uc.spd * 0.8) + uc.phase) * 6 * zCliff;
+          const bobAlt = uc.alt + Math.sin(elapsed * 1.5 + uc.phase) * 7.5;
+          const cp = cPt(uc.wx, uc.wy, bobAlt);
+          const cx = cp.x + driftX;
+          const cy = cp.y + driftY;
+
+          const cAlpha = isNight ? 0.38 : 0.62;
+          ctx.fillStyle = isNight ? `rgba(30, 41, 59, ${cAlpha})` : `rgba(255, 255, 255, ${cAlpha})`;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, uc.rx * zCliff, uc.ry * zCliff, -0.08, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Soft bright white cloud crown on each puff
+          ctx.fillStyle = isNight ? 'rgba(71, 85, 105, 0.45)' : 'rgba(255, 255, 255, 0.85)';
+          ctx.beginPath();
+          ctx.ellipse(cx - 8 * zCliff, cy - 4 * zCliff, uc.rx * 0.55 * zCliff, uc.ry * 0.55 * zCliff, -0.05, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
 
       const fillCliffPoly = (
         pts: Array<{ x: number; y: number }>,
@@ -5261,309 +6397,257 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       };
 
-      // 8-segment division along Left-Front Edge (wx: -8.5 -> +8.5 at wy = +8.5)
-      // and 8-segment division along Right-Front Edge (wy: +8.5 -> -14.5 at wx = +8.5)
-      const leftSoilAlt = [-14, -20, -17, -24, -19, -26, -22, -28, -26];
-      const leftMidAlt = [-48, -74, -62, -98, -86, -124, -112, -148, -142];
-      const leftMidIn = [0.25, 0.55, 0.35, 0.85, 0.65, 1.15, 0.95, 1.35, 1.25];
-      const leftPeakAlt = [-82, -128, -105, -168, -144, -202, -178, -226, -252];
+      // =========================================================================
+      // 2A. UNIFIED MONOLITHIC FLOATING ISLAND LOW-POLY ROCK BASE
+      // Refleksia City & Refleksia Timur are unified into ONE single continuous rock mass
+      // exactly matching reference image (Cuplikan layar) with warm sunlit caramel/sienna on left,
+      // deep espresso/umber shadows on right, and a sharp central inverted conical apex.
+      // Bagian bawah pulau STATIS (tidak bergerak) dan bagian bawah timur memiliki relief
+      // poligonal bertingkat (multi-tier 3D facets & intermediate keel) sehingga menyatu dan TIDAK FLAT.
+      // =========================================================================
+      const islandCenterWx = (-edgeLim + farBankEdgeLim) * 0.5; // wx = 5.0 (Pusat geometris seluruh pulau)
+      const islandCenterWy = (edgeLim + northEdgeLim) * 0.5;    // wy = -3.0 (Pusat geometris seluruh pulau)
 
-      const rightSoilAlt = [-26, -24, -27, -21, -25, -19, -22, -17, -14];
-      const rightMidAlt = [-142, -136, -118, -128, -96, -104, -74, -64, -46];
-      const rightMidIn = [1.25, 1.30, 0.95, 1.10, 0.72, 0.85, 0.52, 0.42, 0.25];
-      const rightPeakAlt = [-252, -218, -184, -198, -152, -162, -116, -96, -78];
+      // Single Unified Inverted Conical Spire Apex (Statis, tanpa goyangan)
+      const apexWx = islandCenterWx;
+      const apexWy = islandCenterWy;
+      const deepApexAlt = -345;
+      const centerApex = cPt(apexWx, apexWy, deepApexAlt);
+      const needleTip = cPt(apexWx, apexWy, deepApexAlt - 48);
 
-      // Sunlit warm brown & bronze-sienna palette (Left-Front) & Shaded deep umber-cocoa palette (Right-Front)
-      const soilColorsLeft = isNight
-        ? ['#451a03', '#52250a', '#3e1a06', '#451a03']
-        : ['#92400e', '#854d0e', '#78350f', '#9a3412'];
-      const soilColorsRight = isNight
-        ? ['#2d1204', '#3b1506', '#270f03', '#331405']
-        : ['#65320d', '#52250a', '#5c280b', '#451a03'];
+      // Palet warna batuan tebing bersudut (Disampling persis dari gambar referensi)
+      // Sisi Kiri / Terang Matahari (Sunlit warm caramel & golden sienna)
+      const rockColorsLeft = isNight
+        ? ['#4a2612', '#3e1e0a', '#341808', '#2a1105', '#42200d']
+        : ['#9e643b', '#8d5a34', '#7d4d2a', '#6e4122', '#86512c'];
 
-      const rockColorsLeftUpper = isNight
-        ? ['#52250a', '#451a03', '#5c280b', '#3e1a06', '#4a1d05']
-        : ['#b45309', '#9a3412', '#a16207', '#854d0e', '#92400e'];
-      const rockColorsLeftLower = isNight
-        ? ['#3b1506', '#2d1204', '#451a03', '#230d03']
-        : ['#78350f', '#65320d', '#713f12', '#52250a'];
+      // Sisi Tengah / Prow Transisi (Rich cocoa & sienna transition)
+      const rockColorsCenter = isNight
+        ? ['#2c1205', '#240d03', '#1c0902', '#150601', '#281106']
+        : ['#63391c', '#562f16', '#4c2811', '#3f1f0c', '#5a3118'];
 
-      const rockColorsRightUpper = isNight
-        ? ['#3b1506', '#2d1204', '#331405', '#230d03', '#2a1004']
-        : ['#78350f', '#65320d', '#5c280b', '#713f12', '#52250a'];
-      const rockColorsRightLower = isNight
-        ? ['#230d03', '#1a0902', '#2a1004', '#140701']
-        : ['#451a03', '#3b1506', '#52250a', '#2d1204'];
+      // Sisi Kanan / Bayangan Refleksia Timur (Deep roasted umber, espresso & chocolate)
+      const rockColorsRight = isNight
+        ? ['#1f0a03', '#170702', '#110401', '#0a0201', '#240e04']
+        : ['#442310', '#3b1d0b', '#2e1507', '#220e04', '#170902'];
 
-      const facetStrokeLeft = isNight ? 'rgba(15, 23, 42, 0.55)' : 'rgba(69, 26, 3, 0.45)';
-      const facetStrokeRight = isNight ? 'rgba(9, 13, 22, 0.65)' : 'rgba(45, 18, 4, 0.55)';
+      // Highlight aksen batuan timur agar timbul dan bervolume 3D (tidak flat)
+      const rockHighlightsRight = isNight
+        ? ['#2f1406', '#260f04', '#1d0a02']
+        : ['#582e14', '#4e2710', '#421f0b'];
 
-      const deepApexAlt = -268 + cliffFloatBase * 1.35;
-      const deepCenterApex = cPt(edgeLim - 1.2 + cliffSwayX, edgeLim - 1.2 + cliffSwayY, deepApexAlt);
+      // Warna kerak tanah atas
+      const soilColorLeft = isNight ? '#42200d' : '#8a4f26';
+      const soilColorCenter = isNight ? '#2e1407' : '#613317';
+      const soilColorRight = isNight ? '#1e0b03' : '#441e0b';
 
-      // 1) Draw Left-Front Polygonal Cliff Face (wx from -8.5 to +8.5 at wy = +8.5)
-      for (let i = 0; i < 8; i++) {
-        const wx0 = -edgeLim + i * (17 / 8);
-        const wx1 = -edgeLim + (i + 1) * (17 / 8);
+      const facetStrokeLeft = isNight ? 'rgba(25, 10, 4, 0.65)' : 'rgba(55, 25, 10, 0.45)';
+      const facetStrokeRight = isNight ? 'rgba(12, 5, 2, 0.78)' : 'rgba(40, 16, 6, 0.55)';
+
+      // -----------------------------------------------------------------------
+      // 1) FRONT FACET STRIP (wy = edgeLim 8.5, dari wx: -8.5 s/d 18.5 = 27 units wide)
+      // -----------------------------------------------------------------------
+      const numFrontSegs = 10;
+      const frontTotalSpan = farBankEdgeLim - (-edgeLim); // 27.0
+      const frontMidAlt = [-115, -145, -130, -165, -155, -162, -150, -158, -142, -125, -112];
+      const frontProjWy = [0.36, 0.52, 0.44, 0.62, 0.68, 0.65, 0.58, 0.54, 0.46, 0.38, 0.32];
+      const frontSoilAlt = [-24, -28, -26, -32, -34, -33, -30, -28, -26, -24, -22];
+
+      for (let i = 0; i < numFrontSegs; i++) {
+        const wx0 = -edgeLim + i * (frontTotalSpan / numFrontSegs);
+        const wx1 = -edgeLim + (i + 1) * (frontTotalSpan / numFrontSegs);
         const wxMid = (wx0 + wx1) * 0.5;
-
-        const segWave0 = Math.sin(elapsed * 1.45 + i * 0.6) * 2.6;
-        const segWave1 = Math.sin(elapsed * 1.45 + (i + 1) * 0.6) * 2.6;
-        const peakWave = cliffFloatBase + Math.sin(elapsed * 1.65 + i * 0.85) * 4.2;
 
         const top0 = cPt(wx0, edgeLim, 0);
         const top1 = cPt(wx1, edgeLim, 0);
-        const soil0 = cPt(wx0, edgeLim, leftSoilAlt[i] + segWave0 * 0.25);
-        const soil1 = cPt(wx1, edgeLim, leftSoilAlt[i + 1] + segWave1 * 0.25);
+        const soil0 = cPt(wx0, edgeLim + 0.12, frontSoilAlt[i]);
+        const soil1 = cPt(wx1, edgeLim + 0.12, frontSoilAlt[i + 1]);
 
-        const mid0 = cPt(
-          wx0 + leftMidIn[i] * 0.35 + cliffSwayX * 0.4,
-          edgeLim - leftMidIn[i] * 0.45 + cliffSwayY * 0.4,
-          leftMidAlt[i] + cliffFloatBase * 0.65 + segWave0
-        );
-        const mid1 = cPt(
-          wx1 + leftMidIn[i + 1] * 0.35 + cliffSwayX * 0.4,
-          edgeLim - leftMidIn[i + 1] * 0.45 + cliffSwayY * 0.4,
-          leftMidAlt[i + 1] + cliffFloatBase * 0.65 + segWave1
-        );
+        const mid0 = cPt(wx0, edgeLim + frontProjWy[i], frontMidAlt[i]);
+        const mid1 = cPt(wx1, edgeLim + frontProjWy[i + 1], frontMidAlt[i + 1]);
 
-        const spikeTip = cPt(
-          wxMid + (leftMidIn[i] + leftMidIn[i + 1]) * 0.38 + cliffSwayX * 0.75,
-          edgeLim - (leftMidIn[i] + leftMidIn[i + 1]) * 0.55 + cliffSwayY * 0.75,
-          leftPeakAlt[i + 1] + peakWave
-        );
+        // Palet warna sesuai posisi dan pencahayaan matahari
+        let soilCol = soilColorLeft;
+        let rockMidA = rockColorsLeft[i % rockColorsLeft.length];
+        let rockMidB = rockColorsLeft[(i + 1) % rockColorsLeft.length];
+        let rockLow = rockColorsLeft[(i + 2) % rockColorsLeft.length];
+        let strokeCol = facetStrokeLeft;
 
-        // Deep inner core triangle connecting to central bottom spire (ensures continuous tapering mass)
-        fillCliffPoly(
-          [mid0, mid1, deepCenterApex],
-          rockColorsLeftLower[(i + 1) % rockColorsLeftLower.length],
-          facetStrokeLeft,
-          0.8
-        );
+        if (wxMid > 8.0) {
+          // Bawah Refleksia Timur: Facet gelap bertekstur 3D bertingkat
+          soilCol = soilColorRight;
+          rockMidA = rockColorsRight[i % rockColorsRight.length];
+          rockMidB = rockHighlightsRight[(i + 1) % rockHighlightsRight.length];
+          rockLow = rockColorsRight[(i + 2) % rockColorsRight.length];
+          strokeCol = facetStrokeRight;
+        } else if (wxMid >= 3.0) {
+          soilCol = soilColorCenter;
+          rockMidA = rockColorsCenter[i % rockColorsCenter.length];
+          rockMidB = rockColorsCenter[(i + 1) % rockColorsCenter.length];
+          rockLow = rockColorsCenter[(i + 2) % rockColorsCenter.length];
+          strokeCol = facetStrokeLeft;
+        }
 
-        // Lower tapering jagged spike triangles (Meruncing ke bawah)
-        fillCliffPoly(
-          [mid0, mid1, spikeTip],
-          rockColorsLeftLower[i % rockColorsLeftLower.length],
-          facetStrokeLeft,
-          0.95
-        );
-        fillCliffPoly(
-          [mid1, deepCenterApex, spikeTip],
-          rockColorsLeftLower[(i + 2) % rockColorsLeftLower.length],
-          facetStrokeLeft,
-          0.85
-        );
+        // Lapisan tanah cokelat atas
+        fillCliffPoly([top0, top1, soil1, soil0], soilCol, strokeCol, 0.85);
 
-        // Upper geometric rock facets (split quad into 2 crisp low-poly triangles)
-        fillCliffPoly(
-          [soil0, soil1, mid0],
-          rockColorsLeftUpper[i % rockColorsLeftUpper.length],
-          facetStrokeLeft,
-          0.95
-        );
-        fillCliffPoly(
-          [soil1, mid1, mid0],
-          rockColorsLeftUpper[(i + 2) % rockColorsLeftUpper.length],
-          facetStrokeLeft,
-          0.95
-        );
+        // Undakan batu poligonal tengah
+        fillCliffPoly([soil0, soil1, mid1], rockMidA, strokeCol, 1.0);
+        fillCliffPoly([soil0, mid1, mid0], rockMidB, strokeCol, 1.0);
 
-        // Top earthen soil crust (Tekstur Tanah Cokelat)
-        fillCliffPoly(
-          [top0, top1, soil1, soil0],
-          soilColorsLeft[i % soilColorsLeft.length],
-          facetStrokeLeft,
-          0.85
-        );
+        // Jika di bawah Refleksia Timur (i >= 5), tambahkan rusuk penopang intermediate agar tidak flat
+        if (i >= 5) {
+          const frontKeelX = wxMid * 0.72 + apexWx * 0.28;
+          const frontKeelY = edgeLim * 0.65 + apexWy * 0.35;
+          const frontKeelAlt = -240 - (i - 5) * 8;
+          const frontKeel = cPt(frontKeelX, frontKeelY, frontKeelAlt);
 
-        // Geometric soil strata & pebble details on earthen crust
-        ctx.fillStyle = isNight ? '#78350f' : '#b45309';
-        ctx.beginPath();
-        ctx.arc(
-          (top0.x + soil1.x) * 0.5,
-          (top0.y + soil1.y) * 0.5,
-          1.8 * zCliff,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
+          // Segitiga undakan intermediate bawah timur
+          fillCliffPoly([mid0, mid1, frontKeel], rockHighlightsRight[i % rockHighlightsRight.length], strokeCol, 1.05);
+          fillCliffPoly([mid0, frontKeel, centerApex], rockLow, strokeCol, 1.1);
+          fillCliffPoly([mid1, centerApex, frontKeel], rockColorsRight[(i + 3) % rockColorsRight.length], strokeCol, 1.1);
+        } else {
+          // Bidang utama bawah pulau barat langsung mengerucut ke puncak pusat
+          fillCliffPoly([mid0, mid1, centerApex], rockLow, strokeCol, 1.1);
+        }
+
+        // Puncak jarum pusat di tengah pulau (i === 4 & 5)
+        if (i === 4) {
+          fillCliffPoly([mid0, needleTip, centerApex], rockColorsCenter[2], strokeCol, 1.0);
+        } else if (i === 5) {
+          fillCliffPoly([mid1, centerApex, needleTip], rockColorsCenter[3], strokeCol, 1.0);
+        }
       }
 
-      // 2) Draw Right-Front Polygonal Cliff Face (wy from +8.5 to -14.5 at wx = +8.5)
-      for (let i = 0; i < 8; i++) {
-        const wy0 = edgeLim - i * (rightEdgeSpan / 8);
-        const wy1 = edgeLim - (i + 1) * (rightEdgeSpan / 8);
-        const wyMid = (wy0 + wy1) * 0.5;
+      // -----------------------------------------------------------------------
+      // 2) EAST FLANK FACET STRIP (wx = farBankEdgeLim 18.5, wy: 8.5 s/d -14.5 = 23.0 units)
+      //    PENGUBAHAN BESAR: Membentuk lereng batuan timur bertingkat 4-tier (Upper Shelf,
+      //    Mid Knuckle, Intermediate Keel, & Deep Apex) dengan tonjolan 3D dramatis (+1.2..2.6)
+      //    sehingga menyatu kokoh dengan puncak pusat dan KELIHATAN SANGAT 3D (TIDAK FLAT!).
+      // -----------------------------------------------------------------------
+      const numEastSegs = 9;
+      const eastTotalSpan = edgeLim - northEdgeLim; // 23.0
+      const eastSoilAlt = [-26, -30, -32, -28, -25, -22, -20, -18, -16, -14];
+      // Tier 1: Undakan atas menonjol keluar (+0.8..1.4)
+      const eastShelfProjWx = [0.95, 1.35, 1.55, 1.40, 1.20, 1.00, 0.85, 0.68, 0.52, 0.40];
+      const eastShelfAlt = [-86, -98, -104, -98, -90, -82, -75, -68, -60, -52];
+      // Tier 2: Buku batuan poligonal besar yang menonjol kuat (+1.6..2.6)
+      const eastMidProjWx = [1.70, 2.35, 2.65, 2.40, 2.10, 1.75, 1.45, 1.15, 0.90, 0.70];
+      const eastMidAlt = [-158, -182, -196, -184, -168, -150, -134, -118, -102, -85];
+      // Tier 3: Rusuk intermediate bawah Refleksia Timur (Punggungan batu di kedalaman -240..-285)
+      const eastKeelWx = [13.2, 13.8, 14.2, 13.6, 12.8, 11.8, 10.5, 9.2, 7.8, 6.5];
+      const eastKeelAlt = [-245, -265, -280, -275, -268, -260, -255, -250, -245, -240];
 
-        const segWave0 = Math.cos(elapsed * 1.45 + i * 0.6) * 2.6;
-        const segWave1 = Math.cos(elapsed * 1.45 + (i + 1) * 0.6) * 2.6;
-        const peakWave = cliffFloatBase + Math.cos(elapsed * 1.65 + i * 0.85) * 4.2;
+      for (let j = 0; j < numEastSegs; j++) {
+        const wy0 = edgeLim - j * (eastTotalSpan / numEastSegs);
+        const wy1 = edgeLim - (j + 1) * (eastTotalSpan / numEastSegs);
 
-        const top0 = cPt(edgeLim, wy0, 0);
-        const top1 = cPt(edgeLim, wy1, 0);
-        const soil0 = cPt(edgeLim, wy0, rightSoilAlt[i] + segWave0 * 0.25);
-        const soil1 = cPt(edgeLim, wy1, rightSoilAlt[i + 1] + segWave1 * 0.25);
+        const top0 = cPt(farBankEdgeLim, wy0, 0);
+        const top1 = cPt(farBankEdgeLim, wy1, 0);
+        const soil0 = cPt(farBankEdgeLim + 0.15, wy0, eastSoilAlt[j]);
+        const soil1 = cPt(farBankEdgeLim + 0.15, wy1, eastSoilAlt[j + 1]);
 
-        const mid0 = cPt(
-          edgeLim - rightMidIn[i] * 0.45 + cliffSwayX * 0.4,
-          wy0 - rightMidIn[i] * 0.35 + cliffSwayY * 0.4,
-          rightMidAlt[i] + cliffFloatBase * 0.65 + segWave0
-        );
-        const mid1 = cPt(
-          edgeLim - rightMidIn[i + 1] * 0.45 + cliffSwayX * 0.4,
-          wy1 - rightMidIn[i + 1] * 0.35 + cliffSwayY * 0.4,
-          rightMidAlt[i + 1] + cliffFloatBase * 0.65 + segWave1
-        );
+        // Tier 1 Shelf
+        const shelf0 = cPt(farBankEdgeLim + eastShelfProjWx[j], wy0, eastShelfAlt[j]);
+        const shelf1 = cPt(farBankEdgeLim + eastShelfProjWx[j + 1], wy1, eastShelfAlt[j + 1]);
 
-        const spikeTip = cPt(
-          edgeLim - (rightMidIn[i] + rightMidIn[i + 1]) * 0.55 + cliffSwayX * 0.75,
-          wyMid - (rightMidIn[i] + rightMidIn[i + 1]) * 0.38 + cliffSwayY * 0.75,
-          rightPeakAlt[i] + peakWave
-        );
+        // Tier 2 Mid Buttress Knuckle
+        const mid0 = cPt(farBankEdgeLim + eastMidProjWx[j], wy0, eastMidAlt[j]);
+        const mid1 = cPt(farBankEdgeLim + eastMidProjWx[j + 1], wy1, eastMidAlt[j + 1]);
 
-        // Deep inner core triangle connecting to central bottom spire
-        fillCliffPoly(
-          [mid0, mid1, deepCenterApex],
-          rockColorsRightLower[(i + 1) % rockColorsRightLower.length],
-          facetStrokeRight,
-          0.8
-        );
+        // Tier 3 Intermediate Keel Ridge
+        const keel0 = cPt(eastKeelWx[j], wy0 * 0.72 + apexWy * 0.28, eastKeelAlt[j]);
+        const keel1 = cPt(eastKeelWx[j + 1], wy1 * 0.72 + apexWy * 0.28, eastKeelAlt[j + 1]);
 
-        // Lower tapering jagged spike triangles (Meruncing ke bawah)
-        fillCliffPoly(
-          [mid0, mid1, spikeTip],
-          rockColorsRightLower[i % rockColorsRightLower.length],
-          facetStrokeRight,
-          0.95
-        );
-        fillCliffPoly(
-          [mid0, spikeTip, deepCenterApex],
-          rockColorsRightLower[(i + 2) % rockColorsRightLower.length],
-          facetStrokeRight,
-          0.85
-        );
+        // Variasi warna gelap bergantian untuk menciptakan kontras bayangan 3D nyata
+        const cSoil = soilColorRight;
+        const cShelfA = rockColorsRight[j % rockColorsRight.length];
+        const cShelfB = rockHighlightsRight[j % rockHighlightsRight.length];
+        const cMidA = rockHighlightsRight[(j + 1) % rockHighlightsRight.length];
+        const cMidB = rockColorsRight[(j + 2) % rockColorsRight.length];
+        const cKeelA = rockColorsRight[(j + 3) % rockColorsRight.length];
+        const cKeelB = rockHighlightsRight[(j + 2) % rockHighlightsRight.length];
+        const cDeep = rockColorsRight[(j + 4) % rockColorsRight.length];
 
-        // Upper geometric rock facets (split quad into 2 crisp low-poly triangles)
-        fillCliffPoly(
-          [soil0, soil1, mid1],
-          rockColorsRightUpper[i % rockColorsRightUpper.length],
-          facetStrokeRight,
-          0.95
-        );
-        fillCliffPoly(
-          [soil0, mid1, mid0],
-          rockColorsRightUpper[(i + 2) % rockColorsRightUpper.length],
-          facetStrokeRight,
-          0.95
-        );
+        // 1. Kerak tanah atas
+        fillCliffPoly([top0, top1, soil1, soil0], cSoil, facetStrokeRight, 0.85);
 
-        // Top earthen soil crust (Tekstur Tanah Cokelat)
-        fillCliffPoly(
-          [top0, top1, soil1, soil0],
-          soilColorsRight[i % soilColorsRight.length],
-          facetStrokeRight,
-          0.85
-        );
+        // 2. Undakan atas Tier 1
+        fillCliffPoly([soil0, soil1, shelf1], cShelfA, facetStrokeRight, 0.95);
+        fillCliffPoly([soil0, shelf1, shelf0], cShelfB, facetStrokeRight, 0.95);
+
+        // 3. Tonjolan batuan poligonal Tier 2
+        fillCliffPoly([shelf0, shelf1, mid1], cMidA, facetStrokeRight, 1.05);
+        fillCliffPoly([shelf0, mid1, mid0], cMidB, facetStrokeRight, 1.05);
+
+        // 4. Lereng intermediate menuju punggungan bawah Tier 3
+        fillCliffPoly([mid0, mid1, keel1], cKeelA, facetStrokeRight, 1.1);
+        fillCliffPoly([mid0, keel1, keel0], cKeelB, facetStrokeRight, 1.1);
+
+        // 5. Lereng dalam dari punggungan bawah menyatu ke pusat kerucut utama
+        fillCliffPoly([keel0, keel1, centerApex], cDeep, facetStrokeRight, 1.15);
       }
 
-      // 3) Central Front Spire Ridge Highlight (Sharp Polygonal Central Keel under cornerS)
-      const cTopS = cPt(edgeLim, edgeLim, 0);
-      const cSoilS = cPt(edgeLim, edgeLim, -26 + cliffFloatBase * 0.2);
-      const cMidS = cPt(
-        edgeLim - 0.65 + cliffSwayX * 0.5,
-        edgeLim - 0.65 + cliffSwayY * 0.5,
-        -145 + cliffFloatBase * 0.75
-      );
-      const cMidL = cPt(
-        edgeLim - 1.65 + cliffSwayX * 0.5,
-        edgeLim + cliffSwayY * 0.5,
-        -135 + cliffFloatBase * 0.7
-      );
-      const cMidR = cPt(
-        edgeLim + cliffSwayX * 0.5,
-        edgeLim - 1.65 + cliffSwayY * 0.5,
-        -135 + cliffFloatBase * 0.7
-      );
-      const cApexS = deepCenterApex;
+      // Tonjolan Prow Sudut Tenggara (Corner wx: 18.5, wy: 8.5)
+      // Membentuk prisma batuan 3D yang sangat kokoh di sudut depan timur
+      const seTop = cPt(farBankEdgeLim, edgeLim, 0);
+      const seSoil = cPt(farBankEdgeLim + 0.25, edgeLim + 0.25, -28);
+      const seProw = cPt(farBankEdgeLim + 1.85, edgeLim + 1.25, -165);
+      const seKeel = cPt(14.0, edgeLim * 0.65 + apexWy * 0.35, -250);
 
-      fillCliffPoly(
-        [cSoilS, cMidL, cMidS],
-        isNight ? '#5c280b' : '#b45309',
-        facetStrokeLeft,
-        1.1
-      );
-      fillCliffPoly(
-        [cSoilS, cMidS, cMidR],
-        isNight ? '#3b1506' : '#65320d',
-        facetStrokeRight,
-        1.1
-      );
-      fillCliffPoly(
-        [cMidL, cApexS, cMidS],
-        isNight ? '#451a03' : '#92400e',
-        facetStrokeLeft,
-        1.1
-      );
-      fillCliffPoly(
-        [cMidS, cApexS, cMidR],
-        isNight ? '#270f03' : '#451a03',
-        facetStrokeRight,
-        1.1
-      );
-      // Crisp vertical ridge line on the front-most central spire
-      ctx.strokeStyle = isNight ? 'rgba(251, 191, 36, 0.22)' : 'rgba(254, 243, 199, 0.45)';
-      ctx.lineWidth = 1.2 * zCliff;
+      fillCliffPoly([seSoil, seProw, seKeel], isNight ? '#260f04' : '#4e2710', facetStrokeRight, 1.2);
+      fillCliffPoly([seProw, centerApex, seKeel], isNight ? '#170702' : '#2e1507', facetStrokeRight, 1.2);
+
+      // -----------------------------------------------------------------------
+      // 3) WEST FLANK FACET STRIP (wx = -edgeLim -8.5, wy: 8.5 s/d -14.5)
+      //    Lereng barat bermandikan cahaya matahari cerah karamel-sienna
+      // -----------------------------------------------------------------------
+      const numWestSegs = 7;
+      const westMidAlt = [-115, -140, -152, -140, -125, -108, -88, -70];
+      const westProjWx = [0.38, 0.54, 0.60, 0.52, 0.44, 0.36, 0.28, 0.22];
+      const westSoilAlt = [-24, -28, -26, -24, -21, -18, -16, -14];
+
+      for (let k = 0; k < numWestSegs; k++) {
+        const wy0 = edgeLim - k * (eastTotalSpan / numWestSegs);
+        const wy1 = edgeLim - (k + 1) * (eastTotalSpan / numWestSegs);
+
+        const top0 = cPt(-edgeLim, wy0, 0);
+        const top1 = cPt(-edgeLim, wy1, 0);
+        const soil0 = cPt(-edgeLim - 0.12, wy0, westSoilAlt[k]);
+        const soil1 = cPt(-edgeLim - 0.12, wy1, westSoilAlt[k + 1]);
+
+        const mid0 = cPt(-edgeLim - westProjWx[k], wy0, westMidAlt[k]);
+        const mid1 = cPt(-edgeLim - westProjWx[k + 1], wy1, westMidAlt[k + 1]);
+
+        // Kerak tanah atas
+        fillCliffPoly([top0, top1, soil1, soil0], soilColorLeft, facetStrokeLeft, 0.85);
+
+        // Undakan batu tengah
+        fillCliffPoly([soil0, soil1, mid1], rockColorsLeft[k % rockColorsLeft.length], facetStrokeLeft, 1.0);
+        fillCliffPoly([soil0, mid1, mid0], rockColorsLeft[(k + 1) % rockColorsLeft.length], facetStrokeLeft, 1.0);
+
+        // Bidang bawah menyatu ke puncak pusat
+        fillCliffPoly([mid0, mid1, centerApex], rockColorsLeft[(k + 2) % rockColorsLeft.length], facetStrokeLeft, 1.1);
+      }
+
+      // -----------------------------------------------------------------------
+      // 4) PROMINENT CENTRAL PROW RIDGE LINE (Identik seperti foto referensi)
+      //    Garis rusuk tajam statis membelah sisi terang dan bayangan hingga jarum bawah
+      // -----------------------------------------------------------------------
+      const ridgeTop = cPt(5.0, edgeLim, 0);
+      const ridgeSoil = cPt(5.0, edgeLim + 0.12, -33);
+      const ridgeMid = cPt(5.0, edgeLim + 0.68, -162);
+
+      ctx.strokeStyle = isNight ? 'rgba(251, 191, 36, 0.45)' : 'rgba(254, 243, 199, 0.80)';
+      ctx.lineWidth = 1.7 * zCliff;
       ctx.beginPath();
-      ctx.moveTo(cTopS.x, cTopS.y);
-      ctx.lineTo(cSoilS.x, cSoilS.y);
-      ctx.lineTo(cMidS.x, cMidS.y);
-      ctx.lineTo(cApexS.x, cApexS.y);
+      ctx.moveTo(ridgeTop.x, ridgeTop.y);
+      ctx.lineTo(ridgeSoil.x, ridgeSoil.y);
+      ctx.lineTo(ridgeMid.x, ridgeMid.y);
+      ctx.lineTo(centerApex.x, centerApex.y);
+      ctx.lineTo(needleTip.x, needleTip.y);
       ctx.stroke();
 
-      // 4) Floating Detached Polygonal Cliff Shards (Bongkahan Batu Kecil Melayang di Sekitar Tebing Bawah)
-      const floatingShards = [
-        { wx: -5.4, wy: 8.8, baseAlt: -125, sz: 0.42, spd: 1.7, ph: 0.0 },
-        { wx: -1.6, wy: 8.9, baseAlt: -175, sz: 0.52, spd: 1.4, ph: 1.3 },
-        { wx: 3.2, wy: 8.8, baseAlt: -215, sz: 0.48, spd: 1.9, ph: 2.5 },
-        { wx: 7.4, wy: 8.4, baseAlt: -260, sz: 0.58, spd: 1.3, ph: 3.7 },
-        { wx: 8.8, wy: 4.2, baseAlt: -205, sz: 0.46, spd: 1.6, ph: 0.8 },
-        { wx: 8.9, wy: -1.8, baseAlt: -165, sz: 0.50, spd: 1.5, ph: 2.1 },
-        { wx: 8.8, wy: -8.6, baseAlt: -118, sz: 0.38, spd: 1.8, ph: 4.2 },
-      ];
-      for (const sh of floatingShards) {
-        const bobAlt = sh.baseAlt + Math.sin(elapsed * sh.spd + sh.ph) * 9.5;
-        const sTop = cPt(sh.wx, sh.wy, bobAlt + 12 * sh.sz);
-        const sL = cPt(sh.wx - sh.sz, sh.wy + sh.sz * 0.4, bobAlt);
-        const sM = cPt(sh.wx + sh.sz * 0.2, sh.wy + sh.sz * 0.2, bobAlt - 5 * sh.sz);
-        const sR = cPt(sh.wx + sh.sz * 0.4, sh.wy - sh.sz, bobAlt);
-        const sBot = cPt(sh.wx, sh.wy, bobAlt - 26 * sh.sz);
-
-        fillCliffPoly(
-          [sTop, sL, sM],
-          isNight ? '#5c280b' : '#b45309',
-          facetStrokeLeft,
-          0.75
-        );
-        fillCliffPoly(
-          [sTop, sM, sR],
-          isNight ? '#3b1506' : '#78350f',
-          facetStrokeRight,
-          0.75
-        );
-        fillCliffPoly(
-          [sL, sBot, sM],
-          isNight ? '#451a03' : '#92400e',
-          facetStrokeLeft,
-          0.75
-        );
-        fillCliffPoly(
-          [sM, sBot, sR],
-          isNight ? '#270f03' : '#451a03',
-          facetStrokeRight,
-          0.75
-        );
-      }
       ctx.restore();
 
       // ---------------------------------------------------------
@@ -5607,6 +6691,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if ((gx === 2 || gx === 3) && gy === -4) return true;
         // Paved corner patio for relocated Toko Roti & Kafe behind Lab DKV at [4..5, 4..5]
         if ((gx === 4 || gx === 5) && (gy === 4 || gy === 5)) return true;
+        // Jalan setapak rapi dari jembatan penyeberangan [8, 0] menuju kawasan Refleksia Timur
+        if (gy === 0 && gx >= 8 && gx <= 11) return true;
         return false;
       };
 
@@ -5757,25 +6843,50 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       const wildernessPathColor = isNight ? '#0e4a2d' : '#4d7c43';
       const wildernessPathBorder = isNight ? '#093a22' : '#3d6735';
 
-      // Draw all isometric base tiles across expanded map (gy: -14..+8, gx: -8..+8)
+      // Draw all isometric base tiles across expanded map (gy: -14..+8, gx: -8..+18)
+      // Expanded +8 grid sideways after the river (gx: 9..18)
       // with a smooth multi-row gradient between City Grass (gy >= -4) and Wilderness Forest (gy <= -11)
       for (let gy = northGridMin; gy <= GRID_RADIUS; gy++) {
         // Smooth S-curve transition factor from 0.0 (City at gy >= -4) to 1.0 (Deep Forest at gy <= -11)
         const rawT = Math.max(0, Math.min(1, (-4.2 - gy) / 6.8));
         const baseForestBlend = rawT * rawT * (3 - 2 * rawT);
 
-        for (let gx = -GRID_RADIUS; gx <= GRID_RADIUS; gx++) {
+        for (let gx = -GRID_RADIUS; gx <= 18; gx++) {
+          // Far bank tiles (gx: 9..18) in Refleksia Timur extend completely from front (gy = 8) to northern mountain border (gy = northGridMin, i.e. -14)
+          // ensuring zero gaps or holes behind the skyscraper row!
+          if (gx > GRID_RADIUS && (gy < northGridMin || gy > GRID_RADIUS)) {
+            continue;
+          }
+
           const pN = toScreen(gx - 0.5, gy - 0.5, 0, camera.x, camera.y);
           const pE = toScreen(gx + 0.5, gy - 0.5, 0, camera.x, camera.y);
           const pS = toScreen(gx + 0.5, gy + 0.5, 0, camera.x, camera.y);
           const pW = toScreen(gx - 0.5, gy + 0.5, 0, camera.x, camera.y);
 
+          // Check if Master Creator Studio painted a custom terrain or road model on this tile
+          const customTile = creatorStateRef.current.terrainTiles?.[`${gx},${gy}`];
+          if (customTile) {
+            drawCustomCreatorTerrainTile(
+              ctx,
+              pN,
+              pE,
+              pS,
+              pW,
+              customTile.terrainType,
+              isNight,
+              currentTime / 1000
+            );
+            continue;
+          }
+
+          const isFarBank = gx >= 9;
           const isRiverZone = (gx === 7 || gx === 8) && gy >= -11;
           const isLakeTile = gx >= 2 && gx <= 7 && gy >= -12 && gy <= -9;
-          const isUnderMountain = gy <= -12;
+          const isBehindMountain = gy <= -14;
           const isRoad = isPathway(gx, gy);
           const isFishingPathTile = isFishingTrail(gx, gy);
-          const isCityRoad = isRoad && !isFishingPathTile;
+          const isCityRoad = isRoad && !isFishingPathTile && !isFarBank;
+          const isFarBankDirtRoad = isFarBank && isRoad;
 
           // Organic per-tile micro-dither so the transition feels natural & hand-crafted
           const checkerShift = (gx + gy) % 2 === 0 ? -0.04 : 0.05;
@@ -5787,15 +6898,39 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           } else if (isCityRoad) {
             ctx.fillStyle = blendHexColor(pathColor, '#e2e8f0', tileBlend * 0.5);
             ctx.strokeStyle = blendHexColor(pathBorder, '#cbd5e1', tileBlend * 0.5);
+          } else if (isFarBankDirtRoad) {
+            // Far Bank rustic dirt road (compacted warm earth & gravel alongside the river)
+            ctx.fillStyle = isNight ? '#65320d' : '#d97706';
+            ctx.strokeStyle = isNight ? '#451a03' : '#b45309';
           } else if (isFishingPathTile) {
-            // Jalan setapak menuju tempat memancing - warna alami tanah berumput (hijau bumi, TIDAK HITAM)
+            // Jalan setapak menuju tempat memancing - warna alami tanah berumput
             ctx.fillStyle = isNight ? '#0e4a2d' : '#4d7c43';
             ctx.strokeStyle = isNight ? '#093a22' : '#3d6735';
+          } else if (isBehindMountain && !isFarBank) {
+            // Alpine Meadow Grass behind mountains: neat, fresh, crisp low-poly grid lines
+            const mtnGrassA = isNight ? '#064e3b' : '#15803d';
+            const mtnGrassB = isNight ? '#043628' : '#166534';
+            ctx.fillStyle = (gx + gy) % 2 === 0 ? mtnGrassA : mtnGrassB;
+            ctx.strokeStyle = isNight ? '#022c22' : '#14532d';
+          } else if (isFarBank && gy <= -11) {
+            // Kawasan Bandara Refleksia Timur (Terminal, Apron Parkir Pesawat, & Landasan Pacu)
+            const isEven = (gx + gy) % 2 === 0;
+            if (gy <= -13) {
+              // Landasan Pacu (Airport Runway Tarmac Asphalt)
+              ctx.fillStyle = isNight ? '#0b1120' : '#1e293b';
+              ctx.strokeStyle = isNight ? '#1e293b' : '#334155';
+            } else {
+              // Apron Parkir Pesawat & Taxiway Tarmac
+              ctx.fillStyle = isNight ? (isEven ? '#111827' : '#0f172a') : (isEven ? '#334155' : '#475569');
+              ctx.strokeStyle = isNight ? '#1e293b' : '#64748b';
+            }
           } else {
-            // SEMUA TANAH DI HUTAN HIJAU SEGAR (emerald & lush forest green, TIDAK ADA HITAM)
+            // SEMUA TANAH DI HUTAN & KOTA HIJAU SEGAR
             const targetForestGrass = (gx + gy) % 2 === 0 ? wildernessGrassColor : wildernessGrassAltColor;
-            const finalGrassColor = blendHexColor(grassColor, targetForestGrass, tileBlend);
-            const finalGrassBorder = blendHexColor(grassBorder, wildernessGrassBorder, tileBlend);
+            const finalGrassColor = isFarBank
+              ? ((gx + gy) % 2 === 0 ? grassColor : blendHexColor(grassColor, '#15803d', 0.15))
+              : blendHexColor(grassColor, targetForestGrass, tileBlend);
+            const finalGrassBorder = isFarBank ? grassBorder : blendHexColor(grassBorder, wildernessGrassBorder, tileBlend);
 
             ctx.fillStyle = finalGrassColor;
             ctx.strokeStyle = finalGrassBorder;
@@ -5809,12 +6944,52 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.lineTo(pW.x, pW.y);
           ctx.closePath();
           ctx.fill();
-          // Hide grid border lines under the mountains (gy <= -12) and inside the lake/river basin
-          if (!isUnderMountain && !isLakeTile) {
+          // Always stroke all land tiles so grid lines are neat, aligned, and distinct
+          if (!isLakeTile) {
             ctx.stroke();
           }
 
-          if (isRiverZone || isLakeTile || isCityRoad) {
+          if (isRiverZone || isLakeTile || isCityRoad || isFarBankDirtRoad) {
+            if (isFarBankDirtRoad) {
+              const pPt = toScreen(gx, gy, 0, camera.x, camera.y);
+              ctx.fillStyle = isNight ? '#451a03' : '#92400e';
+              ctx.beginPath();
+              ctx.arc(pPt.x - 2 * zTile, pPt.y + 1 * zTile, 1.1 * zTile, 0, Math.PI * 2);
+              ctx.arc(pPt.x + 3 * zTile, pPt.y - 1 * zTile, 0.9 * zTile, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            continue;
+          }
+
+          if (isFarBank) {
+            if (gy <= -11) {
+              // Marka Landasan Pacu & Apron Bandara
+              const pPt = toScreen(gx, gy, 0, camera.x, camera.y);
+              if (gy === -13 || gy === -14) {
+                // Garis Putus-putus Putih Tengah Landasan Pacu (Runway Centerline)
+                if (gx % 2 === 0) {
+                  ctx.fillStyle = isNight ? 'rgba(255, 255, 255, 0.75)' : '#ffffff';
+                  ctx.beginPath();
+                  ctx.ellipse(pPt.x, pPt.y, 4.5 * zTile, 1.8 * zTile, 0, 0, Math.PI * 2);
+                  ctx.fill();
+                }
+                // Lampu Tepi Landasan Pacu (Runway Edge Lights)
+                if (gy === -14 && gx % 2 === 1) {
+                  const rEdgePt = toScreen(gx + 0.35, gy - 0.35, 0, camera.x, camera.y);
+                  ctx.fillStyle = isNight ? '#38bdf8' : '#67e8f9';
+                  ctx.beginPath();
+                  ctx.arc(rEdgePt.x, rEdgePt.y, 1.8 * zTile, 0, Math.PI * 2);
+                }
+              }
+            } else {
+              const breeze = Math.sin(elapsed * 2.0 + gx * 0.7 + gy * 0.6) * 0.6 * zTile;
+              if ((gx + gy) % 2 === 0) {
+                drawTidyGrassTuft(gx - 0.22, gy + 0.18, breeze);
+                drawTidyGrassTuft(gx + 0.20, gy - 0.16, breeze);
+              } else if ((gx * 3 + gy) % 4 === 0) {
+                drawTidyFlower(gx + 0.15, gy + 0.15, Math.abs(gx * 3 + gy * 7), 0.85);
+              }
+            }
             continue;
           }
 
@@ -5979,19 +7154,6 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       const snowDeepIce = isNight ? '#64748b' : '#7dd3fc';
       const snowFacetStroke = isNight ? 'rgba(100, 116, 139, 0.45)' : 'rgba(148, 163, 184, 0.32)';
 
-      // 0A) Flat Ground Concealer Skirt on the Horizontal Terrain Plane (alt = 0)
-      //     Hides ground tile seams under the floating island mountain blocks without any vertical wall behind the mountains
-      fillMtnPoly(
-        [
-          mPt(-8.55, -14.55, 0),
-          mPt(8.55, -14.55, 0),
-          mPt(8.55, -11.86, 0),
-          mPt(0, -11.76, 0),
-          mPt(-8.55, -11.86, 0),
-        ],
-        isNight ? '#064e3b' : '#15803d'
-      );
-
       // 0B) Helper: Tiny Stylized Low-Poly 3D Pine Tree on the Mountain Slopes
       const drawTinySlopePine = (wx: number, wy: number, alt: number, scale: number = 1.0, snowTip: boolean = false) => {
         const base = mPt(wx, wy, alt);
@@ -6038,12 +7200,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       };
 
       // 0C) Ground-Level Low-Poly Foothill Turf Apron & Outer Map-Edge Cross-Section Lip
-      // Ensures all 3D Isometric Low-Poly Green Mountains sit flush on the map ground (alt = 0)
-      // and blend organically with the Hutan Belantara grass tiles without any separating wall in front
+      // Ensures all 3D Isometric Low-Poly Green Mountains & Skyscraper Plazas sit flush on the map ground (alt = 0)
+      // and blend organically with the Hutan Belantara & Refleksia Timur grass tiles without any gap or hole behind the map
       {
         const turfNW = mPt(-8.52, -14.52, 0);
-        const turfNE = mPt(8.52, -14.52, 0);
-        const turfSE = mPt(8.52, -11.45, 0);
+        const turfNE = mPt(7.15, -14.52, 0);
+        const turfSE = mPt(7.15, -11.45, 0);
         const turfSMidE = mPt(3.20, -11.30, 0);
         const turfSCenter = mPt(-0.35, -11.18, 0);
         const turfSMidW = mPt(-3.80, -11.32, 0);
@@ -8234,10 +9396,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       // Outer platform border line: ONLY stroke the visible front-left and front-right cliff edges
       // AND break/skip the line across the river waterfall mouth (wx = rivW0 - 0.16 .. rivW1 + 0.16) so NO border line crosses the waterfall!
-      const cornerE_Front = toScreen(GRID_RADIUS + 0.5, -11.92, 0, camera.x, camera.y);
-      const cornerS = toScreen(GRID_RADIUS + 0.5, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
+      const cornerE_FarBank = toScreen(farBankEdgeLim, northEdgeLim, 0, camera.x, camera.y);
+      const cornerS_FarBank = toScreen(farBankEdgeLim, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
       const cornerW = toScreen(-GRID_RADIUS - 0.5, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
-      const cornerW_Front = toScreen(-GRID_RADIUS - 0.5, -11.92, 0, camera.x, camera.y);
+      const cornerW_Front = toScreen(-GRID_RADIUS - 0.5, northEdgeLim, 0, camera.x, camera.y);
       const wfGapLeft = toScreen(rivW0 - 0.16, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
       const wfGapRight = toScreen(rivW1 + 0.16, GRID_RADIUS + 0.5, 0, camera.x, camera.y);
 
@@ -8248,8 +9410,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       ctx.lineTo(cornerW.x, cornerW.y);
       ctx.lineTo(wfGapLeft.x, wfGapLeft.y);
       ctx.moveTo(wfGapRight.x, wfGapRight.y);
-      ctx.lineTo(cornerS.x, cornerS.y);
-      ctx.lineTo(cornerE_Front.x, cornerE_Front.y);
+      ctx.lineTo(cornerS_FarBank.x, cornerS_FarBank.y);
+      ctx.lineTo(cornerE_FarBank.x, cornerE_FarBank.y);
       ctx.stroke();
 
       // Soft Animated Click Destination Ripple on Ground
@@ -8382,7 +9544,16 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             drawRightPost: boolean;
             depth: number;
           }
+        | {
+            type: 'rustic_wood_fence';
+            wx1: number;
+            wy1: number;
+            wx2: number;
+            wy2: number;
+            depth: number;
+          }
         | { type: 'wilderness_gate'; wx: number; wy: number; depth: number }
+        | { type: 'refleksia_timur_sign'; wx: number; wy: number; depth: number }
         | { type: 'lamp'; wx: number; wy: number; depth: number }
         | { type: 'fishing_spot'; wx: number; wy: number; depth: number }
         | { type: 'literacy_corner'; wx: number; wy: number; depth: number }
@@ -8420,13 +9591,86 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             depth: number;
             facingDir?: 1 | -1;
             isWalking?: boolean;
+          }
+        | {
+            type: 'custom_creator_building';
+            building: CreatorBuildingItem;
+            wx: number;
+            wy: number;
+            depth: number;
+          }
+        | {
+            type: 'custom_creator_prop';
+            prop: CreatorPropItem;
+            wx: number;
+            wy: number;
+            depth: number;
+          }
+        | {
+            type: 'custom_creator_animal';
+            animal: CreatorAnimalItem;
+            wx: number;
+            wy: number;
+            depth: number;
+          }
+        | {
+            type: 'custom_creator_fence';
+            fence: CreatorFenceItem;
+            wx: number;
+            wy: number;
+            depth: number;
           };
 
       const drawItems: DrawItem[] = [];
 
       BUILDINGS_INFO.forEach((b) => {
         if (b.id === 'monumen_warga') return; // drawn as fountain
+        if (creatorStateRef.current.existingOverrides?.[b.id]?.isHidden) return;
         drawItems.push({ type: 'building', info: b, depth: b.position[0] + b.position[2] });
+      });
+
+      (creatorStateRef.current.customBuildings || []).forEach((cb) => {
+        drawItems.push({
+          type: 'custom_creator_building',
+          building: cb,
+          wx: cb.wx,
+          wy: cb.wy,
+          depth: cb.wx + cb.wy,
+        });
+      });
+
+      (creatorStateRef.current.customProps || []).forEach((cp) => {
+        drawItems.push({
+          type: 'custom_creator_prop',
+          prop: cp,
+          wx: cp.wx,
+          wy: cp.wy,
+          depth: cp.wx + cp.wy,
+        });
+      });
+
+      (creatorStateRef.current.customAnimals || []).forEach((ca) => {
+        const pose = computeCreatorAnimalLivePose(ca, currentTime, isNight);
+        drawItems.push({
+          type: 'custom_creator_animal',
+          animal: ca,
+          wx: pose.wx,
+          wy: pose.wy,
+          depth: pose.wx + pose.wy,
+        });
+      });
+
+      (creatorStateRef.current.customFences || []).forEach((cf) => {
+        const len = Math.max(1, cf.lengthTiles || 1);
+        const midWx = cf.axis === 'x' ? cf.wx + len * 0.5 : cf.wx;
+        const midWy = cf.axis === 'y' ? cf.wy + len * 0.5 : cf.wy;
+        drawItems.push({
+          type: 'custom_creator_fence',
+          fence: cf,
+          wx: cf.wx,
+          wy: cf.wy,
+          depth: midWx + midWy,
+        });
       });
 
       // 10. Perumahan Guru & Siswa di Belakang Perpustakaan Kampus (Ujung Barat Peta)
@@ -8505,6 +9749,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       });
 
       trees.forEach(([tx, ty], tIdx) => {
+        if (creatorStateRef.current.existingOverrides?.[`tree_${tIdx}`]?.isHidden) return;
         drawItems.push({ type: 'tree', wx: tx, wy: ty, depth: tx + ty, index: tIdx });
       });
 
@@ -8564,6 +9809,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         });
       }
 
+      // Pagar pembatas Hutan Refleksia HANYA ada di sisi barat sungai (wx <= 6.82) dan TIDAK PERNAH sampai ke Refleksia Timur
+      // Sayap pagar kayu minimalis di landing jembatan sisi timur (wx = 8.45)
+      drawItems.push({
+        type: 'rustic_wood_fence',
+        wx1: 8.45,
+        wy1: -0.6,
+        wx2: 8.45,
+        wy2: -1.8,
+        depth: 8.45 - 1.2,
+      });
+      drawItems.push({
+        type: 'rustic_wood_fence',
+        wx1: 8.45,
+        wy1: 0.6,
+        wx2: 8.45,
+        wy2: 1.8,
+        depth: 8.45 + 1.2,
+      });
+
+      // Papan Penanda Kawasan Refleksia Timur di Ujung Jembatan Penyeberangan [wx: 8.95, wy: -1.05]
+      drawItems.push({
+        type: 'refleksia_timur_sign',
+        wx: 8.95,
+        wy: -1.05,
+        depth: 8.95 - 1.05,
+      });
+
       // Gerbang Masuk Hutan Belantara & Danau Pusat di Jalan Belakang Pohon Refleksi (Dijaga @tomi, Khusus Guru)
       drawItems.push({
         type: 'wilderness_gate',
@@ -8608,6 +9880,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       // 3. 8 Minimalist 2-Seater Benches around Central Fountain + 2 Literacy Benches + 2 Campfire Benches
       ALL_TWO_PERSON_BENCHES.forEach((group) => {
+        if (creatorStateRef.current.existingOverrides?.[group.groupId]?.isHidden) return;
         drawItems.push({
           type: 'bench',
           wx: group.wx,
@@ -8620,6 +9893,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       // 5. 2 Tempat Ayunan (Behind Taman Refleksi [-2.8, -4.05] & Taman Timur [2.8, -4.05])
       SWING_STRUCTURES.forEach((st) => {
+        if (creatorStateRef.current.existingOverrides?.[st.id]?.isHidden) return;
         drawItems.push({
           type: 'swings_structure',
           struct: st,
@@ -8630,12 +9904,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       });
 
       // 6. Api Unggun di Atas Rumput [-4.05, 4.15]
-      drawItems.push({
-        type: 'campfire_spot',
-        wx: CAMPFIRE_COORDS.wx,
-        wy: CAMPFIRE_COORDS.wy,
-        depth: CAMPFIRE_COORDS.wx + CAMPFIRE_COORDS.wy,
-      });
+      if (!creatorStateRef.current.existingOverrides?.['campfire']?.isHidden) {
+        drawItems.push({
+          type: 'campfire_spot',
+          wx: CAMPFIRE_COORDS.wx,
+          wy: CAMPFIRE_COORDS.wy,
+          depth: CAMPFIRE_COORDS.wx + CAMPFIRE_COORDS.wy,
+        });
+      }
 
       // 7. Gapura Selamat Datang di Ujung Selatan Peta [0, 6.15]
       drawItems.push({
@@ -11912,6 +13188,53 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.restore();
 
           ctx.restore();
+        } else if (item.type === 'refleksia_timur_sign') {
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          ctx.save();
+
+          // Soft contact shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 1.5 * z, 14 * z, 5.5 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Dual polished timber posts with footings
+          ctx.fillStyle = '#475569';
+          ctx.fillRect(pt.x - 11.5 * z, pt.y - 1.5 * z, 4 * z, 2.5 * z);
+          ctx.fillRect(pt.x + 7.5 * z, pt.y - 1.5 * z, 4 * z, 2.5 * z);
+
+          ctx.fillStyle = isNight ? '#334155' : '#78350f';
+          ctx.fillRect(pt.x - 10.5 * z, pt.y - 25 * z, 2.5 * z, 24 * z);
+          ctx.fillRect(pt.x + 8.2 * z, pt.y - 25 * z, 2.5 * z, 24 * z);
+
+          // Framed modern-rustic signboard
+          const bw = 78 * z;
+          const bh = 17 * z;
+          const bx = pt.x - bw / 2;
+          const by = pt.y - 38 * z;
+
+          ctx.fillStyle = isNight ? '#0f172a' : '#1e293b';
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 1.3 * z;
+          ctx.beginPath();
+          ctx.roundRect(bx, by, bw, bh, 3.5 * z);
+          ctx.fill();
+          ctx.stroke();
+
+          // Header Text
+          ctx.font = `bold ${Math.max(5, Math.round(5.8 * z))}px sans-serif`;
+          ctx.fillStyle = '#38bdf8';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🏙️ REFLEKSIA TIMUR', pt.x, by + bh * 0.38);
+
+          // Subtitle Text
+          ctx.font = `${Math.max(4, Math.round(4.0 * z))}px sans-serif`;
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillText('Kawasan Modern & Pencakar Langit', pt.x, by + bh * 0.74);
+
+          ctx.restore();
         } else if (item.type === 'wilderness_fence_bay') {
           const p1 = toScreen(item.wx1, item.wy, 0, camera.x, camera.y);
           const p2 = toScreen(item.wx2, item.wy, 0, camera.x, camera.y);
@@ -11992,6 +13315,74 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           };
           if (item.drawLeftPost) drawFencePost(p1.x, p1.y);
           if (item.drawRightPost) drawFencePost(p2.x, p2.y);
+
+          ctx.restore();
+        } else if (item.type === 'rustic_wood_fence') {
+          const p1 = toScreen(item.wx1, item.wy1, 0, camera.x, camera.y);
+          const p2 = toScreen(item.wx2, item.wy2, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          ctx.save();
+
+          // 1. Soft contact shadow along the wooden fence
+          ctx.strokeStyle = 'rgba(15, 23, 42, 0.22)';
+          ctx.lineWidth = 3.2 * z;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y + 1.2 * z);
+          ctx.lineTo(p2.x, p2.y + 1.2 * z);
+          ctx.stroke();
+
+          // 2. Double horizontal wooden rails
+          const railColors = isNight
+            ? { top: '#78350f', bot: '#52250a', stroke: '#451a03' }
+            : { top: '#d97706', bot: '#b45309', stroke: '#78350f' };
+
+          // Lower timber rail
+          ctx.strokeStyle = railColors.bot;
+          ctx.lineWidth = 1.6 * z;
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y - 4.5 * z);
+          ctx.lineTo(p2.x, p2.y - 4.5 * z);
+          ctx.stroke();
+
+          // Upper timber rail
+          ctx.strokeStyle = railColors.top;
+          ctx.lineWidth = 1.8 * z;
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y - 9.0 * z);
+          ctx.lineTo(p2.x, p2.y - 9.0 * z);
+          ctx.stroke();
+
+          // 3. Low-poly wooden posts at ends and midpoint
+          const postColors = isNight
+            ? { fill: '#451a03', stroke: '#2d1204', cap: '#78350f' }
+            : { fill: '#92400e', stroke: '#78350f', cap: '#d97706' };
+          const postWidth = 3.4 * z;
+          const postHeight = 13.5 * z;
+
+          [0, 0.5, 1].forEach((t) => {
+            const px = p1.x + (p2.x - p1.x) * t;
+            const py = p1.y + (p2.y - p1.y) * t;
+
+            // Wooden post body
+            ctx.fillStyle = postColors.fill;
+            ctx.strokeStyle = postColors.stroke;
+            ctx.lineWidth = 0.8 * z;
+            ctx.beginPath();
+            ctx.rect(px - postWidth * 0.5, py - postHeight, postWidth, postHeight);
+            ctx.fill();
+            ctx.stroke();
+
+            // Chamfered wooden post cap
+            ctx.fillStyle = postColors.cap;
+            ctx.beginPath();
+            ctx.moveTo(px - postWidth * 0.5, py - postHeight);
+            ctx.lineTo(px, py - postHeight - 2.2 * z);
+            ctx.lineTo(px + postWidth * 0.5, py - postHeight);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          });
 
           ctx.restore();
         } else if (item.type === 'wilderness_gate') {
@@ -14722,6 +16113,566 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#a5b4fc';
             ctx.font = `bold ${Math.round(3.8 * z)}px sans-serif`;
             ctx.fillText('🔒 KHUSUS GURU • GENERATE AI', signBM.x, signBM.y + 3.4 * z);
+          } else if (b.id === 'pencakar_langit') {
+            // =========================================================================
+            // 11. DERETAN GEDUNG PENCAKAR LANGIT REFLEKSIA TIMUR (Sejajar dengan Gunung)
+            //     Kawasan Modern Refleksia Timur: Deretan Menara Kaca Bertingkat, Antena Lampu,
+            //     Plaza Marmer, & Lampu Malam Futuristik
+            // =========================================================================
+            const drawIsoBoxSky = (
+              c: CanvasRenderingContext2D,
+              cx: number,
+              cy: number,
+              zBase: number,
+              w: number,
+              d: number,
+              h: number,
+              topCol: string,
+              leftCol: string,
+              rightCol: string,
+              camX: number,
+              camY: number,
+              strokeCol?: string
+            ) => {
+              const hw = w / 2;
+              const hd = d / 2;
+              const bS = toScreen(cx + hw, cy + hd, zBase, camX, camY);
+              const bW = toScreen(cx - hw, cy + hd, zBase, camX, camY);
+              const bE = toScreen(cx + hw, cy - hd, zBase, camX, camY);
+              const tS = toScreen(cx + hw, cy + hd, zBase + h, camX, camY);
+              const tW = toScreen(cx - hw, cy + hd, zBase + h, camX, camY);
+              const tE = toScreen(cx + hw, cy - hd, zBase + h, camX, camY);
+              const tN = toScreen(cx - hw, cy - hd, zBase + h, camX, camY);
+
+              // Left Face (West-South)
+              c.fillStyle = leftCol;
+              c.beginPath();
+              c.moveTo(bW.x, bW.y);
+              c.lineTo(bS.x, bS.y);
+              c.lineTo(tS.x, tS.y);
+              c.lineTo(tW.x, tW.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.8 * z;
+                c.stroke();
+              }
+
+              // Right Face (East-South)
+              c.fillStyle = rightCol;
+              c.beginPath();
+              c.moveTo(bS.x, bS.y);
+              c.lineTo(bE.x, bE.y);
+              c.lineTo(tE.x, tE.y);
+              c.lineTo(tS.x, tS.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.8 * z;
+                c.stroke();
+              }
+
+              // Top Face
+              c.fillStyle = topCol;
+              c.beginPath();
+              c.moveTo(tN.x, tN.y);
+              c.lineTo(tE.x, tE.y);
+              c.lineTo(tS.x, tS.y);
+              c.lineTo(tW.x, tW.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.8 * z;
+                c.stroke();
+              }
+            };
+
+            // 0. Base Modern Plaza Platform (Refleksia Timur Boulevard Deck)
+            drawIsoBoxSky(ctx, bx, by, 0, 7.6, 2.6, 3.5, '#f8fafc', '#cbd5e1', '#94a3b8', camera.x, camera.y, '#64748b');
+            drawIsoBoxSky(ctx, bx, by, 3.5, 7.2, 2.2, 2.0, '#38bdf8', '#0284c7', '#0369a1', camera.x, camera.y);
+
+            // 5 Berjejeran Skyscraper Towers (Dari Barat ke Timur di Bagian Belakang Sejajar Gunung)
+            const towers = [
+              // Tower 1 (West-mid tower): Blue Glass Corporate Tower
+              { dx: -2.7, dy: 0.1, w: 1.15, d: 1.15, h: 72, top: '#38bdf8', left: '#0284c7', right: '#0369a1', spire: 18, name: 'A' },
+              // Tower 2 (Tower 2): Sleek Emerald Fintech Spire
+              { dx: -1.35, dy: -0.15, w: 1.05, d: 1.05, h: 96, top: '#34d399', left: '#059669', right: '#047857', spire: 24, name: 'B' },
+              // Tower 3 (Center Apex): Central Diamond Skyscraper (Tertinggi)
+              { dx: 0.0, dy: 0.0, w: 1.45, d: 1.45, h: 122, top: '#e0f2fe', left: '#0284c7', right: '#0f172a', spire: 32, name: 'C' },
+              // Tower 4 (East-mid): Indigo Tech Tower
+              { dx: 1.4, dy: -0.1, w: 1.1, d: 1.1, h: 88, top: '#818cf8', left: '#4f46e5', right: '#3730a3', spire: 20, name: 'D' },
+              // Tower 5 (Far East): Amber Sunset Crown Tower
+              { dx: 2.7, dy: 0.15, w: 1.2, d: 1.2, h: 68, top: '#fbbf24', left: '#d97706', right: '#b45309', spire: 16, name: 'E' },
+            ];
+
+            towers.forEach((t) => {
+              const tx = bx + t.dx;
+              const ty = by + t.dy;
+              // Main Tower Body
+              drawIsoBoxSky(ctx, tx, ty, 5.5, t.w, t.d, t.h, t.top, t.left, t.right, camera.x, camera.y, 'rgba(255,255,255,0.4)');
+
+              // Upper Step / Crown
+              drawIsoBoxSky(ctx, tx, ty, 5.5 + t.h, t.w * 0.75, t.d * 0.75, 12, '#ffffff', t.left, t.right, camera.x, camera.y);
+
+              // Modern Glass Window Ribs & Neon Floor Lights
+              const numFloors = Math.floor(t.h / 14);
+              for (let f = 1; f < numFloors; f++) {
+                const floorZ = 5.5 + f * 14;
+                const p1 = toScreen(tx - t.w * 0.48, ty + t.d * 0.48, floorZ, camera.x, camera.y);
+                const p2 = toScreen(tx + t.w * 0.48, ty + t.d * 0.48, floorZ, camera.x, camera.y);
+                const p3 = toScreen(tx + t.w * 0.48, ty - t.d * 0.48, floorZ, camera.x, camera.y);
+                ctx.strokeStyle = isNight ? 'rgba(56, 189, 248, 0.75)' : 'rgba(255, 255, 255, 0.65)';
+                ctx.lineWidth = 0.9 * z;
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.lineTo(p3.x, p3.y);
+                ctx.stroke();
+              }
+
+              // Rooftop Needle Spire & Blinking Aviation Warning Beacon
+              const tipZ = 5.5 + t.h + 12;
+              const spireBase = toScreen(tx, ty, tipZ, camera.x, camera.y);
+              const spireTop = toScreen(tx, ty, tipZ + t.spire, camera.x, camera.y);
+              ctx.strokeStyle = isNight ? '#fde047' : '#cbd5e1';
+              ctx.lineWidth = 1.4 * z;
+              ctx.beginPath();
+              ctx.moveTo(spireBase.x, spireBase.y);
+              ctx.lineTo(spireTop.x, spireTop.y);
+              ctx.stroke();
+
+              // Blinking Beacon at top of spire
+              const beaconGlow = Math.sin(elapsed * 4.5 + t.dx * 1.5) > 0;
+              ctx.fillStyle = beaconGlow ? (isNight ? '#ef4444' : '#f43f5e') : 'rgba(239, 68, 68, 0.3)';
+              ctx.beginPath();
+              ctx.arc(spireTop.x, spireTop.y, 2.2 * z, 0, Math.PI * 2);
+              ctx.fill();
+            });
+
+            // Welcoming Entrance Canopy & Signboard at Front-Center Plaza
+            const canopyC = toScreen(bx, by + 1.25, 0, camera.x, camera.y);
+            drawIsoBoxSky(ctx, bx, by + 1.2, 0, 2.2, 0.75, 7.5, '#0284c7', '#0369a1', '#075985', camera.x, camera.y);
+            drawIsoBoxSky(ctx, bx, by + 1.2, 7.5, 2.4, 0.85, 2.0, '#38bdf8', '#0284c7', '#0369a1', camera.x, camera.y);
+
+            // Glowing Signboard "🏙️ REFLEKSIA TIMUR • PENCAKAR LANGIT"
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(canopyC.x - 48 * z, canopyC.y - 18 * z, 96 * z, 13 * z, 3.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.1 * z;
+            ctx.stroke();
+
+            ctx.fillStyle = '#e0f2fe';
+            ctx.font = `bold ${Math.round(4.8 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🏙️ REFLEKSIA TIMUR • PENCAKAR LANGIT', canopyC.x, canopyC.y - 12 * z);
+          } else if (b.id === 'bandara') {
+            // =========================================================================
+            // 12. BANDARA REFLEKSIA TIMUR (Terminal, Menara ATC, Landasan Pacu & 2 Pesawat Parkir)
+            //     Kawasan Aviasi di Belakang Skyscraper: Landasan Aspal Hitam, Marka Runway,
+            //     Menara ATC dengan Radar Berputar & 2 Pesawat Komersial Parkir di Apron
+            // =========================================================================
+            const drawIsoBoxAirport = (
+              c: CanvasRenderingContext2D,
+              cx: number,
+              cy: number,
+              zBase: number,
+              w: number,
+              d: number,
+              h: number,
+              topCol: string,
+              leftCol: string,
+              rightCol: string,
+              camX: number,
+              camY: number,
+              strokeCol?: string
+            ) => {
+              const hw = w / 2;
+              const hd = d / 2;
+              const bS = toScreen(cx + hw, cy + hd, zBase, camX, camY);
+              const bW = toScreen(cx - hw, cy + hd, zBase, camX, camY);
+              const bE = toScreen(cx + hw, cy - hd, zBase, camX, camY);
+              const tS = toScreen(cx + hw, cy + hd, zBase + h, camX, camY);
+              const tW = toScreen(cx - hw, cy + hd, zBase + h, camX, camY);
+              const tE = toScreen(cx + hw, cy - hd, zBase + h, camX, camY);
+              const tN = toScreen(cx - hw, cy - hd, zBase + h, camX, camY);
+
+              // Left Face (West-South)
+              c.fillStyle = leftCol;
+              c.beginPath();
+              c.moveTo(bW.x, bW.y);
+              c.lineTo(bS.x, bS.y);
+              c.lineTo(tS.x, tS.y);
+              c.lineTo(tW.x, tW.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.8 * z;
+                c.stroke();
+              }
+
+              // Right Face (East-South)
+              c.fillStyle = rightCol;
+              c.beginPath();
+              c.moveTo(bS.x, bS.y);
+              c.lineTo(bE.x, bE.y);
+              c.lineTo(tE.x, tE.y);
+              c.lineTo(tS.x, tS.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.8 * z;
+                c.stroke();
+              }
+
+              // Top Face
+              c.fillStyle = topCol;
+              c.beginPath();
+              c.moveTo(tN.x, tN.y);
+              c.lineTo(tE.x, tE.y);
+              c.lineTo(tS.x, tS.y);
+              c.lineTo(tW.x, tW.y);
+              c.closePath();
+              c.fill();
+              if (strokeCol) {
+                c.strokeStyle = strokeCol;
+                c.lineWidth = 0.8 * z;
+                c.stroke();
+              }
+            };
+
+            // -----------------------------------------------------------
+            // A. LANDASAN PACU UTAMA (AIRPORT RUNWAY STRIP: wx 9.2..18.2, wy -13.5)
+            // -----------------------------------------------------------
+            const rwyP1 = toScreen(9.2, -13.9, 0, camera.x, camera.y);
+            const rwyP2 = toScreen(18.2, -13.9, 0, camera.x, camera.y);
+            const rwyP3 = toScreen(18.2, -13.1, 0, camera.x, camera.y);
+            const rwyP4 = toScreen(9.2, -13.1, 0, camera.x, camera.y);
+
+            // Dark Asphalt Runway Carpet
+            ctx.fillStyle = isNight ? '#020617' : '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(rwyP1.x, rwyP1.y);
+            ctx.lineTo(rwyP2.x, rwyP2.y);
+            ctx.lineTo(rwyP3.x, rwyP3.y);
+            ctx.lineTo(rwyP4.x, rwyP4.y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = isNight ? '#1e293b' : '#38bdf8';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+
+            // Threshold Piano Keys (Marka Garis Ambang Landasan) di Ujung Barat & Timur
+            const drawPianoKeys = (startWx: number) => {
+              for (let k = 0; k < 5; k++) {
+                const kwy = -13.8 + k * 0.16;
+                const kpA = toScreen(startWx, kwy, 0.2, camera.x, camera.y);
+                const kpB = toScreen(startWx + 0.35, kwy, 0.2, camera.x, camera.y);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2.4 * z;
+                ctx.beginPath();
+                ctx.moveTo(kpA.x, kpA.y);
+                ctx.lineTo(kpB.x, kpB.y);
+                ctx.stroke();
+              }
+            };
+            drawPianoKeys(9.45);
+            drawPianoKeys(17.65);
+
+            // Runway Numbers "09L" dan "27R"
+            const num09Pt = toScreen(10.15, -13.5, 0.3, camera.x, camera.y);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.round(4.5 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('09L', num09Pt.x, num09Pt.y);
+
+            const num27Pt = toScreen(17.25, -13.5, 0.3, camera.x, camera.y);
+            ctx.fillText('27R', num27Pt.x, num27Pt.y);
+
+            // Dashed White Centerline Stripes along Runway
+            for (let c = 10.8; c <= 16.5; c += 1.0) {
+              const cA = toScreen(c - 0.25, -13.5, 0.2, camera.x, camera.y);
+              const cB = toScreen(c + 0.25, -13.5, 0.2, camera.x, camera.y);
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1.8 * z;
+              ctx.beginPath();
+              ctx.moveTo(cA.x, cA.y);
+              ctx.lineTo(cB.x, cB.y);
+              ctx.stroke();
+            }
+
+            // Pulsing Runway Edge Lights (Green Threshold, White/Amber Edge Beacons)
+            const lightPulse = Math.sin(elapsed * 3.5) * 0.3 + 0.7;
+            for (let lx = 9.4; lx <= 18.0; lx += 1.4) {
+              const eLightN = toScreen(lx, -13.9, 0.5, camera.x, camera.y);
+              const eLightS = toScreen(lx, -13.1, 0.5, camera.x, camera.y);
+              const isThresh = lx < 10.0 || lx > 17.2;
+              ctx.fillStyle = isThresh
+                ? `rgba(34, 197, 94, ${lightPulse})`
+                : `rgba(250, 204, 21, ${lightPulse * 0.85})`;
+              ctx.beginPath();
+              ctx.arc(eLightN.x, eLightN.y, 2.0 * z, 0, Math.PI * 2);
+              ctx.arc(eLightS.x, eLightS.y, 2.0 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            // -----------------------------------------------------------
+            // B. BANGUNAN TERMINAL BANDARA & MENARA PENGAWAS (ATC TOWER)
+            // -----------------------------------------------------------
+            // 1. Terminal Concourse Building Base
+            drawIsoBoxAirport(ctx, 10.8, -11.8, 0, 2.2, 1.2, 14, '#f8fafc', '#cbd5e1', '#94a3b8', camera.x, camera.y, '#64748b');
+            // Terminal Upper Aerofoil Curved Silver Roof
+            drawIsoBoxAirport(ctx, 10.8, -11.8, 14, 2.35, 1.3, 3.5, '#e0f2fe', '#0284c7', '#0369a1', camera.x, camera.y);
+            // Front Entrance Glass Canopied Forecourt
+            const termCanopy = toScreen(10.8, -11.15, 0, camera.x, camera.y);
+            drawIsoBoxAirport(ctx, 10.8, -11.15, 0, 1.4, 0.45, 6.5, '#0284c7', '#0369a1', '#075985', camera.x, camera.y);
+            drawIsoBoxAirport(ctx, 10.8, -11.15, 6.5, 1.55, 0.55, 1.5, '#38bdf8', '#0284c7', '#0369a1', camera.x, camera.y);
+
+            // Glowing Signboard "✈️ BANDARA REFLEKSIA TIMUR"
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(termCanopy.x - 42 * z, termCanopy.y - 15 * z, 84 * z, 12 * z, 3 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.0 * z;
+            ctx.stroke();
+
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = `bold ${Math.round(4.4 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('✈️ BANDARA REFLEKSIA TIMUR', termCanopy.x, termCanopy.y - 9 * z);
+
+            // 2. Air Traffic Control (ATC) Tower
+            const atcX = 9.75;
+            const atcY = -12.35;
+            // Tower Base Platform
+            drawIsoBoxAirport(ctx, atcX, atcY, 0, 0.95, 0.95, 3.0, '#334155', '#1e293b', '#0f172a', camera.x, camera.y);
+            // Octagonal Sleek Tower Shaft
+            drawIsoBoxAirport(ctx, atcX, atcY, 3.0, 0.72, 0.72, 42, '#f8fafc', '#cbd5e1', '#94a3b8', camera.x, camera.y);
+            // Blue Accent Collar Ring
+            drawIsoBoxAirport(ctx, atcX, atcY, 32, 0.82, 0.82, 2.5, '#38bdf8', '#0284c7', '#0369a1', camera.x, camera.y);
+            // 360-Degree Glass Observation Cab
+            drawIsoBoxAirport(ctx, atcX, atcY, 45, 1.15, 1.15, 8.5, '#38bdf8', '#0284c7', '#0369a1', camera.x, camera.y, '#ffffff');
+            // Radar Dome Roof
+            drawIsoBoxAirport(ctx, atcX, atcY, 53.5, 0.85, 0.85, 2.5, '#ffffff', '#e2e8f0', '#cbd5e1', camera.x, camera.y);
+
+            // ATC Rooftop Radar & Flashing Beacon
+            const atcTip = toScreen(atcX, atcY, 56, camera.x, camera.y);
+            const atcBeaconTip = toScreen(atcX, atcY, 64, camera.x, camera.y);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.2 * z;
+            ctx.beginPath();
+            ctx.moveTo(atcTip.x, atcTip.y);
+            ctx.lineTo(atcBeaconTip.x, atcBeaconTip.y);
+            ctx.stroke();
+
+            // Blinking Red Aviation Beacon atop ATC Tower
+            const atcBeaconOn = Math.sin(elapsed * 5.0) > 0;
+            ctx.fillStyle = atcBeaconOn ? '#ef4444' : 'rgba(239, 68, 68, 0.25)';
+            ctx.beginPath();
+            ctx.arc(atcBeaconTip.x, atcBeaconTip.y, 2.8 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // -----------------------------------------------------------
+            // C. DUA PESAWAT TERBANG SEDANG DIPARKIR (2 PARKED AIRPLANES)
+            // -----------------------------------------------------------
+            const drawLowPolyAirplane = (
+              pX: number,
+              pY: number,
+              bodyL: number,
+              wingSpan: number,
+              liveryColor: string,
+              liveryShade: string,
+              planeCallsign: string
+            ) => {
+              // 1. Soft contact shadow under aircraft on apron tarmac
+              const shadowC = toScreen(pX, pY, 0, camera.x, camera.y);
+              ctx.fillStyle = 'rgba(2, 6, 23, 0.45)';
+              ctx.beginPath();
+              ctx.ellipse(shadowC.x, shadowC.y, (wingSpan * 15 + 4) * z, (bodyL * 8 + 3) * z, 0.25, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Yellow Apron Parking Stand Guide Markings [ T ]
+              ctx.strokeStyle = '#f59e0b';
+              ctx.lineWidth = 1.1 * z;
+              ctx.beginPath();
+              const standL = toScreen(pX - 0.75, pY, 0.1, camera.x, camera.y);
+              const standR = toScreen(pX + 0.75, pY, 0.1, camera.x, camera.y);
+              const standF = toScreen(pX, pY + 0.65, 0.1, camera.x, camera.y);
+              ctx.moveTo(standL.x, standL.y);
+              ctx.lineTo(standR.x, standR.y);
+              ctx.moveTo(shadowC.x, shadowC.y);
+              ctx.lineTo(standF.x, standF.y);
+              ctx.stroke();
+
+              // Wheel Chocks on main landing gear
+              ctx.fillStyle = '#f59e0b';
+              ctx.fillRect(shadowC.x - 7 * z, shadowC.y - 1.5 * z, 3 * z, 2 * z);
+              ctx.fillRect(shadowC.x + 4 * z, shadowC.y - 1.5 * z, 3 * z, 2 * z);
+
+              // 2. Aircraft Fuselage (Main Streamlined Body)
+              const fusH = 4.5;
+              const fusW = 0.42;
+              drawIsoBoxAirport(ctx, pX, pY, fusH, fusW, bodyL, 4.0, '#ffffff', '#e2e8f0', '#cbd5e1', camera.x, camera.y, 'rgba(0,0,0,0.15)');
+
+              // Aerodynamic Tapered Nose Cone
+              const noseC = toScreen(pX, pY + bodyL * 0.5 + 0.22, fusH + 1.8, camera.x, camera.y);
+              const noseBaseW = toScreen(pX - fusW * 0.5, pY + bodyL * 0.5, fusH, camera.x, camera.y);
+              const noseBaseE = toScreen(pX + fusW * 0.5, pY + bodyL * 0.5, fusH, camera.x, camera.y);
+              const noseBaseT = toScreen(pX, pY + bodyL * 0.5, fusH + 3.8, camera.x, camera.y);
+              ctx.fillStyle = '#e2e8f0';
+              ctx.beginPath();
+              ctx.moveTo(noseBaseW.x, noseBaseW.y);
+              ctx.lineTo(noseC.x, noseC.y);
+              ctx.lineTo(noseBaseE.x, noseBaseE.y);
+              ctx.lineTo(noseBaseT.x, noseBaseT.y);
+              ctx.closePath();
+              ctx.fill();
+
+              // Dark Tinted Cockpit Windshield Visor
+              const cockW = toScreen(pX - fusW * 0.45, pY + bodyL * 0.38, fusH + 2.8, camera.x, camera.y);
+              const cockE = toScreen(pX + fusW * 0.45, pY + bodyL * 0.38, fusH + 2.8, camera.x, camera.y);
+              const cockT = toScreen(pX, pY + bodyL * 0.44, fusH + 3.4, camera.x, camera.y);
+              ctx.fillStyle = '#0f172a';
+              ctx.beginPath();
+              ctx.moveTo(cockW.x, cockW.y);
+              ctx.lineTo(cockT.x, cockT.y);
+              ctx.lineTo(cockE.x, cockE.y);
+              ctx.closePath();
+              ctx.fill();
+
+              // Livery Cheatline Band & Passenger Cabin Windows
+              const winStart = toScreen(pX - fusW * 0.51, pY - bodyL * 0.28, fusH + 2.2, camera.x, camera.y);
+              const winEnd = toScreen(pX - fusW * 0.51, pY + bodyL * 0.26, fusH + 2.2, camera.x, camera.y);
+              ctx.strokeStyle = liveryColor;
+              ctx.lineWidth = 2.0 * z;
+              ctx.beginPath();
+              ctx.moveTo(winStart.x, winStart.y);
+              ctx.lineTo(winEnd.x, winEnd.y);
+              ctx.stroke();
+
+              // Individual Passenger Windows (Dotted light rectangles)
+              for (let w = -0.22; w <= 0.22; w += 0.11) {
+                const wPt = toScreen(pX - fusW * 0.52, pY + w * bodyL, fusH + 2.2, camera.x, camera.y);
+                ctx.fillStyle = isNight ? '#fde047' : '#0f172a';
+                ctx.fillRect(wPt.x - 1 * z, wPt.y - 1.2 * z, 1.8 * z, 2.2 * z);
+              }
+
+              // 3. Swept-Back Low Wings & Winglet Tips
+              // Left Wing (Port)
+              const wingRootL = toScreen(pX - fusW * 0.5, pY - 0.1, fusH + 1.2, camera.x, camera.y);
+              const wingTipL = toScreen(pX - wingSpan * 0.5, pY - 0.45, fusH + 1.8, camera.x, camera.y);
+              const wingTrailL = toScreen(pX - wingSpan * 0.46, pY - 0.72, fusH + 1.6, camera.x, camera.y);
+              const wingRootTrailL = toScreen(pX - fusW * 0.5, pY - 0.45, fusH + 1.2, camera.x, camera.y);
+              ctx.fillStyle = '#f1f5f9';
+              ctx.beginPath();
+              ctx.moveTo(wingRootL.x, wingRootL.y);
+              ctx.lineTo(wingTipL.x, wingTipL.y);
+              ctx.lineTo(wingTrailL.x, wingTrailL.y);
+              ctx.lineTo(wingRootTrailL.x, wingRootTrailL.y);
+              ctx.closePath();
+              ctx.fill();
+              ctx.strokeStyle = '#cbd5e1';
+              ctx.lineWidth = 0.8 * z;
+              ctx.stroke();
+
+              // Right Wing (Starboard)
+              const wingRootR = toScreen(pX + fusW * 0.5, pY - 0.1, fusH + 1.2, camera.x, camera.y);
+              const wingTipR = toScreen(pX + wingSpan * 0.5, pY - 0.45, fusH + 1.8, camera.x, camera.y);
+              const wingTrailR = toScreen(pX + wingSpan * 0.46, pY - 0.72, fusH + 1.6, camera.x, camera.y);
+              const wingRootTrailR = toScreen(pX + fusW * 0.5, pY - 0.45, fusH + 1.2, camera.x, camera.y);
+              ctx.fillStyle = '#e2e8f0';
+              ctx.beginPath();
+              ctx.moveTo(wingRootR.x, wingRootR.y);
+              ctx.lineTo(wingTipR.x, wingTipR.y);
+              ctx.lineTo(wingTrailR.x, wingTrailR.y);
+              ctx.lineTo(wingRootTrailR.x, wingRootTrailR.y);
+              ctx.closePath();
+              ctx.fill();
+              ctx.strokeStyle = '#cbd5e1';
+              ctx.lineWidth = 0.8 * z;
+              ctx.stroke();
+
+              // Winglet Vertical Fins with Livery Color
+              const wletL = toScreen(pX - wingSpan * 0.5, pY - 0.48, fusH + 4.8, camera.x, camera.y);
+              ctx.strokeStyle = liveryColor;
+              ctx.lineWidth = 1.8 * z;
+              ctx.beginPath();
+              ctx.moveTo(wingTipL.x, wingTipL.y);
+              ctx.lineTo(wletL.x, wletL.y);
+              ctx.stroke();
+
+              const wletR = toScreen(pX + wingSpan * 0.5, pY - 0.48, fusH + 4.8, camera.x, camera.y);
+              ctx.beginPath();
+              ctx.moveTo(wingTipR.x, wingTipR.y);
+              ctx.lineTo(wletR.x, wletR.y);
+              ctx.stroke();
+
+              // Twin Turbofan Jet Engines Mounted Under Wings
+              const engL = toScreen(pX - wingSpan * 0.24, pY - 0.28, fusH + 0.3, camera.x, camera.y);
+              drawIsoBoxAirport(ctx, pX - wingSpan * 0.24, pY - 0.28, fusH - 0.6, 0.28, 0.65, 2.2, '#94a3b8', '#64748b', '#475569', camera.x, camera.y);
+              drawIsoBoxAirport(ctx, pX + wingSpan * 0.24, pY - 0.28, fusH - 0.6, 0.28, 0.65, 2.2, '#94a3b8', '#64748b', '#475569', camera.x, camera.y);
+
+              // 4. Swept Vertical Tail Fin & Stabilizers
+              const finRootF = toScreen(pX, pY - bodyL * 0.32, fusH + 3.8, camera.x, camera.y);
+              const finRootB = toScreen(pX, pY - bodyL * 0.52, fusH + 3.8, camera.x, camera.y);
+              const finTip = toScreen(pX, pY - bodyL * 0.62, fusH + 11.5, camera.x, camera.y);
+              ctx.fillStyle = liveryColor;
+              ctx.beginPath();
+              ctx.moveTo(finRootF.x, finRootF.y);
+              ctx.lineTo(finTip.x, finTip.y);
+              ctx.lineTo(finRootB.x, finRootB.y);
+              ctx.closePath();
+              ctx.fill();
+              ctx.strokeStyle = liveryShade;
+              ctx.lineWidth = 0.9 * z;
+              ctx.stroke();
+
+              // Callsign / Airline Badge Text on Tail
+              ctx.fillStyle = '#ffffff';
+              ctx.font = `bold ${Math.round(2.8 * z)}px sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.fillText(planeCallsign, (finRootF.x + finTip.x) * 0.5, (finRootF.y + finTip.y) * 0.5 + 1 * z);
+
+              // 5. Blinking Wingtip Navigation & Anti-Collision Strobes
+              const navGlow = Math.sin(elapsed * 4.0 + pX * 0.5) > 0;
+              // Left Wingtip Port Red Light
+              ctx.fillStyle = navGlow ? '#ef4444' : 'rgba(239, 68, 68, 0.3)';
+              ctx.beginPath();
+              ctx.arc(wingTipL.x, wingTipL.y, 2.0 * z, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Right Wingtip Starboard Green Light
+              ctx.fillStyle = navGlow ? '#22c55e' : 'rgba(34, 197, 94, 0.3)';
+              ctx.beginPath();
+              ctx.arc(wingTipR.x, wingTipR.y, 2.0 * z, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Fuselage Top Flashing White Strobe
+              const strobeFlash = Math.sin(elapsed * 6.5 + pX) > 0.65;
+              if (strobeFlash) {
+                const strobePt = toScreen(pX, pY, fusH + 4.2, camera.x, camera.y);
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(strobePt.x, strobePt.y, 2.5 * z, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            };
+
+            // Pesawat 1: Airliner Jet (Refleksia Airways • PK-RFL) di Stand Parkir 1
+            drawLowPolyAirplane(13.6, -12.1, 2.3, 2.4, '#0284c7', '#0369a1', 'PK-RFL');
+
+            // Pesawat 2: Regional Express Jet (SkyRefleksia • PK-XSMK) di Stand Parkir 2
+            drawLowPolyAirplane(16.3, -12.1, 2.0, 2.1, '#059669', '#047857', 'PK-XSMK');
           }
 
           // Floating Building Label ONLY when touched, hovered or active (compact & semi-transparent, fades after 5s stationary)
@@ -14730,7 +16681,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (shouldShowLabel) {
             ctx.save();
             ctx.globalAlpha = (ctx.globalAlpha || 1.0) * tagAlpha;
-            const tagY = pt.y - (b.id === 'balai_kota' ? 86 : b.id === 'masjid' || b.id === 'bank_materi' ? 78 : b.id === 'menara_mentor' || b.id === 'bengkel_latihan' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
+            const tagY = pt.y - (b.id === 'pencakar_langit' ? 145 : b.id === 'bandara' ? 76 : b.id === 'balai_kota' ? 86 : b.id === 'masjid' || b.id === 'bank_materi' ? 78 : b.id === 'menara_mentor' || b.id === 'bengkel_latihan' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
             const labelText = `${b.icon} ${b.name}`;
             ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
             const tMetrics = ctx.measureText(labelText);
@@ -19208,8 +21159,158 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           ctx.restore();
+        } else if (item.type === 'custom_creator_building') {
+          const cb = item.building;
+          const isNearCb = Math.hypot(player.wx - cb.wx, player.wy - cb.wy) < 2.2 * (cb.scale || 1);
+          const isSelectedInCreator =
+            isCreatorStudioOpenRef.current &&
+            creatorSelectedTargetRef.current?.kind === 'custom_building' &&
+            creatorSelectedTargetRef.current.id === cb.id;
+          drawCustomCreatorBuilding3D(
+            ctx,
+            (wx: number, wy: number, wz: number) => toScreen(wx, wy, wz * 34, camera.x, camera.y),
+            currentTileW,
+            cb,
+            currentTime,
+            false,
+            isSelectedInCreator,
+            isNearCb
+          );
+        } else if (item.type === 'custom_creator_prop') {
+          const cp = item.prop;
+          const isSelectedProp =
+            isCreatorStudioOpenRef.current &&
+            creatorSelectedTargetRef.current?.kind === 'custom_prop' &&
+            creatorSelectedTargetRef.current.id === cp.id;
+          drawCustomCreatorProp3D(
+            ctx,
+            (wx: number, wy: number, wz: number) => toScreen(wx, wy, wz * 34, camera.x, camera.y),
+            currentTileW,
+            cp,
+            currentTime,
+            isSelectedProp
+          );
+        } else if (item.type === 'custom_creator_animal') {
+          const ca = item.animal;
+          const isSelectedAnimal =
+            isCreatorStudioOpenRef.current &&
+            creatorSelectedTargetRef.current?.kind === 'custom_animal' &&
+            creatorSelectedTargetRef.current.id === ca.id;
+          drawCustomCreatorAnimal3D(
+            ctx,
+            (wx: number, wy: number, wz: number) => toScreen(wx, wy, wz * 34, camera.x, camera.y),
+            currentTileW,
+            ca,
+            currentTime,
+            isNight,
+            isSelectedAnimal
+          );
+        } else if (item.type === 'custom_creator_fence') {
+          const cf = item.fence;
+          const isSelectedFence =
+            isCreatorStudioOpenRef.current &&
+            creatorSelectedTargetRef.current?.kind === 'custom_fence' &&
+            creatorSelectedTargetRef.current.id === cf.id;
+          drawCustomCreatorFence3D(
+            ctx,
+            (wx: number, wy: number, wz: number) => toScreen(wx, wy, wz * 34, camera.x, camera.y),
+            currentTileW,
+            cf,
+            isSelectedFence
+          );
         }
       });
+
+      if (isCreatorStudioOpenRef.current) {
+        let activeCoords: { wx: number; wy: number; label: string } | null = null;
+        const sel = creatorSelectedTargetRef.current;
+        if (sel) {
+          if (sel.kind === 'custom_building') {
+            const cb = (creatorStateRef.current.customBuildings || []).find((c) => c.id === sel.id);
+            if (cb) activeCoords = { wx: cb.wx, wy: cb.wy, label: cb.name };
+          } else if (sel.kind === 'custom_prop') {
+            const cp = (creatorStateRef.current.customProps || []).find((p) => p.id === sel.id);
+            if (cp) activeCoords = { wx: cp.wx, wy: cp.wy, label: cp.name };
+          } else if (sel.kind === 'custom_animal') {
+            const ca = (creatorStateRef.current.customAnimals || []).find((a) => a.id === sel.id);
+            if (ca) activeCoords = { wx: ca.homeWx, wy: ca.homeWy, label: ca.name };
+          } else if (sel.kind === 'custom_fence') {
+            const cf = (creatorStateRef.current.customFences || []).find((f) => f.id === sel.id);
+            if (cf) activeCoords = { wx: cf.wx, wy: cf.wy, label: cf.name };
+          } else if (sel.kind === 'existing_object') {
+            const b = BUILDINGS_INFO.find((item) => item.id === sel.id);
+            if (b) {
+              activeCoords = { wx: b.position[0], wy: b.position[2], label: b.name };
+            } else if (sel.id === 'cafe') {
+              activeCoords = { wx: CAFE_COORDS.wx, wy: CAFE_COORDS.wy, label: 'Lapak Refleksia' };
+            } else if (sel.id === 'beringin') {
+              activeCoords = { wx: BERINGIN_TREE_COORDS.wx, wy: BERINGIN_TREE_COORDS.wy, label: 'Pohon Refleksi' };
+            } else if (sel.id === 'literacy_corner') {
+              activeCoords = { wx: LITERACY_CORNER_COORDS.wx, wy: LITERACY_CORNER_COORDS.wy, label: 'Sudut Literasi' };
+            } else if (sel.id === 'announcement_board') {
+              activeCoords = { wx: ANNOUNCEMENT_BOARD_COORDS.wx, wy: ANNOUNCEMENT_BOARD_COORDS.wy, label: 'Papan Pengumuman' };
+            } else if (sel.id === 'rules_board') {
+              activeCoords = { wx: TOWN_RULES_BOARD_COORDS.wx, wy: TOWN_RULES_BOARD_COORDS.wy, label: 'Papan Tata Tertib' };
+            } else if (sel.id === 'campfire') {
+              activeCoords = { wx: CAMPFIRE_COORDS.wx, wy: CAMPFIRE_COORDS.wy, label: 'Api Unggun' };
+            } else if (sel.id.startsWith('tree_')) {
+              const tIdx = parseInt(sel.id.replace('tree_', ''), 10);
+              const tCoord = TREES_LIST[tIdx];
+              if (tCoord) activeCoords = { wx: tCoord[0], wy: tCoord[1], label: `Pohon #${tIdx + 1}` };
+            } else {
+              const bg = ALL_TWO_PERSON_BENCHES.find((g) => g.groupId === sel.id);
+              if (bg) {
+                activeCoords = { wx: bg.wx, wy: bg.wy, label: bg.name };
+              } else {
+                const st = SWING_STRUCTURES.find((s) => s.id === sel.id);
+                if (st) activeCoords = { wx: st.wx, wy: st.wy, label: st.title };
+              }
+            }
+          } else if (sel.kind === 'npc') {
+            const liveNpc = npcsRef.current.find((n) => n.id === sel.id);
+            if (liveNpc) activeCoords = { wx: liveNpc.wx, wy: liveNpc.wy, label: liveNpc.name || sel.id };
+          }
+        }
+
+        const activeNpcConfig: CreatorNpcConfig | null =
+          sel?.kind === 'npc'
+            ? creatorStateRef.current.npcConfigs?.[sel.id] ||
+              DEFAULT_CITY_NPCS_CATALOG.find((n) => n.id === sel.id) ||
+              null
+            : null;
+
+        const ghostModel = placingStockModelRef.current;
+        const ghostProp = placingPropEntryRef.current;
+        const ghostAnimal = placingAnimalEntryRef.current;
+        const ghostFence = placingFenceEntryRef.current;
+        const ghostBrush = activeTerrainBrushRef.current;
+        const hoverPt = creatorHoverGhostRef.current;
+        const hoverGhostCoords = hoverPt
+          ? ghostModel
+            ? { wx: hoverPt.wx, wy: hoverPt.wy, icon: ghostModel.icon, name: ghostModel.defaultName }
+            : ghostProp
+            ? { wx: hoverPt.wx, wy: hoverPt.wy, icon: ghostProp.icon, name: ghostProp.name }
+            : ghostAnimal
+            ? { wx: hoverPt.wx, wy: hoverPt.wy, icon: ghostAnimal.icon, name: ghostAnimal.defaultName }
+            : ghostFence
+            ? { wx: hoverPt.wx, wy: hoverPt.wy, icon: '🪵', name: ghostFence.name }
+            : ghostBrush
+            ? { wx: hoverPt.wx, wy: hoverPt.wy, icon: ghostBrush === 'eraser' ? '🧹' : '🖌️', name: `Petak (${hoverPt.wx}, ${hoverPt.wy})` }
+            : null
+          : null;
+
+        drawCreatorStudioMapGizmos(
+          ctx,
+          (wx: number, wy: number, wz: number) => toScreen(wx, wy, wz * 34, camera.x, camera.y),
+          currentTileW,
+          {
+            selectedCoords: activeCoords,
+            selectedNpcConfig: activeNpcConfig,
+            hoverGhostCoords,
+            now: currentTime,
+          }
+        );
+      }
 
       // -----------------------------------------------------------
       // BURUNG HUTAN YANG BERPUTAR-PUTAR DI ATAS HUTAN REFLEKSIA (Soaring Forest Bird)
@@ -19809,6 +21910,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
+      canvas.removeEventListener('mousedown', onCreatorMouseDown);
+      window.removeEventListener('mouseup', onCreatorMouseUp);
       canvas.removeEventListener('click', onPointerDown);
       canvas.removeEventListener('dblclick', onDblClick);
       canvas.removeEventListener('mousemove', onPointerMove);
@@ -20581,6 +22684,35 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                           <span>⚡</span>
                           <span>Teleport</span>
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            setIsCreatorStudioOpen((prev) => {
+                              const next = !prev;
+                              if (!next) {
+                                setPlacingStockModel(null);
+                                setRecordingPatrolNpcId(null);
+                              }
+                              showToast(
+                                next
+                                  ? '🏗️ Creator Studio Aktif! Geser bangunan/NPC langsung di peta atau tambah bangunan dari katalog.'
+                                  : '✅ Creator Studio ditutup.',
+                                2800
+                              );
+                              return next;
+                            });
+                          }}
+                          className={`px-2.5 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ml-0.5 ${
+                            isCreatorStudioOpen
+                              ? 'bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 text-slate-950 shadow-md ring-2 ring-amber-300/60'
+                              : 'bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-400/50'
+                          }`}
+                          title="Buka Master Creator Studio (Drag & Drop Bangunan, Fasilitas Kota, Games, Ide & Kontrol NPC)"
+                        >
+                          <span>🏗️</span>
+                          <span>Creator Studio</span>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -21034,6 +23166,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       setPendingConfirmation(null);
                       if (target.type === 'cafe') {
                         setIsCafeMenuOpen(true);
+                      } else if (target.type === 'creator_building') {
+                        const foundCb = (creatorStateRef.current.customBuildings || []).find(
+                          (c) => c.id === target.id
+                        );
+                        if (foundCb) {
+                          setActiveCreatorBuildingModal(foundCb);
+                        }
                       } else {
                         onSelectBuildingRef.current(target.id as BuildingId);
                       }
@@ -23590,6 +25729,93 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             </div>
           </div>
         </div>
+      )}
+
+      {/* MASTER KIKYBAHSOAN CREATOR STUDIO FLOATING DOCK */}
+      {isMasterKiky && isCreatorStudioOpen && (
+        <CreatorStudioFloatingDock
+          creatorState={creatorState}
+          onUpdateCreatorState={handleUpdateCreatorState}
+          onSaveToCity={handleSaveCreatorStateToCity}
+          onCloseStudio={() => {
+            setIsCreatorStudioOpen(false);
+            setPlacingStockModel(null);
+            setPlacingPropEntry(null);
+            setPlacingAnimalEntry(null);
+            setActiveTerrainBrush(null);
+            setPlacingFenceEntry(null);
+            setRecordingPatrolNpcId(null);
+          }}
+          snapToGrid={creatorSnapToGrid}
+          onToggleSnapToGrid={() => setCreatorSnapToGrid((prev) => !prev)}
+          selectedTarget={creatorSelectedTarget}
+          onSelectTarget={setCreatorSelectedTarget}
+          isPlacingModel={placingStockModel}
+          onStartPlacingModel={setPlacingStockModel}
+          placingPropEntry={placingPropEntry}
+          onStartPlacingProp={setPlacingPropEntry}
+          placingAnimalEntry={placingAnimalEntry}
+          onStartPlacingAnimal={setPlacingAnimalEntry}
+          activeTerrainBrush={activeTerrainBrush}
+          onSelectTerrainBrush={setActiveTerrainBrush}
+          placingFenceEntry={placingFenceEntry}
+          onStartPlacingFence={setPlacingFenceEntry}
+          isRecordingPatrolNpcId={recordingPatrolNpcId}
+          onToggleRecordPatrol={setRecordingPatrolNpcId}
+          playerCurrentCoords={{
+            wx: playerRef.current?.wx ?? 0,
+            wy: playerRef.current?.wy ?? 0,
+          }}
+          onPreviewCustomBuildingModal={(b: CreatorBuildingItem) => setActiveCreatorBuildingModal(b)}
+          onTeleportCameraOrAvatar={(wx: number, wy: number) => {
+            if (playerRef.current) {
+              playerRef.current.wx = wx;
+              playerRef.current.wy = wy;
+              playerRef.current.targetWx = wx;
+              playerRef.current.targetWy = wy;
+              playerRef.current.isMoving = false;
+              resetCameraRequestedRef.current = true;
+              sendHeartbeatRef.current?.();
+            }
+          }}
+        />
+      )}
+
+      {/* CITIZEN INTERACTIVE MODAL FOR CUSTOM CREATOR BUILDINGS */}
+      {activeCreatorBuildingModal && (
+        <CreatorBuildingCitizenModal
+          building={
+            creatorState.customBuildings.find((b) => b.id === activeCreatorBuildingModal.id) ||
+            activeCreatorBuildingModal
+          }
+          currentUser={
+            studentId
+              ? {
+                  id: studentId,
+                  name: studentName,
+                  className: isTeacher ? 'Guru Refleksia' : 'Warga Refleksia',
+                  points: studentPoints,
+                  badges: [],
+                  completedMissionsCount: 0,
+                  lastLogin: new Date().toISOString(),
+                  streakDays: 1,
+                }
+              : null
+          }
+          isMasterKiky={isMasterKiky}
+          onClose={() => setActiveCreatorBuildingModal(null)}
+          onAwardCitizenXp={(amount: number, label: string) => {
+            if (onAddXpRef.current) {
+              onAddXpRef.current(amount, label);
+            }
+          }}
+          onEditInStudio={() => {
+            const bId = activeCreatorBuildingModal.id;
+            setActiveCreatorBuildingModal(null);
+            setIsCreatorStudioOpen(true);
+            setCreatorSelectedTarget({ kind: 'custom_building', id: bId });
+          }}
+        />
       )}
 
     </div>

@@ -1,122 +1,134 @@
-# Arena Cerdas Cermat Balai Kota (Refleksia Grand Quiz Battle)
+# Master Creator Studio — Drag & Drop City, Facility & NPC Builder (Khusus Mode Master `kikybahsoan`)
 
-Fitur permainan kelompok interaktif realtime di Balai Kota dan Alun-alun Pusat Refleksia City yang mempertemukan tim siswa dalam kuis serentak bertema Desain Komunikasi Visual (DKV), dipandu langsung oleh Guru atau otomatis oleh Wali Kota @Sony.
+Fitur pembangunan dan tata kelola kota secara visual (*No-Code Drag & Drop City & NPC Studio*) khusus bagi akun Master `kikybahsoan` untuk:
+1. Menambahkan **Fasilitas Kota, Fitur Kota, Papan Ide, dan Arena Games** baru dari stok katalog model bangunan,
+2. Menggeser dan mengubah posisi **bangunan utama serta fasilitas publik yang sudah ada saat ini**,
+3. Mengatur posisi, perilaku, dan rute pergerakan **NPC yang sudah ada saat ini**, serta **menambahkan NPC baru** lengkap dengan dialog dan pola jalannya,
+4. Menyimpan seluruh perubahan dengan satu tombol **Simpan ke Kota** agar otomatis ter-update dan langsung dirasakan oleh seluruh warga Kota Refleksia.
 
-### User Review & Critical Decisions
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Berdasarkan jawaban klarifikasi yang telah dikonfirmasi, permainan kelompok dirancang dengan ketentuan utama:
-> - **Jenis Permainan**: Cerdas Cermat Tim seputar kompetensi dan kreativitas DKV.
-> - **Sistem Bermain**: Realtime serentak yang dapat dipandu langsung oleh Guru (Host/Juri) atau berjalan otomatis oleh Wali Kota @Sony.
-> - **Arena Pusat**: Balai Kota dan Panggung Alun-alun Utama.
+> Berikut adalah cakupan lengkap yang telah diperbarui sesuai arahan tambahan Anda dan siap diimplementasikan begitu Anda menekan tombol **Proceed**:
 
-- **Keputusan Terkonfirmasi 1**: Sistem Tim berbasis Kelas (Tim X DKV 2 vs Tim X DKV 3) atau Pemilihan Kubu Tim Bebas (Tim Cyan vs Tim Amber) saat sesi dibuka di Balai Kota.
-- **Keputusan Terkonfirmasi 2**: Peran Tamu Kota (Wartawan) adalah sebagai Penonton & Peliput Berita Resmi (dapat melihat jalannya kuis dan papan skor tanpa mengganggu jalannya perlombaan).
-- **Rekomendasi Default**: Guru memiliki kontrol penuh (Mulai Ronde, Jeda, Verifikasi Jawaban, Beri Poin Bonus), namun kuis juga dilengkapi Mode Otomatis jika Guru sedang tidak memimpin sesi.
-
----
-
-### 1. Overview & Core Concept
-
-- **Apa yang Dibangun**: Sebuah modul arena kompetisi cerdas cermat kelompok *"Refleksia Grand Quiz Battle"* yang terintegrasi di Balai Kota dan Alun-alun Pusat. Siswa bergabung ke dalam tim, menekan tombol bel (buzzer) secara realtime, dan menjawab soal-soal DKV dalam batas waktu serentak.
-- **Target Pengguna**: Siswa SMK jurusan DKV (sebagai kontestan tim), Guru DKV / Master kikybahsoan (sebagai Host / Pemandu Kuis), dan Tamu / Wartawan (sebagai penonton dan peliput skor).
-- **Nilai Utama**: Membangun kolaborasi dan antusiasme belajar siswa dalam suasana kota virtual yang hidup, meriah, dan kompetitif secara sehat.
+- **Katalog Model Bangunan Baru (Confirmed)**: Pustaka stok model 3D isometrik low-poly dalam 3 kategori utama:
+  1. **Gedung Modern, Sekolah, Laboratorium & Kantor** (Menara Kaca, Lab Inovasi, Gedung Riset, Studio Kreatif, Pusat Karier).
+  2. **Arena Games, Taman Hiburan & Panggung Acara** (Arcade Arena, Panggung Konser/Teater, Wahana Bianglala Mini, Arena Kompetisi E-Sports).
+  3. **Fasilitas Publik, Kafe, Taman & Dekorasi Kota** (Kafe Terbuka, Paviliun Taman Baca, Air Mancur Mini, Pos Informasi, Taman Sakura).
+- **Relokasi Bangunan & Fasilitas Publik Eksisting (Updated)**: Seluruh gedung asli kota (Balai Kota, Studio ON AIR, Perpustakaan, Pasar Prestasi, Kantor Pos, Pusat Refleksi, Lab DKV, Masjid Al-Hikmah, Bank Materi, Pencakar Langit, Bandara) dan fasilitas publik (Lapak Refleksia, Pohon Beringin Jurnal, Sudut Literasi, Api Unggun, Papan Pengumuman, Papan Peraturan, Wisma) dapat diklik lalu digeser (*drag-and-drop*) ke posisi baru di peta, disertai tombol **Reset ke Posisi Awal**.
+- **Pengaturan Pergerakan NPC Eksisting & Penambahan NPC Baru (Updated)**:
+  - **Edit NPC Saat Ini**: Mengubah posisi berjaga, kecepatan jalan, kalimat dialog, dan mode pergerakan NPC yang sudah ada (`Surya`, `Malik`, `Ma Uba`, `Patra`, `Pak Sufri`, `Wali Kota Sony`, dan `Komandan Nawa`).
+  - **Tambah NPC Baru**: Menambahkan karakter NPC baru dengan kustomisasi tampilan (nama, jabatan/peran, gender, warna pakaian), daftar kalimat sapaan saat diklik warga, serta pola pergerakan (**Diam Berjaga**, **Keliling Area / Wander Radius**, atau **Rute Patroli Waypoint** di mana titik-titik rutenya bisa diklik langsung di peta).
+- **Template Fungsi Interaktif & Drag Presisi (Confirmed)**: Mendukung **Snap ke Grid** maupun **Posisi Bebas**, serta 4 template fungsi siap pakai (**Arena Games/Kuis**, **Kotak Ide & Voting Warga**, **Informasi Fasilitas**, dan **Misi Komunitas**).
 
 ---
 
-### 2. User Experience & Visual Design
+## 1. Overview & Core Concept
 
-- **Alur Pengguna**:
-  1. **Akses Masuk**: Siswa atau Guru mendekati Balai Kota atau mengklik podium panggung Alun-alun untuk membuka antarmuka arena Cerdas Cermat.
-  2. **Lobi Pembagian Tim**: Siswa memilih tim (Tim Cyan / Tim Amber atau DKV 2 / DKV 3) dan siap di podium masing-masing.
-  3. **Mulai Pertandingan**: Guru (atau sistem otomatis dipandu Wali Kota @Sony) membunyikan bel tanda babak dimulai.
-  4. **Babak Pertandingan**:
-     - *Babak 1 (Pilihan Ganda Cepat)*: Semua tim menjawab serentak dalam waktu 20 detik.
-     - *Babak 2 (Rebutan Buzzer)*: Tim yang menekan bel tercepat mendapat hak menjawab pertama.
-     - *Babak 3 (Tebak Istilah DKV & Estafet)*: Pertanyaan poin ganda untuk penentuan juara.
-  5. **Selebrasi & Penganugerahan XP**: Pengumuman tim pemenang dengan efek confetti meriah, piala virtual, dan pembagian reward poin XP otomatis.
-
-- **Identitas Visual & Tema**:
-  - *Gaya Desain*: Panggung kuis megah berlatar arsitektur Balai Kota Refleksia dengan aksen emas (`#F59E0B`), biru langit (`#0284C7`), dan emerald (`#10B981`).
-  - *Tipografi*: Display elegan dan tegas menggunakan font sans tebal dengan angka tabular (`tabular-nums`) untuk timer hitung mundur dan skor tim.
-  - *Pencahayaan & Efek*: Efek sorot lampu podium kuis, tombol buzzer bersinar saat ditekan, serta animasi ticker papan skor di Alun-alun.
-
-- **Umpan Balik Interaktif**:
-  - Efek suara bel kuis (*chime buzzer*), efek detak timer detik-detik terakhir, dan suara perayaan kemenangan.
-  - Indikator visual jelas ketika tim sedang menekan bel atau waktu habis.
+- **What It Does**: Menghadirkan mode **Creator Studio** eksklusif pada HUD Master `kikybahsoan`. Saat aktif, seluruh elemen di atas peta Kota Refleksia menjadi kanvas interaktif yang dapat diedit: Master dapat menaruh gedung baru dari katalog, memindahkan gedung atau fasilitas publik yang sudah ada, mengatur rute jalan NPC lama, maupun menerjunkan NPC baru ke kota.
+- **Target Audience / Persona**:
+  - **Master / Creator (`kikybahsoan`)**: Arsitek utama Kota Refleksia yang merancang tata ruang, menyusun alur keramaian NPC, dan meluncurkan fasilitas/permainan baru secara langsung di atas peta.
+  - **Seluruh Warga Kota (Siswa, Guru, Tamu)**: Menikmati tata kota terbaru, bertegur sapa dengan NPC baru atau NPC yang berpatroli di rute baru, serta berinteraksi di fasilitas/gedung baru yang ditambahkan Master.
+- **Key Value**: Memberikan kendali penuh (*full sandbox control*) atas seluruh bangunan, fasilitas, dan kehidupan NPC di Kota Refleksia secara visual tanpa perlu menulis ulang kode.
 
 ---
 
-### 3. Key Product Decisions & Trade-Offs
+## 2. User Experience & Visual Design
 
-- **Keputusan 1: Integrasi dengan Bank Soal DKV yang Sudah Ada**
-  - *Pendekatan*: Memanfaatkan bank materi dan kuis DKV yang telah dihasilkan Guru di Bengkel Latihan dan Bank Materi AI, ditambah paket soal cerdas cermat khusus.
-  - *Alasan*: Materi selalu relevan dengan kurikulum SMK DKV dan tidak memerlukan input soal ulang yang memberatkan Guru.
+- **Key User Flows**:
+  1. **Aktivasi Creator Studio & Mode Edit**:
+     - Master menekan tombol **Creator Studio** di bilah atas.
+     - Tersedia 4 Tab Mode di dalam dock Creator Studio:
+       - **Tab 1: Katalog Bangunan Baru** (Drag & drop stok model Gedung, Lab, Arena Games, Kafe, Taman).
+       - **Tab 2: Tata Letak Kota Eksisting** (Pilih atau klik langsung gedung/fasilitas publik yang sudah ada di peta untuk digeser posisinya, diubah namanya/ikonnya, atau di-reset ke posisi bawaan).
+       - **Tab 3: Kelola & Tambah NPC** (Pilih NPC yang sudah ada seperti *Sony, Surya, Malik, Ma Uba, Patra, Pak Sufri, Nawa* atau klik **+ Tambah NPC Baru**; atur posisi, mode jalan, kecepatan, rute patroli, dan dialognya).
+       - **Tab 4: Inspector Kegunaan & Template** (Mengatur isi kuis/mini-game, papan ide warga, atau informasi fasilitas pada bangunan yang dipilih).
+  2. **Drag & Drop Langsung di Peta (Snap Grid & Posisi Bebas)**:
+     - Ketika mode Creator aktif, mengklik dan menahan (*pointer down & drag*) pada bangunan baru, bangunan eksisting, fasilitas publik, maupun NPC di atas kanvas akan langsung menggeser posisinya mengikuti kursor.
+     - Tersedia tombol pengalih **Snap Grid (0.5 petak)** untuk penataan sejajar yang rapi atau **Posisi Bebas** untuk penempatan organik.
+  3. **Editor Pergerakan & Rute Patroli NPC**:
+     - Saat sebuah NPC (baik NPC asli maupun NPC baru) dipilih, Master dapat memilih 1 dari 3 mode gerak:
+       - **Diam di Tempat (Statis)**: NPC berdiri di koordinat `(wx, wy)` dengan pilihan arah hadap (*kiri-depan, kanan-depan, kiri-belakang, kanan-belakang*).
+       - **Keliling Area (Wander Radius)**: NPC berjalan santai secara acak di sekitar titik jangkar (*anchor*) dengan slider **Radius Area (`0.5m – 6.0m`)** dan **Kecepatan Jalan**.
+       - **Rute Patroli (Waypoints)**: Master dapat menekan tombol **Rekam Titik Rute di Peta**, lalu mengklik beberapa titik di jalan raya/jembatan/taman. Garis putus-putus rute patroli akan tampil di atas peta, dan NPC akan berjalan menyusuri titik-titik tersebut secara berurutan.
+  4. **Simpan & Publikasi Otomatis ke Seluruh Warga**:
+     - Menekan tombol **Simpan ke Kota** akan menyimpan seluruh perubahan (gedung baru, posisi gedung/fasilitas lama, serta konfigurasi NPC lama & baru) dan menyiarkannya secara *real-time* ke seluruh warga.
 
-- **Keputusan 2: Arsitektur Realtime Hybrid (WebSocket Mesh + Server Authority)**
-  - *Pendekatan*: Sinkronisasi status bel buzzer, timer, dan skor menggunakan jaringan *Realtime Presence Mesh* yang sudah berjalan di Refleksia City, dengan Express API sebagai penyimpan riwayat pertandingan.
-  - *Alasan*: Latensi sangat rendah (<50ms) antar perangkat laptop, tablet, dan HP tanpa memerlukan infrastruktur server eksternal tambahan.
+- **Visual Identity & Theme**:
+  - *Aesthetic Direction*: Studio arsitektur & sutradara kota isometrik berbalut *deep obsidian glass* (`#0f172a/90`) yang elegan dan tidak menghalangi pandangan ke kanvas peta.
+  - *Color Palette & Mood*: Aksen *Electric Cyan* (`#06b6d4`) untuk seleksi bangunan, *Amber Gold* (`#f59e0b`) untuk jalur patroli dan seleksi NPC, serta *Emerald Green* (`#10b981`) untuk indikator penyimpanan dan posisi valid.
+  - *Typography & Hierarchy*: `Plus Jakarta Sans` untuk navigasi panel dan formulir template; `JetBrains Mono` (`tabular-nums`) untuk pembacaan koordinat `(wx, wy)`, radius gerak, dan kecepatan NPC.
+  - *Component Styling & Layout*: *Floating Creator Dock* di sisi kiri/kanan yang dapat disembunyikan (*minimize*) menjadi bilah mini saat Master ingin melihat peta secara penuh.
 
-- **Keputusan 3: Penanganan Khusus untuk Mode Tamu (Wartawan)**
-  - *Pendekatan*: Tamu tetap memiliki status *View Only*—dapat menyaksikan jalannya pertandingan langsung di Balai Kota dan melihat papan skor tanpa tombol menjawab soal.
-  - *Alasan*: Menjaga integritas kompetisi siswa sekaligus konsisten dengan peran jurnalis tamu yang telah ditetapkan.
+- **Interactive Feedback & Motion**:
+  - Indikator cincin sorot (*selection ring*) di bawah bangunan, fasilitas, atau kaki NPC yang sedang diedit.
+  - Visualisasi lingkaran radius gerak (*wander radius circle*) atau garis penghubung titik patroli (*waypoint path lines*) di atas tanah saat mengedit pergerakan NPC.
 
 ---
 
-### 4. Technical Architecture & Data Strategy
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Sistem Override Non-Destruktif untuk Bangunan, Fasilitas & NPC Eksisting**
+  - *Chosen Approach*: Menyimpan perubahan posisi bangunan/fasilitas asli dan perubahan pergerakan NPC asli sebagai lapisan konfigurasi dinamis (*override map*) di atas data bawaan kota.
+  - *Why*: Memungkinkan seluruh gedung, fasilitas publik (kafe, pohon beringin, sudut literasi, api unggun, papan pengumuman), dan ke-7 NPC utama dipindahkan atau diubah perilakunya secara bebas tanpa merusak fungsi khusus masing-masing (misalnya *Pak Sufri* tetap melayani tiket hutan & jual ikan di posisi barunya, *Komandan Nawa* tetap mencatat buku tamu gerbang, dan *Balai Kota* tetap membuka modal Balai Kota di lokasi barunya), serta mendukung fitur **Reset ke Default** kapan saja.
+- **Decision 2: Mesin Perilaku NPC Terpadu (Static, Wander, & Multi-Waypoint Patrol)**
+  - *Chosen Approach*: Memperbarui siklus pembaruan gerak NPC di kanvas agar membaca konfigurasi *real-time* dari Creator Studio (mendukung penambahan NPC baru secara langsung ke dalam *array* `npcsRef` tanpa perlu *reload* halaman) lengkap dengan logika penyeberangan jembatan sungai otomatis jika rute NPC melintasi Refleksia Timur.
+  - *Why*: Agar Master `kikybahsoan` dapat langsung melihat NPC berjalan mengikuti rute atau kecepatan baru detik itu juga saat diedit.
+
+---
+
+## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+
+- **Architecture & Component Diagram**:
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        BALAI KOTA & ALUN-ALUN                          │
-│                                                                        │
-│  ┌──────────────────┐    ┌────────────────────┐    ┌────────────────┐  │
-│  │   Podium Tim A   │    │  Panggung Host /   │    │  Podium Tim B  │  │
-│  │   (Buzzer & UI)  │    │  Juri (@Sony/Guru) │    │  (Buzzer & UI) │  │
-│  └────────┬─────────┘    └─────────┬──────────┘    └────────┬───────┘  │
-│           │                        │                        │          │
-└───────────┼────────────────────────┼────────────────────────┼──────────┘
-            │                        │                        │           
-            ▼                        ▼                        ▼           
-┌────────────────────────────────────────────────────────────────────────┐
-│                 CERDAS CERMAT REALTIME CONTROLLER                      │
-│                                                                        │
-│   • State Mesin: LOBBY ──► QUESTION_ACTIVE ──► BUZZER_LOCKED           │
-│                  ▲                                  │                  │
-│                  └─────── ROUND_RESULT ◄────────────┘                  │
-│   • Timer Countdown Engine (15s / 20s)                                 │
-│   • Buzzer Lockout Arbiter (Penentu tim pertama menekan bel)           │
-│   • Auto-Score Calculator & XP Distributor                             │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │                                     
-                   ┌────────────────┴────────────────┐                    
-                   ▼                                 ▼                    
-┌─────────────────────────────────────┐  ┌───────────────────────────────┐
-│       REALTIME PRESENCE MESH        │  │       STORAGE & SPREADSHEET   │
-│  • WSS MQTT Event Broadcast         │  │  • Riwayat Juara Balai Kota   │
-│  • Local BroadcastChannel           │  │  • Poin XP Siswa & Leaderboard│
-│  • Express SSE Stream Fallback      │  │  • Sinkronisasi GAS           │
-└─────────────────────────────────────┘  └───────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        HUD Mode Master (kikybahsoan)                         │
+│  [🚶 Jalan | ⚡ Teleport]   [🏗️ Creator Studio Toggle]   [💾 Simpan ke Kota] │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │
+     ┌─────────────────────────────────┼─────────────────────────────────┐
+     ▼                                 ▼                                 ▼
+┌─────────────────────────┐ ┌───────────────────────────┐ ┌─────────────────────────┐
+│ 1. Bangunan & Katalog   │ │ 2. Relokasi Kota Eksisting│ │ 3. Studio NPC & Rute    │
+│ ─────────────────────── │ │ ───────────────────────── │ │ ─────────────────────── │
+│ • Stok Model 3 Kategori │ │ • Geser Gedung Utama      │ │ • Edit 7 NPC Utama Kota │
+│ • Drag & Drop ke Peta   │ │ • Geser Fasilitas Publik  │ │ • + Tambah NPC Baru     │
+│ • Template: Games/Kuis, │ │   (Kafe, Beringin, Api    │ │ • Mode: Diam, Wander    │
+│   Ide Warga, Fasilitas, │ │   Unggun, Literasi, Papan)│ │   Radius, Rute Patroli  │
+│   & Misi Komunitas      │ │ • Tombol Reset Default    │ │ • Edit Dialog & Kostum  │
+└────────────┬────────────┘ └─────────────┬─────────────┘ └────────────┬────────────┘
+             │                            │                            │
+             └────────────────────────────┼────────────────────────────┘
+                                          ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                   Isometric World Canvas & Simulation Loop                   │
+│ ──────────────────────────────────────────────────────────────────────────── │
+│ • Unified Raycaster: Deteksi klik & drag pada Gedung Baru, Gedung Lama,      │
+│   Fasilitas Publik, dan NPC saat Creator Mode aktif                          │
+│ • Visual Gizmos: Lingkaran Radius NPC, Garis Rute Waypoint, & Grid Snap      │
+│ • Dynamic Collision & Proximity: Pintu masuk gedung & kolisi otomatis ikut   │
+│   berpindah mengikuti koordinat gedung yang digeser                          │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│             Multi-Layer Persistence (Local + Broadcast + Cloud)              │
+│ ──────────────────────────────────────────────────────────────────────────── │
+│ • Menyimpan state terpadu `CityCreatorState`:                                │
+│   - `customBuildings[]` (Gedung, Games, Ide & Fasilitas baru)                │
+│   - `existingOverrides{}` (Koordinat baru Gedung & Fasilitas Publik asli)    │
+│   - `npcOverrides{}` & `customNpcs[]` (Posisi, rute, speed & dialog NPC)     │
+│ • Disinkronkan ke semua warga via BroadcastChannel & Cloud Spreadsheet Sync  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Entitas Data Utama**:
-  - `QuizBattleRoom`: ID ruangan, status ronde, daftar peserta per tim, soal aktif, sisa waktu timer.
-  - `TeamScore`: Akumulasi poin tim, waktu respons rata-rata, riwayat jawaban benar.
-  - `BuzzerEvent`: Timestamp milidetik tim yang menekan bel pertama untuk hak menjawab.
-
----
-
-### 5. Tahapan Eksekusi Pembangunan
-
-1. **Pembuatan Komponen Arena Cerdas Cermat**:
-   - Merancang modal dan antarmuka panggung kuis interaktif di Balai Kota (`CerdasCermatModal.tsx`).
-   - Menyediakan tampilan podium untuk Tim A, Tim B, dan Panggung Juri Guru/Wali Kota Sony.
-2. **Implementasi Logika Buzzer & Timer Realtime**:
-   - Menghubungkan event bel kuis serentak dengan jaminan penentu tercepat (*lockout arbiter*).
-   - Sinkronisasi timer mundur serentak untuk semua pemain di perangkat masing-masing.
-3. **Panel Kontrol Pemandu Guru**:
-   - Tombol kontrol kuis untuk Guru: Mulai Ronde, Lanjut Soal, Beri Poin Bonus Tim, atau Mode Panduan Otomatis Wali Kota Sony.
-4. **Pemberian Reward & Papan Juara Alun-alun**:
-   - Integrasi perolehan poin XP tim ke profil siswa yang menang.
-   - Papan rekapitulasi juara cerdas cermat di Balai Kota.
-5. **Verifikasi & Pengujian Antar Perangkat**:
-   - Memastikan responsivitas dan ringannya rendering di Laptop, Tablet, dan HP.
+- **Data Model & State**:
+  - `CityCreatorState`:
+    1. `customBuildings: CreatorBuildingItem[]` — Bangunan baru dari katalog beserta konfigurasi template interaksinya (`games`, `ideas`, `facility_info`, `community_mission`) dan daftar kiriman ide/skor warga.
+    2. `buildingOverrides: Record<string, { wx: number; wy: number; name?: string; tagline?: string; icon?: string }>` — Menyimpan perubahan posisi dan label untuk gedung-gedung utama (`BUILDINGS_INFO`) serta fasilitas publik (`cafe`, `beringin`, `literacy_corner`, `campfire`, `announcement_board`, `rules_board`, dan unit `wisma`).
+    3. `npcConfigs: CreatorNpcConfig[]` — Mencakup *override* untuk ke-7 NPC bawaan (`surya`, `malik`, `ma_uba`, `patra`, `sufri`, `sony`, `nawa`) serta daftar NPC baru buatan Master, berisi `id`, `name`, `handle`, `roleLabel`, `roleStyle`, `gender`, `shirtColor`, `pantsColor`, `hairColor`, `wx`, `wy`, `moveMode` (`'static'` | `'wander'` | `'patrol'`), `wanderRadius`, `patrolWaypoints`, `speed`, `facing`, dan `speeches[]`.
+- **Interactive Component & State Mapping**:
+  - **Pemindahan Gedung & Fasilitas Eksisting**:
+    - Ketika gedung atau fasilitas asli digeser di peta, fungsi perenderan, deteksi klik, batas kolisi (`SOLID_BUILDING_OBSTACLES`), dan titik berhentinya avatar secara dinamis menghitung selisih perpindahan `(\Delta wx, \Delta wy)` dari posisi awal gedung tersebut.
+  - **Editor Rute Patroli NPC di Atas Peta**:
+    - Ketika Master memilih mode **Rute Patroli** pada sebuah NPC dan mengaktifkan tombol **+ Titik Rute di Peta**, setiap klik di atas tanah kanvas akan menambahkan koordinat `[wx, wy]` ke dalam `patrolWaypoints` NPC tersebut dan menggambar garis rute bernomor `1 → 2 → 3` secara visual di atas peta.

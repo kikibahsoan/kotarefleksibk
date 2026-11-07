@@ -102,6 +102,126 @@ export const INITIAL_MATERI: Materi[] = [
       'Bagaimana kebiasaan menata folder dan layer secara berurutan meningkatkan efisiensi kerjamu sebagai calon desainer grafis?',
     ],
   },
+  {
+    id: 'materi-pk-pencakar-langit',
+    title: 'Menara Karier: Peta Profesi Industri Kreatif & Cita-cita Lulusan SMK',
+    subject: 'Bimbingan Karier & Kewirausahaan DKV',
+    targetClass: 'X DKV 2 & X DKV 3',
+    tujuanPembelajaran:
+      'Peserta didik mampu memetakan peluang karier di industri kreatif digital serta menyusun langkah persiapan portofolio menuju cita-cita masa depan.',
+    content:
+      'BAB 1 — MENATAP MASA DEPAN DARI PUNCAK GEDUNG PENCAKAR LANGIT\nSetiap gedung tinggi dibangun dari fondasi yang kuat. Begitu pula karier seorang lulusan SMK Desain Komunikasi Visual (DKV): cita-cita besar dimulai dari kebiasaan belajar dan portofolio yang kamu bangun sejak bangku kelas X.\n\n1. Empat Jalur Utama Karier Lulusan SMK (BMW+)\n• Bekerja (Profesional Industri): Graphic Designer, UI/UX Designer, Motion Graphic Artist, Fotografer/Videografer Komersial, atau Social Media Specialist.\n• Melanjutkan Studi (Perguruan Tinggi): Melanjutkan ke jurusan DKV, Ilmu Komunikasi, Animasi, atau Informatika.\n• Wirausaha (Creativepreneur): Membangun studio desain mandiri, percetakan kreatif, agensi konten digital, atau bisnis merchandise.\n• Freelancer Global: Mengerjakan proyek desain dari klien nasional maupun internasional secara jarak jauh.\n\n2. Aktivitas Gedung Pencakar Langit\nTentukan 1 profesi impianmu, identifikasi 3 keahlian teknis (hard skill) dan 3 karakter kerja (soft skill) yang wajib kamu latih mulai semester ini.',
+    link: PDF_MODUL_URL,
+    location: 'pencakar_langit',
+    createdAt: '2026-11-06',
+    isNew: true,
+    isActive: true,
+    customQuestions: [
+      'Profesi atau jalur karier apa yang paling ingin kamu capai setelah lulus SMK nanti, dan mengapa profesi tersebut menarik bagimu?',
+      'Keahlian apa yang saat ini masih perlu kamu latih agar siap mencapai cita-cita tersebut?',
+      'Apa 1 langkah nyata yang akan kamu lakukan minggu ini untuk membangun portofolio masa depanmu?',
+    ],
+  },
+  {
+    id: 'materi-pk-latihan-tentara',
+    title: 'Ksatria Disiplin: Manajemen Waktu, Tanggung Jawab & Kekompakan Tim',
+    subject: 'Penguatan Karakter & Budaya Kerja Industri',
+    targetClass: 'X DKV 2 & X DKV 3',
+    tujuanPembelajaran:
+      'Peserta didik mampu menerapkan kedisiplinan waktu, tanggung jawab penyelesaian tugas, dan komunikasi tim yang kompak dalam proyek kelas.',
+    content:
+      'BAB 1 — DISIPLIN DAN KERJA TIM ALA KSATRIA LAPANGAN\nDi dunia kerja dan industri kreatif, bakat desain yang hebat tidak akan cukup tanpa kedisiplinan terhadap tenggat waktu (deadline) dan kemampuan bekerja sama dalam tim.\n\n1. Tiga Pilar Karakter Ksatria SMK\n• Disiplin Waktu: Hadir tepat waktu, mengumpulkan tugas sesuai jadwal, dan tidak menunda pekerjaan hingga menit terakhir.\n• Tanggung Jawab Penuh: Menyelesaikan bagian tugas kelompok dengan standar terbaik tanpa saling lempar kesalahan.\n• Kerja Tim (Teamwork): Saling membantu rekan satu tim yang mengalami kesulitan teknis dan menghargai pembagian peran (ketua tim, ilustrator, penyunting teks, dan penyaji).\n\n2. Aktivitas Kemah Latihan Tentara\nLakukan evaluasi jujur terhadap kedisiplinan belajarmu minggu ini dan buat komitmen ketertiban bersama tim kelompokmu.',
+    link: PDF_MODUL_URL,
+    location: 'latihan_tentara',
+    createdAt: '2026-11-06',
+    isNew: true,
+    isActive: true,
+    customQuestions: [
+      'Kebiasaan disiplin apa yang sudah berhasil kamu jalankan dengan baik selama belajar di sekolah minggu ini?',
+      'Tantangan apa yang paling sering membuatmu atau kelompokmu terlambat menyelesaikan tugas proyek?',
+      'Bagaimana caramu meningkatkan kekompakan dan tanggung jawab saat bekerja dalam kelompok di tugas berikutnya?',
+    ],
+  },
+  {
+    id: 'materi-pk-museum-seni',
+    title: 'Kurasi Galeri: Apresiasi Karya Visual, Orisinalitas & Proses Kreatif',
+    subject: 'Dasar Desain Komunikasi Visual & Estetika',
+    targetClass: 'X DKV 2 & X DKV 3',
+    tujuanPembelajaran:
+      'Peserta didik mampu mengapresiasi karya seni/desain secara objektif serta menampilkan karya orisinal dengan pesan visual yang kuat.',
+    content:
+      'BAB 1 — MEMAJANG KARYA DAN MENGHARGAI PROSES KREATIF\nMuseum Seni Kota Refleksia adalah ruang bagi setiap warga untuk memamerkan karya terbaiknya—mulai dari sketsa ilustrasi, poster digital, fotografi, hingga tipografi.\n\n1. Cara Mengapresiasi Karya Teman dengan Santun\n• Amati (Observe): Perhatikan komposisi warna, garis, dan bentuk pada karya.\n• Pahami Pesan (Interpret): Tangkap cerita atau pesan positif yang ingin disampaikan pembuat karya.\n• Beri Masukan Membangun (Constructive Feedback): Sampaikan kekuatan karya terlebih dahulu sebelum memberikan saran perbaikan yang sopan.\n\n2. Menjaga Orisinalitas Karya\nKreator sejati menghargai hak cipta dan tidak menjiplak karya orang lain. Gunakan referensi sebagai inspirasi untuk melahirkan gaya visualmu sendiri.',
+    link: PDF_MODUL_URL,
+    location: 'museum_seni',
+    createdAt: '2026-11-06',
+    isNew: true,
+    isActive: true,
+    customQuestions: [
+      'Karya desain atau seni seperti apa yang paling membanggakan yang pernah kamu buat atau ingin kamu pajang di Museum Seni?',
+      'Bagian mana dari proses kreatif (mencari ide, membuat sketsa, atau pewarnaan/finishing) yang menurutmu paling menantang?',
+      'Bagaimana caramu menjaga agar karyamu tetap orisinal dan memiliki ciri khas tersendiri?',
+    ],
+  },
+  {
+    id: 'materi-pk-panggung-kota',
+    title: 'Komunikasi Panggung: Teknik Presentasi Karya & Pengumuman Kelas',
+    subject: 'Komunikasi Publik & Presentasi Desain',
+    targetClass: 'X DKV 2 & X DKV 3',
+    tujuanPembelajaran:
+      'Peserta didik mampu mempresentasikan gagasan karya dan menyampaikan informasi di depan kelas dengan bahasa yang jelas, santun, dan percaya diri.',
+    content:
+      'BAB 1 — TAMPIL PERCAYA DIRI DI PANGGUNG KOTA REFLEKSIA\nDesainer yang hebat bukan hanya mahir membuat karya di balik layar, tetapi juga mampu menceritakan ide di balik karyanya (design pitching) di depan guru, teman kelas, maupun klien.\n\n1. Struktur Presentasi 3 Menit yang Memukau\n• Pembukaan (30 Detik): Sapa audiens dengan ramah dan sebutkan masalah/tujuan utama dari karya yang kamu buat.\n• Inti Karya (2 Menit): Jelaskan alasan pemilihan konsep, warna, tipografi, dan bagaimana karya tersebut menjawab kebutuhan audiens.\n• Penutup & Ajakan (30 Detik): Simpulkan manfaat karya dan buka sesi tanya jawab dengan sikap terbuka.\n\n2. Etika Menjadi Penonton yang Baik\nSimak rekan yang sedang tampil di panggung, berikan tepuk tangan apresiasi, dan ajukan pertanyaan yang relevan dengan sopan.',
+    link: PDF_MODUL_URL,
+    location: 'panggung_kota',
+    createdAt: '2026-11-06',
+    isNew: true,
+    isActive: true,
+    customQuestions: [
+      'Apa yang biasanya kamu rasakan saat diminta maju mempresentasikan karya atau berbicara di depan kelas?',
+      'Bagian mana dari teknik presentasi (menyusun materi bicara, kontak mata, atau menjawab pertanyaan) yang masih perlu kamu latih?',
+      'Tips apa yang akan kamu terapkan agar presentasi kelompokmu berikutnya di Panggung Kota berjalan lebih lancar?',
+    ],
+  },
+  {
+    id: 'materi-pk-mall-kota',
+    title: 'Literasi Belanja Bijak: Manajemen Poin, Skala Prioritas & Nilai Karya',
+    subject: 'Projek Kreatif & Literasi Finansial',
+    targetClass: 'X DKV 2 & X DKV 3',
+    tujuanPembelajaran:
+      'Peserta didik mampu membedakan kebutuhan dan keinginan serta mengelola sumber daya/poin secara bijak dan produktif.',
+    content:
+      'BAB 1 — BELANJA BIJAK DAN MENGHARGAI USAHA DI MALL PUSAT KOTA\nMall Pusat Kota Refleksia bukan sekadar tempat berbelanja atribut warga, melainkan laboratorium nyata untuk melatih literasi finansial dan skala prioritas bagi calon wirausahawan kreatif.\n\n1. Membedakan Kebutuhan vs Keinginan\n• Prioritas Utama (Kebutuhan Produktif): Peralatan dan sumber daya yang mendukung peningkatan kompetensi belajar serta kualitas karya.\n• Prioritas Tambahan (Apresiasi Diri): Atribut hobi atau hiburan yang diambil setelah target utama terpenuhi dan tabungan poin tetap aman.\n\n2. Memahami Nilai Ekonomi Karya Desain\nSaat berbelanja di Mall, amati bagaimana kemasan produk, logo brand, dan tata letak etalase memengaruhi daya tarik pembeli.',
+    link: PDF_MODUL_URL,
+    location: 'mall_kota',
+    createdAt: '2026-11-06',
+    isNew: true,
+    isActive: true,
+    customQuestions: [
+      'Bagaimana caramu menentukan skala prioritas antara barang/hal yang benar-benar kamu butuhkan dengan yang sekadar kamu inginkan?',
+      'Saat melihat produk di pusat perbelanjaan, elemen desain kemasan apa yang paling cepat menarik perhatianmu?',
+      'Bagaimana rencana pengelolaan poin XP dan waktu belajarmu agar tetap seimbang dan produktif?',
+    ],
+  },
+  {
+    id: 'materi-pk-bandara',
+    title: 'Penerbangan Belajar: Menyusun Peta Perjalanan & Target Jangka Panjang',
+    subject: 'Perencanaan Belajar & Pengembangan Diri',
+    targetClass: 'X DKV 2 & X DKV 3',
+    tujuanPembelajaran:
+      'Peserta didik mampu merumuskan target belajar jangka pendek, menengah, dan panjang layaknya rencana penerbangan yang terarah.',
+    content:
+      'BAB 1 — LEPAS LANDAS MENUJU TARGET JANGKA PANJANG\nSebuah pesawat di Bandara Refleksia tidak pernah terbang tanpa koordinat tujuan dan rencana jalur penerbangan (flight plan). Begitu pula perjalanan belajarmu selama 3 tahun di SMK.\n\n1. Tiga Terminal Perjalanan Belajar Siswa SMK\n• Terminal 1 — Target Jangka Pendek (Mingguan/Bulanan): Menuntaskan modul tepat waktu, menguasai dasar perangkat lunak desain, dan rajin menulis refleksi.\n• Terminal 2 — Target Jangka Menengah (Semester/Tahunan): Menghasilkan minimal 5 karya portofolio terbaik dan siap mengikuti Praktik Kerja Lapangan (PKL).\n• Terminal 3 — Target Jangka Panjang (Lulus SMK): Memiliki portofolio profesional, sertifikasi kompetensi, dan kesiapan memasuki dunia industri atau perguruan tinggi.\n\n2. Menghadapi Cuaca Buruk (Rintangan Belajar)\nJika menemui materi sulit (turbulensi), jangan berhenti terbang—hubungi menara pemandu (bertanya pada Guru) dan perbaiki strategi belajarmu.',
+    link: PDF_MODUL_URL,
+    location: 'bandara',
+    createdAt: '2026-11-06',
+    isNew: true,
+    isActive: true,
+    customQuestions: [
+      'Apa "destinasi utama" atau target terbesar yang ingin kamu capai pada akhir semester ini?',
+      'Rintangan atau "cuaca buruk" apa yang paling sering menghambat perjalanan belajarmu akhir-akhir ini?',
+      'Tuliskan 3 langkah persiapan ("cek pra-terbang") agar target jangka panjangmu di SMK dapat tercapai tepat waktu!',
+    ],
+  },
 ];
 
 export const INITIAL_OBJECTIVES: LearningObjective[] = [
@@ -139,6 +259,48 @@ export const INITIAL_OBJECTIVES: LearningObjective[] = [
     goalStatement: 'Murid mampu membandingkan efisiensi algoritma Linear Search dan Binary Search pada persoalan pengorganisasian aset visual digital.',
     indicator: 'Mampu membuktikan efisiensi jumlah langkah pencarian data terurut menggunakan Binary Search.',
     deadline: '2026-11-05',
+  },
+  {
+    id: 'tp-pk-01',
+    materiId: 'materi-pk-pencakar-langit',
+    goalStatement: 'Murid mampu memetakan peluang karier industri kreatif dan menyusun rencana portofolio menuju cita-cita.',
+    indicator: 'Menentukan target profesi impian beserta keahlian teknis dan karakter kerja yang harus dilatih.',
+    deadline: '2026-11-20',
+  },
+  {
+    id: 'tp-pk-02',
+    materiId: 'materi-pk-latihan-tentara',
+    goalStatement: 'Murid mampu menerapkan kedisiplinan waktu, tanggung jawab, dan kerja sama tim dalam tugas kolaboratif.',
+    indicator: 'Menyelesaikan komitmen disiplin harian dan pembagian peran kerja tim secara tertib.',
+    deadline: '2026-11-22',
+  },
+  {
+    id: 'tp-pk-03',
+    materiId: 'materi-pk-museum-seni',
+    goalStatement: 'Murid mampu memajang karya kreatif dan memberikan apresiasi objektif yang santun terhadap karya rekan.',
+    indicator: 'Menampilkan deskripsi konsep karya dan memberikan umpan balik apresiatif di Museum Seni.',
+    deadline: '2026-11-25',
+  },
+  {
+    id: 'tp-pk-04',
+    materiId: 'materi-pk-panggung-kota',
+    goalStatement: 'Murid mampu mempresentasikan gagasan karya dan pengumuman kelas secara terstruktur dan percaya diri.',
+    indicator: 'Menyusun naskah presentasi 3 menit (Pembukaan, Inti Konsep, Penutup) di Panggung Kota.',
+    deadline: '2026-11-27',
+  },
+  {
+    id: 'tp-pk-05',
+    materiId: 'materi-pk-mall-kota',
+    goalStatement: 'Murid mampu mempraktikkan literasi belanja bijak berdasarkan skala prioritas kebutuhan belajar.',
+    indicator: 'Mengelola perolehan XP dan memilih atribut produktif secara terukur di Mall Pusat Kota.',
+    deadline: '2026-11-29',
+  },
+  {
+    id: 'tp-pk-06',
+    materiId: 'materi-pk-bandara',
+    goalStatement: 'Murid mampu menyusun peta perjalanan belajar (learning roadmap) jangka pendek, menengah, dan panjang.',
+    indicator: 'Menerbitkan Boarding Pass Target Belajar lengkap dengan langkah antisipasi kendala belajar.',
+    deadline: '2026-12-05',
   },
 ];
 

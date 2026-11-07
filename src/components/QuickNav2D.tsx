@@ -10,7 +10,7 @@ interface QuickNav2DProps {
   onOpenTeacher?: () => void;
 }
 
-const BUILDING_ICONS: Record<BuildingId, string> = {
+const BUILDING_ICONS: Partial<Record<BuildingId, string>> = {
   balai_kota: '🏛️',
   perpustakaan: '📚',
   taman_refleksi: '🌍',
@@ -21,9 +21,15 @@ const BUILDING_ICONS: Record<BuildingId, string> = {
   masjid: '🕌',
   bank_materi: '🏦',
   monumen_warga: '⛲',
+  pencakar_langit: '🏙️',
+  latihan_tentara: '⛺',
+  museum_seni: '🎨',
+  panggung_kota: '🎭',
+  mall_kota: '🛍️',
+  bandara: '✈️',
 };
 
-const BUILDING_DESCRIPTIONS: Record<BuildingId, string> = {
+const BUILDING_DESCRIPTIONS: Partial<Record<BuildingId, string>> = {
   balai_kota: 'Misi hari ini, pengumuman sekolah, dan target pembelajaran aktif.',
   perpustakaan: 'Baca rak 5 buku materi detail, modul Bank Materi AI Guru, tulis jurnal 4F, dan arsip refleksi.',
   taman_refleksi: 'Tulis refleksi pemahaman 3 pertanyaan dan dapatkan +3 XP per refleksi.',
@@ -34,6 +40,12 @@ const BUILDING_DESCRIPTIONS: Record<BuildingId, string> = {
   masjid: 'Belajar membaca Iqro (Jilid 1 s.d. 6) bersuara tajwid/makhraj serta panduan lengkap Tuntunan Sholat & Wudhu.',
   bank_materi: 'Khusus Guru • Input Mata Pelajaran, Elemen, TP, Materi Esensial & Generate AI otomatis tersebar ke seluruh bangunan kota + Spreadsheet.',
   monumen_warga: 'Sapa & obrolan langsung sesama warga dan teman kelas di tengah kota.',
+  pencakar_langit: 'Pusat Kota (Setelah Sungai) • Tantangan karier, plaza, dan cita-cita masa depan.',
+  latihan_tentara: 'Pusat Kota (Setelah Sungai) • Lapangan latihan disiplin waktu, tanggung jawab, dan kerja tim.',
+  museum_seni: 'Pusat Kota (Setelah Sungai) • Galeri pameran karya visual dan apresiasi kreativitas.',
+  panggung_kota: 'Pusat Kota (Setelah Sungai) • Panggung terbuka untuk presentasi karya dan pengumuman kelas.',
+  mall_kota: 'Pusat Kota (Setelah Sungai) • Etalase belanja atribut warga dan literasi finansial bijak.',
+  bandara: 'Pusat Kota (Setelah Sungai) • Terminal perjalanan belajar dan target jangka panjang.',
 };
 
 export const QuickNav2D: React.FC<QuickNav2DProps> = ({

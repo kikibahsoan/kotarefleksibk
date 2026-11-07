@@ -942,6 +942,45 @@ function doPost(e) {
         xpLog.timestamp || Date.now()
       ]);
       result.message = "Log XP Mingguan berhasil dicatat di Spreadsheet!";
+
+    } else if (action === 'sync_city_buildings') {
+      var buildings = Array.isArray(requestData.buildings) ? requestData.buildings : [];
+      var headersBangunan = [
+        'ID Bangunan',
+        'Nama Bangunan',
+        'Posisi X',
+        'Posisi Y',
+        'Jenis / Zona',
+        'Kategori',
+        'Deskripsi & Fungsi',
+        'Tujuan Belajar',
+        'Kapasitas',
+        'Jam Operasional',
+        'Status',
+        'Waktu Update'
+      ];
+      var bSheet = getOrCreateSheet('Data_Bangunan_Kota', headersBangunan, '#0284C7');
+      if (bSheet.getLastRow() > 1) {
+        bSheet.deleteRows(2, bSheet.getLastRow() - 1);
+      }
+      for (var bi = 0; bi < buildings.length; bi++) {
+        var bItem = buildings[bi] || {};
+        bSheet.appendRow([
+          bItem.id || '',
+          bItem.name || '',
+          Number(bItem.wx) || 0,
+          Number(bItem.wy) || 0,
+          bItem.zone || 'Pusat Kota',
+          bItem.category || '',
+          bItem.description || '',
+          bItem.learningObjective || '',
+          Number(bItem.capacity) || 35,
+          bItem.openingHours || '06.00 - 22.00 WITA',
+          bItem.status || 'Terbuka',
+          bItem.updatedAt || new Date().toLocaleString('id-ID')
+        ]);
+      }
+      result.message = "Sheet Data_Bangunan_Kota berhasil disinkronkan!";
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))

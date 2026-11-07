@@ -8,7 +8,13 @@ export type BuildingId =
   | 'pasar_prestasi'
   | 'monumen_warga'
   | 'masjid'
-  | 'bank_materi';
+  | 'bank_materi'
+  | 'pencakar_langit'
+  | 'latihan_tentara'
+  | 'museum_seni'
+  | 'panggung_kota'
+  | 'mall_kota'
+  | 'bandara';
 
 export interface PublicChatMessage {
   id: string;
@@ -68,6 +74,8 @@ export interface Materi {
   location: BuildingId;
   createdAt: string;
   isNew?: boolean;
+  isActive?: boolean;
+  hiddenClasses?: string[];
   customQuestions?: string[];
   elemen?: string;
   tujuanPembelajaran?: string;
@@ -391,6 +399,251 @@ export interface CityEntryLogEntry {
   timestamp: number;
 }
 
+// ============================================================================
+// MASTER CREATOR STUDIO (DRAG & DROP CITY, FACILITY & NPC BUILDER)
+// ============================================================================
 
+export type CreatorModelType =
+  // 1. Gedung Modern, Sekolah, Laboratorium & Kantor
+  | 'modern_tower'
+  | 'innovation_lab'
+  | 'school_pavilion'
+  | 'creative_studio'
+  | 'office_hq'
+  // 2. Arena Games, Taman Hiburan & Panggung Acara
+  | 'arcade_arena'
+  | 'concert_stage'
+  | 'ferris_park'
+  | 'esports_dome'
+  // 3. Fasilitas Publik, Kafe, Taman & Dekorasi Kota
+  | 'open_cafe'
+  | 'reading_gazebo'
+  | 'fountain_plaza'
+  | 'info_kiosk'
+  | 'sakura_park';
 
+export type CreatorBuildingCategory = 'gedung_kantor' | 'arena_hiburan' | 'fasilitas_taman';
+
+export type CreatorTemplateType =
+  | 'games'
+  | 'ideas'
+  | 'facility_info'
+  | 'community_mission';
+
+export interface CreatorQuizItem {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation?: string;
+}
+
+export interface CreatorIdeaItem {
+  id: string;
+  authorId: string;
+  authorName: string;
+  className: string;
+  content: string;
+  votes: number;
+  votedBy: string[];
+  createdAt: string;
+}
+
+export interface CreatorMissionSubmission {
+  id: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  responseText: string;
+  createdAt: string;
+}
+
+export interface CreatorBuildingItem {
+  id: string;
+  name: string;
+  tagline: string;
+  icon: string;
+  category: CreatorBuildingCategory;
+  modelType: CreatorModelType;
+  wx: number;
+  wy: number;
+  scale: number;
+  accentColor: string;
+  roofColor: string;
+  hasCollision: boolean;
+  templateType: CreatorTemplateType;
+  templateData: {
+    welcomeText: string;
+    xpReward: number;
+    // 'games' template
+    gameTitle?: string;
+    quizItems?: CreatorQuizItem[];
+    highScores?: Array<{ studentId: string; studentName: string; score: number; date: string }>;
+    // 'ideas' template
+    ideaPrompt?: string;
+    ideas?: CreatorIdeaItem[];
+    // 'facility_info' template
+    infoContent?: string;
+    externalUrl?: string;
+    mediaCaption?: string;
+    // 'community_mission' template
+    missionChecklist?: string[];
+    submissions?: CreatorMissionSubmission[];
+  };
+  createdBy: string;
+  updatedAt: string;
+}
+
+export interface ExistingObjectOverride {
+  id: string; // e.g. 'balai_kota', 'cafe', 'tree_0', 'fountain_1', 'swing_struct_1', 'campfire', etc.
+  objectCategory: 'building' | 'facility' | 'tree' | 'bench' | 'swing' | 'campfire';
+  wx: number;
+  wy: number;
+  customName?: string;
+  customTagline?: string;
+  customIcon?: string;
+  isHidden?: boolean;
+}
+
+export type CreatorPropCategory = 'tree' | 'bench' | 'swing' | 'campfire';
+
+export type CreatorPropModel =
+  // Pohon (6 model)
+  | 'tree_oak_apple'
+  | 'tree_pine_spruce'
+  | 'tree_sakura_pink'
+  | 'tree_banyan_shady'
+  | 'tree_palm_tropical'
+  | 'tree_autumn_maple'
+  // Tempat Duduk / Bangku (5 model)
+  | 'bench_wood_classic'
+  | 'bench_white_minimal'
+  | 'bench_stone_marble'
+  | 'bench_picnic_table'
+  | 'bench_royal_gold'
+  // Ayunan (2 model)
+  | 'swing_wood_garden'
+  | 'swing_cyan_modern'
+  // Api Unggun (2 model)
+  | 'campfire_stone_ring'
+  | 'campfire_royal_brazier';
+
+export interface CreatorPropItem {
+  id: string;
+  name: string;
+  propCategory: CreatorPropCategory;
+  propModel: CreatorPropModel;
+  wx: number;
+  wy: number;
+  scale: number;
+  facing: 'down-left' | 'down-right';
+  accentColor?: string;
+}
+
+export type CreatorAnimalSpecies =
+  | 'deer_stag'
+  | 'deer_doe'
+  | 'kancil'
+  | 'rabbit'
+  | 'squirrel'
+  | 'fox'
+  | 'ground_bird'
+  | 'swan'
+  | 'cat'
+  | 'butterfly_flock';
+
+export type AnimalTimeCycle = 'all_day' | 'diurnal' | 'nocturnal';
+
+export type AnimalBehaviorCycle =
+  | 'graze_wander'
+  | 'playful_hop'
+  | 'orbit_patrol'
+  | 'stay_nest';
+
+export interface CreatorAnimalItem {
+  id: string;
+  name: string;
+  species: CreatorAnimalSpecies;
+  homeWx: number;
+  homeWy: number;
+  wanderRadius: number;
+  speed: number;
+  scale: number;
+  timeCycle: AnimalTimeCycle;
+  behaviorCycle: AnimalBehaviorCycle;
+  cycleDurationSec: number; // duration of each cycle phase (walk -> feed/graze -> rest)
+}
+
+export type CreatorTerrainType =
+  | 'road_asphalt'
+  | 'road_cobble'
+  | 'road_dirt'
+  | 'wood_deck'
+  | 'plaza_marble'
+  | 'sand_golden'
+  | 'flower_garden'
+  | 'grass_emerald'
+  | 'water_pond';
+
+export interface CreatorTerrainTile {
+  gx: number;
+  gy: number;
+  terrainType: CreatorTerrainType;
+}
+
+export type CreatorFenceModel =
+  | 'fence_wood_rustic'
+  | 'fence_white_picket'
+  | 'fence_iron_gold'
+  | 'fence_hedge_bush'
+  | 'fence_stone_brick';
+
+export interface CreatorFenceItem {
+  id: string;
+  name: string;
+  fenceModel: CreatorFenceModel;
+  wx: number;
+  wy: number;
+  axis: 'x' | 'y';
+  lengthTiles: number;
+  hasCollision: boolean;
+}
+
+export type NpcMovementMode = 'static' | 'wander' | 'patrol';
+
+export interface CreatorNpcConfig {
+  id: string; // e.g. 'surya', 'malik', 'ma_uba', 'patra', 'sufri', 'sony', 'nawa', or 'npc-custom-...'
+  isCustom: boolean;
+  name: string;
+  role: string;
+  gender: 'L' | 'P';
+  wx: number;
+  wy: number;
+  homeWx: number;
+  homeWy: number;
+  movementMode: NpcMovementMode;
+  wanderRadius: number; // e.g. 0.8 to 4.5
+  speed: number;        // e.g. 0.45 to 1.25
+  patrolWaypoints?: Array<{ wx: number; wy: number }>;
+  shirtColor: string;
+  pantsColor: string;
+  hairColor: string;
+  hatColor?: string;
+  speeches: string[];
+  facing?: number;
+  isHidden?: boolean;
+}
+
+export interface CityCreatorState {
+  version: number;
+  updatedAt: string;
+  updatedBy: string;
+  customBuildings: CreatorBuildingItem[];
+  existingOverrides: Record<string, ExistingObjectOverride>;
+  npcConfigs: Record<string, CreatorNpcConfig>;
+  customProps?: CreatorPropItem[];
+  customAnimals?: CreatorAnimalItem[];
+  terrainTiles?: Record<string, CreatorTerrainTile>;
+  customFences?: CreatorFenceItem[];
+}
 

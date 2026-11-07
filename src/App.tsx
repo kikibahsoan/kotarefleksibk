@@ -40,6 +40,8 @@ import { RuangGuruModal } from './components/modals/RuangGuruModal.tsx';
 import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal.tsx';
 import { MasjidModal } from './components/modals/MasjidModal.tsx';
 import { BankMateriModal } from './components/modals/BankMateriModal.tsx';
+import { PusatKotaBuildingModal } from './components/modals/PusatKotaBuildingModal.tsx';
+import { isPusatKotaBuilding } from './utils/aturanBakuKota.ts';
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
 import { LofiAudioControl } from './components/LofiAudioControl.tsx';
 import { getTimePeriodWita, TimePeriod } from './utils/lofiAudio.ts';
@@ -613,10 +615,11 @@ export default function App() {
     setCloudPhase('closing');
   };
 
-  // Pastikan warga yang sedang aktif di sesi ini tercatat oleh Penjaga Gerbang Nawa
+  // Pastikan warga yang sedang aktif di sesi ini tercatat oleh Penjaga Gerbang Nawa & data bangunan tersinkron ke Spreadsheet
   useEffect(() => {
     if (student && student.name) {
       StorageService.recordCityEntry(student);
+      StorageService.syncCityBuildingsToSpreadsheet();
     }
   }, [student?.id, student?.name]);
 
@@ -1457,6 +1460,53 @@ export default function App() {
           }}
           onRefreshBankMateri={refreshBankMateriState}
           onSelectBuilding={(id: BuildingId) => handleSelectBuilding(id)}
+        />
+      )}
+
+      {activeBuilding && isPusatKotaBuilding(activeBuilding) && (
+        <PusatKotaBuildingModal
+          buildingId={activeBuilding}
+          student={student}
+          materis={materis}
+          objectives={objectives}
+          reflections={reflections}
+          messages={messages}
+          onClose={() => setActiveBuilding(null)}
+          onSubmitReflection={(materiId, scale, answers, moodEmoji) => {
+            const matchedMat = materis.find((m) => m.id === materiId);
+            const nowStr = new Date().toLocaleString('id-ID');
+            const refId = `ref-pk-${Date.now()}`;
+            const newRef: Reflection = {
+              id: refId,
+              studentId: student.id,
+              studentName: student.name,
+              className: student.className,
+              materiId,
+              materiTitle: matchedMat ? matchedMat.title : `Refleksi Pusat Kota (${activeBuilding})`,
+              scale,
+              moodEmoji: moodEmoji || '😊',
+              answers,
+              createdAt: nowStr,
+            };
+            const newFb: MentorFeedback = {
+              id: `fb-pk-${Date.now()}`,
+              reflectionId: refId,
+              studentId: student.id,
+              apresiasi: `Terima kasih ${student.name}, refleksi belajarmu di Pusat Kota sangat inspiratif!`,
+              saran: 'Terus terapkan wawasan ini dalam proyek dan keseharian di sekolah.',
+              pertanyaanLanjutan: 'Langkah konkret apa yang akan kamu mulai minggu ini?',
+              skorRefleksi: scale * 20,
+              perlu_perhatian_guru: scale <= 2,
+              createdAt: nowStr,
+            };
+            handleSubmitReflection(newRef, newFb);
+          }}
+          onSendMessage={handleSendMessage}
+          onGainXp={handleAddPoints}
+          onRefreshMateris={() => {
+            setMateris(StorageService.getMateri());
+            setObjectives(StorageService.getObjectives());
+          }}
         />
       )}
 

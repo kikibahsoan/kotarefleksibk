@@ -1,0 +1,28 @@
+[
+  {
+    "id": "guru_kikybahsoan_dev_lxp9tf_c9z4",
+    "handle": "kikybahsoan",
+    "name": "kikybahsoan",
+    "role": "guru",
+    "roleLabel": "GURU DKV",
+    "gender": "L",
+    "shirtColor": "#0f172a",
+    "pantsColor": "#1e1b4b",
+    "hairColor": "#0f172a",
+    "wx": 12.388,
+    "wy": 7.524,
+    "targetWx": 12.388,
+    "targetWy": 7.524,
+    "speed": 0.88,
+    "isMoving": false,
+    "walkFrame": 0,
+    "facing": "down-right",
+    "isSitting": false,
+    "isFishing": false,
+    "heldItem": null,
+    "activeEmote": null,
+    "speechTimer": 0,
+    "lastSeen": 1794050723032,
+    "connectedAt": 1794050470471
+  }
+]
