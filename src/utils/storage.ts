@@ -2837,9 +2837,11 @@ export const StorageService = {
   // ==========================================================================
   // MASTER CREATOR STUDIO (KIKYBAHSOAN) — REALTIME & CLOUD PERSISTENCE
   // ==========================================================================
-  getCreatorCityState(): CityCreatorState {
+  _creatorGasSyncTimer: null as any,
+
+  normalizeCreatorCityState(raw: any): CityCreatorState {
     const defaultState: CityCreatorState = {
-      version: 1,
+      version: 0,
       updatedAt: new Date().toLocaleString('id-ID'),
       updatedBy: 'kikybahsoan',
       customBuildings: [],
@@ -2850,49 +2852,57 @@ export const StorageService = {
       terrainTiles: {},
       customFences: [],
     };
-    const saved = safeGet<CityCreatorState>(STORAGE_KEYS.CREATOR_CITY_STATE, defaultState);
-    if (!saved || typeof saved !== 'object') return defaultState;
+    if (!raw || typeof raw !== 'object') return defaultState;
     return {
-      version: typeof saved.version === 'number' ? saved.version : 1,
-      updatedAt: saved.updatedAt || defaultState.updatedAt,
-      updatedBy: saved.updatedBy || 'kikybahsoan',
-      customBuildings: Array.isArray(saved.customBuildings) ? saved.customBuildings : [],
+      version: typeof raw.version === 'number' ? raw.version : 0,
+      updatedAt: raw.updatedAt || defaultState.updatedAt,
+      updatedBy: raw.updatedBy || 'kikybahsoan',
+      customBuildings: Array.isArray(raw.customBuildings) ? raw.customBuildings : [],
       existingOverrides:
-        saved.existingOverrides && typeof saved.existingOverrides === 'object'
-          ? saved.existingOverrides
+        raw.existingOverrides && typeof raw.existingOverrides === 'object'
+          ? raw.existingOverrides
           : {},
       npcConfigs:
-        saved.npcConfigs && typeof saved.npcConfigs === 'object' ? saved.npcConfigs : {},
-      customProps: Array.isArray(saved.customProps) ? saved.customProps : [],
-      customAnimals: Array.isArray(saved.customAnimals) ? saved.customAnimals : [],
+        raw.npcConfigs && typeof raw.npcConfigs === 'object' ? raw.npcConfigs : {},
+      customProps: Array.isArray(raw.customProps) ? raw.customProps : [],
+      customAnimals: Array.isArray(raw.customAnimals) ? raw.customAnimals : [],
       terrainTiles:
-        saved.terrainTiles && typeof saved.terrainTiles === 'object' ? saved.terrainTiles : {},
-      customFences: Array.isArray(saved.customFences) ? saved.customFences : [],
+        raw.terrainTiles && typeof raw.terrainTiles === 'object' ? raw.terrainTiles : {},
+      customFences: Array.isArray(raw.customFences) ? raw.customFences : [],
     };
+  },
+
+  getCreatorCityState(): CityCreatorState {
+    const saved = safeGet<CityCreatorState | null>(STORAGE_KEYS.CREATOR_CITY_STATE, null);
+    return this.normalizeCreatorCityState(saved);
   },
 
   async saveCreatorCityState(
     nextState: CityCreatorState,
-    options?: { syncCloud?: boolean; broadcast?: boolean }
+    options?: {
+      syncCloud?: boolean;
+      broadcast?: boolean;
+      preserveVersion?: boolean;
+      immediateCloud?: boolean;
+    }
   ): Promise<CityCreatorState> {
+    const normalized = this.normalizeCreatorCityState(nextState);
+    const nextVersion =
+      options?.preserveVersion && normalized.version > 0
+        ? normalized.version
+        : Math.max((normalized.version || 0) + 1, Date.now());
+
     const cleanState: CityCreatorState = {
-      ...nextState,
-      version: Math.max((nextState.version || 1) + 1, Date.now()),
-      updatedAt: new Date().toLocaleString('id-ID', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }),
-      updatedBy: nextState.updatedBy || 'kikybahsoan',
-      customBuildings: Array.isArray(nextState.customBuildings) ? nextState.customBuildings : [],
-      existingOverrides: nextState.existingOverrides || {},
-      npcConfigs: nextState.npcConfigs || {},
-      customProps: Array.isArray(nextState.customProps) ? nextState.customProps : [],
-      customAnimals: Array.isArray(nextState.customAnimals) ? nextState.customAnimals : [],
-      terrainTiles:
-        nextState.terrainTiles && typeof nextState.terrainTiles === 'object'
-          ? nextState.terrainTiles
-          : {},
-      customFences: Array.isArray(nextState.customFences) ? nextState.customFences : [],
+      ...normalized,
+      version: nextVersion,
+      updatedAt:
+        options?.preserveVersion && nextState.updatedAt
+          ? nextState.updatedAt
+          : new Date().toLocaleString('id-ID', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            }),
+      updatedBy: normalized.updatedBy || 'kikybahsoan',
     };
 
     safeSet(STORAGE_KEYS.CREATOR_CITY_STATE, cleanState);
@@ -2903,34 +2913,64 @@ export const StorageService = {
           new CustomEvent('kota_refleksi_creator_state_updated', { detail: cleanState })
         );
         if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-          const bc = new BroadcastChannel('kota_refleksi_channel');
-          bc.postMessage({ type: 'creator_city_updated', data: cleanState });
-          bc.close();
+          const bc1 = new BroadcastChannel('kota_refleksi_channel');
+          bc1.postMessage({ type: 'creator_city_updated', data: cleanState });
+          bc1.close();
+
+          const bc2 = new BroadcastChannel('kota_refleksi_presence');
+          bc2.postMessage({ type: 'creator_city_updated', data: cleanState });
+          bc2.close();
         }
       } catch {}
     }
 
     if (options?.syncCloud !== false) {
-      const payloadReflection: Reflection = {
-        id: 'creator-city-state-v1',
-        studentId: 'master-kikybahsoan',
-        studentName: 'Master Creator (kikybahsoan)',
-        studentNumber: 'CREATOR_CITY_STATE',
-        className: 'Master Studio Kota Refleksia',
-        materiId: 'creator-city-state',
-        materiTitle: `[CREATOR_CITY_STATE] Tata Kota & Fasilitas (${cleanState.customBuildings.length} Bangunan Baru • v${cleanState.version})`,
-        scale: 5,
-        moodEmoji: '🏗️',
-        answers: {
-          understood: `Tata Kota diperbarui oleh ${cleanState.updatedBy} pada ${cleanState.updatedAt}`,
-          difficult: `Bangunan Baru: ${cleanState.customBuildings.length} | Override Objek: ${Object.keys(cleanState.existingOverrides).length} | Konfigurasi NPC: ${Object.keys(cleanState.npcConfigs).length}`,
-          actionPlan: 'Sinkronisasi otomatis tata kota ke seluruh warga Kota Refleksia',
-          findings: JSON.stringify(cleanState),
-        },
-        createdAt: cleanState.updatedAt,
+      // 1. Instant push to Express Backend (/api/creator-city-state) which broadcasts via SSE to all online citizens in <20ms
+      try {
+        fetch('/api/creator-city-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ creatorCityState: cleanState }),
+        }).catch(() => {});
+      } catch {}
+
+      // 2. Push to Google Spreadsheet / Apps Script (immediately on "Simpan ke Kota", or debounced 600ms during live drags)
+      const pushToGAS = async () => {
+        const payloadReflection: Reflection = {
+          id: `creator-city-state-v${cleanState.version}`,
+          studentId: 'master-kikybahsoan',
+          studentName: 'Master Creator (kikybahsoan)',
+          studentNumber: 'CREATOR_CITY_STATE',
+          className: 'Master Studio Kota Refleksia',
+          materiId: 'creator-city-state',
+          materiTitle: `[CREATOR_CITY_STATE] Tata Kota & Fasilitas (v${cleanState.version})`,
+          scale: 5,
+          moodEmoji: '🏗️',
+          answers: {
+            understood: `Tata Kota diperbarui oleh ${cleanState.updatedBy} pada ${cleanState.updatedAt}`,
+            difficult: `Bangunan: ${cleanState.customBuildings.length} | Taman: ${(cleanState.customProps || []).length} | Hewan: ${(cleanState.customAnimals || []).length} | Pagar: ${(cleanState.customFences || []).length} | Tanah: ${Object.keys(cleanState.terrainTiles || {}).length}`,
+            actionPlan: 'Sinkronisasi otomatis tata kota ke seluruh warga Kota Refleksia',
+            findings: JSON.stringify(cleanState),
+          },
+          createdAt: cleanState.updatedAt,
+        };
+        await this.syncWithGAS('save_creator_city_state', { creatorCityState: cleanState });
+        await this.syncWithGAS('submit_reflection', { reflection: payloadReflection });
       };
-      await this.syncWithGAS('submit_reflection', { reflection: payloadReflection });
-      await this.syncWithGAS('save_creator_city_state', { creatorCityState: cleanState });
+
+      if (this._creatorGasSyncTimer) {
+        clearTimeout(this._creatorGasSyncTimer);
+        this._creatorGasSyncTimer = null;
+      }
+
+      if (options?.immediateCloud) {
+        await pushToGAS();
+      } else {
+        this._creatorGasSyncTimer = setTimeout(() => {
+          this._creatorGasSyncTimer = null;
+          pushToGAS().catch(() => {});
+        }, 600);
+      }
     }
 
     return cleanState;
@@ -2938,59 +2978,103 @@ export const StorageService = {
 
   async fetchCreatorCityStateFromCloud(): Promise<CityCreatorState> {
     const local = this.getCreatorCityState();
-    const settings = this.getSettings();
-    if (!settings.gasWebAppUrl || !settings.gasWebAppUrl.startsWith('http')) {
-      return local;
-    }
+    let bestRemote: CityCreatorState | null = null;
+    let serverVersion = 0;
+
+    // 1. Check Express Server (/api/creator-city-state) first (fastest, <20ms)
     try {
-      const url = new URL(settings.gasWebAppUrl);
-      url.searchParams.set('action', 'get_data');
-      url.searchParams.set('_t', String(Date.now()));
-      const res = await fetch(url.toString(), {
+      const serverRes = await fetch(`/api/creator-city-state?_t=${Date.now()}`, {
         method: 'GET',
-        redirect: 'follow',
         cache: 'no-store',
       });
-      if (!res.ok) return local;
-      const data = await res.json();
-      let remoteCandidate: CityCreatorState | null = null;
-
-      if (data.creatorCityState && typeof data.creatorCityState === 'object') {
-        remoteCandidate = data.creatorCityState as CityCreatorState;
-      }
-
-      if (Array.isArray(data.reflections)) {
-        data.reflections.forEach((r: Reflection) => {
-          const isCreatorRow =
-            r &&
-            (r.id === 'creator-city-state-v1' ||
-              r.studentNumber === 'CREATOR_CITY_STATE' ||
-              (r.materiTitle && String(r.materiTitle).includes('[CREATOR_CITY_STATE]')));
-          if (isCreatorRow && r.answers?.findings) {
-            try {
-              const parsed = JSON.parse(r.answers.findings) as CityCreatorState;
-              if (
-                parsed &&
-                typeof parsed.version === 'number' &&
-                (!remoteCandidate || parsed.version > remoteCandidate.version)
-              ) {
-                remoteCandidate = parsed;
-              }
-            } catch {}
-          }
-        });
-      }
-
-      if (remoteCandidate && remoteCandidate.version > local.version) {
-        safeSet(STORAGE_KEYS.CREATOR_CITY_STATE, remoteCandidate);
-        try {
-          window.dispatchEvent(
-            new CustomEvent('kota_refleksi_creator_state_updated', { detail: remoteCandidate })
-          );
-        } catch {}
-        return remoteCandidate;
+      if (serverRes.ok) {
+        const serverJson = await serverRes.json();
+        if (serverJson?.data && typeof serverJson.data.version === 'number') {
+          const parsedServer = this.normalizeCreatorCityState(serverJson.data);
+          serverVersion = parsedServer.version;
+          bestRemote = parsedServer;
+        }
       }
     } catch {}
+
+    // 2. Also check Google Spreadsheet / Google Apps Script Web App
+    const settings = this.getSettings();
+    if (settings.gasWebAppUrl && settings.gasWebAppUrl.startsWith('http')) {
+      try {
+        const url = new URL(settings.gasWebAppUrl);
+        url.searchParams.set('action', 'get_data');
+        url.searchParams.set('_t', String(Date.now()));
+        const res = await fetch(url.toString(), {
+          method: 'GET',
+          redirect: 'follow',
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.creatorCityState && typeof data.creatorCityState === 'object') {
+            const parsedGas = this.normalizeCreatorCityState(data.creatorCityState);
+            if (!bestRemote || parsedGas.version > bestRemote.version) {
+              bestRemote = parsedGas;
+            }
+          }
+
+          if (Array.isArray(data.reflections)) {
+            data.reflections.forEach((r: Reflection) => {
+              const isCreatorRow =
+                r &&
+                (String(r.id || '').startsWith('creator-city-state') ||
+                  r.studentNumber === 'CREATOR_CITY_STATE' ||
+                  (r.materiTitle && String(r.materiTitle).includes('[CREATOR_CITY_STATE]')));
+              if (isCreatorRow && r.answers?.findings) {
+                try {
+                  const parsed = this.normalizeCreatorCityState(JSON.parse(r.answers.findings));
+                  if (
+                    parsed &&
+                    parsed.version > 0 &&
+                    (!bestRemote || parsed.version > bestRemote.version)
+                  ) {
+                    bestRemote = parsed;
+                  }
+                } catch {}
+              }
+            });
+          }
+        }
+      } catch {}
+    }
+
+    // If GAS had a newer state than the Express server, backfill the Express server so all connected citizens get it
+    if (bestRemote && bestRemote.version > serverVersion) {
+      try {
+        fetch('/api/creator-city-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ creatorCityState: bestRemote }),
+        }).catch(() => {});
+      } catch {}
+    }
+
+    // If local state is newer than remote (e.g., kikybahsoan just made changes before server restarted), push local to server
+    if (local.version > (bestRemote?.version || 0) && local.version > serverVersion) {
+      try {
+        fetch('/api/creator-city-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ creatorCityState: local }),
+        }).catch(() => {});
+      } catch {}
+    }
+
+    if (bestRemote && bestRemote.version > local.version) {
+      safeSet(STORAGE_KEYS.CREATOR_CITY_STATE, bestRemote);
+      try {
+        window.dispatchEvent(
+          new CustomEvent('kota_refleksi_creator_state_updated', { detail: bestRemote })
+        );
+      } catch {}
+      return bestRemote;
+    }
+
     return local;
   },
 

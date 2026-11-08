@@ -148,8 +148,9 @@ function parseIncomingPackets(buffer: Uint8Array): string[] {
 }
 
 export interface PresenceMeshMessage {
-  type: 'presence_update' | 'presence_leave' | 'request_sync';
+  type: 'presence_update' | 'presence_leave' | 'request_sync' | 'creator_state_update';
   player?: any;
+  creatorState?: any;
   id?: string;
   senderId?: string;
   ts?: number;

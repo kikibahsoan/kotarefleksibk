@@ -1778,30 +1778,124 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const applyCreatorStateToWorldRef = useRef(applyCreatorStateToWorld);
   applyCreatorStateToWorldRef.current = applyCreatorStateToWorld;
 
-  const handleUpdateCreatorState = (nextState: CityCreatorState) => {
-    const stamped: CityCreatorState = {
-      ...nextState,
-      updatedAt: new Date().toISOString(),
-      updatedBy: 'kikybahsoan',
-    };
-    setCreatorState(stamped);
-    creatorStateRef.current = stamped;
-    applyCreatorStateToWorld(stamped);
-    StorageService.saveCreatorCityState(stamped);
+  const meshRef = useRef<RealtimePresenceMesh | null>(null);
+  const lastLiveCreatorMeshBroadcastRef = useRef<number>(0);
+
+  const applyIncomingRemoteCreatorState = (incoming: any) => {
+    if (!incoming || typeof incoming !== 'object') return;
+    // Do not overwrite while kikybahsoan is actively dragging or painting on the canvas
+    if (
+      isCreatorStudioOpenRef.current &&
+      (creatorDraggingRef.current || isPaintingTerrainRef.current)
+    ) {
+      return;
+    }
+    const norm = StorageService.normalizeCreatorCityState(incoming);
+    if (norm.version > (creatorStateRef.current?.version || 0)) {
+      creatorStateRef.current = norm;
+      applyCreatorStateToWorldRef.current(norm);
+      setCreatorState(norm);
+      StorageService.saveCreatorCityState(norm, {
+        syncCloud: false,
+        broadcast: false,
+        preserveVersion: true,
+      });
+    }
   };
 
-  const handleSaveCreatorStateToCity = async () => {
-    const stamped: CityCreatorState = {
-      ...creatorStateRef.current,
-      updatedAt: new Date().toISOString(),
+  const applyIncomingRemoteCreatorStateRef = useRef(applyIncomingRemoteCreatorState);
+  applyIncomingRemoteCreatorStateRef.current = applyIncomingRemoteCreatorState;
+
+  const handleUpdateCreatorState = (
+    nextState: CityCreatorState,
+    options?: { immediateCloud?: boolean }
+  ) => {
+    const nextVersion = Math.max((nextState.version || 0) + 1, Date.now());
+    const stamped: CityCreatorState = StorageService.normalizeCreatorCityState({
+      ...nextState,
+      version: nextVersion,
+      updatedAt: new Date().toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+      updatedBy: 'kikybahsoan',
+    });
+    creatorStateRef.current = stamped;
+    setCreatorState(stamped);
+    applyCreatorStateToWorldRef.current(stamped);
+    StorageService.saveCreatorCityState(stamped, {
+      preserveVersion: true,
+      immediateCloud: options?.immediateCloud,
+    });
+    // Broadcast immediately over Global WebSocket MQTT Mesh (<50ms to all online citizens across any network)
+    if (meshRef.current) {
+      meshRef.current.publish({
+        type: 'creator_state_update',
+        creatorState: stamped,
+        senderId: studentId || 'master-kikybahsoan',
+      });
+    }
+  };
+
+  const handleUpdateCreatorStateRef = useRef(handleUpdateCreatorState);
+  handleUpdateCreatorStateRef.current = handleUpdateCreatorState;
+
+  const broadcastLiveCreatorStateThrottled = (liveState: CityCreatorState) => {
+    const now = performance.now();
+    if (now - lastLiveCreatorMeshBroadcastRef.current < 110) return;
+    lastLiveCreatorMeshBroadcastRef.current = now;
+    const liveStamped: CityCreatorState = {
+      ...liveState,
+      version: Math.max((liveState.version || 0) + 1, Date.now()),
       updatedBy: 'kikybahsoan',
     };
-    setCreatorState(stamped);
+    creatorStateRef.current = liveStamped;
+    if (meshRef.current) {
+      meshRef.current.publish({
+        type: 'creator_state_update',
+        creatorState: liveStamped,
+        senderId: studentId || 'master-kikybahsoan',
+      });
+    }
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('kota_refleksi_channel');
+        bc.postMessage({ type: 'creator_city_updated', data: liveStamped });
+        bc.close();
+      }
+    } catch {}
+  };
+
+  const broadcastLiveCreatorStateThrottledRef = useRef(broadcastLiveCreatorStateThrottled);
+  broadcastLiveCreatorStateThrottledRef.current = broadcastLiveCreatorStateThrottled;
+
+  const handleSaveCreatorStateToCity = async () => {
+    const nextVersion = Math.max((creatorStateRef.current.version || 0) + 1, Date.now());
+    const stamped: CityCreatorState = StorageService.normalizeCreatorCityState({
+      ...creatorStateRef.current,
+      version: nextVersion,
+      updatedAt: new Date().toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+      updatedBy: 'kikybahsoan',
+    });
     creatorStateRef.current = stamped;
-    applyCreatorStateToWorld(stamped);
-    await StorageService.saveCreatorCityState(stamped);
+    setCreatorState(stamped);
+    applyCreatorStateToWorldRef.current(stamped);
+    if (meshRef.current) {
+      meshRef.current.publish({
+        type: 'creator_state_update',
+        creatorState: stamped,
+        senderId: studentId || 'master-kikybahsoan',
+      });
+    }
+    await StorageService.saveCreatorCityState(stamped, {
+      preserveVersion: true,
+      immediateCloud: true,
+    });
     sounds.playRewardXp();
-    showToast('🏛️ Perubahan Kota berhasil disimpan & disinkronkan ke seluruh warga!', 3500);
+    showToast('🏛️ Perubahan Kota berhasil disimpan & disinkronkan secara real-time ke seluruh warga!', 3500);
   };
 
   useEffect(() => {
@@ -1819,19 +1913,34 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
   useEffect(() => {
     let isMounted = true;
-    StorageService.fetchCreatorCityStateFromCloud().then((remote) => {
-      if (isMounted && remote) {
-        setCreatorState(remote);
-      }
-    });
+    const syncRemoteCreatorState = () => {
+      StorageService.fetchCreatorCityStateFromCloud().then((remote) => {
+        if (isMounted && remote) {
+          applyIncomingRemoteCreatorStateRef.current(remote);
+        }
+      });
+    };
+
+    syncRemoteCreatorState();
+    const pollInterval = window.setInterval(syncRemoteCreatorState, 4000);
 
     const handleCustomEvent = (e: Event) => {
       const custom = e as CustomEvent<CityCreatorState>;
       if (custom.detail && isMounted) {
-        setCreatorState(custom.detail);
+        applyIncomingRemoteCreatorStateRef.current(custom.detail);
       }
     };
     window.addEventListener('kota_refleksi_creator_state_updated', handleCustomEvent);
+
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key === 'kota_refleksi_creator_city_state' && e.newValue && isMounted) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          applyIncomingRemoteCreatorStateRef.current(parsed);
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
 
     let bc: BroadcastChannel | null = null;
     try {
@@ -1839,7 +1948,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         bc = new BroadcastChannel('kota_refleksi_channel');
         bc.onmessage = (ev) => {
           if (ev.data?.type === 'creator_city_updated' && ev.data.data && isMounted) {
-            setCreatorState(ev.data.data);
+            applyIncomingRemoteCreatorStateRef.current(ev.data.data);
           }
         };
       }
@@ -1847,7 +1956,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
     return () => {
       isMounted = false;
+      clearInterval(pollInterval);
       window.removeEventListener('kota_refleksi_creator_state_updated', handleCustomEvent);
+      window.removeEventListener('storage', handleStorageEvent);
       if (bc) bc.close();
     };
   }, []);
@@ -2997,21 +3108,38 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (!isMounted) return;
         if (msg.type === 'presence_update' && msg.player && msg.player.id !== mySessionId) {
           handleIncomingOthers([msg.player]);
+        } else if (msg.type === 'creator_state_update' && msg.creatorState) {
+          applyIncomingRemoteCreatorStateRef.current(msg.creatorState);
         } else if (msg.type === 'presence_leave' && msg.id) {
           remotePlayersRef.current.delete(msg.id);
           syncOnlineUiList();
         } else if (msg.type === 'request_sync' && msg.senderId !== mySessionId) {
-          // Immediately reply with our current state so the newly connected device sees us in <50ms
+          // Immediately reply with our current state & latest Creator City State so the newly connected device sees everything in <50ms
           mesh.publish({ type: 'presence_update', player: buildLocalPayload() });
+          if ((creatorStateRef.current?.version || 0) > 0) {
+            mesh.publish({
+              type: 'creator_state_update',
+              creatorState: creatorStateRef.current,
+              senderId: mySessionId,
+            });
+          }
         }
       },
       () => {
         if (!isMounted) return;
-        // Request all online citizens on other devices to announce themselves immediately
+        // Request all online citizens on other devices to announce themselves & share latest Creator City State immediately
         mesh.publish({ type: 'request_sync', senderId: mySessionId });
         mesh.publish({ type: 'presence_update', player: buildLocalPayload() });
+        if ((creatorStateRef.current?.version || 0) > 0) {
+          mesh.publish({
+            type: 'creator_state_update',
+            creatorState: creatorStateRef.current,
+            senderId: mySessionId,
+          });
+        }
       }
     );
+    meshRef.current = mesh;
 
     const sendHeartbeat = async () => {
       if (!isMounted) return;
@@ -3041,6 +3169,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             if (json.success && Array.isArray(json.onlinePlayers)) {
               handleIncomingOthers(json.onlinePlayers);
             }
+            if (
+              typeof json.creatorCityStateVersion === 'number' &&
+              json.creatorCityStateVersion > (creatorStateRef.current?.version || 0)
+            ) {
+              fetch(`/api/creator-city-state?_t=${Date.now()}`, { cache: 'no-store' })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((cJson) => {
+                  if (cJson?.data && isMounted) {
+                    applyIncomingRemoteCreatorStateRef.current(cJson.data);
+                  }
+                })
+                .catch(() => {});
+            }
           }
         }
       } catch (err) {
@@ -3066,6 +3207,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const data = JSON.parse(event.data);
             if ((data.type === 'sync' || data.type === 'init') && Array.isArray(data.onlinePlayers || data.players)) {
               handleIncomingOthers(data.onlinePlayers || data.players);
+              if (data.creatorCityState) {
+                applyIncomingRemoteCreatorStateRef.current(data.creatorCityState);
+              }
+            } else if (data.type === 'creator_state_update' && data.creatorCityState) {
+              applyIncomingRemoteCreatorStateRef.current(data.creatorCityState);
             } else if (data.type === 'player_update' || data.type === 'update') {
               if (Array.isArray(data.onlinePlayers)) {
                 handleIncomingOthers(data.onlinePlayers);
@@ -3101,6 +3247,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       presenceChannel.onmessage = (event) => {
         if (event.data?.type === 'presence_update' && event.data.player) {
           handleIncomingOthers([event.data.player]);
+        } else if (event.data?.type === 'creator_city_updated' && event.data.data) {
+          applyIncomingRemoteCreatorStateRef.current(event.data.data);
         } else if (event.data?.type === 'presence_leave' && event.data.id) {
           remotePlayersRef.current.delete(event.data.id);
           syncOnlineUiList();
@@ -3128,6 +3276,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     return () => {
       isMounted = false;
       sendHeartbeatRef.current = null;
+      if (meshRef.current === mesh) {
+        meshRef.current = null;
+      }
       clearInterval(interval);
       clearTimeout(initTimer);
       if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -3819,8 +3970,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ...creatorStateRef.current,
             terrainTiles: nextTiles,
           };
-          creatorStateRef.current = nextState;
-          setCreatorState(nextState);
+          handleUpdateCreatorStateRef.current(nextState);
           sounds.playClick();
           return;
         }
@@ -3834,8 +3984,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ...creatorStateRef.current,
             customBuildings: [...creatorStateRef.current.customBuildings, newB],
           };
-          creatorStateRef.current = nextState;
-          setCreatorState(nextState);
+          handleUpdateCreatorStateRef.current(nextState);
           setCreatorSelectedTarget({ kind: 'custom_building', id: newB.id });
           setPlacingStockModel(null);
           creatorHoverGhostRef.current = null;
@@ -3852,8 +4001,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ...creatorStateRef.current,
             customProps: [...(creatorStateRef.current.customProps || []), newProp],
           };
-          creatorStateRef.current = nextState;
-          setCreatorState(nextState);
+          handleUpdateCreatorStateRef.current(nextState);
           setCreatorSelectedTarget({ kind: 'custom_prop', id: newProp.id });
           sounds.playClick();
           return;
@@ -3868,8 +4016,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ...creatorStateRef.current,
             customAnimals: [...(creatorStateRef.current.customAnimals || []), newAnimal],
           };
-          creatorStateRef.current = nextState;
-          setCreatorState(nextState);
+          handleUpdateCreatorStateRef.current(nextState);
           setCreatorSelectedTarget({ kind: 'custom_animal', id: newAnimal.id });
           sounds.playClick();
           return;
@@ -3884,9 +4031,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ...creatorStateRef.current,
             customFences: [...(creatorStateRef.current.customFences || []), newFence],
           };
-          creatorStateRef.current = nextState;
-          setCreatorState(nextState);
-          applyCreatorStateToWorldRef.current(nextState);
+          handleUpdateCreatorStateRef.current(nextState);
           setCreatorSelectedTarget({ kind: 'custom_fence', id: newFence.id });
           sounds.playClick();
           return;
@@ -3914,9 +4059,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 [npcId]: updatedNpc,
               },
             };
-            creatorStateRef.current = nextState;
-            setCreatorState(nextState);
-            applyCreatorStateToWorldRef.current(nextState);
+            handleUpdateCreatorStateRef.current(nextState);
             sounds.playClick();
           }
           return;
@@ -4881,7 +5024,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       if (isPaintingTerrainRef.current) {
         isPaintingTerrainRef.current = false;
         creatorJustDraggedRef.current = true;
-        setCreatorState({ ...creatorStateRef.current });
+        handleUpdateCreatorStateRef.current({ ...creatorStateRef.current });
         return;
       }
       if (creatorDraggingRef.current) {
@@ -4893,7 +5036,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         canvas.style.cursor = 'grab';
         if (movedPx > 5) {
           creatorJustDraggedRef.current = true;
-          setCreatorState({ ...creatorStateRef.current });
+          handleUpdateCreatorStateRef.current({ ...creatorStateRef.current });
         }
       }
     };
@@ -4922,10 +5065,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                 const nextTiles = { ...curTiles };
                 delete nextTiles[key];
                 creatorStateRef.current = { ...creatorStateRef.current, terrainTiles: nextTiles };
+                broadcastLiveCreatorStateThrottledRef.current(creatorStateRef.current);
               }
             } else if (curTiles[key]?.terrainType !== brush) {
               const nextTiles = { ...curTiles, [key]: { gx, gy, terrainType: brush } };
               creatorStateRef.current = { ...creatorStateRef.current, terrainTiles: nextTiles };
+              broadcastLiveCreatorStateThrottledRef.current(creatorStateRef.current);
             }
           }
           return;
@@ -5017,6 +5162,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               }
             }
           }
+          broadcastLiveCreatorStateThrottledRef.current(creatorStateRef.current);
           canvas.style.cursor = 'grabbing';
           return;
         }

@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 const apiKey = process.env.GEMINI_API_KEY || '';
 
@@ -1164,7 +1164,78 @@ setInterval(() => {
   }
 }, 2500);
 
-// SSE Stream for Instant Real-Time Multi-Device Presence
+const CREATOR_CITY_STATE_FILE_PATH = path.join(__dirname, 'server_creator_city_state.json');
+
+function loadCreatorCityStateFromFile(): any | null {
+  try {
+    if (fs.existsSync(CREATOR_CITY_STATE_FILE_PATH)) {
+      const raw = fs.readFileSync(CREATOR_CITY_STATE_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && typeof parsed.version === 'number') {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[server.ts] Could not read server_creator_city_state.json:', err);
+  }
+  return null;
+}
+
+let serverCreatorCityState: any | null = loadCreatorCityStateFromFile();
+
+function saveCreatorCityStateToFile() {
+  if (!serverCreatorCityState) return;
+  try {
+    fs.writeFileSync(
+      CREATOR_CITY_STATE_FILE_PATH,
+      JSON.stringify(serverCreatorCityState, null, 2),
+      'utf-8'
+    );
+  } catch (err) {
+    console.warn('[server.ts] Failed to persist server_creator_city_state.json:', err);
+  }
+}
+
+app.get('/api/creator-city-state', (_req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    success: true,
+    data: serverCreatorCityState,
+    version: serverCreatorCityState?.version || 0,
+    serverTime: Date.now(),
+  });
+});
+
+app.post('/api/creator-city-state', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const incoming = req.body?.creatorCityState || req.body;
+  if (!incoming || typeof incoming !== 'object' || typeof incoming.version !== 'number') {
+    return res.status(400).json({
+      success: false,
+      error: 'Data Creator City State tidak valid.',
+    });
+  }
+
+  if (!serverCreatorCityState || incoming.version >= (serverCreatorCityState.version || 0)) {
+    serverCreatorCityState = incoming;
+    saveCreatorCityStateToFile();
+
+    // Broadcast immediately via SSE to all connected citizens in real-time
+    broadcastPresence({
+      type: 'creator_state_update',
+      creatorCityState: serverCreatorCityState,
+    });
+  }
+
+  return res.json({
+    success: true,
+    data: serverCreatorCityState,
+    version: serverCreatorCityState?.version || 0,
+  });
+});
+
+// SSE Stream for Instant Real-Time Multi-Device Presence & Creator City State
 app.get('/api/presence/stream', (_req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -1175,10 +1246,16 @@ app.get('/api/presence/stream', (_req, res) => {
 
   sseClients.add(res);
 
-  // Send initial players immediately on connection
+  // Send initial players and current creatorCityState immediately on connection
   purgeInactivePlayers();
   const initial = Array.from(onlinePlayersMap.values());
-  res.write(`data: ${JSON.stringify({ type: 'sync', onlinePlayers: initial })}\n\n`);
+  res.write(
+    `data: ${JSON.stringify({
+      type: 'sync',
+      onlinePlayers: initial,
+      creatorCityState: serverCreatorCityState,
+    })}\n\n`
+  );
 
   _req.on('close', () => {
     sseClients.delete(res);
@@ -1238,12 +1315,13 @@ app.post('/api/presence/heartbeat', (req, res) => {
     onlinePlayers: Array.from(onlinePlayersMap.values()),
   });
 
-  // Return all other active online players from other devices/browsers
+  // Return all other active online players from other devices/browsers + latest creator state version
   const others = Array.from(onlinePlayersMap.values()).filter((p) => p.id !== data.id);
   res.json({
     success: true,
     onlinePlayers: others,
     count: others.length + 1,
+    creatorCityStateVersion: serverCreatorCityState?.version || 0,
     serverTime: now,
     mode: '24h-realtime-active',
   });
