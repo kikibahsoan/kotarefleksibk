@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computeCreatorAnimalLivePose,
+  computeCustomPropSwingAndRideMetrics,
   shadeHex,
   drawCustomCreatorBuilding3D,
   drawCustomCreatorProp3D,
@@ -88,6 +89,66 @@ test('computeCreatorAnimalLivePose respects diurnal/nocturnal sleep cycles and a
   assert.equal(dayPose.isSleeping, false);
 });
 
+test('computeCustomPropSwingAndRideMetrics computes synchronized swing seats, seesaw, spring rider, and slide trajectory', () => {
+  const swingProp: CreatorPropItem = {
+    id: 'swing-1',
+    propCategory: 'swing',
+    propModel: 'swing_builtin_city',
+    name: 'Ayunan Kota',
+    wx: 0,
+    wy: 0,
+    facing: 'down-right',
+    scale: 1,
+  };
+  const metrics = computeCustomPropSwingAndRideMetrics(
+    swingProp,
+    mockProject,
+    38,
+    1500,
+    {
+      propId: 'swing-1',
+      actionId: 'swing_high_joy',
+      emoteType: 'swing',
+      startTime: 1000,
+      durationMs: 25000,
+    },
+    ['custom_swing:swing-1:left']
+  );
+  assert.ok(metrics.swingLeft);
+  assert.ok(metrics.swingRight);
+  assert.equal(metrics.swingLeft?.isOccupied, true);
+  assert.equal(metrics.swingRight?.isOccupied, false);
+
+  const slideProp: CreatorPropItem = {
+    id: 'slide-1',
+    propCategory: 'playground',
+    propModel: 'playground_slide_colorful',
+    name: 'Perosotan Pelangi',
+    wx: 1,
+    wy: 1,
+    facing: 'down-right',
+    scale: 1,
+  };
+  const slideMetrics = computeCustomPropSwingAndRideMetrics(
+    slideProp,
+    mockProject,
+    38,
+    2200,
+    {
+      propId: 'slide-1',
+      actionId: 'playground_slide',
+      emoteType: 'cheer',
+      startTime: 1000,
+      durationMs: 20000,
+    },
+    []
+  );
+  assert.equal(slideMetrics.kind, 'slide');
+  assert.ok(typeof slideMetrics.slideAvatarX === 'number');
+  assert.ok(typeof slideMetrics.slideAvatarY === 'number');
+  assert.ok(['climb', 'top_cheer', 'slide_down', 'done'].includes(slideMetrics.slidePhase ?? ''));
+});
+
 test('getCreatorPropInteractiveActions returns 3 rich avatar activities with XP rewards for every prop category', () => {
   const categories: CreatorPropCategory[] = [
     'tree',
@@ -121,7 +182,7 @@ test('getCreatorPropInteractiveActions returns 3 rich avatar activities with XP 
   }
 });
 
-test('all 29 building models (including 15 built-in models), 32 prop models, 10 animal species, 36 terrain types, and 5 fence models render without error', () => {
+test('all 29 building models (including 15 built-in models), 40 prop models (including 8 built-in models), 10 animal species, 44 terrain types (including 8 built-in terrain types), and 5 fence models render without error', () => {
   const ctx = createMockCanvasContext();
 
   const buildingModels: CreatorModelType[] = [
@@ -179,19 +240,27 @@ test('all 29 building models (including 15 built-in models), 32 prop models, 10 
   }
 
   const propModels: CreatorPropModel[] = [
+    'tree_builtin_city_emerald',
+    'tree_builtin_city_autumn',
+    'tree_builtin_forest_pine',
     'tree_oak_apple',
     'tree_pine_spruce',
     'tree_sakura_pink',
     'tree_banyan_shady',
     'tree_palm_tropical',
     'tree_autumn_maple',
+    'bench_builtin_fountain',
+    'bench_builtin_riverside',
+    'bench_builtin_campfire',
     'bench_wood_classic',
     'bench_white_minimal',
     'bench_stone_marble',
     'bench_picnic_table',
     'bench_royal_gold',
+    'swing_builtin_city',
     'swing_wood_garden',
     'swing_cyan_modern',
+    'campfire_builtin_city',
     'campfire_stone_ring',
     'campfire_royal_brazier',
     'playground_slide_colorful',
@@ -224,7 +293,22 @@ test('all 29 building models (including 15 built-in models), 32 prop models, 10 
       facing: 'down-right',
       scale: 1,
     };
-    drawCustomCreatorProp3D(ctx, mockProject, 38, p, 1200, true);
+    drawCustomCreatorProp3D(
+      ctx,
+      mockProject,
+      38,
+      p,
+      1200,
+      true,
+      {
+        propId: p.id,
+        actionId: 'tree_water_care',
+        emoteType: 'care',
+        startTime: 1000,
+        durationMs: 9000,
+      },
+      [`custom_swing:${p.id}:left`]
+    );
   }
 
   const speciesList: CreatorAnimalSpecies[] = [
@@ -258,6 +342,14 @@ test('all 29 building models (including 15 built-in models), 32 prop models, 10 
   }
 
   const terrainTypes: CreatorTerrainType[] = [
+    'builtin_city_grass',
+    'builtin_forest_grass',
+    'builtin_city_road',
+    'builtin_fishing_trail',
+    'builtin_east_dirt_road',
+    'builtin_airport_tarmac',
+    'builtin_alpine_grass',
+    'builtin_river_water',
     'road_asphalt',
     'road_asphalt_y',
     'road_asphalt_cross',

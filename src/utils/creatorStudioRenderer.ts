@@ -23,32 +23,257 @@ export interface PropAvatarActionOption {
   emoteType: 'sit' | 'swing' | 'cheer' | 'sport' | 'warm' | 'care' | 'water';
 }
 
+export interface CreatorPropInteractionState {
+  propId: string;
+  actionId: string;
+  emoteType: 'sit' | 'swing' | 'cheer' | 'sport' | 'warm' | 'care' | 'water';
+  startTime: number;
+  durationMs: number;
+}
+
+export interface CustomSwingSeatMetric {
+  anchorX: number;
+  anchorY: number;
+  seatX: number;
+  seatY: number;
+  shadowX: number;
+  shadowY: number;
+  shadowScale: number;
+  isOccupied: boolean;
+  sway: number;
+}
+
+export interface CustomPropRideMetrics {
+  kind: 'swing' | 'seesaw' | 'spring' | 'slide' | 'bench' | 'none';
+  swingLeft?: CustomSwingSeatMetric;
+  swingRight?: CustomSwingSeatMetric;
+  riderSeatX?: number;
+  riderSeatY?: number;
+  riderHandX?: number;
+  riderHandY?: number;
+  tiltOrBounce?: number;
+  rockX?: number;
+  slideAvatarX?: number;
+  slideAvatarY?: number;
+  slidePhase?: 'climb' | 'top_cheer' | 'slide_down' | 'done';
+  slideProgress?: number;
+}
+
+export function computeCustomPropSwingAndRideMetrics(
+  prop: CreatorPropItem,
+  project: ProjectFn,
+  tileW: number,
+  now: number,
+  activeInteraction?: CreatorPropInteractionState | null,
+  occupiedSeatIds?: string[]
+): CustomPropRideMetrics {
+  const { wx, wy, propModel, propCategory, scale = 1.0 } = prop;
+  const sc = Math.max(0.5, Math.min(2.2, scale)) * (tileW / 38);
+  const pt = project(wx, wy, 0);
+  const elapsed = now * 0.001;
+  const isInteractingThisProp = Boolean(
+    activeInteraction &&
+      activeInteraction.propId === prop.id &&
+      now < activeInteraction.startTime + activeInteraction.durationMs
+  );
+
+  // 1. SWINGS (swing_builtin_city, swing_wood_garden, swing_cyan_modern)
+  if (propCategory === 'swing') {
+    const leftId = `custom_swing:${prop.id}:left`;
+    const rightId = `custom_swing:${prop.id}:right`;
+    const leftOcc = Boolean(occupiedSeatIds?.includes(leftId));
+    const rightOcc = Boolean(occupiedSeatIds?.includes(rightId));
+    const isHighJoy =
+      isInteractingThisProp && activeInteraction?.actionId === 'swing_high_joy';
+
+    const buildSeat = (isLeft: boolean, isOccupied: boolean): CustomSwingSeatMetric => {
+      const sxOffset =
+        propModel === 'swing_builtin_city'
+          ? isLeft
+            ? -3.5 * sc
+            : 3.5 * sc
+          : isLeft
+          ? -5.5 * sc
+          : 5.5 * sc;
+      const anchorX = pt.x + sxOffset;
+      const anchorY =
+        propModel === 'swing_builtin_city' ? pt.y - 16.2 * sc : pt.y - 24 * sc;
+      const restSeatY =
+        propModel === 'swing_builtin_city' ? pt.y - 6.0 * sc : pt.y - 8.5 * sc;
+
+      const phaseOffset = isLeft ? 0 : 1.15;
+      const freq = isOccupied || isInteractingThisProp ? (isHighJoy ? 4.3 : 3.4) : 1.8;
+      const amp =
+        isOccupied || isInteractingThisProp
+          ? (isHighJoy ? 10.2 : 6.8) * sc
+          : 1.15 * sc;
+      const phase = elapsed * freq + wx * 0.7 + phaseOffset;
+      const sway = Math.sin(phase) * amp;
+      const lift =
+        (1 - Math.cos(Math.sin(phase) * (isOccupied || isInteractingThisProp ? 0.52 : 0.1))) *
+        (isHighJoy ? 5.2 : 3.2) *
+        sc;
+
+      const seatX = anchorX + sway;
+      const seatY = restSeatY - lift;
+      const shadowX = anchorX + sway * 0.92;
+      const shadowY = pt.y + 1.8 * sc + sway * 0.18;
+      const shadowScale = isOccupied ? Math.max(0.7, 1 - lift / (16 * sc)) : 0.85;
+
+      return {
+        anchorX,
+        anchorY,
+        seatX,
+        seatY,
+        shadowX,
+        shadowY,
+        shadowScale,
+        isOccupied,
+        sway,
+      };
+    };
+
+    return {
+      kind: 'swing',
+      swingLeft: buildSeat(true, leftOcc || isInteractingThisProp),
+      swingRight: buildSeat(false, rightOcc),
+    };
+  }
+
+  // 2. SEESAW (playground_seesaw_dual)
+  if (propModel === 'playground_seesaw_dual') {
+    const isRiding =
+      Boolean(occupiedSeatIds?.includes(`custom_seesaw:${prop.id}`)) ||
+      isInteractingThisProp;
+    const speed = isRiding ? 3.8 : 2.2;
+    const amp = (isRiding ? 6.2 : 3.2) * sc;
+    const tilt = Math.sin(elapsed * speed + wx) * amp;
+    return {
+      kind: 'seesaw',
+      tiltOrBounce: tilt,
+      riderSeatX: pt.x - 14.5 * sc,
+      riderSeatY: pt.y - 11.2 * sc - tilt,
+      riderHandX: pt.x - 11.5 * sc,
+      riderHandY: pt.y - 13.5 * sc - tilt * 0.72,
+    };
+  }
+
+  // 3. SPRING RIDER (playground_spring_rider)
+  if (propModel === 'playground_spring_rider') {
+    const isRiding =
+      Boolean(occupiedSeatIds?.includes(`custom_spring:${prop.id}`)) ||
+      isInteractingThisProp;
+    const speed = isRiding ? 6.2 : 4.0;
+    const bounce = Math.sin(elapsed * speed + wy) * (isRiding ? 3.4 : 1.8) * sc;
+    const rock = Math.cos(elapsed * speed + wy) * (isRiding ? 3.8 : 1.2) * sc;
+    return {
+      kind: 'spring',
+      tiltOrBounce: bounce,
+      rockX: rock,
+      riderSeatX: pt.x - 0.5 * sc + rock,
+      riderSeatY: pt.y - 16.2 * sc + bounce,
+      riderHandX: pt.x + 4.5 * sc + rock,
+      riderHandY: pt.y - 21.5 * sc + bounce,
+    };
+  }
+
+  // 4. SLIDES & CASTLE PLAYGROUND (playground_slide_colorful, playground_combo_castle)
+  if (
+    propModel === 'playground_slide_colorful' ||
+    propModel === 'playground_combo_castle'
+  ) {
+    if (isInteractingThisProp && activeInteraction) {
+      const ageSec = Math.max(0, (now - activeInteraction.startTime) * 0.001);
+      const isCastle = propModel === 'playground_combo_castle';
+      if (ageSec < 1.05) {
+        // Phase 1: Climbing up the ladder steps
+        const p = Math.min(1, ageSec / 1.05);
+        const startX = pt.x + (isCastle ? -11 * sc : -14.5 * sc);
+        const startY = pt.y;
+        const topX = pt.x + (isCastle ? -6.5 * sc : -8.5 * sc);
+        const topY = pt.y - (isCastle ? 18.5 * sc : 19.5 * sc);
+        return {
+          kind: 'slide',
+          slidePhase: 'climb',
+          slideProgress: p,
+          slideAvatarX: startX + (topX - startX) * p,
+          slideAvatarY: startY + (topY - startY) * p,
+        };
+      }
+      if (ageSec < 1.55) {
+        // Phase 2: Cheering at the top platform
+        const p = (ageSec - 1.05) / 0.5;
+        const topX = pt.x + (isCastle ? 10.5 * sc : -5.5 * sc);
+        const topY = pt.y - (isCastle ? 16.5 * sc : 18.5 * sc);
+        return {
+          kind: 'slide',
+          slidePhase: 'top_cheer',
+          slideProgress: p,
+          slideAvatarX: topX,
+          slideAvatarY: topY - Math.abs(Math.sin(p * Math.PI * 2)) * 3 * sc,
+        };
+      }
+      if (ageSec < 2.85) {
+        // Phase 3: Sliding rapidly down the chute!
+        const p = Math.min(1, (ageSec - 1.55) / 1.3);
+        const easeP = p * p * (3 - 2 * p);
+        const startX = pt.x + (isCastle ? 14 * sc : -4 * sc);
+        const startY = pt.y - (isCastle ? 14 * sc : 17.5 * sc);
+        const endX = pt.x + (isCastle ? 24 * sc : 16.5 * sc);
+        const endY = pt.y + 1 * sc;
+        return {
+          kind: 'slide',
+          slidePhase: 'slide_down',
+          slideProgress: easeP,
+          slideAvatarX: startX + (endX - startX) * easeP,
+          slideAvatarY:
+            startY + (endY - startY) * easeP - Math.sin(easeP * Math.PI) * 2.2 * sc,
+        };
+      }
+    }
+    return { kind: 'slide', slidePhase: 'done', slideProgress: 1 };
+  }
+
+  // 5. BENCHES (bench_*)
+  if (propCategory === 'bench') {
+    return {
+      kind: 'bench',
+      riderSeatX: pt.x - 3.2 * sc,
+      riderSeatY: pt.y - 7.5 * sc,
+    };
+  }
+
+  return { kind: 'none' };
+}
+
 export function getCreatorPropInteractiveActions(prop: CreatorPropItem): PropAvatarActionOption[] {
   const { propCategory, propModel, name } = prop;
 
   switch (propCategory) {
     case 'tree': {
       const harvestLabel =
-        propModel === 'tree_oak_apple'
+        propModel === 'tree_oak_apple' || propModel === 'tree_builtin_city_emerald'
           ? 'Petik Buah Apel Segar'
           : propModel === 'tree_palm_tropical'
           ? 'Panen Kelapa Muda Segar'
           : propModel === 'tree_sakura_pink'
           ? 'Kumpulkan Kelopak Sakura'
-          : propModel === 'tree_autumn_maple'
-          ? 'Koleksi Daun Maple Emas'
-          : propModel === 'tree_pine_spruce'
+          : propModel === 'tree_autumn_maple' || propModel === 'tree_builtin_city_autumn'
+          ? 'Koleksi Daun Musim Gugur'
+          : propModel === 'tree_pine_spruce' || propModel === 'tree_builtin_forest_pine'
           ? 'Ambil Biji Pinus Hutan'
           : 'Gantungkan Harapan di Pohon';
       const harvestIcon =
-        propModel === 'tree_oak_apple'
+        propModel === 'tree_oak_apple' || propModel === 'tree_builtin_city_emerald'
           ? '🍎'
           : propModel === 'tree_palm_tropical'
           ? '🥥'
           : propModel === 'tree_sakura_pink'
           ? '🌸'
-          : propModel === 'tree_autumn_maple'
-          ? '🍁'
+          : propModel === 'tree_autumn_maple' || propModel === 'tree_builtin_city_autumn'
+          ? '🍂'
+          : propModel === 'tree_pine_spruce' || propModel === 'tree_builtin_forest_pine'
+          ? '🌲'
           : '🌿';
       return [
         {
@@ -56,7 +281,7 @@ export function getCreatorPropInteractiveActions(prop: CreatorPropItem): PropAva
           label: 'Berteduh & Baca Buku',
           icon: '📖',
           speechText: `📖 Duduk berteduh sambil membaca buku inspirasi di bawah ${name}...`,
-          toastText: `📖 Berteduh & membaca buku di bawah ${name} (+2 XP)`,
+          toastText: `📖 Berteduh & membaca buku di bawah ${name}`,
           xpReward: 2,
           emoteType: 'sit',
         },
@@ -2268,13 +2493,37 @@ export function drawCustomCreatorProp3D(
   tileW: number,
   prop: CreatorPropItem,
   now: number,
-  isSelectedInStudio: boolean
+  isSelectedInStudio: boolean,
+  activeInteraction?: CreatorPropInteractionState | null,
+  occupiedSeatIds?: string[]
 ) {
   const { wx, wy, propModel, scale = 1.0 } = prop;
   const sc = Math.max(0.5, Math.min(2.2, scale)) * (tileW / 38);
   const pt = project(wx, wy, 0);
   const elapsed = now * 0.001;
   const breeze = Math.sin(elapsed * 2.2 + wx * 0.7 + wy * 0.5) * 1.5 * sc;
+
+  const isInteractingThisProp = Boolean(
+    activeInteraction &&
+      activeInteraction.propId === prop.id &&
+      now < activeInteraction.startTime + activeInteraction.durationMs
+  );
+  const interactionAgeSec =
+    isInteractingThisProp && activeInteraction
+      ? Math.max(0, (now - activeInteraction.startTime) * 0.001)
+      : 0;
+  const interactionProgress =
+    isInteractingThisProp && activeInteraction
+      ? Math.min(1, (now - activeInteraction.startTime) / Math.max(1, activeInteraction.durationMs))
+      : 0;
+  const rideMetrics = computeCustomPropSwingAndRideMetrics(
+    prop,
+    project,
+    tileW,
+    now,
+    activeInteraction,
+    occupiedSeatIds
+  );
 
   ctx.save();
 
@@ -2297,6 +2546,132 @@ export function drawCustomCreatorProp3D(
   }
 
   switch (propModel) {
+    // =========================================================================
+    // AUTHENTIC BUILT-IN REFLEKSIA CITY TREES (100% IDENTICAL TO ThreeTownCanvas)
+    // =========================================================================
+    case 'tree_builtin_city_emerald':
+    case 'tree_builtin_city_autumn': {
+      const isAutumnTree = propModel === 'tree_builtin_city_autumn';
+
+      // Soft ambient tree shadow on lawn
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+      ctx.beginPath();
+      ctx.ellipse(pt.x + 6 * sc, pt.y + 3 * sc, 21 * sc, 10.5 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sturdy two-tone brown trunk (exact match to ThreeTownCanvas line 12770)
+      ctx.fillStyle = '#6a2f0c';
+      ctx.fillRect(pt.x - 4 * sc, pt.y - 24 * sc, 8 * sc, 24 * sc);
+      ctx.fillStyle = '#451a03';
+      ctx.fillRect(pt.x, pt.y - 24 * sc, 4 * sc, 24 * sc);
+
+      // Sphere 1 (Lower Large Canopy)
+      ctx.fillStyle = isAutumnTree ? '#ea580c' : '#16a34a';
+      ctx.beginPath();
+      ctx.arc(pt.x + breeze * 0.55, pt.y - 28 * sc, 22 * sc, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sphere 1 Highlight
+      ctx.fillStyle = isAutumnTree ? '#f97316' : '#22c55e';
+      ctx.beginPath();
+      ctx.arc(pt.x - 4 * sc + breeze * 0.55, pt.y - 31 * sc, 16 * sc, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sphere 2 (Upper Medium Canopy)
+      ctx.fillStyle = isAutumnTree ? '#f97316' : '#22c55e';
+      ctx.beginPath();
+      ctx.arc(pt.x + breeze * 0.85, pt.y - 45 * sc, 16 * sc, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sphere 2 Highlight
+      ctx.fillStyle = isAutumnTree ? '#fb923c' : '#4ade80';
+      ctx.beginPath();
+      ctx.arc(pt.x - 3 * sc + breeze * 0.85, pt.y - 48 * sc, 11 * sc, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Top Foliage Bud
+      ctx.fillStyle = isAutumnTree ? '#fdba74' : '#86efac';
+      ctx.beginPath();
+      ctx.arc(pt.x + breeze, pt.y - 59 * sc, 6 * sc, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isAutumnTree) {
+        // 7 Red Apples on Canopy + Ground (exact match to ThreeTownCanvas line 12805)
+        const applePositions = [
+          { dx: -11, dy: -26 },
+          { dx: 10, dy: -23 },
+          { dx: -4, dy: -41 },
+          { dx: 7, dy: -46 },
+          { dx: 0, dy: -19 },
+          { dx: -12, dy: 2 },
+          { dx: 11, dy: 4 },
+        ];
+        applePositions.forEach((ap) => {
+          const ax = pt.x + ap.dx * sc + (ap.dy < 0 ? breeze * 0.6 : 0);
+          const ay = pt.y + ap.dy * sc;
+          ctx.fillStyle = '#dc2626';
+          ctx.beginPath();
+          ctx.arc(ax, ay, 2.5 * sc, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#fca5a5';
+          ctx.beginPath();
+          ctx.arc(ax - 0.7 * sc, ay - 0.7 * sc, 0.8 * sc, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else {
+        // 5 Fallen Dry Leaves around the base of the Autumn Tree (exact match to ThreeTownCanvas line 12858)
+        const leafPositions = [
+          { dx: -13, dy: 2, rot: 0.4, col: '#ea580c' },
+          { dx: -6, dy: 5, rot: -0.5, col: '#d97706' },
+          { dx: 8, dy: 4, rot: 0.8, col: '#f97316' },
+          { dx: 14, dy: 1, rot: -0.3, col: '#b45309' },
+          { dx: 2, dy: 6, rot: 0.2, col: '#f59e0b' },
+        ];
+        leafPositions.forEach((lf) => {
+          const lx = pt.x + lf.dx * sc;
+          const ly = pt.y + lf.dy * sc;
+          ctx.save();
+          ctx.translate(lx, ly);
+          ctx.rotate(lf.rot);
+          ctx.fillStyle = lf.col;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 2.8 * sc, 1.4 * sc, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+      break;
+    }
+
+    case 'tree_builtin_forest_pine': {
+      // Exact Built-in Wilderness 3-Tiered Evergreen Pine Tree (ThreeTownCanvas line 12990)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+      ctx.beginPath();
+      ctx.ellipse(pt.x + 2 * sc, pt.y + 2 * sc, 12 * sc, 6 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#5d4037';
+      ctx.fillRect(pt.x - 2.6 * sc, pt.y - 15 * sc, 5.2 * sc, 15 * sc);
+
+      const pineTiers = [
+        { baseY: -11 * sc, tipY: -29 * sc, halfW: 14 * sc, fill: '#14532d' },
+        { baseY: -21 * sc, tipY: -39 * sc, halfW: 11 * sc, fill: '#15803d' },
+        { baseY: -30 * sc, tipY: -48 * sc, halfW: 7.8 * sc, fill: '#22c55e' },
+      ];
+      pineTiers.forEach((tr, ti) => {
+        const tipSway = breeze * (0.45 + ti * 0.3);
+        ctx.fillStyle = tr.fill;
+        ctx.beginPath();
+        ctx.moveTo(pt.x + tipSway, pt.y + tr.tipY);
+        ctx.lineTo(pt.x + tr.halfW + tipSway * 0.35, pt.y + tr.baseY);
+        ctx.lineTo(pt.x, pt.y + tr.baseY + 2.5 * sc);
+        ctx.lineTo(pt.x - tr.halfW + tipSway * 0.35, pt.y + tr.baseY);
+        ctx.closePath();
+        ctx.fill();
+      });
+      break;
+    }
+
     case 'tree_oak_apple': {
       ctx.fillStyle = '#94a3b8';
       ctx.beginPath();
@@ -2561,6 +2936,100 @@ export function drawCustomCreatorProp3D(
       break;
     }
 
+    // =========================================================================
+    // AUTHENTIC BUILT-IN REFLEKSIA CITY BENCHES (Fountain, Riverside, Campfire)
+    // =========================================================================
+    case 'bench_builtin_fountain':
+    case 'bench_builtin_riverside': {
+      const isRiverside = propModel === 'bench_builtin_riverside';
+      const bx = pt.x;
+      const by = pt.y;
+      // Soft ground shadow (ThreeTownCanvas line 10680)
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath();
+      ctx.ellipse(bx, by + 2 * sc, 11.5 * sc, 4.2 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cast-iron legs (left, center, right)
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(bx - 8.5 * sc, by - 2.5 * sc, 2 * sc, 5 * sc);
+      ctx.fillRect(bx - 0.9 * sc, by - 2.5 * sc, 1.8 * sc, 5 * sc);
+      ctx.fillRect(bx + 6.5 * sc, by - 2.5 * sc, 2 * sc, 5 * sc);
+
+      // Wooden seat plank (warm teak for riverside, golden oak for fountain)
+      ctx.fillStyle = isRiverside ? '#b45309' : '#d97706';
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 1.0 * sc;
+      ctx.beginPath();
+      ctx.roundRect(bx - 10 * sc, by - 4.8 * sc, 20 * sc, 3.6 * sc, 1.5 * sc);
+      ctx.fill();
+      ctx.stroke();
+
+      // Center seat divider line (2-person slots)
+      ctx.strokeStyle = 'rgba(120, 53, 15, 0.55)';
+      ctx.lineWidth = 0.8 * sc;
+      ctx.beginPath();
+      ctx.moveTo(bx, by - 4.6 * sc);
+      ctx.lineTo(bx, by - 1.4 * sc);
+      ctx.stroke();
+
+      // Wooden backrest plank
+      ctx.fillStyle = isRiverside ? '#92400e' : '#b45309';
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 0.9 * sc;
+      ctx.beginPath();
+      ctx.roundRect(bx - 9.5 * sc, by - 8.6 * sc, 19 * sc, 3.2 * sc, 1.2 * sc);
+      ctx.fill();
+      ctx.stroke();
+
+      // Cast-iron armrests
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.4 * sc;
+      ctx.beginPath();
+      ctx.moveTo(bx - 9.2 * sc, by - 7.5 * sc);
+      ctx.lineTo(bx - 9.2 * sc, by - 2.5 * sc);
+      ctx.moveTo(bx + 9.2 * sc, by - 7.5 * sc);
+      ctx.lineTo(bx + 9.2 * sc, by - 2.5 * sc);
+      ctx.stroke();
+      break;
+    }
+
+    case 'bench_builtin_campfire': {
+      // Built-in Rustic Log Bench around Campfire (ThreeTownCanvas line 10722)
+      const bx = pt.x;
+      const by = pt.y;
+      ctx.fillStyle = 'rgba(0,0,0,0.24)';
+      ctx.beginPath();
+      ctx.ellipse(bx, by + 2.2 * sc, 12.5 * sc, 4.5 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Log support stumps
+      ctx.fillStyle = '#451a03';
+      ctx.fillRect(bx - 8 * sc, by - 1.5 * sc, 3.2 * sc, 4.2 * sc);
+      ctx.fillRect(bx + 4.8 * sc, by - 1.5 * sc, 3.2 * sc, 4.2 * sc);
+
+      // Thick split-timber log body
+      ctx.fillStyle = '#78350f';
+      ctx.strokeStyle = '#451a03';
+      ctx.lineWidth = 1.2 * sc;
+      ctx.beginPath();
+      ctx.roundRect(bx - 11 * sc, by - 5.5 * sc, 22 * sc, 4.8 * sc, 2.4 * sc);
+      ctx.fill();
+      ctx.stroke();
+
+      // Light wood grain top highlight & bark rings on ends
+      ctx.fillStyle = '#b45309';
+      ctx.beginPath();
+      ctx.roundRect(bx - 9.8 * sc, by - 5.0 * sc, 19.6 * sc, 1.8 * sc, 1 * sc);
+      ctx.fill();
+      ctx.fillStyle = '#fde68a';
+      ctx.beginPath();
+      ctx.arc(bx - 9.5 * sc, by - 3.1 * sc, 1.5 * sc, 0, Math.PI * 2);
+      ctx.arc(bx + 9.5 * sc, by - 3.1 * sc, 1.5 * sc, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+
     case 'bench_wood_classic':
     case 'bench_white_minimal':
     case 'bench_stone_marble':
@@ -2661,12 +3130,93 @@ export function drawCustomCreatorProp3D(
       break;
     }
 
+    // =========================================================================
+    // AUTHENTIC BUILT-IN & CUSTOM SWINGS (SYNCHRONIZED PENDULUM WITH AVATAR)
+    // =========================================================================
+    case 'swing_builtin_city': {
+      // Exact Built-in Refleksia City Double Swing (ThreeTownCanvas line 10849)
+      const swPt = pt;
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath();
+      ctx.ellipse(swPt.x, swPt.y + 2 * sc, 13 * sc, 4.5 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Left & Right A-Frame wooden support posts
+      ctx.strokeStyle = '#5c280b';
+      ctx.lineWidth = 2.4 * sc;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(swPt.x - 11 * sc, swPt.y + 2 * sc);
+      ctx.lineTo(swPt.x - 8 * sc, swPt.y - 16 * sc);
+      ctx.lineTo(swPt.x - 5 * sc, swPt.y + 1 * sc);
+      ctx.moveTo(swPt.x + 5 * sc, swPt.y + 1 * sc);
+      ctx.lineTo(swPt.x + 8 * sc, swPt.y - 16 * sc);
+      ctx.lineTo(swPt.x + 11 * sc, swPt.y + 2 * sc);
+      ctx.stroke();
+
+      // Top horizontal wooden crossbar beam
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 3.0 * sc;
+      ctx.beginPath();
+      ctx.moveTo(swPt.x - 9.5 * sc, swPt.y - 16 * sc);
+      ctx.lineTo(swPt.x + 9.5 * sc, swPt.y - 16 * sc);
+      ctx.stroke();
+
+      // Decorative green leaf garlands & pink blossom on top beam
+      ctx.fillStyle = '#16a34a';
+      ctx.beginPath();
+      ctx.arc(swPt.x - 8 * sc, swPt.y - 16.8 * sc, 2.2 * sc, 0, Math.PI * 2);
+      ctx.arc(swPt.x, swPt.y - 17 * sc, 2.0 * sc, 0, Math.PI * 2);
+      ctx.arc(swPt.x + 8 * sc, swPt.y - 16.8 * sc, 2.2 * sc, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f472b6';
+      ctx.beginPath();
+      ctx.arc(swPt.x, swPt.y - 17.2 * sc, 1.0 * sc, 0, Math.PI * 2);
+      ctx.fill();
+
+      const seats = [rideMetrics.swingLeft, rideMetrics.swingRight];
+      seats.forEach((m) => {
+        if (!m) return;
+        // Moving shadow beneath swing seat
+        ctx.fillStyle = m.isOccupied ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.16)';
+        ctx.beginPath();
+        ctx.ellipse(
+          m.shadowX,
+          m.shadowY,
+          3.4 * sc * m.shadowScale,
+          1.4 * sc * m.shadowScale,
+          0,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+
+        // Hanging chains from top crossbar to swinging seat
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1.0 * sc;
+        ctx.beginPath();
+        ctx.moveTo(m.anchorX - 1.8 * sc, m.anchorY);
+        ctx.lineTo(m.seatX - 1.8 * sc, m.seatY);
+        ctx.moveTo(m.anchorX + 1.8 * sc, m.anchorY);
+        ctx.lineTo(m.seatX + 1.8 * sc, m.seatY);
+        ctx.stroke();
+
+        // Warm wooden swing seat plank
+        ctx.fillStyle = '#d97706';
+        ctx.strokeStyle = '#78350f';
+        ctx.lineWidth = 0.8 * sc;
+        ctx.beginPath();
+        ctx.roundRect(m.seatX - 2.8 * sc, m.seatY - 1.0 * sc, 5.6 * sc, 2.2 * sc, 1 * sc);
+        ctx.fill();
+        ctx.stroke();
+      });
+      break;
+    }
+
     case 'swing_wood_garden':
     case 'swing_cyan_modern': {
       const frameColor = propModel === 'swing_cyan_modern' ? '#0891b2' : '#92400e';
       const barColor = propModel === 'swing_cyan_modern' ? '#22d3ee' : '#15803d';
-      const swingSway1 = Math.sin(elapsed * 2.8 + wx) * 2.8 * sc;
-      const swingSway2 = Math.sin(elapsed * 2.8 + wx + 1.4) * 2.4 * sc;
 
       ctx.fillStyle = propModel === 'swing_cyan_modern' ? 'rgba(56, 189, 248, 0.25)' : 'rgba(253, 230, 138, 0.45)';
       ctx.beginPath();
@@ -2693,28 +3243,48 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
 
       [
-        { sx: -5.5, sway: swingSway1, col: '#fbbf24' },
-        { sx: 5.5, sway: swingSway2, col: '#f43f5e' },
-      ].forEach(({ sx, sway, col }) => {
+        { m: rideMetrics.swingLeft, col: '#fbbf24' },
+        { m: rideMetrics.swingRight, col: '#f43f5e' },
+      ].forEach(({ m, col }) => {
+        if (!m) return;
+        ctx.fillStyle = m.isOccupied ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.15)';
+        ctx.beginPath();
+        ctx.ellipse(
+          m.shadowX,
+          m.shadowY,
+          3.8 * sc * m.shadowScale,
+          1.6 * sc * m.shadowScale,
+          0,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+
         ctx.strokeStyle = '#cbd5e1';
         ctx.lineWidth = 1.2 * sc;
         ctx.beginPath();
-        ctx.moveTo(pt.x + (sx - 2.2) * sc, pt.y - 24 * sc);
-        ctx.lineTo(pt.x + (sx - 2.2) * sc + sway, pt.y - 8 * sc);
-        ctx.moveTo(pt.x + (sx + 2.2) * sc, pt.y - 24 * sc);
-        ctx.lineTo(pt.x + (sx + 2.2) * sc + sway, pt.y - 8 * sc);
+        ctx.moveTo(m.anchorX - 2.2 * sc, m.anchorY);
+        ctx.lineTo(m.seatX - 2.2 * sc, m.seatY);
+        ctx.moveTo(m.anchorX + 2.2 * sc, m.anchorY);
+        ctx.lineTo(m.seatX + 2.2 * sc, m.seatY);
         ctx.stroke();
 
         ctx.fillStyle = col;
         ctx.beginPath();
-        ctx.roundRect(pt.x + (sx - 3.6) * sc + sway, pt.y - 9 * sc, 7.2 * sc, 2.8 * sc, 1 * sc);
+        ctx.roundRect(m.seatX - 3.6 * sc, m.seatY - 1.2 * sc, 7.2 * sc, 2.8 * sc, 1 * sc);
         ctx.fill();
       });
       break;
     }
 
+    // =========================================================================
+    // AUTHENTIC BUILT-IN & CUSTOM CAMPFIRES (WITH INTERACTIVE FLAME BOOST)
+    // =========================================================================
+    case 'campfire_builtin_city':
     case 'campfire_stone_ring':
     case 'campfire_royal_brazier': {
+      const fireBoost = isInteractingThisProp ? 1.38 : 1.0;
+
       if (propModel === 'campfire_royal_brazier') {
         ctx.fillStyle = '#475569';
         ctx.fillRect(pt.x - 4 * sc, pt.y - 4 * sc, 8 * sc, 5 * sc);
@@ -2726,76 +3296,132 @@ export function drawCustomCreatorProp3D(
         ctx.lineWidth = 2 * sc;
         ctx.stroke();
       } else {
-        ctx.fillStyle = '#334155';
+        // Warm ground fire glow
+        const fireGlow = ctx.createRadialGradient(
+          pt.x,
+          pt.y - 2 * sc,
+          2 * sc,
+          pt.x,
+          pt.y - 2 * sc,
+          26 * sc * fireBoost
+        );
+        fireGlow.addColorStop(0, 'rgba(251, 146, 60, 0.50)');
+        fireGlow.addColorStop(0.5, 'rgba(234, 88, 12, 0.22)');
+        fireGlow.addColorStop(1, 'rgba(234, 88, 12, 0)');
+        ctx.fillStyle = fireGlow;
         ctx.beginPath();
-        ctx.ellipse(pt.x, pt.y, 10 * sc, 5 * sc, 0, 0, Math.PI * 2);
+        ctx.ellipse(pt.x, pt.y + 1 * sc, 26 * sc * fireBoost, 13 * sc * fireBoost, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#78350f';
-        ctx.lineWidth = 3.2 * sc;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(pt.x - 8 * sc, pt.y - 1 * sc);
-        ctx.lineTo(pt.x + 8 * sc, pt.y - 4 * sc);
-        ctx.moveTo(pt.x - 7 * sc, pt.y - 4 * sc);
-        ctx.lineTo(pt.x + 7 * sc, pt.y - 1 * sc);
-        ctx.stroke();
 
-        for (let i = 0; i < 10; i++) {
-          const ang = (i / 10) * Math.PI * 2;
-          ctx.fillStyle = i % 2 === 0 ? '#64748b' : '#94a3b8';
+        // Stone ring base
+        const stoneCount = propModel === 'campfire_builtin_city' ? 8 : 10;
+        for (let i = 0; i < stoneCount; i++) {
+          const ang = (i / stoneCount) * Math.PI * 2;
+          ctx.fillStyle = i % 2 === 0 ? '#475569' : '#64748b';
           ctx.beginPath();
-          ctx.arc(
-            pt.x + Math.cos(ang) * 10.5 * sc,
-            pt.y + Math.sin(ang) * 5.2 * sc,
-            2.5 * sc,
+          ctx.ellipse(
+            pt.x + Math.cos(ang) * 9.5 * sc,
+            pt.y + 1.5 * sc + Math.sin(ang) * 4.5 * sc,
+            2.6 * sc,
+            1.8 * sc,
+            0,
             0,
             Math.PI * 2
           );
           ctx.fill();
         }
 
-        ctx.strokeStyle = '#1e293b';
-        ctx.lineWidth = 1.3 * sc;
+        // Crossed firewood logs
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 3.0 * sc;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(pt.x - 11 * sc, pt.y + 2 * sc);
-        ctx.lineTo(pt.x, pt.y - 23 * sc);
-        ctx.lineTo(pt.x + 11 * sc, pt.y + 2 * sc);
+        ctx.moveTo(pt.x - 6.5 * sc, pt.y + 2 * sc);
+        ctx.lineTo(pt.x + 6.5 * sc, pt.y - 1.5 * sc);
+        ctx.moveTo(pt.x + 6.5 * sc, pt.y + 2 * sc);
+        ctx.lineTo(pt.x - 6.5 * sc, pt.y - 1.5 * sc);
         ctx.stroke();
+
+        if (propModel === 'campfire_stone_ring') {
+          ctx.strokeStyle = '#1e293b';
+          ctx.lineWidth = 1.3 * sc;
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 11 * sc, pt.y + 2 * sc);
+          ctx.lineTo(pt.x, pt.y - 23 * sc);
+          ctx.lineTo(pt.x + 11 * sc, pt.y + 2 * sc);
+          ctx.stroke();
+        }
       }
 
-      const flicker = Math.sin(elapsed * 10 + wx) * 1.8 * sc;
-      const glow = ctx.createRadialGradient(pt.x, pt.y - 8 * sc, 1 * sc, pt.x, pt.y - 8 * sc, 21 * sc);
-      glow.addColorStop(0, 'rgba(251, 191, 36, 0.62)');
-      glow.addColorStop(0.55, 'rgba(239, 68, 68, 0.26)');
-      glow.addColorStop(1, 'rgba(239, 68, 68, 0)');
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y - 8 * sc, 21 * sc, 0, Math.PI * 2);
-      ctx.fill();
+      const flicker = Math.sin(elapsed * 11 + wx) * 1.6 * sc;
+      const flicker2 = Math.cos(elapsed * 14 + wy) * 1.2 * sc;
 
-      ctx.fillStyle = '#ea580c';
+      // Outer red-orange flame
+      ctx.fillStyle = '#dc2626';
       ctx.beginPath();
-      ctx.moveTo(pt.x - 7 * sc, pt.y - 2 * sc);
-      ctx.quadraticCurveTo(pt.x - 8 * sc, pt.y - 13 * sc, pt.x + flicker * 0.5, pt.y - 20 * sc + flicker);
-      ctx.quadraticCurveTo(pt.x + 8 * sc, pt.y - 13 * sc, pt.x + 7 * sc, pt.y - 2 * sc);
+      ctx.moveTo(pt.x - 6.2 * sc * fireBoost, pt.y);
+      ctx.quadraticCurveTo(
+        pt.x - 7.5 * sc * fireBoost,
+        pt.y - 9 * sc * fireBoost,
+        pt.x + flicker,
+        pt.y - 16.5 * sc * fireBoost
+      );
+      ctx.quadraticCurveTo(
+        pt.x + 7.5 * sc * fireBoost,
+        pt.y - 9 * sc * fireBoost,
+        pt.x + 6.2 * sc * fireBoost,
+        pt.y
+      );
       ctx.closePath();
       ctx.fill();
 
+      // Middle orange flame
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.moveTo(pt.x - 4.4 * sc * fireBoost, pt.y);
+      ctx.quadraticCurveTo(
+        pt.x - 5 * sc * fireBoost,
+        pt.y - 7 * sc * fireBoost,
+        pt.x + flicker2,
+        pt.y - 12.8 * sc * fireBoost
+      );
+      ctx.quadraticCurveTo(
+        pt.x + 5 * sc * fireBoost,
+        pt.y - 7 * sc * fireBoost,
+        pt.x + 4.4 * sc * fireBoost,
+        pt.y
+      );
+      ctx.closePath();
+      ctx.fill();
+
+      // Inner bright yellow core flame
       ctx.fillStyle = '#fde047';
       ctx.beginPath();
-      ctx.moveTo(pt.x - 4 * sc, pt.y - 2 * sc);
-      ctx.quadraticCurveTo(pt.x - 3.5 * sc, pt.y - 10 * sc, pt.x - flicker * 0.4, pt.y - 14 * sc - flicker * 0.5);
-      ctx.quadraticCurveTo(pt.x + 3.5 * sc, pt.y - 10 * sc, pt.x + 4 * sc, pt.y - 2 * sc);
+      ctx.moveTo(pt.x - 2.4 * sc * fireBoost, pt.y);
+      ctx.quadraticCurveTo(
+        pt.x - 2 * sc * fireBoost,
+        pt.y - 4.5 * sc * fireBoost,
+        pt.x + flicker * 0.5,
+        pt.y - 8.5 * sc * fireBoost
+      );
+      ctx.quadraticCurveTo(
+        pt.x + 2 * sc * fireBoost,
+        pt.y - 4.5 * sc * fireBoost,
+        pt.x + 2.4 * sc * fireBoost,
+        pt.y
+      );
       ctx.closePath();
       ctx.fill();
 
-      for (let s = 0; s < 4; s++) {
-        const sparkT = (elapsed * 1.6 + s * 0.25) % 1;
-        const sx = pt.x + Math.sin(elapsed * 4 + s * 2) * 5 * sc;
-        const sy = pt.y - (10 + sparkT * 18) * sc;
+      // Rising glowing sparks (more intense when interacting!)
+      const sparkCount = isInteractingThisProp ? 7 : 4;
+      for (let s = 0; s < sparkCount; s++) {
+        const sparkT = (elapsed * (isInteractingThisProp ? 2.4 : 1.6) + s * 0.21) % 1;
+        const sx = pt.x + Math.sin(elapsed * 4.5 + s * 2) * 5.5 * sc * fireBoost;
+        const sy = pt.y - (8 + sparkT * 20 * fireBoost) * sc;
         ctx.fillStyle = `rgba(253, 224, 71, ${1 - sparkT})`;
         ctx.beginPath();
-        ctx.arc(sx, sy, 1.3 * sc, 0, Math.PI * 2);
+        ctx.arc(sx, sy, 1.35 * sc, 0, Math.PI * 2);
         ctx.fill();
       }
       break;
@@ -2867,7 +3493,7 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'playground_seesaw_dual': {
-      const tilt = Math.sin(elapsed * 2.5 + wx) * 4.5 * sc;
+      const tilt = rideMetrics.tiltOrBounce ?? Math.sin(elapsed * 2.5 + wx) * 4.5 * sc;
       ctx.fillStyle = '#dcfce7';
       ctx.strokeStyle = '#22c55e';
       ctx.lineWidth = 1.4 * sc;
@@ -2918,8 +3544,8 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'playground_spring_rider': {
-      const bounce = Math.sin(elapsed * 4.5 + wy) * 2 * sc;
-      const rock = Math.cos(elapsed * 4.5 + wy) * 1.2 * sc;
+      const bounce = rideMetrics.tiltOrBounce ?? Math.sin(elapsed * 4.5 + wy) * 2 * sc;
+      const rock = rideMetrics.rockX ?? Math.cos(elapsed * 4.5 + wy) * 1.2 * sc;
 
       ctx.fillStyle = '#e0f2fe';
       ctx.strokeStyle = '#0284c7';
@@ -3179,18 +3805,49 @@ export function drawCustomCreatorProp3D(
         ctx.lineWidth = 1.1 * sc;
         ctx.fillRect(midN.x - 9 * sc, midN.y - 13 * sc, 18 * sc, 7.5 * sc);
         ctx.strokeRect(midN.x - 9 * sc, midN.y - 13 * sc, 18 * sc, 7.5 * sc);
-        ctx.fillStyle = '#4ade80';
+        ctx.fillStyle = isInteractingThisProp ? '#fde047' : '#4ade80';
         ctx.font = `900 ${Math.round(5.5 * sc)}px monospace`;
         ctx.textAlign = 'center';
-        ctx.fillText('88 : 86', midN.x, midN.y - 8 * sc);
+        ctx.fillText(isInteractingThisProp ? '91 : 86' : '88 : 86', midN.x, midN.y - 8 * sc);
 
-        const bPhase = (elapsed * 0.9) % 1;
-        const bPos = courtPt(0.35 + Math.sin(elapsed * 1.4) * 0.25, 0.5);
-        const bJump = Math.abs(Math.sin(bPhase * Math.PI * 2)) * 12 * sc;
-        ctx.fillStyle = '#ea580c';
-        ctx.beginPath();
-        ctx.arc(bPos.x, bPos.y - 3 * sc - bJump, 3 * sc, 0, Math.PI * 2);
-        ctx.fill();
+        if (isInteractingThisProp) {
+          // High 3-point basketball shot arc right into the east hoop!
+          const shotP = (interactionAgeSec * 0.85) % 1;
+          const startShot = courtPt(0.42, 0.52);
+          const targetRim = { x: midE.x - 3.2 * sc, y: midE.y - 20.5 * sc };
+          const bx = startShot.x + (targetRim.x - startShot.x) * shotP;
+          const by =
+            startShot.y -
+            10 * sc +
+            (targetRim.y - (startShot.y - 10 * sc)) * shotP -
+            Math.sin(shotP * Math.PI) * 24 * sc;
+          ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
+          ctx.lineWidth = 1.4 * sc;
+          ctx.setLineDash([2 * sc, 2 * sc]);
+          ctx.beginPath();
+          ctx.moveTo(startShot.x, startShot.y - 10 * sc);
+          ctx.quadraticCurveTo(
+            (startShot.x + targetRim.x) * 0.5,
+            targetRim.y - 22 * sc,
+            bx,
+            by
+          );
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.fillStyle = '#ea580c';
+          ctx.beginPath();
+          ctx.arc(bx, by, 3.4 * sc, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          const bPhase = (elapsed * 0.9) % 1;
+          const bPos = courtPt(0.35 + Math.sin(elapsed * 1.4) * 0.25, 0.5);
+          const bJump = Math.abs(Math.sin(bPhase * Math.PI * 2)) * 12 * sc;
+          ctx.fillStyle = '#ea580c';
+          ctx.beginPath();
+          ctx.arc(bPos.x, bPos.y - 3 * sc - bJump, 3 * sc, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else if (propModel === 'court_futsal_green') {
         [
           [0, 0.18],
@@ -3225,12 +3882,16 @@ export function drawCustomCreatorProp3D(
           ctx.stroke();
         });
 
-        const ballPos = courtPt(0.5 + Math.sin(elapsed * 2.1) * 0.32, 0.5 + Math.cos(elapsed * 1.5) * 0.22);
+        const shotP = isInteractingThisProp ? (interactionAgeSec * 1.1) % 1 : 0;
+        const ballPos = isInteractingThisProp
+          ? courtPt(0.35 + shotP * 0.62, 0.5 + Math.sin(shotP * Math.PI) * 0.08)
+          : courtPt(0.5 + Math.sin(elapsed * 2.1) * 0.32, 0.5 + Math.cos(elapsed * 1.5) * 0.22);
+        const ballLift = isInteractingThisProp ? Math.sin(shotP * Math.PI) * 9 * sc : 0;
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = '#0f172a';
         ctx.lineWidth = 1 * sc;
         ctx.beginPath();
-        ctx.arc(ballPos.x, ballPos.y - 2.5 * sc, 2.8 * sc, 0, Math.PI * 2);
+        ctx.arc(ballPos.x, ballPos.y - 2.5 * sc - ballLift, 3.0 * sc, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       } else if (propModel === 'court_badminton_pro') {
@@ -3269,12 +3930,14 @@ export function drawCustomCreatorProp3D(
         ctx.lineTo(midS.x, midS.y - 11 * sc);
         ctx.stroke();
 
-        const shuttleU = 0.5 + Math.sin(elapsed * 2.8) * 0.28;
-        const shuttleArc = Math.cos((shuttleU - 0.5) * Math.PI * 1.6) * 15 * sc;
+        const shuttleSpeed = isInteractingThisProp ? 5.2 : 2.8;
+        const shuttleU = 0.5 + Math.sin(elapsed * shuttleSpeed) * 0.32;
+        const shuttleArc =
+          Math.cos((shuttleU - 0.5) * Math.PI * 1.6) * (isInteractingThisProp ? 21 : 15) * sc;
         const sPt = courtPt(shuttleU, 0.5);
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(sPt.x, sPt.y - 6 * sc - shuttleArc, 2.2 * sc, 0, Math.PI * 2);
+        ctx.arc(sPt.x, sPt.y - 6 * sc - shuttleArc, 2.4 * sc, 0, Math.PI * 2);
         ctx.fill();
       }
       break;
@@ -3442,6 +4105,7 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'water_fountain_tiered': {
+      const jetBoost = isInteractingThisProp ? 1.38 : 1.0;
       ctx.fillStyle = '#cbd5e1';
       ctx.strokeStyle = '#64748b';
       ctx.lineWidth = 1.8 * sc;
@@ -3455,9 +4119,9 @@ export function drawCustomCreatorProp3D(
       ctx.ellipse(pt.x, pt.y - 1 * sc, 17.5 * sc, 8.5 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      const ripR = (6 + ((elapsed * 8) % 10)) * sc;
-      ctx.strokeStyle = 'rgba(224, 242, 254, 0.55)';
-      ctx.lineWidth = 1 * sc;
+      const ripR = (6 + ((elapsed * (isInteractingThisProp ? 14 : 8)) % 11)) * sc;
+      ctx.strokeStyle = 'rgba(224, 242, 254, 0.72)';
+      ctx.lineWidth = 1.2 * sc;
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y - 1 * sc, ripR, ripR * 0.48, 0, 0, Math.PI * 2);
       ctx.stroke();
@@ -3469,9 +4133,9 @@ export function drawCustomCreatorProp3D(
       ctx.ellipse(pt.x, pt.y - 18 * sc, 7 * sc, 3.2 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      const sprayH = (28 + Math.sin(elapsed * 8) * 2.5) * sc;
+      const sprayH = (28 * jetBoost + Math.sin(elapsed * 8) * 2.5) * sc;
       ctx.strokeStyle = '#e0f2fe';
-      ctx.lineWidth = 1.7 * sc;
+      ctx.lineWidth = 1.8 * sc;
       [-9, -4.5, 4.5, 9].forEach((sx) => {
         ctx.beginPath();
         ctx.moveTo(pt.x, pt.y - 23 * sc);
@@ -3493,15 +4157,16 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
 
       const koiPalette = ['#f97316', '#facc15', '#f8fafc'];
+      const feedGather = isInteractingThisProp ? 0.52 : 1.0;
       koiPalette.forEach((kCol, idx) => {
-        const koiAng = elapsed * (1.2 + idx * 0.25) + idx * 2.1;
-        const rx = (6 + idx * 3.2) * sc;
-        const ry = (2.8 + idx * 1.4) * sc;
+        const koiAng = elapsed * (isInteractingThisProp ? 2.6 : 1.2 + idx * 0.25) + idx * 2.1;
+        const rx = (6 + idx * 3.2) * sc * feedGather;
+        const ry = (2.8 + idx * 1.4) * sc * feedGather;
         const kx = pt.x + Math.cos(koiAng) * rx;
         const ky = pt.y - 1 * sc + Math.sin(koiAng) * ry;
         ctx.fillStyle = kCol;
         ctx.beginPath();
-        ctx.ellipse(kx, ky, 3.2 * sc, 1.4 * sc, koiAng + Math.PI / 2, 0, Math.PI * 2);
+        ctx.ellipse(kx, ky, 3.4 * sc, 1.5 * sc, koiAng + Math.PI / 2, 0, Math.PI * 2);
         ctx.fill();
       });
 
@@ -3549,7 +4214,7 @@ export function drawCustomCreatorProp3D(
       ctx.fillStyle = '#38bdf8';
       ctx.fillRect(pt.x - 5 * sc, pt.y - 21 * sc, 10 * sc, 20 * sc);
       for (let f = 0; f < 3; f++) {
-        const foamOffset = (elapsed * 16 + f * 6) % 18;
+        const foamOffset = (elapsed * (isInteractingThisProp ? 24 : 16) + f * 6) % 18;
         ctx.strokeStyle = '#e0f2fe';
         ctx.lineWidth = 1.5 * sc;
         ctx.beginPath();
@@ -3565,6 +4230,7 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'water_dancing_jets': {
+      const jetBoost = isInteractingThisProp ? 1.45 : 1.0;
       ctx.fillStyle = '#1e293b';
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 1.6 * sc;
@@ -3574,7 +4240,7 @@ export function drawCustomCreatorProp3D(
       ctx.stroke();
 
       [-12, -8, -4, 0, 4, 8, 12].forEach((jx, idx) => {
-        const jh = (8 + Math.abs(Math.sin(elapsed * 4.5 + idx * 0.75)) * 18) * sc;
+        const jh = (8 + Math.abs(Math.sin(elapsed * 5.2 + idx * 0.75)) * 18 * jetBoost) * sc;
         ctx.fillStyle = idx % 2 === 0 ? '#38bdf8' : '#f472b6';
         ctx.beginPath();
         ctx.arc(pt.x + jx * sc, pt.y, 1.8 * sc, 0, Math.PI * 2);
@@ -3589,6 +4255,86 @@ export function drawCustomCreatorProp3D(
         ctx.stroke();
       });
       break;
+    }
+  }
+
+  // ===========================================================================
+  // LIVE INTERACTIVE VISUAL EFFECTS WHEN AVATAR INTERACTS WITH THIS PROP
+  // ===========================================================================
+  if (isInteractingThisProp && activeInteraction) {
+    const actId = activeInteraction.actionId;
+
+    // 1. Watering & Caring for Trees / Shrubs (Rain shower + expanding aqua ring + green growth sparkles)
+    if (actId === 'tree_water_care' || actId === 'plant_water_prune') {
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5 * sc;
+      for (let d = 0; d < 7; d++) {
+        const dropPhase = (interactionAgeSec * 2.8 + d * 0.14) % 1;
+        const dx = pt.x + ((d - 3) * 4.2 + Math.sin(d * 2) * 2) * sc;
+        const dy = pt.y - 28 * sc + dropPhase * 28 * sc;
+        ctx.beginPath();
+        ctx.moveTo(dx, dy);
+        ctx.lineTo(dx - 0.8 * sc, dy + 4.2 * sc);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = `rgba(56, 189, 248, ${Math.max(0, 1 - interactionProgress * 0.85)})`;
+      ctx.lineWidth = 1.8 * sc;
+      ctx.beginPath();
+      ctx.ellipse(
+        pt.x,
+        pt.y + 2 * sc,
+        (8 + interactionProgress * 18) * sc,
+        (4 + interactionProgress * 9) * sc,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.stroke();
+    }
+
+    // 2. Harvesting Fruit / Blossom / Pine Cone from Tree
+    if (actId === 'tree_harvest' || actId === 'plant_botany_observe') {
+      const floatY = pt.y - (22 + interactionProgress * 22) * sc;
+      const alpha = Math.max(0, 1 - interactionProgress * 0.75);
+      ctx.fillStyle = `rgba(254, 240, 138, ${alpha * 0.9})`;
+      ctx.beginPath();
+      ctx.arc(pt.x, floatY, 7.5 * sc, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle =
+        propModel === 'tree_sakura_pink'
+          ? '#ec4899'
+          : propModel === 'tree_autumn_maple' || propModel === 'tree_builtin_city_autumn'
+          ? '#ea580c'
+          : '#dc2626';
+      ctx.beginPath();
+      ctx.arc(pt.x, floatY, 4.2 * sc, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 3. Feeding Koi / Wishing at Water Feature (Golden pellets arcing into water + concentric golden rings)
+    if (prop.propCategory === 'water_feature') {
+      for (let p = 0; p < 5; p++) {
+        const pT = (interactionAgeSec * 1.9 + p * 0.18) % 1;
+        const px = pt.x + (p - 2) * 4.5 * sc * pT;
+        const py = pt.y - 16 * sc * (1 - pT) - Math.sin(pT * Math.PI) * 8 * sc;
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(px, py, 1.8 * sc, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = `rgba(250, 204, 21, ${Math.max(0, 1 - interactionProgress * 0.8)})`;
+      ctx.lineWidth = 1.6 * sc;
+      ctx.beginPath();
+      ctx.ellipse(
+        pt.x,
+        pt.y,
+        (5 + ((interactionAgeSec * 12) % 14)) * sc,
+        (2.5 + ((interactionAgeSec * 6) % 7)) * sc,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.stroke();
     }
   }
 
@@ -4526,6 +5272,224 @@ export function drawCustomCreatorTerrainTile(
       ctx.ellipse(fp.x, fp.y, 2.6, 1.1, fishT, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    ctx.restore();
+    return;
+  }
+
+  // ===========================================================================
+  // 11. AUTHENTIC BUILT-IN REFLEKSIA CITY TERRAINS (8 TANAH BAWAAN KOTA & HUTAN)
+  // ===========================================================================
+
+  // 11A. TANAH RUMPUT BAWAAN KOTA (builtin_city_grass) — Exact #4a7c52 / #134e4a + 3-Blade Grass Tuft & 4-Petal Flower
+  if (terrainType === 'builtin_city_grass') {
+    const cityGrass = isNight ? '#134e4a' : '#4a7c52';
+    const cityGrassStroke = isNight ? '#042f2e' : '#3d6944';
+    fillIsoQuad(0, 0, 1, 1, cityGrass, cityGrassStroke);
+
+    const sway = Math.sin(elapsedSec * 2.1 + gx * 0.6 + gy * 0.8) * 1.4;
+    // Exact drawTidyGrassTuft from ThreeTownCanvas line 6985
+    const drawBuiltinTuft = (tu: number, tv: number) => {
+      const p = tilePt(tu, tv);
+      ctx.fillStyle = isNight ? '#047857' : '#22c55e';
+      ctx.beginPath();
+      ctx.moveTo(p.x - 1.5, p.y);
+      ctx.quadraticCurveTo(p.x - 3.5 + sway, p.y - 4, p.x - 4.5 + sway * 1.3, p.y - 6.5);
+      ctx.quadraticCurveTo(p.x - 1.5 + sway * 0.5, p.y - 3, p.x - 0.3, p.y);
+      ctx.fill();
+
+      ctx.fillStyle = isNight ? '#10b981' : '#4ade80';
+      ctx.beginPath();
+      ctx.moveTo(p.x - 0.8, p.y);
+      ctx.quadraticCurveTo(p.x + sway, p.y - 5.5, p.x + 0.5 + sway * 1.5, p.y - 8.5);
+      ctx.quadraticCurveTo(p.x + 1.2 + sway * 0.5, p.y - 4.5, p.x + 0.8, p.y);
+      ctx.fill();
+
+      ctx.fillStyle = isNight ? '#059669' : '#16a34a';
+      ctx.beginPath();
+      ctx.moveTo(p.x + 0.3, p.y);
+      ctx.quadraticCurveTo(p.x + 3.2 + sway, p.y - 3.5, p.x + 4.8 + sway * 1.2, p.y - 5.8);
+      ctx.quadraticCurveTo(p.x + 2.2 + sway * 0.5, p.y - 2, p.x + 1.5, p.y);
+      ctx.fill();
+    };
+
+    drawBuiltinTuft(0.32, 0.45);
+    drawBuiltinTuft(0.7, 0.65);
+
+    // Exact drawTidyFlower from ThreeTownCanvas line 7013 on alternating tiles
+    if (Math.abs(gx + gy) % 2 === 0) {
+      const fp = tilePt(0.62, 0.36);
+      const petalColors = ['#f472b6', '#fbbf24', '#f87171', '#c084fc', '#60a5fa'];
+      const pCol = petalColors[Math.abs(gx * 3 + gy) % petalColors.length];
+      ctx.strokeStyle = isNight ? '#059669' : '#15803d';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(fp.x, fp.y + 2.5);
+      ctx.quadraticCurveTo(fp.x + sway * 0.4, fp.y - 1, fp.x + sway * 0.8, fp.y - 3.5);
+      ctx.stroke();
+
+      const headX = fp.x + sway * 0.8;
+      const headY = fp.y - 3.5;
+      const r = 1.65;
+      ctx.fillStyle = pCol;
+      [
+        [0, -r],
+        [r, 0],
+        [0, r],
+        [-r, 0],
+      ].forEach(([ox, oy]) => {
+        ctx.beginPath();
+        ctx.arc(headX + ox, headY + oy, 1.35, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(headX, headY, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+    return;
+  }
+
+  // 11B. TANAH HUTAN BELANTARA BAWAAN (builtin_forest_grass) — Exact #15803d / #064e3b + Shrub Bush & Berry
+  if (terrainType === 'builtin_forest_grass') {
+    const forestBase = isNight ? '#064e3b' : '#15803d';
+    const forestStroke = isNight ? '#022c22' : '#14532d';
+    fillIsoQuad(0, 0, 1, 1, forestBase, forestStroke);
+
+    const sway = Math.sin(elapsedSec * 2.0 + gx + gy) * 1.1;
+    // Exact drawForestBush from ThreeTownCanvas line 7054
+    const bp = tilePt(0.5, 0.54);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    ctx.beginPath();
+    ctx.ellipse(bp.x, bp.y + 1.5, 6.8, 3.0, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = isNight ? '#064e3b' : '#14532d';
+    ctx.beginPath();
+    ctx.arc(bp.x - 3.4 + sway * 0.3, bp.y - 1.8, 3.8, 0, Math.PI * 2);
+    ctx.arc(bp.x + 3.4 + sway * 0.3, bp.y - 1.8, 3.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = isNight ? '#047857' : '#16a34a';
+    ctx.beginPath();
+    ctx.arc(bp.x + sway * 0.45, bp.y - 3.8, 4.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = isNight ? '#10b981' : '#4ade80';
+    ctx.beginPath();
+    ctx.arc(bp.x - 1.1 + sway * 0.5, bp.y - 5.2, 2.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (Math.abs(gx + gy) % 2 === 0) {
+      ctx.fillStyle = '#fb7185';
+      ctx.beginPath();
+      ctx.arc(bp.x + 1.8 + sway * 0.4, bp.y - 3.4, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+    return;
+  }
+
+  // 11C. JALAN PUTIH UTAMA BAWAAN KOTA (builtin_city_road) — Exact #fcfaf2 / #475569 Boulevard Path
+  if (terrainType === 'builtin_city_road') {
+    const roadFill = isNight ? '#475569' : '#fcfaf2';
+    const roadBorder = isNight ? '#334155' : '#e2e8f0';
+    fillIsoQuad(0, 0, 1, 1, roadFill, roadBorder);
+    fillIsoQuad(0.08, 0.08, 0.92, 0.92, roadFill, isNight ? '#64748b' : '#f1f5f9');
+    ctx.restore();
+    return;
+  }
+
+  // 11D. JALAN SETAPAK PEMANCINGAN BAWAAN (builtin_fishing_trail) — Exact #4d7c43 / #0f5132 Mossy Trail + Stepping Stones
+  if (terrainType === 'builtin_fishing_trail') {
+    const fishFill = isNight ? '#0f5132' : '#4d7c43';
+    const fishBorder = isNight ? '#064e3b' : '#3f6836';
+    fillIsoQuad(0, 0, 1, 1, fishFill, fishBorder);
+    [
+      [0.34, 0.36],
+      [0.66, 0.64],
+    ].forEach(([su, sv], idx) => {
+      const sp = tilePt(su, sv);
+      ctx.fillStyle = isNight ? '#64748b' : idx === 0 ? '#cbd5e1' : '#94a3b8';
+      ctx.beginPath();
+      ctx.ellipse(sp.x, sp.y, 3.8, 2.0, 0.15, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+    return;
+  }
+
+  // 11E. JALAN TANAH COKELAT SEBERANG TIMUR BAWAAN (builtin_east_dirt_road) — Exact #d97706 / #78350f
+  if (terrainType === 'builtin_east_dirt_road') {
+    const eastDirt = isNight ? '#78350f' : '#d97706';
+    const eastBorder = isNight ? '#451a03' : '#b45309';
+    fillIsoQuad(0, 0, 1, 1, eastDirt, eastBorder);
+    fillIsoQuad(0.16, 0.16, 0.84, 0.84, isNight ? '#92400e' : '#f59e0b');
+    ctx.restore();
+    return;
+  }
+
+  // 11F. ASPAL LANDASAN BANDARA BAWAAN (builtin_airport_tarmac) — Exact #334155 / #1e293b + Centerline Dash
+  if (terrainType === 'builtin_airport_tarmac') {
+    const tarmacFill = isNight ? '#1e293b' : '#334155';
+    const tarmacBorder = isNight ? '#0f172a' : '#475569';
+    fillIsoQuad(0, 0, 1, 1, tarmacFill, tarmacBorder);
+    const mW = tilePt(0.18, 0.5);
+    const mE = tilePt(0.82, 0.5);
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(mW.x, mW.y);
+    ctx.lineTo(mE.x, mE.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
+
+  // 11G. RUMPUT DATARAN TINGGI PEGUNUNGAN BAWAAN (builtin_alpine_grass) — Exact #16a34a / #065f46 + Alpine Ridge Stone
+  if (terrainType === 'builtin_alpine_grass') {
+    const alpineFill = isNight ? '#065f46' : '#16a34a';
+    const alpineBorder = isNight ? '#047857' : '#15803d';
+    fillIsoQuad(0, 0, 1, 1, alpineFill, alpineBorder);
+    const rp = tilePt(0.5, 0.5);
+    ctx.fillStyle = isNight ? '#475569' : '#94a3b8';
+    ctx.beginPath();
+    ctx.ellipse(rp.x - 2, rp.y + 1, 3.2, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = isNight ? '#34d399' : '#86efac';
+    ctx.beginPath();
+    ctx.arc(rp.x + 2.5, rp.y - 1.5, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  // 11H. AIR SUNGAI & DANAU BAWAAN REFLEKSIA (builtin_river_water) — Exact #0284c7 / #0369a1 + Animated Shimmer Waves
+  if (terrainType === 'builtin_river_water') {
+    const riverBase = isNight ? '#0369a1' : '#0284c7';
+    const riverStroke = isNight ? '#075985' : '#0369a1';
+    fillIsoQuad(0, 0, 1, 1, riverBase, riverStroke);
+
+    const waveShift = Math.sin(elapsedSec * 2.8 + gx * 0.9 + gy * 0.6) * 0.08;
+    const w1L = tilePt(0.2, 0.35 + waveShift);
+    const w1R = tilePt(0.75, 0.35 - waveShift);
+    const w2L = tilePt(0.25, 0.68 - waveShift);
+    const w2R = tilePt(0.8, 0.68 + waveShift);
+
+    ctx.strokeStyle = isNight ? 'rgba(125, 211, 252, 0.45)' : 'rgba(224, 242, 254, 0.78)';
+    ctx.lineWidth = 1.25;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(w1L.x, w1L.y);
+    ctx.lineTo(w1R.x, w1R.y);
+    ctx.moveTo(w2L.x, w2L.y);
+    ctx.lineTo(w2R.x, w2R.y);
+    ctx.stroke();
 
     ctx.restore();
     return;

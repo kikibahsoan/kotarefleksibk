@@ -39,6 +39,9 @@ import {
 import {
   drawCustomCreatorBuilding3D,
   drawCustomCreatorProp3D,
+  computeCustomPropSwingAndRideMetrics,
+  CreatorPropInteractionState,
+  CustomSwingSeatMetric,
   computeCreatorAnimalLivePose,
   drawCustomCreatorAnimal3D,
   drawCustomCreatorTerrainTile,
@@ -911,7 +914,14 @@ export type BenchId =
   | 'swing_left'
   | 'swing_right'
   | 'swing_2_left'
-  | 'swing_2_right';
+  | 'swing_2_right'
+  | `custom_swing:${string}:left`
+  | `custom_swing:${string}:right`
+  | `custom_bench:${string}:0`
+  | `custom_bench:${string}:1`
+  | `custom_seesaw:${string}`
+  | `custom_spring:${string}`
+  | `custom_prop_sit:${string}`;
 
 export interface TwoPersonSeatSlot {
   id: BenchId;
@@ -1540,6 +1550,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     useState<CreatorBuildingItem | null>(null);
   const [activeCreatorPropModal, setActiveCreatorPropModal] =
     useState<CreatorPropItem | null>(null);
+  const customPropInteractionRef = useRef<CreatorPropInteractionState | null>(null);
 
   const creatorHoverGhostRef = useRef<{ wx: number; wy: number } | null>(null);
   const creatorDraggingRef = useRef<CreatorSelectedTarget>(null);
@@ -4086,116 +4097,88 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           // Open the 3-choice Interactive Prop Activity Bar for all citizens
           setActiveCreatorPropModal(cp);
 
-          if (cp.propCategory === 'bench' || cp.propCategory === 'swing') {
-            player.targetWx = cp.wx;
-            player.targetWy = cp.wy;
-            player.isMoving = Math.hypot(player.wx - cp.wx, player.wy - cp.wy) > 0.08;
-            playerSpeechRef.current = {
-              text:
-                cp.propCategory === 'swing'
-                  ? `🎠 Berayun santai menikmati angin di ${cp.name}...`
-                  : `🪑 Duduk beristirahat dan bercengkerama di ${cp.name}...`,
-              expiresAt: Date.now() + 4200,
-            };
+          const defaultAct = getCreatorPropInteractiveActions(cp)[0];
+          const durationMs =
+            cp.propModel === 'playground_slide_colorful' ||
+            cp.propModel === 'playground_combo_castle'
+              ? 3100
+              : 6500;
+          customPropInteractionRef.current = {
+            propId: cp.id,
+            actionId: defaultAct.id,
+            emoteType: defaultAct.emoteType,
+            startTime: Date.now(),
+            durationMs,
+          };
+
+          const resolveCustomPropSeat = (
+            propItem: CreatorPropItem,
+            actItem: PropAvatarActionOption
+          ): BenchId | null => {
+            if (propItem.propCategory === 'swing') {
+              return `custom_swing:${propItem.id}:left`;
+            }
+            if (propItem.propModel === 'playground_seesaw_dual' && actItem.id !== 'play_agility_game') {
+              return `custom_seesaw:${propItem.id}`;
+            }
+            if (propItem.propModel === 'playground_spring_rider' && actItem.id !== 'play_agility_game') {
+              return `custom_spring:${propItem.id}`;
+            }
+            if (propItem.propCategory === 'bench') {
+              return `custom_bench:${propItem.id}:0`;
+            }
+            if (actItem.emoteType === 'sit') {
+              return `custom_prop_sit:${propItem.id}`;
+            }
+            return null;
+          };
+
+          const customSeatId = resolveCustomPropSeat(cp, defaultAct);
+          const targetWx = customSeatId
+            ? cp.wx
+            : cp.propCategory === 'campfire'
+            ? cp.wx + 0.48
+            : cp.wx + 0.15;
+          const targetWy = customSeatId
+            ? cp.wy
+            : cp.propCategory === 'water_feature'
+            ? cp.wy + 0.52 * (cp.scale || 1)
+            : cp.wy + 0.34 * (cp.scale || 1);
+
+          player.targetWx = targetWx;
+          player.targetWy = targetWy;
+          player.isMoving = Math.hypot(player.wx - targetWx, player.wy - targetWy) > 0.12;
+          playerSpeechRef.current = {
+            text: defaultAct.speechText,
+            expiresAt: Date.now() + 4500,
+          };
+
+          if (customSeatId) {
             if (!player.isMoving) {
+              player.wx = cp.wx;
+              player.wy = cp.wy;
+              player.facing = cp.facing || 'down-right';
               setIsSitting(true);
+              setSittingSeat(customSeatId);
+              sendHeartbeatRef.current?.();
             } else {
               pendingSeatRef.current = {
-                seatId: 'fountain_1_a',
+                seatId: customSeatId,
                 facingDir: cp.facing || 'down-right',
                 targetX: cp.wx,
                 targetY: cp.wy,
               };
             }
-            return;
+          } else {
+            setIsSitting(false);
+            setSittingSeat(null);
+            if (cp.propCategory === 'sports_court') {
+              player.isRunning = true;
+              player.speed = 1.28;
+            }
           }
-          if (cp.propCategory === 'campfire') {
-            const standWx = cp.wx + 0.55;
-            const standWy = cp.wy + 0.35;
-            player.targetWx = standWx;
-            player.targetWy = standWy;
-            player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
-            playerSpeechRef.current = {
-              text: `🔥 Menghangatkan diri & berbagi cerita warga di ${cp.name}!`,
-              expiresAt: Date.now() + 4200,
-            };
-            showToast(`🔥 Menghangatkan diri di dekat ${cp.name}`, 2500);
-            return;
-          }
-          if (cp.propCategory === 'playground') {
-            const standWx = cp.wx;
-            const standWy = cp.wy + 0.25;
-            player.targetWx = standWx;
-            player.targetWy = standWy;
-            player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
-            const playMsg =
-              cp.propModel === 'playground_slide_colorful'
-                ? `🛝 Wushhh! Meluncur seru di ${cp.name}!`
-                : cp.propModel === 'playground_seesaw_dual'
-                ? `⚖️ Bermain jungkat-jungkit gembira di ${cp.name}!`
-                : cp.propModel === 'playground_spring_rider'
-                ? `🎠 Membal seru naik ${cp.name}!`
-                : `🏰 Menjelajahi wahana ${cp.name}!`;
-            playerSpeechRef.current = {
-              text: playMsg,
-              expiresAt: Date.now() + 4200,
-            };
-            showToast(playMsg, 2600);
-            return;
-          }
-          if (cp.propCategory === 'sports_court') {
-            player.targetWx = wx;
-            player.targetWy = wy;
-            player.isMoving = Math.hypot(player.wx - wx, player.wy - wy) > 0.08;
-            player.isRunning = true;
-            player.speed = 1.28;
-            const sportMsg =
-              cp.propModel === 'court_basketball_full'
-                ? `🏀 Dribble & tembakan 3 poin di ${cp.name}!`
-                : cp.propModel === 'court_futsal_green'
-                ? `⚽ Menggiring bola & tendangan gol di ${cp.name}!`
-                : cp.propModel === 'court_badminton_pro'
-                ? `🏸 Jumping smash tajam di ${cp.name}!`
-                : `🌱 Beraktivitas segar bersama warga di ${cp.name}!`;
-            playerSpeechRef.current = {
-              text: sportMsg,
-              expiresAt: Date.now() + 4200,
-            };
-            showToast(sportMsg, 2600);
-            return;
-          }
-          if (cp.propCategory === 'water_feature') {
-            const standWx = cp.wx;
-            const standWy = cp.wy + 0.58 * (cp.scale || 1);
-            player.targetWx = standWx;
-            player.targetWy = standWy;
-            player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
-            const waterMsg =
-              cp.propModel === 'water_koi_pond_lotus'
-                ? `🪷 Memberi makan ikan koi & mengagumi bunga teratai di ${cp.name}...`
-                : cp.propModel === 'water_mini_waterfall'
-                ? `🏞️ Menikmati sejuknya gemericik ${cp.name}...`
-                : `⛲ Menikmati kesejukan pancuran ${cp.name}...`;
-            playerSpeechRef.current = {
-              text: waterMsg,
-              expiresAt: Date.now() + 4200,
-            };
-            showToast(waterMsg, 2600);
-            return;
-          }
-          if (cp.propCategory === 'shrub_plant' || cp.propCategory === 'tree') {
-            const standWx = cp.wx;
-            const standWy = cp.wy + 0.45 * (cp.scale || 1);
-            player.targetWx = standWx;
-            player.targetWy = standWy;
-            player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
-            playerSpeechRef.current = {
-              text: `🌿 Merawat keasrian ${cp.name} agar Refleksia makin hijau!`,
-              expiresAt: Date.now() + 3800,
-            };
-            showToast(`🌿 Menikmati keasrian ${cp.name}`, 2400);
-            return;
-          }
+          showToast(defaultAct.toastText, 2600);
+          return;
         }
       }
 
@@ -9985,6 +9968,29 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           );
           if (benchGroup) {
             return benchGroup.wx + benchGroup.wy + 0.02;
+          }
+          if (seatId.startsWith('custom_')) {
+            const parts = seatId.split(':');
+            const customPropId = parts[1];
+            const matchedCustomProp = (creatorStateRef.current.customProps || []).find(
+              (p) => p.id === customPropId
+            );
+            if (matchedCustomProp) {
+              return matchedCustomProp.wx + matchedCustomProp.wy + 0.025;
+            }
+          }
+        }
+        if (
+          isLocalPlayer &&
+          customPropInteractionRef.current &&
+          Date.now() <
+            customPropInteractionRef.current.startTime + customPropInteractionRef.current.durationMs
+        ) {
+          const activeProp = (creatorStateRef.current.customProps || []).find(
+            (p) => p.id === customPropInteractionRef.current?.propId
+          );
+          if (activeProp) {
+            return activeProp.wx + activeProp.wy + 0.03;
           }
         }
         if (avData.role === 'penjaga_gerbang_utama' || (avData.wy > WELCOME_GATE_COORDS.wy + 0.18 && Math.abs(avData.wx) < 1.25)) {
@@ -17742,29 +17748,149 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const currentHeldItem = item.isPlayer ? heldItemRef.current : av.heldItem;
 
           const currentSeatId = item.isPlayer ? sittingSeatRef.current : av.sittingSeat;
-          const isOnSwing = Boolean(isSittingNow && isSwingSeatId(currentSeatId));
-          const swingMetrics = isOnSwing && currentSeatId
-            ? getSwingSeatMetrics(currentSeatId as 'swing_left' | 'swing_right' | 'swing_2_left' | 'swing_2_right')
-            : null;
-          const isCampfireSeat = Boolean(isSittingNow && currentSeatId && currentSeatId.startsWith('campfire_'));
+          const isBuiltinSwing = Boolean(isSittingNow && isSwingSeatId(currentSeatId));
+          const isCustomSwing = Boolean(
+            isSittingNow && currentSeatId && currentSeatId.startsWith('custom_swing:')
+          );
+          const isCustomRide = Boolean(
+            isSittingNow &&
+              currentSeatId &&
+              (currentSeatId.startsWith('custom_seesaw:') ||
+                currentSeatId.startsWith('custom_spring:'))
+          );
+          const isCustomBench = Boolean(
+            isSittingNow &&
+              currentSeatId &&
+              (currentSeatId.startsWith('custom_bench:') ||
+                currentSeatId.startsWith('custom_prop_sit:'))
+          );
 
-          // Check if sitting on any 2-person bench (4 Fountain Minimalist Benches or 2 Campfire Benches)
-          let twoPersonBenchLock: { screenX: number; screenY: number } | null = null;
-          if (isSittingNow && currentSeatId && !isOnSwing) {
-            for (const bGroup of ALL_TWO_PERSON_BENCHES) {
-              const matchedSlot = bGroup.seats.find((s) => s.id === currentSeatId);
-              if (matchedSlot) {
-                const bPt = toScreen(bGroup.wx, bGroup.wy, 0, camera.x, camera.y);
-                twoPersonBenchLock = {
-                  screenX: bPt.x + matchedSlot.screenOffsetX * z,
-                  screenY: bPt.y - 2.2 * z,
+          let customSwingMetrics: CustomSwingSeatMetric | null = null;
+          let customRideLock: {
+            seatX: number;
+            seatY: number;
+            handX?: number;
+            handY?: number;
+            kickVal?: number;
+          } | null = null;
+          let customSlideOverride: {
+            avatarX: number;
+            avatarY: number;
+            phase: 'climb' | 'top_cheer' | 'slide_down';
+            progress: number;
+          } | null = null;
+
+          if ((isCustomSwing || isCustomRide || isCustomBench) && currentSeatId) {
+            const propId = currentSeatId.split(':')[1];
+            const matchedProp = (creatorStateRef.current.customProps || []).find(
+              (p) => p.id === propId
+            );
+            if (matchedProp) {
+              const occIds: string[] = [];
+              if (sittingSeatRef.current) occIds.push(sittingSeatRef.current);
+              const rm = computeCustomPropSwingAndRideMetrics(
+                matchedProp,
+                (wx: number, wy: number, wz: number) => toScreen(wx, wy, wz * 34, camera.x, camera.y),
+                currentTileW,
+                currentTime,
+                customPropInteractionRef.current,
+                occIds
+              );
+              if (isCustomSwing) {
+                const isRightSlot = currentSeatId.endsWith(':right');
+                customSwingMetrics = (isRightSlot ? rm.swingRight : rm.swingLeft) || null;
+              } else if (isCustomRide && rm.riderSeatX !== undefined && rm.riderSeatY !== undefined) {
+                customRideLock = {
+                  seatX: rm.riderSeatX,
+                  seatY: rm.riderSeatY + 1.2 * z,
+                  handX: rm.riderHandX,
+                  handY: rm.riderHandY,
+                  kickVal: (rm.tiltOrBounce || 0) / Math.max(0.5, z),
                 };
-                break;
+              } else if (isCustomBench && rm.riderSeatX !== undefined && rm.riderSeatY !== undefined) {
+                customRideLock = {
+                  seatX: rm.riderSeatX,
+                  seatY: rm.riderSeatY + 2.0 * z,
+                };
               }
             }
           }
 
-          if (twoPersonBenchLock) {
+          if (
+            item.isPlayer &&
+            customPropInteractionRef.current &&
+            currentTime <
+              customPropInteractionRef.current.startTime + customPropInteractionRef.current.durationMs
+          ) {
+            const activeProp = (creatorStateRef.current.customProps || []).find(
+              (p) => p.id === customPropInteractionRef.current?.propId
+            );
+            if (
+              activeProp &&
+              (activeProp.propModel === 'playground_slide_colorful' ||
+                activeProp.propModel === 'playground_combo_castle')
+            ) {
+              const sm = computeCustomPropSwingAndRideMetrics(
+                activeProp,
+                (wx: number, wy: number, wz: number) => toScreen(wx, wy, wz * 34, camera.x, camera.y),
+                currentTileW,
+                currentTime,
+                customPropInteractionRef.current
+              );
+              if (
+                sm.kind === 'slide' &&
+                sm.slidePhase &&
+                sm.slidePhase !== 'done' &&
+                sm.slideAvatarX !== undefined &&
+                sm.slideAvatarY !== undefined
+              ) {
+                customSlideOverride = {
+                  avatarX: sm.slideAvatarX,
+                  avatarY: sm.slideAvatarY,
+                  phase: sm.slidePhase,
+                  progress: sm.slideProgress || 0,
+                };
+              }
+            }
+          }
+
+          const isOnSwing = isBuiltinSwing || Boolean(customSwingMetrics);
+          const swingMetrics =
+            isBuiltinSwing && currentSeatId
+              ? getSwingSeatMetrics(
+                  currentSeatId as 'swing_left' | 'swing_right' | 'swing_2_left' | 'swing_2_right'
+                )
+              : customSwingMetrics;
+          const isCampfireSeat = Boolean(
+            isSittingNow && currentSeatId && currentSeatId.startsWith('campfire_')
+          );
+
+          // Check if sitting on any 2-person bench (4 Fountain Minimalist Benches or 2 Campfire Benches)
+          let twoPersonBenchLock: { screenX: number; screenY: number } | null = null;
+          if (isSittingNow && currentSeatId && !isOnSwing) {
+            if (customRideLock) {
+              twoPersonBenchLock = {
+                screenX: customRideLock.seatX,
+                screenY: customRideLock.seatY,
+              };
+            } else {
+              for (const bGroup of ALL_TWO_PERSON_BENCHES) {
+                const matchedSlot = bGroup.seats.find((s) => s.id === currentSeatId);
+                if (matchedSlot) {
+                  const bPt = toScreen(bGroup.wx, bGroup.wy, 0, camera.x, camera.y);
+                  twoPersonBenchLock = {
+                    screenX: bPt.x + matchedSlot.screenOffsetX * z,
+                    screenY: bPt.y - 2.2 * z,
+                  };
+                  break;
+                }
+              }
+            }
+          }
+
+          if (customSlideOverride) {
+            pt.x = customSlideOverride.avatarX;
+          } else if (twoPersonBenchLock) {
             pt.x = twoPersonBenchLock.screenX;
           }
 
@@ -17859,13 +17985,29 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             avY -= thumbBounce;
           }
 
-          if (swingMetrics) {
+          if (customSlideOverride) {
+            pt.x = customSlideOverride.avatarX;
+            avY = customSlideOverride.avatarY;
+            if (customSlideOverride.phase === 'climb') {
+              legSwing = Math.sin(customSlideOverride.progress * Math.PI * 8) * 3.8 * z;
+            }
+          } else if (swingMetrics) {
             // Lock avatar hip/seat center with 100% precision onto the wooden swing plank!
             pt.x = swingMetrics.seatX;
             avY = swingMetrics.seatY + 1.2 * z;
           } else if (twoPersonBenchLock) {
             pt.x = twoPersonBenchLock.screenX;
             avY = twoPersonBenchLock.screenY;
+          } else if (
+            item.isPlayer &&
+            customPropInteractionRef.current &&
+            currentTime <
+              customPropInteractionRef.current.startTime + customPropInteractionRef.current.durationMs &&
+            (customPropInteractionRef.current.emoteType === 'sport' ||
+              customPropInteractionRef.current.emoteType === 'cheer')
+          ) {
+            // Energetic athletic jump / cheer bounce during sports court or harvest actions!
+            avY -= Math.abs(Math.sin(elapsed * 9.5)) * 4.5 * z;
           }
 
           const isKikyTimeTraveler = Boolean(
@@ -18009,11 +18151,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           // 1. LEGS & PANTS / SKIRT
-          if (isSittingNow) {
-            // SITTING ANIMATION: Legs folded forward resting comfortably over the bench/swing surface
-            const swayVal = swingMetrics ? swingMetrics.sway : 0;
-            const calfKickX = isOnSwing ? swayVal * 2.2 * z : 0;
-            const calfKickY = isOnSwing ? -Math.max(0, swayVal) * 1.6 * z : 0;
+          if (isSittingNow || customSlideOverride?.phase === 'slide_down') {
+            // SITTING / SLIDING ANIMATION: Legs folded forward resting comfortably over the bench/swing/seesaw/spring/slide
+            const swayVal = swingMetrics
+              ? swingMetrics.sway
+              : customRideLock?.kickVal
+              ? customRideLock.kickVal
+              : customSlideOverride?.phase === 'slide_down'
+              ? 2.2
+              : 0;
+            const isAnimatedKick =
+              isOnSwing || Boolean(customRideLock?.kickVal) || customSlideOverride?.phase === 'slide_down';
+            const calfKickX = isAnimatedKick ? swayVal * 1.8 * z : 0;
+            const calfKickY = isAnimatedKick ? -Math.max(0, swayVal) * 1.2 * z : 0;
 
             ctx.fillStyle = isKikyTimeTraveler
               ? '#0f172a'
@@ -18574,9 +18724,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
 
           // 3. ARMS & HANDS
+          const activeCustomPropAct =
+            item.isPlayer &&
+            customPropInteractionRef.current &&
+            currentTime <
+              customPropInteractionRef.current.startTime + customPropInteractionRef.current.durationMs
+              ? customPropInteractionRef.current
+              : null;
+
           const isReadingNow = Boolean(
             item.isPlayer &&
               (activeLiteracyDoc !== null ||
+                activeCustomPropAct?.actionId === 'tree_shade_read' ||
+                activeCustomPropAct?.actionId === 'bench_write_journal' ||
                 (isSittingNow && (sittingSeat === 'literacy' || sittingSeat?.startsWith('literacy_'))))
           );
 
@@ -18640,10 +18800,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           } else if (isOnSwing && swingMetrics) {
             // Gripping the left & right swing chains with exact chain alignment
             const handChainT = 0.68; // 68% down from top beam to seat
-            const leftHandX = swingMetrics.anchorX - 4.2 * z + ((swingMetrics.seatX - 4.5 * z) - (swingMetrics.anchorX - 4.2 * z)) * handChainT;
-            const leftHandY = swingMetrics.anchorY + (swingMetrics.seatY - swingMetrics.anchorY) * handChainT;
-            const rightHandX = swingMetrics.anchorX + 4.2 * z + ((swingMetrics.seatX + 4.5 * z) - (swingMetrics.anchorX + 4.2 * z)) * handChainT;
-            const rightHandY = swingMetrics.anchorY + (swingMetrics.seatY - swingMetrics.anchorY) * handChainT;
+            const chainHalfW = isCustomSwing ? 2.2 * z : 4.2 * z;
+            const seatHalfW = isCustomSwing ? 2.2 * z : 4.5 * z;
+            const leftHandX =
+              swingMetrics.anchorX -
+              chainHalfW +
+              (swingMetrics.seatX - seatHalfW - (swingMetrics.anchorX - chainHalfW)) * handChainT;
+            const leftHandY =
+              swingMetrics.anchorY + (swingMetrics.seatY - swingMetrics.anchorY) * handChainT;
+            const rightHandX =
+              swingMetrics.anchorX +
+              chainHalfW +
+              (swingMetrics.seatX + seatHalfW - (swingMetrics.anchorX + chainHalfW)) * handChainT;
+            const rightHandY =
+              swingMetrics.anchorY + (swingMetrics.seatY - swingMetrics.anchorY) * handChainT;
 
             // Sleeves reaching from shoulders to the chains
             ctx.strokeStyle = sleeveColor;
@@ -18667,19 +18837,93 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 1.2 * z;
             ctx.beginPath();
             ctx.moveTo(leftHandX, leftHandY);
-            ctx.lineTo(swingMetrics.seatX - 4.5 * z, swingMetrics.seatY);
+            ctx.lineTo(swingMetrics.seatX - seatHalfW, swingMetrics.seatY);
             ctx.moveTo(rightHandX, rightHandY);
-            ctx.lineTo(swingMetrics.seatX + 4.5 * z, swingMetrics.seatY);
+            ctx.lineTo(swingMetrics.seatX + seatHalfW, swingMetrics.seatY);
             ctx.stroke();
+          } else if (isCustomRide && customRideLock?.handX !== undefined && customRideLock?.handY !== undefined) {
+            // Gripping the Seesaw or Spring Rider handlebar!
+            ctx.strokeStyle = sleeveColor;
+            ctx.lineWidth = 2.4 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 4.5 * z, avY - 12.5 * z);
+            ctx.lineTo(customRideLock.handX - 1.5 * z, customRideLock.handY);
+            ctx.moveTo(pt.x + 4.5 * z, avY - 12.5 * z);
+            ctx.lineTo(customRideLock.handX + 1.5 * z, customRideLock.handY);
+            ctx.stroke();
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(customRideLock.handX - 1.5 * z, customRideLock.handY, 1.5 * z, 0, Math.PI * 2);
+            ctx.arc(customRideLock.handX + 1.5 * z, customRideLock.handY, 1.5 * z, 0, Math.PI * 2);
+            ctx.fill();
           } else if (isSittingNow) {
-            // Resting arms on lap / knees
+            // Resting arms on lap / knees (or holding picnic croissant if bench_picnic_snack is active!)
             ctx.fillStyle = sleeveColor;
             ctx.fillRect(pt.x - 6.5 * z, avY - 13 * z, 2.2 * z, 6.5 * z);
             ctx.fillRect(pt.x + 4.5 * z, avY - 13 * z, 2.2 * z, 6.5 * z);
-            // Hands on knees
             ctx.fillStyle = '#fed7aa';
             ctx.fillRect(pt.x - 5.5 * z, avY - 7 * z, 2.6 * z, 2.2 * z);
             ctx.fillRect(pt.x + 3 * z, avY - 7 * z, 2.6 * z, 2.2 * z);
+            if (activeCustomPropAct?.actionId === 'bench_picnic_snack') {
+              ctx.fillStyle = '#f59e0b';
+              ctx.beginPath();
+              ctx.arc(pt.x + 4.5 * z, avY - 8.5 * z, 2.4 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else if (activeCustomPropAct && !isSittingNow) {
+            // ACTIVE STANDING PROP INTERACTIONS (Watering Can, Marshmallow Skewer, Harvested Fruit, Cheer)
+            const waveP = Math.sin(elapsed * 8) * 1.8 * z;
+            ctx.strokeStyle = sleeveColor;
+            ctx.lineWidth = 2.4 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 4.8 * z, avY - 12.5 * z);
+            ctx.lineTo(pt.x - 7.5 * z, avY - 9 * z + waveP * 0.4);
+            ctx.moveTo(pt.x + 4.8 * z, avY - 12.5 * z);
+            ctx.lineTo(pt.x + 9.2 * z, avY - 11.5 * z + waveP);
+            ctx.stroke();
+
+            const handRx = pt.x + 9.2 * z;
+            const handRy = avY - 11.5 * z + waveP;
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x - 7.5 * z, avY - 9 * z + waveP * 0.4, 1.4 * z, 0, Math.PI * 2);
+            ctx.arc(handRx, handRy, 1.5 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (
+              activeCustomPropAct.actionId === 'tree_water_care' ||
+              activeCustomPropAct.actionId === 'plant_water_prune'
+            ) {
+              // Cyan watering can pouring droplets in avatar's hand
+              ctx.fillStyle = '#0ea5e9';
+              ctx.beginPath();
+              ctx.roundRect(handRx, handRy - 2.5 * z, 4.8 * z, 4.2 * z, 1 * z);
+              ctx.fill();
+              ctx.strokeStyle = '#38bdf8';
+              ctx.lineWidth = 1.2 * z;
+              ctx.beginPath();
+              ctx.moveTo(handRx + 4.5 * z, handRy - 1 * z);
+              ctx.lineTo(handRx + 7.5 * z, handRy - 3 * z);
+              ctx.stroke();
+            } else if (activeCustomPropAct.actionId === 'fire_roast_marshmallow') {
+              // Wooden skewer stick + toasted marshmallow over campfire
+              ctx.strokeStyle = '#92400e';
+              ctx.lineWidth = 1.2 * z;
+              ctx.beginPath();
+              ctx.moveTo(handRx, handRy);
+              ctx.lineTo(handRx - 11 * z, handRy + 2 * z);
+              ctx.stroke();
+              ctx.fillStyle = '#fef3c7';
+              ctx.beginPath();
+              ctx.arc(handRx - 11 * z, handRy + 2 * z, 2.2 * z, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (activeCustomPropAct.actionId === 'tree_harvest') {
+              // Harvested fruit / blossom held high
+              ctx.fillStyle = '#ef4444';
+              ctx.beginPath();
+              ctx.arc(handRx + 1 * z, handRy - 2.5 * z, 2.5 * z, 0, Math.PI * 2);
+              ctx.fill();
+            }
           } else if (av.role === 'kepala_balai') {
             // SONY (WALI KOTA): Left arm normal swing, Right arm waves warmly to greet citizens!
             const armSwing = av.isMoving ? Math.sin(av.walkFrame) * 2.5 * z : 0;
@@ -21456,13 +21700,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             isCreatorStudioOpenRef.current &&
             creatorSelectedTargetRef.current?.kind === 'custom_prop' &&
             creatorSelectedTargetRef.current.id === cp.id;
+          const occupiedSeatsForProps: string[] = [];
+          if (isSittingRef.current && sittingSeatRef.current) {
+            occupiedSeatsForProps.push(sittingSeatRef.current);
+          }
           drawCustomCreatorProp3D(
             ctx,
             (wx: number, wy: number, wz: number) => toScreen(wx, wy, wz * 34, camera.x, camera.y),
             currentTileW,
             cp,
             currentTime,
-            isSelectedProp
+            isSelectedProp,
+            customPropInteractionRef.current,
+            occupiedSeatsForProps
           );
         } else if (item.type === 'custom_creator_animal') {
           const ca = item.animal;
@@ -26110,14 +26360,32 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setActiveCreatorPropModal(null)}
-                className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 cursor-pointer shrink-0"
-                title="Tutup Panel Interaksi"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isSitting && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playClick();
+                      setIsSitting(false);
+                      setSittingSeat(null);
+                      customPropInteractionRef.current = null;
+                      showToast('🚶 Berdiri kembali dari wahana/bangku taman.', 2200);
+                      sendHeartbeatRef.current?.();
+                    }}
+                    className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-400/40 text-[10px] font-bold cursor-pointer"
+                  >
+                    🚶 Berdiri
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveCreatorPropModal(null)}
+                  className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 cursor-pointer shrink-0"
+                  title="Tutup Panel Interaksi"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-1.5">
@@ -26130,21 +26398,60 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       sounds.playClick();
                       const player = playerRef.current;
                       const prop = activeCreatorPropModal;
+                      const durationMs =
+                        prop.propModel === 'playground_slide_colorful' ||
+                        prop.propModel === 'playground_combo_castle'
+                          ? 3100
+                          : 6500;
+                      customPropInteractionRef.current = {
+                        propId: prop.id,
+                        actionId: act.id,
+                        emoteType: act.emoteType,
+                        startTime: Date.now(),
+                        durationMs,
+                      };
+
+                      const customSeatId: BenchId | null =
+                        prop.propCategory === 'swing'
+                          ? `custom_swing:${prop.id}:left`
+                          : prop.propModel === 'playground_seesaw_dual' && act.id !== 'play_agility_game'
+                          ? `custom_seesaw:${prop.id}`
+                          : prop.propModel === 'playground_spring_rider' && act.id !== 'play_agility_game'
+                          ? `custom_spring:${prop.id}`
+                          : prop.propCategory === 'bench'
+                          ? `custom_bench:${prop.id}:0`
+                          : act.emoteType === 'sit'
+                          ? `custom_prop_sit:${prop.id}`
+                          : null;
+
                       if (player) {
-                        const targetWx =
-                          act.emoteType === 'sit' ? prop.wx : prop.wx + (Math.random() - 0.5) * 0.35;
-                        const targetWy =
-                          act.emoteType === 'sit' ? prop.wy : prop.wy + 0.32 * (prop.scale || 1);
+                        const targetWx = customSeatId
+                          ? prop.wx
+                          : prop.propCategory === 'campfire'
+                          ? prop.wx + 0.48
+                          : prop.wx + 0.15;
+                        const targetWy = customSeatId
+                          ? prop.wy
+                          : prop.propCategory === 'water_feature'
+                          ? prop.wy + 0.52 * (prop.scale || 1)
+                          : prop.wy + 0.34 * (prop.scale || 1);
+
                         player.targetWx = targetWx;
                         player.targetWy = targetWy;
                         player.isMoving =
-                          Math.hypot(player.wx - targetWx, player.wy - targetWy) > 0.08;
-                        if (act.emoteType === 'sit') {
+                          Math.hypot(player.wx - targetWx, player.wy - targetWy) > 0.12;
+
+                        if (customSeatId) {
                           if (!player.isMoving) {
+                            player.wx = prop.wx;
+                            player.wy = prop.wy;
+                            player.facing = prop.facing || 'down-right';
                             setIsSitting(true);
+                            setSittingSeat(customSeatId);
+                            sendHeartbeatRef.current?.();
                           } else {
                             pendingSeatRef.current = {
-                              seatId: 'fountain_1_a',
+                              seatId: customSeatId,
                               facingDir: prop.facing || 'down-right',
                               targetX: prop.wx,
                               targetY: prop.wy,
@@ -26152,6 +26459,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                           }
                         } else {
                           setIsSitting(false);
+                          setSittingSeat(null);
                           if (act.emoteType === 'sport' || act.emoteType === 'cheer') {
                             player.isRunning = true;
                             player.speed = 1.25;

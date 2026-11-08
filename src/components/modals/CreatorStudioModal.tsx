@@ -413,20 +413,41 @@ export interface CreatorPropCatalogEntry {
 }
 
 export const CREATOR_PROP_CATALOG: CreatorPropCatalogEntry[] = [
-  // 6 Model Pohon
+  // 9 Model Pohon (3 Pohon Bawaan Asli Kota & Hutan + 6 Pohon Kreasi)
+  {
+    model: 'tree_builtin_city_emerald',
+    category: 'tree',
+    name: 'Pohon Rindang Kota (Bawaan Apel)',
+    icon: '🌳',
+    description: 'Model pohon bulat ganda asli bawaan Kota Refleksia lengkap dengan 7 buah apel merah.',
+  },
+  {
+    model: 'tree_builtin_city_autumn',
+    category: 'tree',
+    name: 'Pohon Musim Gugur Kota (Bawaan)',
+    icon: '🍂',
+    description: 'Model pohon bulat ganda jingga-terakota asli bawaan Kota Refleksia dengan daun gugur.',
+  },
+  {
+    model: 'tree_builtin_forest_pine',
+    category: 'tree',
+    name: 'Pohon Cemara Hutan (Bawaan)',
+    icon: '🌲',
+    description: 'Model pohon pinus cemara 3 tingkat asli bawaan Hutan Belantara Refleksia.',
+  },
   {
     model: 'tree_oak_apple',
     category: 'tree',
-    name: 'Pohon Apel Rindang',
-    icon: '🌳',
-    description: 'Pohon hijau lebat dengan buah apel merah segar.',
+    name: 'Pohon Apel Rindang Rumah Burung',
+    icon: '🍎',
+    description: 'Pohon hijau lebat dengan rumah burung dan buah apel merah segar.',
   },
   {
     model: 'tree_pine_spruce',
     category: 'tree',
-    name: 'Pohon Pinus Cemara',
+    name: 'Pohon Pinus Cemara Biji',
     icon: '🌲',
-    description: 'Pohon cemara pegunungan bertingkat tiga yang sejuk.',
+    description: 'Pohon cemara pegunungan bertingkat empat lengkap dengan biji pinus.',
   },
   {
     model: 'tree_sakura_pink',
@@ -457,13 +478,34 @@ export const CREATOR_PROP_CATALOG: CreatorPropCatalogEntry[] = [
     description: 'Pohon daun jingga keemasan hangat khas musim gugur.',
   },
 
-  // 5 Model Tempat Duduk / Bangku
+  // 8 Model Tempat Duduk / Bangku (3 Bangku Bawaan Asli Kota + 5 Bangku Kreasi)
+  {
+    model: 'bench_builtin_fountain',
+    category: 'bench',
+    name: 'Bangku Taman Air Mancur (Bawaan)',
+    icon: '🪑',
+    description: 'Bangku kayu jati & besi tempa 2 dudukan asli bawaan Bundaran Air Mancur Kota.',
+  },
+  {
+    model: 'bench_builtin_riverside',
+    category: 'bench',
+    name: 'Bangku Tepi Sungai (Bawaan)',
+    icon: '🪑',
+    description: 'Bangku kayu cokelat hangat 2 dudukan asli bawaan Tepi Sungai Refleksia.',
+  },
+  {
+    model: 'bench_builtin_campfire',
+    category: 'bench',
+    name: 'Bangku Kayu Gelondong Api Unggun (Bawaan)',
+    icon: '🪵',
+    description: 'Bangku batang kayu gelondong alami asli bawaan Lingkar Api Unggun Kota.',
+  },
   {
     model: 'bench_wood_classic',
     category: 'bench',
-    name: 'Bangku Kayu Klasik',
+    name: 'Bangku Kayu Klasik & Pot Bunga',
     icon: '🪑',
-    description: 'Bangku taman kayu jati hangat dengan sandaran punggung.',
+    description: 'Bangku taman kayu jati hangat dengan sandaran punggung dan pot bunga.',
   },
   {
     model: 'bench_white_minimal',
@@ -494,29 +536,43 @@ export const CREATOR_PROP_CATALOG: CreatorPropCatalogEntry[] = [
     description: 'Bangku beludru merah marun dengan ukiran sandaran emas.',
   },
 
-  // 2 Model Ayunan
+  // 3 Model Ayunan (1 Ayunan Bawaan Asli Kota + 2 Ayunan Kreasi — Semuanya Berayun Bersama Avatar!)
+  {
+    model: 'swing_builtin_city',
+    category: 'swing',
+    name: 'Ayunan Taman Kota (Bawaan Asli 2 Kursi)',
+    icon: '🎠',
+    description: 'Ayunan kayu ganda berhias daun & bunga asli bawaan Kota Refleksia (avatar ikut berayun!).',
+  },
   {
     model: 'swing_wood_garden',
     category: 'swing',
     name: 'Ayunan Kayu Taman (2 Kursi)',
     icon: '🎠',
-    description: 'Ayunan tiang kayu klasik dengan kanopi daun dan 2 dudukan.',
+    description: 'Ayunan tiang kayu klasik dengan kanopi daun dan 2 dudukan (avatar ikut berayun!).',
   },
   {
     model: 'swing_cyan_modern',
     category: 'swing',
     name: 'Ayunan Besi Modern Cyan',
     icon: '🎡',
-    description: 'Ayunan rangka baja pirus modern yang berayun lembut.',
+    description: 'Ayunan rangka baja pirus modern yang berayun bersama avatar.',
   },
 
-  // 2 Model Api Unggun
+  // 3 Model Api Unggun (1 Api Unggun Bawaan Asli Kota + 2 Kreasi)
+  {
+    model: 'campfire_builtin_city',
+    category: 'campfire',
+    name: 'Api Unggun Warga (Bawaan Asli Kota)',
+    icon: '🔥',
+    description: 'Api unggun lingkar 8 batu kali & kayu silang asli bawaan Kota Refleksia.',
+  },
   {
     model: 'campfire_stone_ring',
     category: 'campfire',
-    name: 'Api Unggun Batu Lingkar',
+    name: 'Api Unggun Tripod Kemah',
     icon: '🔥',
-    description: 'Api unggun kayu bakar dikelilingi batu kali dengan percikan bara.',
+    description: 'Api unggun kayu bakar dengan penyangga tripod kemah dan percikan bara.',
   },
   {
     model: 'campfire_royal_brazier',
@@ -828,6 +884,72 @@ export interface CreatorTerrainCatalogEntry {
 }
 
 export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
+  // 8 Jenis Tanah & Jalan Asli Bawaan Kota Refleksia (100% Identik dengan Peta Bawaan)
+  {
+    terrainType: 'builtin_city_grass',
+    name: '🌟 Rumput Taman Kota (Bawaan Asli)',
+    icon: '🌱',
+    previewColor: '#4a7c52',
+    borderColor: '#22c55e',
+    description: 'Rumput hijau zamrud asli bawaan Kota Refleksia lengkap dengan rumpun 3 helai daun & bunga 4 kelopak.',
+  },
+  {
+    terrainType: 'builtin_forest_grass',
+    name: '🌟 Tanah Hutan Belantara (Bawaan Asli)',
+    icon: '🌲',
+    previewColor: '#15803d',
+    borderColor: '#14532d',
+    description: 'Tanah rumput hutan belantara asli bawaan Refleksia lengkap dengan semak belukar & buah beri.',
+  },
+  {
+    terrainType: 'builtin_city_road',
+    name: '🌟 Jalan Putih Boulevard Kota (Bawaan Asli)',
+    icon: '🛣️',
+    previewColor: '#fcfaf2',
+    borderColor: '#cbd5e1',
+    description: 'Jalan utama krem-putih terang asli bawaan tengah Kota Refleksia.',
+  },
+  {
+    terrainType: 'builtin_fishing_trail',
+    name: '🌟 Jalan Setapak Pemancingan (Bawaan Asli)',
+    icon: '🎣',
+    previewColor: '#4d7c43',
+    borderColor: '#cbd5e1',
+    description: 'Jalan lumut hijau menuju tepi sungai lengkap dengan batu pijakan asli bawaan kota.',
+  },
+  {
+    terrainType: 'builtin_east_dirt_road',
+    name: '🌟 Jalan Tanah Cokelat Seberang Timur (Bawaan)',
+    icon: '🟧',
+    previewColor: '#d97706',
+    borderColor: '#b45309',
+    description: 'Jalan tanah oranye-cokelat hangat asli bawaan distrik seberang timur & bandara.',
+  },
+  {
+    terrainType: 'builtin_airport_tarmac',
+    name: '🌟 Aspal Landasan Bandara (Bawaan Asli)',
+    icon: '✈️',
+    previewColor: '#334155',
+    borderColor: '#fde047',
+    description: 'Permukaan aspal gelap landasan pacu Bandara Internasional Refleksia dengan garis kuning.',
+  },
+  {
+    terrainType: 'builtin_alpine_grass',
+    name: '🌟 Rumput Dataran Tinggi Pegunungan (Bawaan)',
+    icon: '⛰️',
+    previewColor: '#16a34a',
+    borderColor: '#86efac',
+    description: 'Tanah rumput pegunungan utara lengkap dengan batu tebing & pucuk tanaman dataran tinggi.',
+  },
+  {
+    terrainType: 'builtin_river_water',
+    name: '🌟 Air Sungai & Danau Refleksia (Bawaan Asli)',
+    icon: '🌊',
+    previewColor: '#0284c7',
+    borderColor: '#bae6fd',
+    description: 'Permukaan air sungai biru jernih beriak berkilau asli bawaan Sungai Refleksia.',
+  },
+
   // 16 Jenis Tanah & Paving Sesuai Gambar Referensi (Baris 1 - 4, Kolom 1 - 4)
   {
     terrainType: 'img_paving_herringbone_red',
@@ -3000,22 +3122,40 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                           return;
                         }
                         if (item.objectCategory === 'bench') {
-                          const benchEntry = CREATOR_PROP_CATALOG.find((p) => p.model === 'bench_wood_classic');
+                          const targetBenchModel: CreatorPropModel = item.id.startsWith('riverside_')
+                            ? 'bench_builtin_riverside'
+                            : item.id.startsWith('campfire_')
+                            ? 'bench_builtin_campfire'
+                            : 'bench_builtin_fountain';
+                          const benchEntry =
+                            CREATOR_PROP_CATALOG.find((p) => p.model === targetBenchModel) ||
+                            CREATOR_PROP_CATALOG.find((p) => p.model === 'bench_wood_classic');
                           if (benchEntry) handleQuickSpawnProp({ ...benchEntry, name: `${curName} Baru` });
                           return;
                         }
                         if (item.objectCategory === 'swing') {
-                          const swingEntry = CREATOR_PROP_CATALOG.find((p) => p.model === 'swing_wood_garden');
+                          const swingEntry =
+                            CREATOR_PROP_CATALOG.find((p) => p.model === 'swing_builtin_city') ||
+                            CREATOR_PROP_CATALOG.find((p) => p.model === 'swing_wood_garden');
                           if (swingEntry) handleQuickSpawnProp({ ...swingEntry, name: `${curName} Baru` });
                           return;
                         }
                         if (item.objectCategory === 'campfire') {
-                          const fireEntry = CREATOR_PROP_CATALOG.find((p) => p.model === 'campfire_stone_ring');
+                          const fireEntry =
+                            CREATOR_PROP_CATALOG.find((p) => p.model === 'campfire_builtin_city') ||
+                            CREATOR_PROP_CATALOG.find((p) => p.model === 'campfire_stone_ring');
                           if (fireEntry) handleQuickSpawnProp({ ...fireEntry, name: `${curName} Baru` });
                           return;
                         }
                         if (item.objectCategory === 'tree') {
-                          const treeEntry = CREATOR_PROP_CATALOG.find((p) => p.model === 'tree_banyan_shady');
+                          const treeIdx = parseInt(item.id.replace('tree_', ''), 10);
+                          const isAutumn = !isNaN(treeIdx) && treeIdx % 5 === 2;
+                          const targetTreeModel: CreatorPropModel = isAutumn
+                            ? 'tree_builtin_city_autumn'
+                            : 'tree_builtin_city_emerald';
+                          const treeEntry =
+                            CREATOR_PROP_CATALOG.find((p) => p.model === targetTreeModel) ||
+                            CREATOR_PROP_CATALOG.find((p) => p.model === 'tree_builtin_city_emerald');
                           if (treeEntry) handleQuickSpawnProp({ ...treeEntry, name: `${curName} Baru` });
                         }
                       };

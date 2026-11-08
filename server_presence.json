@@ -1,6 +1,6 @@
 [
   {
-    "id": "guru_kikybahsoan_dev_betm0f_be0l",
+    "id": "guru_kikybahsoan_dev_xg0rg5_bjdx",
     "handle": "kikybahsoan",
     "name": "kikybahsoan",
     "role": "guru",
@@ -9,10 +9,10 @@
     "shirtColor": "#0f172a",
     "pantsColor": "#1e1b4b",
     "hairColor": "#0f172a",
-    "wx": 4.148,
-    "wy": -2.338,
-    "targetWx": 4.209,
-    "targetWy": -2.334,
+    "wx": -0.373,
+    "wy": -6.056,
+    "targetWx": -0.373,
+    "targetWy": -6.056,
     "speed": 0.88,
     "isMoving": false,
     "walkFrame": 0,
@@ -22,7 +22,7 @@
     "heldItem": null,
     "activeEmote": null,
     "speechTimer": 0,
-    "lastSeen": 1794116904230,
-    "connectedAt": 1794116286775
+    "lastSeen": 1794142792719,
+    "connectedAt": 1794140906701
   }
 ]

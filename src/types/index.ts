@@ -536,23 +536,31 @@ export type CreatorPropCategory =
   | 'water_feature';
 
 export type CreatorPropModel =
-  // Pohon (6 model)
+  // Pohon Bawaan Asli Kota & Hutan + Pohon Kreasi
+  | 'tree_builtin_city_emerald'
+  | 'tree_builtin_city_autumn'
+  | 'tree_builtin_forest_pine'
   | 'tree_oak_apple'
   | 'tree_pine_spruce'
   | 'tree_sakura_pink'
   | 'tree_banyan_shady'
   | 'tree_palm_tropical'
   | 'tree_autumn_maple'
-  // Tempat Duduk / Bangku (5 model)
+  // Tempat Duduk / Bangku Bawaan Asli Kota + Kreasi
+  | 'bench_builtin_fountain'
+  | 'bench_builtin_riverside'
+  | 'bench_builtin_campfire'
   | 'bench_wood_classic'
   | 'bench_white_minimal'
   | 'bench_stone_marble'
   | 'bench_picnic_table'
   | 'bench_royal_gold'
-  // Ayunan (2 model)
+  // Ayunan Bawaan Asli Kota + Kreasi
+  | 'swing_builtin_city'
   | 'swing_wood_garden'
   | 'swing_cyan_modern'
-  // Api Unggun (2 model)
+  // Api Unggun Bawaan Asli Kota + Kreasi
+  | 'campfire_builtin_city'
   | 'campfire_stone_ring'
   | 'campfire_royal_brazier'
   // Playground Anak (4 model)
@@ -624,6 +632,16 @@ export interface CreatorAnimalItem {
 }
 
 export type CreatorTerrainType =
+  // 8 Model Tanah & Jalan Bawaan Asli Kota Refleksia (100% Identik dengan Peta Bawaan)
+  | 'builtin_city_grass'
+  | 'builtin_forest_grass'
+  | 'builtin_city_road'
+  | 'builtin_fishing_trail'
+  | 'builtin_east_dirt_road'
+  | 'builtin_airport_tarmac'
+  | 'builtin_alpine_grass'
+  | 'builtin_river_water'
+  // Jalan Raya Aspal & Persimpangan (X, Y, Perempatan, Pertigaan, Belokan)
   | 'road_asphalt'
   | 'road_asphalt_y'
   | 'road_asphalt_cross'
