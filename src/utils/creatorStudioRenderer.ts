@@ -4,10 +4,339 @@ import {
   CreatorPropItem,
   CreatorAnimalItem,
   CreatorTerrainType,
+  CreatorTerrainTile,
   CreatorFenceItem,
 } from '../types/index.ts';
 
 type ProjectFn = (wx: number, wy: number, wz: number) => { x: number; y: number };
+
+// ============================================================================
+// INTERACTIVE AVATAR ACTIONS FOR ALL 32 PROP MODELS (POHON & TAMAN)
+// ============================================================================
+export interface PropAvatarActionOption {
+  id: string;
+  label: string;
+  icon: string;
+  speechText: string;
+  toastText: string;
+  xpReward: number;
+  emoteType: 'sit' | 'swing' | 'cheer' | 'sport' | 'warm' | 'care' | 'water';
+}
+
+export function getCreatorPropInteractiveActions(prop: CreatorPropItem): PropAvatarActionOption[] {
+  const { propCategory, propModel, name } = prop;
+
+  switch (propCategory) {
+    case 'tree': {
+      const harvestLabel =
+        propModel === 'tree_oak_apple'
+          ? 'Petik Buah Apel Segar'
+          : propModel === 'tree_palm_tropical'
+          ? 'Panen Kelapa Muda Segar'
+          : propModel === 'tree_sakura_pink'
+          ? 'Kumpulkan Kelopak Sakura'
+          : propModel === 'tree_autumn_maple'
+          ? 'Koleksi Daun Maple Emas'
+          : propModel === 'tree_pine_spruce'
+          ? 'Ambil Biji Pinus Hutan'
+          : 'Gantungkan Harapan di Pohon';
+      const harvestIcon =
+        propModel === 'tree_oak_apple'
+          ? '🍎'
+          : propModel === 'tree_palm_tropical'
+          ? '🥥'
+          : propModel === 'tree_sakura_pink'
+          ? '🌸'
+          : propModel === 'tree_autumn_maple'
+          ? '🍁'
+          : '🌿';
+      return [
+        {
+          id: 'tree_shade_read',
+          label: 'Berteduh & Baca Buku',
+          icon: '📖',
+          speechText: `📖 Duduk berteduh sambil membaca buku inspirasi di bawah ${name}...`,
+          toastText: `📖 Berteduh & membaca buku di bawah ${name} (+2 XP)`,
+          xpReward: 2,
+          emoteType: 'sit',
+        },
+        {
+          id: 'tree_harvest',
+          label: harvestLabel,
+          icon: harvestIcon,
+          speechText: `${harvestIcon} Wah segar sekali! Berhasil ${harvestLabel.toLowerCase()} dari ${name}!`,
+          toastText: `${harvestIcon} ${harvestLabel} di ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'cheer',
+        },
+        {
+          id: 'tree_water_care',
+          label: 'Siram & Rawat Pohon',
+          icon: '🚿',
+          speechText: `🚿 Menyiram dan memberi nutrisi pada ${name} agar Refleksia makin rindang!`,
+          toastText: `🌱 Merawat kelestarian ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'care',
+        },
+      ];
+    }
+
+    case 'bench': {
+      return [
+        {
+          id: 'bench_sit_relax',
+          label: 'Duduk Santai & Istirahat',
+          icon: '🪑',
+          speechText: `🪑 Duduk santai menikmati suasana kota di ${name}...`,
+          toastText: `🪑 Duduk beristirahat di ${name}`,
+          xpReward: 2,
+          emoteType: 'sit',
+        },
+        {
+          id: 'bench_picnic_snack',
+          label: 'Santap Bekal & Minuman',
+          icon: '🥐',
+          speechText: `🥐🍹 Menikmati bekal roti hangat & minuman segar bersama warga di ${name}!`,
+          toastText: `🥐 Menikmati bekal piknik di ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'sit',
+        },
+        {
+          id: 'bench_write_journal',
+          label: 'Tulis Catatan & Ide',
+          icon: '✍️',
+          speechText: `✍️ Menulis ide kreatif dan refleksi harian di atas ${name}...`,
+          toastText: `✍️ Menulis catatan refleksi di ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'sit',
+        },
+      ];
+    }
+
+    case 'swing': {
+      return [
+        {
+          id: 'swing_gentle',
+          label: 'Duduk & Berayun Santai',
+          icon: '🎠',
+          speechText: `🎠 Berayun perlahan sambil menikmati semilir angin di ${name}...`,
+          toastText: `🎠 Berayun santai di ${name}`,
+          xpReward: 2,
+          emoteType: 'swing',
+        },
+        {
+          id: 'swing_high_joy',
+          label: 'Ayunan Tinggi Gembira!',
+          icon: '🤩',
+          speechText: `🤩 Wuuuush! Berayun tinggi penuh semangat di ${name}!`,
+          toastText: `🤩 Berayun tinggi gembira di ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'swing',
+        },
+        {
+          id: 'swing_chat_friend',
+          label: 'Ngobrol Seru di Ayunan',
+          icon: '💬',
+          speechText: `💬 Ayo warga, duduk di kursi sebelah ${name} dan mengobrol bersama!`,
+          toastText: `💬 Mengajak warga mengobrol di ${name} (+2 XP)`,
+          xpReward: 2,
+          emoteType: 'swing',
+        },
+      ];
+    }
+
+    case 'campfire': {
+      return [
+        {
+          id: 'fire_warm_hands',
+          label: 'Hangatkan Badan',
+          icon: '🔥',
+          speechText: `🔥 Menghangatkan tangan di dekat nyala ${name} yang nyaman...`,
+          toastText: `🔥 Menghangatkan diri di ${name} (+2 XP)`,
+          xpReward: 2,
+          emoteType: 'warm',
+        },
+        {
+          id: 'fire_roast_marshmallow',
+          label: 'Bakar Marshmallow & Jagung',
+          icon: '🍡',
+          speechText: `🍡🌽 Memanggang marshmallow dan jagung bakar manis di atas ${name}!`,
+          toastText: `🍡 Bakar marshmallow & jagung di ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'cheer',
+        },
+        {
+          id: 'fire_story_circle',
+          label: 'Duduk & Cerita Malam Warga',
+          icon: '🎸',
+          speechText: `🎸🎶 Duduk melingkar berbagi cerita inspiratif di sekitar ${name}...`,
+          toastText: `🎸 Berbagi cerita warga di ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'sit',
+        },
+      ];
+    }
+
+    case 'playground': {
+      const mainRideLabel =
+        propModel === 'playground_slide_colorful'
+          ? 'Meluncur dari Perosotan!'
+          : propModel === 'playground_seesaw_dual'
+          ? 'Main Jungkat-Jungkit Naik-Turun!'
+          : propModel === 'playground_spring_rider'
+          ? 'Tunggangi Kuda Pegas Membal!'
+          : 'Jelajahi Menara & Jembatan Istana!';
+      return [
+        {
+          id: 'play_ride_main',
+          label: mainRideLabel,
+          icon: '🛝',
+          speechText: `🛝🎉 Seru sekali! ${mainRideLabel} di ${name}!`,
+          toastText: `🛝 ${mainRideLabel} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'cheer',
+        },
+        {
+          id: 'play_agility_game',
+          label: 'Tantangan Ketangkasan Taman',
+          icon: '🏅',
+          speechText: `🏅 Melatih ketangkasan dan keseimbangan tubuh di wahana ${name}!`,
+          toastText: `🏅 Tantangan ketangkasan di ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'sport',
+        },
+        {
+          id: 'play_sit_rest',
+          label: 'Duduk Santai di Tepi Wahana',
+          icon: '😊',
+          speechText: `😊 Beristirahat sejenak sambil melihat keceriaan taman di ${name}...`,
+          toastText: `😊 Bersantai di area ${name} (+2 XP)`,
+          xpReward: 2,
+          emoteType: 'sit',
+        },
+      ];
+    }
+
+    case 'sports_court': {
+      const mainSportLabel =
+        propModel === 'court_basketball_full'
+          ? 'Tembakan Three-Point & Slam Dunk!'
+          : propModel === 'court_futsal_green'
+          ? 'Dribble & Tendangan Gol Futsal!'
+          : propModel === 'court_badminton_pro'
+          ? 'Jumping Smash Bulu Tangkis!'
+          : 'Lari Sprint & Senam Kebugaran!';
+      const sportIcon =
+        propModel === 'court_basketball_full'
+          ? '🏀'
+          : propModel === 'court_futsal_green'
+          ? '⚽'
+          : propModel === 'court_badminton_pro'
+          ? '🏸'
+          : '🏃';
+      return [
+        {
+          id: 'sport_score_action',
+          label: mainSportLabel,
+          icon: sportIcon,
+          speechText: `${sportIcon}🔥 MASUK! ${mainSportLabel} di ${name}!`,
+          toastText: `${sportIcon} ${mainSportLabel} (+4 XP Olahraga)`,
+          xpReward: 4,
+          emoteType: 'sport',
+        },
+        {
+          id: 'sport_warmup',
+          label: 'Pemanasan & Latihan Fisik',
+          icon: '💪',
+          speechText: `💪 Melakukan pemanasan dan latihan kebugaran tubuh di ${name}!`,
+          toastText: `💪 Latihan fisik sehat di ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'cheer',
+        },
+        {
+          id: 'sport_friendly_match',
+          label: 'Tanding Persahabatan Warga',
+          icon: '🏆',
+          speechText: `🏆 Ayo warga Refleksia, kita mulai pertandingan persahabatan sportif di ${name}!`,
+          toastText: `🏆 Pertandingan sportif di ${name} (+4 XP)`,
+          xpReward: 4,
+          emoteType: 'sport',
+        },
+      ];
+    }
+
+    case 'shrub_plant': {
+      return [
+        {
+          id: 'plant_water_prune',
+          label: 'Siram & Pangkas Tanaman',
+          icon: '🪴',
+          speechText: `🪴 Menyiram dan merapikan daun ${name} agar taman kota tampak asri!`,
+          toastText: `🪴 Merawat tanaman ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'care',
+        },
+        {
+          id: 'plant_botany_observe',
+          label: 'Observasi Botani & Aroma Bunga',
+          icon: '🔍',
+          speechText: `🌺🔍 Mengamati keindahan tekstur daun dan menghirup kesegaran ${name}...`,
+          toastText: `🔍 Observasi botani di ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'cheer',
+        },
+        {
+          id: 'plant_zen_relax',
+          label: 'Duduk Meditasi Hijau',
+          icon: '🧘',
+          speechText: `🧘 Menenangkan pikiran di dekat keasrian ${name}...`,
+          toastText: `🧘 Relaksasi hijau di dekat ${name} (+2 XP)`,
+          xpReward: 2,
+          emoteType: 'sit',
+        },
+      ];
+    }
+
+    case 'water_feature':
+    default: {
+      const feedLabel =
+        propModel === 'water_koi_pond_lotus'
+          ? 'Beri Makan Ikan Koi & Teratai'
+          : propModel === 'water_mini_waterfall'
+          ? 'Rasakan Embun Segar Air Terjun'
+          : 'Buat Harapan Positif di Air Mancur';
+      return [
+        {
+          id: 'water_main_interact',
+          label: feedLabel,
+          icon: '🪷',
+          speechText: `🪷✨ ${feedLabel} di ${name}, suasana hati jadi damai dan jernih!`,
+          toastText: `🪷 ${feedLabel} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'water',
+        },
+        {
+          id: 'water_splash_play',
+          label: 'Sentuh Gemericik Air Jernih',
+          icon: '💦',
+          speechText: `💦 Segarnya percikan air jernih di ${name}!`,
+          toastText: `💦 Menikmati kesegaran air di ${name} (+2 XP)`,
+          xpReward: 2,
+          emoteType: 'cheer',
+        },
+        {
+          id: 'water_sit_reflect',
+          label: 'Duduk Tenang di Tepi Air',
+          icon: '🧘‍♂️',
+          speechText: `🧘‍♂️ Duduk merenung mendengarkan suara gemericik air ${name}...`,
+          toastText: `🧘‍♂️ Refleksi tenang di tepi ${name} (+3 XP)`,
+          xpReward: 3,
+          emoteType: 'sit',
+        },
+      ];
+    }
+  }
+}
 
 // ============================================================================
 // SHARED SPRITE ATLAS FOR THE 16 REFERENCE TERRAIN TEXTURES (4x4 GRID)
@@ -31,10 +360,6 @@ const TERRAIN_SPRITE_GRID_MAP: Partial<Record<CreatorTerrainType, { row: number;
   img_tile_diamond_gold: { row: 3, col: 3 },
 };
 
-// Exact crop rects (normalized 0..1 of the 626x626 reference image) for each of the 4 rows & 4 columns
-// In the reference image, the 4 squares are arranged with white margins at:
-// Cols: [0.041..0.242], [0.281..0.481], [0.520..0.721], [0.760..0.961]
-// Rows: [0.040..0.241], [0.280..0.481], [0.520..0.721], [0.760..0.961]
 const COL_CROP_NORM = [
   { start: 0.043, size: 0.196 },
   { start: 0.283, size: 0.196 },
@@ -172,7 +497,6 @@ function drawIsoPyramidRoof(
   const p01 = project(x0, y1, wz);
   const apex = project(wx, wy, wz + dz);
 
-  // Back-left
   ctx.beginPath();
   ctx.moveTo(p00.x, p00.y);
   ctx.lineTo(p01.x, p01.y);
@@ -181,7 +505,6 @@ function drawIsoPyramidRoof(
   ctx.fillStyle = shadeHex(baseColor, -15);
   ctx.fill();
 
-  // Back-right
   ctx.beginPath();
   ctx.moveTo(p00.x, p00.y);
   ctx.lineTo(p10.x, p10.y);
@@ -190,7 +513,6 @@ function drawIsoPyramidRoof(
   ctx.fillStyle = shadeHex(baseColor, -5);
   ctx.fill();
 
-  // Front-left
   ctx.beginPath();
   ctx.moveTo(p01.x, p01.y);
   ctx.lineTo(p11.x, p11.y);
@@ -202,7 +524,6 @@ function drawIsoPyramidRoof(
   ctx.lineWidth = 0.7;
   ctx.stroke();
 
-  // Front-right
   ctx.beginPath();
   ctx.moveTo(p11.x, p11.y);
   ctx.lineTo(p10.x, p10.y);
@@ -213,7 +534,6 @@ function drawIsoPyramidRoof(
   ctx.stroke();
 }
 
-// Helper to draw isometric window grids on left-front (y1) and right-front (x1) faces
 function drawBuildingWindowGrid(
   ctx: CanvasRenderingContext2D,
   project: ProjectFn,
@@ -238,7 +558,6 @@ function drawBuildingWindowGrid(
     const zBot = zStart + ((zEnd - zStart) * (r + 0.22)) / rows;
     const zTop = zStart + ((zEnd - zStart) * (r + 0.78)) / rows;
 
-    // Left-front face windows (along x from x0 to x1 at y = y1)
     for (let c = 0; c < cols; c++) {
       const u0 = (c + 0.22) / cols;
       const u1 = (c + 0.78) / cols;
@@ -261,7 +580,6 @@ function drawBuildingWindowGrid(
       ctx.fill();
     }
 
-    // Right-front face windows (along y from y1 to y0 at x = x1)
     for (let c = 0; c < cols; c++) {
       const v0 = (c + 0.22) / cols;
       const v1 = (c + 0.78) / cols;
@@ -286,7 +604,6 @@ function drawBuildingWindowGrid(
   }
 }
 
-// Helper to draw front entrance door, canopy & steps on left-front face (y1)
 function drawBuildingEntrance(
   ctx: CanvasRenderingContext2D,
   project: ProjectFn,
@@ -298,7 +615,6 @@ function drawBuildingEntrance(
   canopyColor: string
 ) {
   const yFront = wy + dy / 2;
-  // Entrance steps
   drawIsoPrism(
     ctx,
     project,
@@ -313,7 +629,6 @@ function drawBuildingEntrance(
     '#94a3b8'
   );
 
-  // Double glass door on front-left face
   const dL = project(wx - 0.1 * sc, yFront + 0.005, zBase);
   const dR = project(wx + 0.1 * sc, yFront + 0.005, zBase);
   const dTR = project(wx + 0.1 * sc, yFront + 0.005, zBase + 0.22 * sc);
@@ -328,7 +643,6 @@ function drawBuildingEntrance(
   ctx.closePath();
   ctx.fill();
 
-  // Warm welcoming light inside doorway
   ctx.fillStyle = 'rgba(253, 224, 71, 0.78)';
   ctx.beginPath();
   ctx.moveTo(dL.x + 1.5, dL.y - 1);
@@ -338,7 +652,6 @@ function drawBuildingEntrance(
   ctx.closePath();
   ctx.fill();
 
-  // Door canopy awning
   drawIsoPrism(
     ctx,
     project,
@@ -355,7 +668,7 @@ function drawBuildingEntrance(
 }
 
 // ============================================================================
-// 1. CUSTOM BUILDINGS 3D RENDERER (14 HIGH-DETAIL ARCHITECTURAL MODELS)
+// 1. CUSTOM BUILDINGS 3D RENDERER (29 MODELS: 14 CREATOR + 15 BUILT-IN CITY MODELS)
 // ============================================================================
 export function drawCustomCreatorBuilding3D(
   ctx: CanvasRenderingContext2D,
@@ -390,7 +703,6 @@ export function drawCustomCreatorBuilding3D(
   ctx.fillStyle = 'rgba(15, 23, 42, 0.30)';
   ctx.fill();
 
-  // Highlight ring if selected in studio, hovered, or near player
   if (isSelectedInStudio || isHovered || isNearPlayer) {
     ctx.beginPath();
     ctx.ellipse(
@@ -415,7 +727,7 @@ export function drawCustomCreatorBuilding3D(
     ctx.setLineDash([]);
   }
 
-  // Two-tier Stone Courtyard Foundation Platform with Corner Shrubs
+  // Two-tier Stone Courtyard Foundation Platform with Corner Shrubs & Lamps
   drawIsoPrism(
     ctx,
     project,
@@ -443,7 +755,6 @@ export function drawCustomCreatorBuilding3D(
     '#cbd5e1'
   );
 
-  // Corner ornamental hedges & lamp posts on building courtyard
   const cornerPosts = [
     [-0.41, 0.41],
     [0.41, 0.41],
@@ -456,7 +767,6 @@ export function drawCustomCreatorBuilding3D(
     ctx.arc(cp.x, cp.y - 3 * sc, 3.6 * sc, 0, Math.PI * 2);
     ctx.fill();
     if (idx < 2) {
-      // Courtyard warm streetlamp at front corners
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = 1.4 * sc;
       ctx.beginPath();
@@ -470,10 +780,10 @@ export function drawCustomCreatorBuilding3D(
     }
   });
 
-  // 2. Model-specific Complex 3D Architecture & Refleksia Life Elements
+  // 2. Model-specific Complex 3D Architecture
   switch (modelType) {
-    case 'modern_tower': {
-      // Tier 1 Podium Lobby
+    case 'modern_tower':
+    case 'builtin_pencakar_langit': {
       drawIsoPrism(
         ctx,
         project,
@@ -487,7 +797,6 @@ export function drawCustomCreatorBuilding3D(
         shadeHex(accentColor, 10),
         shadeHex(accentColor, -18)
       );
-      // Tier 2 Glass Curtain Wall Tower
       drawIsoPrism(
         ctx,
         project,
@@ -496,7 +805,7 @@ export function drawCustomCreatorBuilding3D(
         0.41 * sc,
         0.64 * sc,
         0.64 * sc,
-        1.05 * sc,
+        1.15 * sc,
         shadeHex(accentColor, 22),
         shadeHex(accentColor, 2),
         shadeHex(accentColor, -26)
@@ -509,20 +818,19 @@ export function drawCustomCreatorBuilding3D(
         0.64 * sc,
         0.64 * sc,
         0.44 * sc,
-        1.42 * sc,
+        1.52 * sc,
         6,
         3,
         'rgba(186, 230, 253, 0.85)',
         '#fef08a',
         now
       );
-      // Tier 3 Penthouse Crown & Helipad Deck
       drawIsoPrism(
         ctx,
         project,
         wx,
         wy,
-        1.46 * sc,
+        1.56 * sc,
         0.48 * sc,
         0.48 * sc,
         0.42 * sc,
@@ -537,16 +845,15 @@ export function drawCustomCreatorBuilding3D(
         wy,
         0.48 * sc,
         0.48 * sc,
-        1.5 * sc,
-        1.84 * sc,
+        1.6 * sc,
+        1.94 * sc,
         2,
         2,
         'rgba(224, 242, 254, 0.9)',
         '#fde047',
         now
       );
-      // Rooftop Helipad Circle + 'H' + Solar Array
-      const heliC = project(wx, wy, 1.89 * sc);
+      const heliC = project(wx, wy, 1.99 * sc);
       ctx.strokeStyle = '#facc15';
       ctx.lineWidth = 1.4 * sc;
       ctx.beginPath();
@@ -557,9 +864,8 @@ export function drawCustomCreatorBuilding3D(
       ctx.textAlign = 'center';
       ctx.fillText('H', heliC.x, heliC.y + 2 * sc);
 
-      // Communication Spire & Aircraft Warning Beacon
-      const spireTop = project(wx - 0.12 * sc, wy - 0.12 * sc, 2.32 * sc);
-      const spireBase = project(wx - 0.12 * sc, wy - 0.12 * sc, 1.88 * sc);
+      const spireTop = project(wx - 0.12 * sc, wy - 0.12 * sc, 2.42 * sc);
+      const spireBase = project(wx - 0.12 * sc, wy - 0.12 * sc, 1.98 * sc);
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 2 * sc;
       ctx.beginPath();
@@ -575,8 +881,422 @@ export function drawCustomCreatorBuilding3D(
       break;
     }
 
-    case 'innovation_lab': {
-      // Main Research Wing
+    case 'builtin_balai_kota': {
+      // Grand Classical City Hall with Golden Dome & Columns
+      drawIsoPrism(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.09 * sc,
+        0.86 * sc,
+        0.76 * sc,
+        0.64 * sc,
+        '#f8fafc',
+        '#e2e8f0',
+        '#cbd5e1'
+      );
+      drawBuildingWindowGrid(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.86 * sc,
+        0.76 * sc,
+        0.16 * sc,
+        0.65 * sc,
+        2,
+        4,
+        '#38bdf8',
+        '#fef08a',
+        now
+      );
+      // 4 White Classical Columns at Front Portico
+      [-0.3, -0.1, 0.1, 0.3].forEach((colX) => {
+        drawIsoPrism(
+          ctx,
+          project,
+          wx + colX * sc,
+          wy + 0.4 * sc,
+          0.09 * sc,
+          0.06 * sc,
+          0.06 * sc,
+          0.58 * sc,
+          '#ffffff',
+          '#f1f5f9',
+          '#cbd5e1'
+        );
+      });
+      // Drum & Grand Golden Dome
+      drawIsoPrism(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.73 * sc,
+        0.52 * sc,
+        0.52 * sc,
+        0.2 * sc,
+        '#fef3c7',
+        '#fde68a',
+        '#f59e0b'
+      );
+      const domeP = project(wx, wy, 0.93 * sc);
+      ctx.beginPath();
+      ctx.arc(domeP.x, domeP.y - 2 * sc, tileW * 0.28 * sc, Math.PI, 0);
+      ctx.closePath();
+      ctx.fillStyle = '#eab308';
+      ctx.fill();
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 1.6 * sc;
+      ctx.stroke();
+      // Spire finial
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 2 * sc;
+      ctx.beginPath();
+      ctx.moveTo(domeP.x, domeP.y - tileW * 0.28 * sc);
+      ctx.lineTo(domeP.x, domeP.y - tileW * 0.42 * sc);
+      ctx.stroke();
+      drawBuildingEntrance(ctx, project, wx, wy, 0.76 * sc, 0.09 * sc, sc, '#eab308');
+      break;
+    }
+
+    case 'builtin_masjid': {
+      // Masjid Al-Hikmah with Emerald Green Dome & Tall Minaret
+      drawIsoPrism(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.09 * sc,
+        0.82 * sc,
+        0.78 * sc,
+        0.6 * sc,
+        '#f0fdf4',
+        '#dcfce7',
+        '#bbf7d0'
+      );
+      drawBuildingWindowGrid(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.82 * sc,
+        0.78 * sc,
+        0.16 * sc,
+        0.62 * sc,
+        2,
+        3,
+        '#059669',
+        '#fef08a',
+        now
+      );
+      // Tall Minaret Tower on Right Corner
+      drawIsoPrism(
+        ctx,
+        project,
+        wx + 0.34 * sc,
+        wy - 0.28 * sc,
+        0.09 * sc,
+        0.16 * sc,
+        0.16 * sc,
+        1.18 * sc,
+        '#ffffff',
+        '#e2e8f0',
+        '#cbd5e1'
+      );
+      const minTop = project(wx + 0.34 * sc, wy - 0.28 * sc, 1.27 * sc);
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(minTop.x, minTop.y, 4.5 * sc, Math.PI, 0);
+      ctx.fill();
+
+      // Main Emerald Mosque Dome + Golden Crescent Finial
+      const mDome = project(wx - 0.04 * sc, wy + 0.04 * sc, 0.69 * sc);
+      ctx.beginPath();
+      ctx.arc(mDome.x, mDome.y - 2 * sc, tileW * 0.31 * sc, Math.PI, 0);
+      ctx.closePath();
+      ctx.fillStyle = '#059669';
+      ctx.fill();
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 1.6 * sc;
+      ctx.stroke();
+
+      ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(mDome.x, mDome.y - tileW * 0.36 * sc, 3 * sc, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawBuildingEntrance(ctx, project, wx, wy, 0.78 * sc, 0.09 * sc, sc, '#059669');
+      break;
+    }
+
+    case 'builtin_studio_onair': {
+      // Studio ON AIR with Red-White Broadcast Lattice Tower
+      drawIsoPrism(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.09 * sc,
+        0.78 * sc,
+        0.74 * sc,
+        0.64 * sc,
+        '#1e293b',
+        '#334155',
+        '#0f172a'
+      );
+      drawBuildingWindowGrid(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.78 * sc,
+        0.74 * sc,
+        0.16 * sc,
+        0.66 * sc,
+        2,
+        3,
+        '#38bdf8',
+        '#f43f5e',
+        now
+      );
+      // Red-and-white Radio Antenna Tower on Roof
+      const antBase = project(wx, wy, 0.73 * sc);
+      const antTop = project(wx, wy, 1.55 * sc);
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2.6 * sc;
+      ctx.beginPath();
+      ctx.moveTo(antBase.x - 6 * sc, antBase.y);
+      ctx.lineTo(antTop.x, antTop.y);
+      ctx.lineTo(antBase.x + 6 * sc, antBase.y);
+      ctx.stroke();
+      // Pulsing Radio Wave Rings
+      ctx.strokeStyle = `rgba(244, 63, 94, ${0.85 - pulse * 0.5})`;
+      ctx.lineWidth = 1.4 * sc;
+      ctx.beginPath();
+      ctx.arc(antTop.x, antTop.y, (5 + pulse * 8) * sc, 0, Math.PI * 2);
+      ctx.stroke();
+
+      drawBuildingEntrance(ctx, project, wx, wy, 0.74 * sc, 0.09 * sc, sc, '#ef4444');
+      break;
+    }
+
+    case 'builtin_perpustakaan':
+    case 'builtin_bank_materi': {
+      // Classical Blue Library / Bank Materi with Pillars & Pediment
+      const wallTop = modelType === 'builtin_perpustakaan' ? '#dbeafe' : '#f1f5f9';
+      const wallLeft = modelType === 'builtin_perpustakaan' ? '#93c5fd' : '#e2e8f0';
+      const wallRight = modelType === 'builtin_perpustakaan' ? '#3b82f6' : '#94a3b8';
+      const rCol = modelType === 'builtin_perpustakaan' ? '#1d4ed8' : '#0f766e';
+      drawIsoPrism(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.09 * sc,
+        0.84 * sc,
+        0.74 * sc,
+        0.62 * sc,
+        wallTop,
+        wallLeft,
+        wallRight
+      );
+      drawBuildingWindowGrid(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.84 * sc,
+        0.74 * sc,
+        0.16 * sc,
+        0.64 * sc,
+        2,
+        4,
+        '#e0f2fe',
+        '#fef08a',
+        now
+      );
+      drawIsoPyramidRoof(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.71 * sc,
+        0.92 * sc,
+        0.82 * sc,
+        0.36 * sc,
+        rCol
+      );
+      drawBuildingEntrance(ctx, project, wx, wy, 0.74 * sc, 0.09 * sc, sc, rCol);
+      break;
+    }
+
+    case 'builtin_pasar_prestasi':
+    case 'builtin_kantor_pos':
+    case 'builtin_taman_refleksi': {
+      drawIsoPrism(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.09 * sc,
+        0.8 * sc,
+        0.74 * sc,
+        0.58 * sc,
+        shadeHex(accentColor, 35),
+        shadeHex(accentColor, 15),
+        shadeHex(accentColor, -15)
+      );
+      drawBuildingWindowGrid(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.8 * sc,
+        0.74 * sc,
+        0.16 * sc,
+        0.6 * sc,
+        2,
+        3,
+        '#ffffff',
+        '#fef08a',
+        now
+      );
+      drawIsoPyramidRoof(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.67 * sc,
+        0.88 * sc,
+        0.82 * sc,
+        0.35 * sc,
+        roofColor
+      );
+      // Iconic Rooftop Emblem (Trophy / Globe / Post Box)
+      const topEmb = project(wx, wy, 1.08 * sc);
+      ctx.fillStyle = modelType === 'builtin_taman_refleksi' ? '#38bdf8' : '#facc15';
+      ctx.beginPath();
+      ctx.arc(topEmb.x, topEmb.y, 5.5 * sc, 0, Math.PI * 2);
+      ctx.fill();
+      drawBuildingEntrance(ctx, project, wx, wy, 0.74 * sc, 0.09 * sc, sc, roofColor);
+      break;
+    }
+
+    case 'builtin_bandara': {
+      // Airport Terminal + Air Traffic Control Tower + Mini Jet on Apron
+      drawIsoPrism(
+        ctx,
+        project,
+        wx - 0.1 * sc,
+        wy,
+        0.09 * sc,
+        0.68 * sc,
+        0.68 * sc,
+        0.48 * sc,
+        '#e0f2fe',
+        '#bae6fd',
+        '#0284c7'
+      );
+      // Control Tower
+      drawIsoPrism(
+        ctx,
+        project,
+        wx + 0.25 * sc,
+        wy - 0.22 * sc,
+        0.09 * sc,
+        0.22 * sc,
+        0.22 * sc,
+        1.15 * sc,
+        '#f8fafc',
+        '#cbd5e1',
+        '#64748b'
+      );
+      drawIsoPrism(
+        ctx,
+        project,
+        wx + 0.25 * sc,
+        wy - 0.22 * sc,
+        1.24 * sc,
+        0.3 * sc,
+        0.3 * sc,
+        0.18 * sc,
+        '#38bdf8',
+        '#0ea5e9',
+        '#0369a1'
+      );
+      // Mini White Jet Plane on Front Apron
+      const jetP = project(wx + 0.15 * sc, wy + 0.32 * sc, 0.1 * sc);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(jetP.x, jetP.y, 8 * sc, 2.8 * sc, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 2 * sc;
+      ctx.beginPath();
+      ctx.moveTo(jetP.x - 4 * sc, jetP.y - 4 * sc);
+      ctx.lineTo(jetP.x + 4 * sc, jetP.y + 4 * sc);
+      ctx.stroke();
+
+      drawBuildingEntrance(ctx, project, wx - 0.1 * sc, wy, 0.68 * sc, 0.09 * sc, sc, '#0284c7');
+      break;
+    }
+
+    case 'builtin_beringin_rumah_pohon': {
+      // Giant Sacred Banyan with Treehouse Deck in Canopy
+      drawIsoPrism(
+        ctx,
+        project,
+        wx,
+        wy,
+        0.09 * sc,
+        0.26 * sc,
+        0.26 * sc,
+        0.68 * sc,
+        '#78350f',
+        '#713f12',
+        '#451a03'
+      );
+      const bCanopy = project(wx, wy, 0.95 * sc);
+      ctx.fillStyle = '#14532d';
+      ctx.beginPath();
+      ctx.ellipse(bCanopy.x, bCanopy.y, 26 * sc, 14 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#16a34a';
+      ctx.beginPath();
+      ctx.ellipse(bCanopy.x, bCanopy.y - 6 * sc, 22 * sc, 12 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Wooden Treehouse Cabin perched in canopy
+      drawIsoPrism(
+        ctx,
+        project,
+        wx + 0.12 * sc,
+        wy + 0.12 * sc,
+        0.68 * sc,
+        0.38 * sc,
+        0.34 * sc,
+        0.28 * sc,
+        '#fde68a',
+        '#d97706',
+        '#92400e'
+      );
+      drawIsoPyramidRoof(
+        ctx,
+        project,
+        wx + 0.12 * sc,
+        wy + 0.12 * sc,
+        0.96 * sc,
+        0.44 * sc,
+        0.4 * sc,
+        0.2 * sc,
+        '#b45309'
+      );
+      break;
+    }
+
+    case 'innovation_lab':
+    case 'builtin_lab_dkv': {
       drawIsoPrism(
         ctx,
         project,
@@ -590,7 +1310,6 @@ export function drawCustomCreatorBuilding3D(
         '#e2e8f0',
         '#cbd5e1'
       );
-      // Cyan/Accent Energy Belt
       drawIsoPrism(
         ctx,
         project,
@@ -619,8 +1338,6 @@ export function drawCustomCreatorBuilding3D(
         '#a5f3fc',
         now
       );
-
-      // Rooftop Solar Panels (Left Wing)
       drawIsoPrism(
         ctx,
         project,
@@ -635,7 +1352,6 @@ export function drawCustomCreatorBuilding3D(
         '#172554'
       );
 
-      // Observatory Geodesic Dome + Telescope Slit + Rotating Atom Ring
       const domeBase = project(wx + 0.06 * sc, wy - 0.04 * sc, 0.71 * sc);
       ctx.beginPath();
       ctx.arc(domeBase.x, domeBase.y - tileW * 0.06 * sc, tileW * 0.25 * sc, Math.PI, 0);
@@ -646,15 +1362,6 @@ export function drawCustomCreatorBuilding3D(
       ctx.lineWidth = 1.6 * sc;
       ctx.stroke();
 
-      // Telescope barrel peeking out
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 3 * sc;
-      ctx.beginPath();
-      ctx.moveTo(domeBase.x + 3 * sc, domeBase.y - 10 * sc);
-      ctx.lineTo(domeBase.x + 12 * sc, domeBase.y - 19 * sc);
-      ctx.stroke();
-
-      // Animated Orbiting Atom Electrons above Lab
       const atomCenter = project(wx, wy, 1.08 * sc);
       for (let i = 0; i < 2; i++) {
         const rot = (i === 0 ? 0.45 : -0.45) + Math.sin(elapsed * 1.5) * 0.15;
@@ -677,7 +1384,6 @@ export function drawCustomCreatorBuilding3D(
     }
 
     case 'school_pavilion': {
-      // Warm Academic Brick Hall
       drawIsoPrism(
         ctx,
         project,
@@ -706,7 +1412,6 @@ export function drawCustomCreatorBuilding3D(
         '#fef08a',
         now
       );
-      // Pitched Terracotta/Accent Roof
       drawIsoPyramidRoof(
         ctx,
         project,
@@ -718,7 +1423,6 @@ export function drawCustomCreatorBuilding3D(
         0.4 * sc,
         roofColor
       );
-      // Central Clock Tower & Belfry
       drawIsoPrism(
         ctx,
         project,
@@ -743,7 +1447,6 @@ export function drawCustomCreatorBuilding3D(
         0.22 * sc,
         accentColor
       );
-      // Clock face with hands
       const clk = project(wx, wy + 0.14 * sc, 1.12 * sc);
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#78350f';
@@ -752,14 +1455,7 @@ export function drawCustomCreatorBuilding3D(
       ctx.arc(clk.x, clk.y, 4.5 * sc, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(clk.x, clk.y);
-      ctx.lineTo(clk.x, clk.y - 3 * sc);
-      ctx.moveTo(clk.x, clk.y);
-      ctx.lineTo(clk.x + 2.5 * sc, clk.y);
-      ctx.stroke();
 
-      // Schoolyard Flagpole with Fluttering Red-White Flag
       const fpBase = project(wx - 0.36 * sc, wy + 0.42 * sc, 0.09 * sc);
       const fpTop = project(wx - 0.36 * sc, wy + 0.42 * sc, 0.85 * sc);
       ctx.strokeStyle = '#f8fafc';
@@ -779,7 +1475,6 @@ export function drawCustomCreatorBuilding3D(
     }
 
     case 'creative_studio': {
-      // Sleek Dark Media Production Hub
       drawIsoPrism(
         ctx,
         project,
@@ -808,7 +1503,6 @@ export function drawCustomCreatorBuilding3D(
         '#f472b6',
         now
       );
-      // Neon Crown Trim
       drawIsoPrism(
         ctx,
         project,
@@ -822,14 +1516,6 @@ export function drawCustomCreatorBuilding3D(
         accentColor,
         shadeHex(accentColor, -20)
       );
-      // Satellite Dish on Right Roof
-      const dishP = project(wx + 0.24 * sc, wy - 0.18 * sc, 0.88 * sc);
-      ctx.fillStyle = '#cbd5e1';
-      ctx.beginPath();
-      ctx.arc(dishP.x, dishP.y - 4 * sc, 5.5 * sc, 0.2, Math.PI + 0.2);
-      ctx.fill();
-
-      // Giant Rooftop LED Billboard with Animated Audio Equalizer Bars
       const bb = project(wx, wy, 1.08 * sc);
       ctx.fillStyle = '#090d16';
       ctx.strokeStyle = accentColor;
@@ -839,7 +1525,6 @@ export function drawCustomCreatorBuilding3D(
       ctx.fill();
       ctx.stroke();
 
-      // Equalizer bars inside billboard
       const eqCols = ['#f472b6', '#38bdf8', '#facc15', '#4ade80', '#a855f7', '#fb7185'];
       eqCols.forEach((col, i) => {
         const bh = (4 + Math.abs(Math.sin(elapsed * 6 + i * 1.1)) * 10) * sc;
@@ -856,7 +1541,6 @@ export function drawCustomCreatorBuilding3D(
     }
 
     case 'office_hq': {
-      // Twin Executive Towers + Glass Skybridge + Rooftop Garden
       drawIsoPrism(
         ctx,
         project,
@@ -915,7 +1599,6 @@ export function drawCustomCreatorBuilding3D(
         now
       );
 
-      // Panoramic Glass Skybridge connecting the twin towers
       drawIsoPrism(
         ctx,
         project,
@@ -930,20 +1613,11 @@ export function drawCustomCreatorBuilding3D(
         '#0284c7'
       );
 
-      // Green Rooftop Eco-Garden on East Tower
-      const roofGarden = project(wx + 0.21 * sc, wy, 1.02 * sc);
-      ctx.fillStyle = '#22c55e';
-      ctx.beginPath();
-      ctx.arc(roofGarden.x - 3 * sc, roofGarden.y, 3.2 * sc, 0, Math.PI * 2);
-      ctx.arc(roofGarden.x + 3 * sc, roofGarden.y, 2.8 * sc, 0, Math.PI * 2);
-      ctx.fill();
-
       drawBuildingEntrance(ctx, project, wx, wy, 0.6 * sc, 0.09 * sc, sc, accentColor);
       break;
     }
 
     case 'arcade_arena': {
-      // Cyber Arcade Hall with Pixel Invader / Joystick Crown
       drawIsoPrism(
         ctx,
         project,
@@ -985,7 +1659,6 @@ export function drawCustomCreatorBuilding3D(
         accentColor,
         shadeHex(roofColor, -10)
       );
-      // Giant 3D Arcade Joystick & Glowing Orb on Roof
       const topP = project(wx, wy, 1.02 * sc);
       ctx.fillStyle = '#334155';
       ctx.beginPath();
@@ -1011,7 +1684,6 @@ export function drawCustomCreatorBuilding3D(
     }
 
     case 'concert_stage': {
-      // Festival Main Stage Deck
       drawIsoPrism(
         ctx,
         project,
@@ -1025,7 +1697,6 @@ export function drawCustomCreatorBuilding3D(
         '#1e293b',
         '#0f172a'
       );
-      // LED Backdrop Wall
       drawIsoPrism(
         ctx,
         project,
@@ -1039,7 +1710,6 @@ export function drawCustomCreatorBuilding3D(
         accentColor,
         roofColor
       );
-      // Left & Right Line-Array Speaker Towers
       [
         [-0.36, 0.28],
         [0.36, -0.28],
@@ -1058,7 +1728,6 @@ export function drawCustomCreatorBuilding3D(
           '#020617'
         );
       });
-      // Stage Canopy Roof Rig
       drawIsoPrism(
         ctx,
         project,
@@ -1072,27 +1741,10 @@ export function drawCustomCreatorBuilding3D(
         roofColor,
         shadeHex(roofColor, -25)
       );
-      // Sweeping Laser Spotlights
-      const spotOrigin1 = project(wx - 0.25 * sc, wy + 0.2 * sc, 0.96 * sc);
-      const spotOrigin2 = project(wx + 0.25 * sc, wy - 0.2 * sc, 0.96 * sc);
-      const sway1 = Math.sin(elapsed * 2.8) * 14 * sc;
-      const sway2 = Math.cos(elapsed * 2.8) * 14 * sc;
-      ctx.strokeStyle = 'rgba(250, 204, 21, 0.45)';
-      ctx.lineWidth = 4 * sc;
-      ctx.beginPath();
-      ctx.moveTo(spotOrigin1.x, spotOrigin1.y);
-      ctx.lineTo(spotOrigin1.x + sway1, spotOrigin1.y + 24 * sc);
-      ctx.stroke();
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-      ctx.beginPath();
-      ctx.moveTo(spotOrigin2.x, spotOrigin2.y);
-      ctx.lineTo(spotOrigin2.x + sway2, spotOrigin2.y + 24 * sc);
-      ctx.stroke();
       break;
     }
 
     case 'ferris_park': {
-      // Ticket Booth & Boarding Platform
       drawIsoPrism(
         ctx,
         project,
@@ -1110,7 +1762,6 @@ export function drawCustomCreatorBuilding3D(
       const baseL = project(wx - 0.28 * sc, wy + 0.18 * sc, 0.22 * sc);
       const baseR = project(wx + 0.28 * sc, wy - 0.18 * sc, 0.22 * sc);
 
-      // A-frame support legs
       ctx.beginPath();
       ctx.moveTo(baseL.x, baseL.y);
       ctx.lineTo(hub.x, hub.y);
@@ -1119,20 +1770,13 @@ export function drawCustomCreatorBuilding3D(
       ctx.lineWidth = 3.2 * sc;
       ctx.stroke();
 
-      // Outer & Inner Wheel rims
       const wheelR = tileW * 0.44 * sc;
       ctx.beginPath();
       ctx.arc(hub.x, hub.y, wheelR, 0, Math.PI * 2);
       ctx.strokeStyle = accentColor;
       ctx.lineWidth = 3 * sc;
       ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(hub.x, hub.y, wheelR * 0.62, 0, Math.PI * 2);
-      ctx.strokeStyle = '#fde047';
-      ctx.lineWidth = 1.4 * sc;
-      ctx.stroke();
 
-      // Rotating spokes & Detailed Gondola Cabins
       const angleBase = now * 0.00085;
       const cabinColors = ['#f43f5e', '#facc15', '#38bdf8', '#4ade80', '#a855f7', '#fb923c', '#ec4899', '#2dd4bf'];
       for (let i = 0; i < 8; i++) {
@@ -1146,24 +1790,15 @@ export function drawCustomCreatorBuilding3D(
         ctx.lineWidth = 1.2 * sc;
         ctx.stroke();
 
-        // Hanging gondola cabin
         ctx.fillStyle = cabinColors[i % cabinColors.length];
         ctx.beginPath();
         ctx.roundRect(cx - 4.2 * sc, cy - 1 * sc, 8.4 * sc, 7 * sc, 2.5 * sc);
         ctx.fill();
-        ctx.fillStyle = '#e0f2fe';
-        ctx.fillRect(cx - 2.6 * sc, cy + 0.5 * sc, 5.2 * sc, 2.5 * sc);
       }
-      // Hub star
-      ctx.fillStyle = '#fef08a';
-      ctx.beginPath();
-      ctx.arc(hub.x, hub.y, 4.5 * sc, 0, Math.PI * 2);
-      ctx.fill();
       break;
     }
 
     case 'esports_dome': {
-      // Cyber Stadium Base
       drawIsoPrism(
         ctx,
         project,
@@ -1194,37 +1829,12 @@ export function drawCustomCreatorBuilding3D(
       ctx.strokeStyle = accentColor;
       ctx.lineWidth = 2.6 * sc;
       ctx.stroke();
-
-      // Geodesic Neon Ribs across the Dome
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
-      ctx.lineWidth = 1.3 * sc;
-      [-0.22, 0, 0.22].forEach((rib) => {
-        ctx.beginPath();
-        ctx.ellipse(
-          domeP.x + rib * tileW * sc,
-          domeP.y - tileW * 0.06 * sc,
-          tileW * 0.14 * sc,
-          tileW * 0.27 * sc,
-          0,
-          Math.PI,
-          0
-        );
-        ctx.stroke();
-      });
-
-      // Floating Trophy Hologram above Dome
-      const holoP = project(wx, wy, 0.98 * sc + Math.sin(elapsed * 3) * 0.04 * sc);
-      ctx.fillStyle = '#facc15';
-      ctx.beginPath();
-      ctx.arc(holoP.x, holoP.y, 4.5 * sc, 0, Math.PI * 2);
-      ctx.fill();
-
       drawBuildingEntrance(ctx, project, wx, wy, 0.86 * sc, 0.09 * sc, sc, accentColor);
       break;
     }
 
-    case 'open_cafe': {
-      // Cozy Artisan Bakery & Coffee House
+    case 'open_cafe':
+    case 'builtin_lapak_cafe': {
       drawIsoPrism(
         ctx,
         project,
@@ -1265,13 +1875,11 @@ export function drawCustomCreatorBuilding3D(
         accentColor
       );
 
-      // Outdoor Patio Umbrella + Bistro Table + Steaming Coffee Cup
       const patioP = project(wx + 0.26 * sc, wy + 0.34 * sc, 0.09 * sc);
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.ellipse(patioP.x, patioP.y - 4 * sc, 5.5 * sc, 2.8 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
-      // Umbrella pole & canopy
       ctx.strokeStyle = '#78350f';
       ctx.lineWidth = 1.4 * sc;
       ctx.beginPath();
@@ -1284,26 +1892,12 @@ export function drawCustomCreatorBuilding3D(
       ctx.closePath();
       ctx.fill();
 
-      // Rooftop Coffee Cup Sign with Rising Steam
-      const cupP = project(wx, wy, 0.96 * sc);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(cupP.x - 3.5 * sc, cupP.y - 4 * sc, 7 * sc, 5 * sc);
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
-      ctx.lineWidth = 1.1 * sc;
-      const steamShift = Math.sin(elapsed * 4) * 1.5 * sc;
-      ctx.beginPath();
-      ctx.moveTo(cupP.x - 1.5 * sc, cupP.y - 5 * sc);
-      ctx.lineTo(cupP.x - 1.5 * sc + steamShift, cupP.y - 10 * sc);
-      ctx.moveTo(cupP.x + 1.5 * sc, cupP.y - 5 * sc);
-      ctx.lineTo(cupP.x + 1.5 * sc - steamShift, cupP.y - 10 * sc);
-      ctx.stroke();
-
       drawBuildingEntrance(ctx, project, wx, wy, 0.58 * sc, 0.09 * sc, sc, roofColor);
       break;
     }
 
-    case 'reading_gazebo': {
-      // Wooden Deck Base
+    case 'reading_gazebo':
+    case 'builtin_sudut_literasi': {
       drawIsoPrism(
         ctx,
         project,
@@ -1317,21 +1911,19 @@ export function drawCustomCreatorBuilding3D(
         '#b45309',
         '#78350f'
       );
-      // Center Bookshelf & Reading Table inside Gazebo
       drawIsoPrism(
         ctx,
         project,
         wx,
         wy,
         0.15 * sc,
-        0.28 * sc,
+        0.32 * sc,
         0.24 * sc,
-        0.26 * sc,
+        0.32 * sc,
         '#fde68a',
         '#b45309',
         '#92400e'
       );
-      // 4 Corner Timber Pillars
       const pillarOffsets = [
         [-0.3, -0.3],
         [0.3, -0.3],
@@ -1353,13 +1945,6 @@ export function drawCustomCreatorBuilding3D(
           '#78350f'
         );
       });
-      // Hanging Warm Lantern in Center
-      const lanternP = project(wx, wy, 0.54 * sc);
-      ctx.fillStyle = '#fde047';
-      ctx.beginPath();
-      ctx.arc(lanternP.x, lanternP.y, 3.2 * sc, 0, Math.PI * 2);
-      ctx.fill();
-
       drawIsoPyramidRoof(
         ctx,
         project,
@@ -1375,7 +1960,6 @@ export function drawCustomCreatorBuilding3D(
     }
 
     case 'fountain_plaza': {
-      // Grand Marble Plaza Basin
       drawIsoPrism(
         ctx,
         project,
@@ -1415,7 +1999,6 @@ export function drawCustomCreatorBuilding3D(
         '#f8fafc',
         '#cbd5e1'
       );
-      // Main geyser & 4 parabolic water arcs
       const jetTop = project(wx, wy, (0.86 + pulse * 0.14) * sc);
       const jetBase = project(wx, wy, 0.65 * sc);
       ctx.beginPath();
@@ -1424,87 +2007,48 @@ export function drawCustomCreatorBuilding3D(
       ctx.strokeStyle = '#e0f2fe';
       ctx.lineWidth = 3.2 * sc;
       ctx.stroke();
-
-      [-10, -5, 5, 10].forEach((arcX) => {
-        ctx.strokeStyle = 'rgba(186, 230, 253, 0.85)';
-        ctx.lineWidth = 1.5 * sc;
-        ctx.beginPath();
-        ctx.moveTo(jetBase.x, jetBase.y);
-        ctx.quadraticCurveTo(
-          jetBase.x + arcX * 0.6 * sc,
-          jetTop.y - 4 * sc,
-          jetBase.x + arcX * 1.2 * sc,
-          jetBase.y + 14 * sc
-        );
-        ctx.stroke();
-      });
       break;
     }
 
-    case 'info_kiosk': {
-      // Smart Interactive City Totem
+    case 'info_kiosk':
+    case 'builtin_papan_pengumuman': {
       drawIsoPrism(
         ctx,
         project,
         wx,
         wy,
         0.09 * sc,
-        0.44 * sc,
-        0.34 * sc,
-        0.86 * sc,
+        0.54 * sc,
+        0.28 * sc,
+        0.78 * sc,
         shadeHex(accentColor, 20),
-        '#1e293b',
-        '#0f172a'
+        '#78350f',
+        '#451a03'
       );
-      // Glowing Touch Screen Display on Front
-      const scrP = project(wx, wy + 0.18 * sc, 0.52 * sc);
-      ctx.fillStyle = '#0284c7';
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.4 * sc;
+      const scrP = project(wx, wy + 0.15 * sc, 0.48 * sc);
+      ctx.fillStyle = modelType === 'builtin_papan_pengumuman' ? '#fef3c7' : '#0284c7';
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.5 * sc;
       ctx.beginPath();
-      ctx.roundRect(scrP.x - 8 * sc, scrP.y - 12 * sc, 16 * sc, 22 * sc, 2 * sc);
+      ctx.roundRect(scrP.x - 11 * sc, scrP.y - 11 * sc, 22 * sc, 18 * sc, 2 * sc);
       ctx.fill();
       ctx.stroke();
-      // Screen UI lines
-      ctx.fillStyle = '#e0f2fe';
-      ctx.fillRect(scrP.x - 5 * sc, scrP.y - 8 * sc, 10 * sc, 2 * sc);
-      ctx.fillRect(scrP.x - 5 * sc, scrP.y - 4 * sc, 7 * sc, 2 * sc);
-      ctx.fillStyle = '#facc15';
-      ctx.fillRect(scrP.x - 5 * sc, scrP.y + 1 * sc, 10 * sc, 4 * sc);
-
-      drawIsoPrism(
+      drawIsoPyramidRoof(
         ctx,
         project,
         wx,
         wy,
-        0.95 * sc,
-        0.54 * sc,
-        0.44 * sc,
-        0.1 * sc,
-        accentColor,
-        roofColor,
-        shadeHex(roofColor, -20)
+        0.87 * sc,
+        0.66 * sc,
+        0.42 * sc,
+        0.24 * sc,
+        roofColor
       );
       break;
     }
 
     case 'sakura_park':
     default: {
-      // Japanese Stone Lantern (Toro) + Red Torii/Bridge Accent + Sakura Blossom Tree
-      const lanternBase = project(wx - 0.25 * sc, wy + 0.22 * sc, 0.09 * sc);
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillRect(lanternBase.x - 2.5 * sc, lanternBase.y - 10 * sc, 5 * sc, 10 * sc);
-      ctx.fillStyle = '#fde047';
-      ctx.fillRect(lanternBase.x - 2 * sc, lanternBase.y - 8 * sc, 4 * sc, 3 * sc);
-      ctx.fillStyle = '#64748b';
-      ctx.beginPath();
-      ctx.moveTo(lanternBase.x, lanternBase.y - 14 * sc);
-      ctx.lineTo(lanternBase.x - 5 * sc, lanternBase.y - 9 * sc);
-      ctx.lineTo(lanternBase.x + 5 * sc, lanternBase.y - 9 * sc);
-      ctx.closePath();
-      ctx.fill();
-
-      // Main Sakura Trunk
       drawIsoPrism(
         ctx,
         project,
@@ -1543,28 +2087,17 @@ export function drawCustomCreatorBuilding3D(
       );
       ctx.fillStyle = roofColor || '#db2777';
       ctx.fill();
-
-      // Falling Pink Sakura Petals
-      for (let i = 0; i < 5; i++) {
-        const pPhase = (elapsed * 0.9 + i * 0.35) % 1;
-        const px = canopyCenter.x + Math.sin(elapsed * 2 + i * 1.7) * 14 * sc;
-        const py = canopyCenter.y + pPhase * 26 * sc;
-        ctx.fillStyle = '#fbcfe8';
-        ctx.beginPath();
-        ctx.ellipse(px, py, 2 * sc, 1.1 * sc, pPhase * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-      }
       break;
     }
   }
 
-  // 3. Floating Building Label Badge + Interactive Template Tag
+  // 3. Floating Building Label Badge
   const labelZ =
-    modelType === 'modern_tower'
-      ? 2.38 * sc
-      : modelType === 'ferris_park' || modelType === 'office_hq'
-      ? 1.62 * sc
-      : 1.32 * sc;
+    modelType === 'modern_tower' || modelType === 'builtin_pencakar_langit'
+      ? 2.48 * sc
+      : modelType === 'ferris_park' || modelType === 'office_hq' || modelType === 'builtin_studio_onair'
+      ? 1.66 * sc
+      : 1.35 * sc;
   const labelAnchor = project(wx, wy, labelZ);
 
   const badgeTitle = `${building.icon} ${building.name}`;
@@ -1623,7 +2156,6 @@ export function drawCreatorStudioMapGizmos(
 
   ctx.save();
 
-  // 1. If an NPC is selected, draw its home anchor + wander radius or patrol waypoints
   if (selectedNpcConfig) {
     const homeP = project(selectedNpcConfig.homeWx, selectedNpcConfig.homeWy, 0.02);
 
@@ -1672,7 +2204,6 @@ export function drawCreatorStudioMapGizmos(
     }
   }
 
-  // 2. Selected object gizmo ring & drag badge
   if (selectedCoords) {
     const p = project(selectedCoords.wx, selectedCoords.wy, 0.03);
     const pulseR = 1 + 0.08 * Math.sin(now * 0.006);
@@ -1705,7 +2236,6 @@ export function drawCreatorStudioMapGizmos(
     ctx.fillText(coordStr, p.x, p.y + 21);
   }
 
-  // 3. Hover placement ghost
   if (hoverGhostCoords) {
     const gp = project(hoverGhostCoords.wx, hoverGhostCoords.wy, 0.04);
     ctx.beginPath();
@@ -1748,7 +2278,6 @@ export function drawCustomCreatorProp3D(
 
   ctx.save();
 
-  // Selection ring in Creator Studio
   if (isSelectedInStudio) {
     const ringR = prop.propCategory === 'sports_court' ? 42 * sc : 22 * sc;
     ctx.beginPath();
@@ -1760,7 +2289,6 @@ export function drawCustomCreatorProp3D(
     ctx.setLineDash([]);
   }
 
-  // Soft Ground Shadow (Courts draw their own full surface)
   if (prop.propCategory !== 'sports_court') {
     ctx.fillStyle = 'rgba(15, 23, 42, 0.26)';
     ctx.beginPath();
@@ -1769,9 +2297,7 @@ export function drawCustomCreatorProp3D(
   }
 
   switch (propModel) {
-    // ---------------- POHON (6 MODEL BERDETAIL TINGGI) ----------------
     case 'tree_oak_apple': {
-      // Stone tree ring planter + grass tuft
       ctx.fillStyle = '#94a3b8';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y + 1 * sc, 9 * sc, 4.2 * sc, 0, 0, Math.PI * 2);
@@ -1781,7 +2307,6 @@ export function drawCustomCreatorProp3D(
       ctx.ellipse(pt.x, pt.y + 0.5 * sc, 7 * sc, 3 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Sculpted trunk with root flares & branches
       ctx.fillStyle = '#78350f';
       ctx.beginPath();
       ctx.moveTo(pt.x - 5 * sc, pt.y + 1 * sc);
@@ -1790,11 +2315,9 @@ export function drawCustomCreatorProp3D(
       ctx.lineTo(pt.x + 5 * sc, pt.y + 1 * sc);
       ctx.closePath();
       ctx.fill();
-      // Bark highlight
       ctx.fillStyle = '#92400e';
       ctx.fillRect(pt.x - 1.5 * sc, pt.y - 22 * sc, 2 * sc, 20 * sc);
 
-      // Wooden birdhouse hanging on right branch
       ctx.fillStyle = '#fef3c7';
       ctx.fillRect(pt.x + 5 * sc, pt.y - 18 * sc, 4.5 * sc, 4.5 * sc);
       ctx.fillStyle = '#dc2626';
@@ -1805,7 +2328,6 @@ export function drawCustomCreatorProp3D(
       ctx.closePath();
       ctx.fill();
 
-      // Multi-layered 3D canopy clusters (Shadow -> Mid -> Highlight)
       ctx.fillStyle = '#14532d';
       ctx.beginPath();
       ctx.arc(pt.x - 9 * sc + breeze, pt.y - 25 * sc, 11 * sc, 0, Math.PI * 2);
@@ -1823,7 +2345,6 @@ export function drawCustomCreatorProp3D(
       ctx.arc(pt.x + breeze, pt.y - 36 * sc, 12.5 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // Glossy red apples with leaf stems
       const apples = [
         [-8, -27],
         [7, -30],
@@ -1846,7 +2367,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'tree_pine_spruce': {
-      // Base boulders & ferns
       ctx.fillStyle = '#64748b';
       ctx.beginPath();
       ctx.arc(pt.x - 5 * sc, pt.y, 3.2 * sc, 0, Math.PI * 2);
@@ -1863,7 +2383,6 @@ export function drawCustomCreatorProp3D(
         { y: -39, w: 8, h: 12, cDark: '#059669', cLight: '#34d399' },
       ];
       tiers.forEach((t) => {
-        // Left shaded side
         ctx.fillStyle = t.cLight;
         ctx.beginPath();
         ctx.moveTo(pt.x + breeze * 0.7, pt.y + (t.y - t.h) * sc);
@@ -1871,7 +2390,6 @@ export function drawCustomCreatorProp3D(
         ctx.lineTo(pt.x, pt.y + (t.y + 2) * sc);
         ctx.closePath();
         ctx.fill();
-        // Right darker side
         ctx.fillStyle = t.cDark;
         ctx.beginPath();
         ctx.moveTo(pt.x + breeze * 0.7, pt.y + (t.y - t.h) * sc);
@@ -1881,7 +2399,6 @@ export function drawCustomCreatorProp3D(
         ctx.fill();
       });
 
-      // Pinecones
       ctx.fillStyle = '#92400e';
       [
         [-5, -15],
@@ -1896,13 +2413,11 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'tree_sakura_pink': {
-      // Dropped sakura petals ring on ground
       ctx.fillStyle = 'rgba(244, 114, 182, 0.35)';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y + 1.5 * sc, 14 * sc, 6.5 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Gnarled cherry wood trunk & branches
       ctx.strokeStyle = '#4c1d95';
       ctx.lineWidth = 5 * sc;
       ctx.lineCap = 'round';
@@ -1911,7 +2426,6 @@ export function drawCustomCreatorProp3D(
       ctx.quadraticCurveTo(pt.x - 2 * sc, pt.y - 12 * sc, pt.x + breeze * 0.4, pt.y - 25 * sc);
       ctx.stroke();
 
-      // Blossom layers
       ctx.fillStyle = '#db2777';
       ctx.beginPath();
       ctx.arc(pt.x - 9 * sc + breeze, pt.y - 25 * sc, 11 * sc, 0, Math.PI * 2);
@@ -1927,7 +2441,6 @@ export function drawCustomCreatorProp3D(
       ctx.arc(pt.x + breeze, pt.y - 36 * sc, 12 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // Drifting sakura petals
       for (let i = 0; i < 4; i++) {
         const fall = ((elapsed * 0.8 + i * 0.25) % 1) * 26 * sc;
         const sx = pt.x + Math.sin(elapsed * 2.5 + i * 2) * 11 * sc;
@@ -1940,7 +2453,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'tree_banyan_shady': {
-      // Stone circular bench around the banyan base
       ctx.fillStyle = '#cbd5e1';
       ctx.strokeStyle = '#64748b';
       ctx.lineWidth = 1.2 * sc;
@@ -1949,10 +2461,8 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // Massive multi-root trunk
       ctx.fillStyle = '#5c280b';
       ctx.fillRect(pt.x - 5.5 * sc, pt.y - 26 * sc, 11 * sc, 26 * sc);
-      // Aerial hanging roots & warm hanging lantern
       ctx.strokeStyle = '#92400e';
       ctx.lineWidth = 1.3 * sc;
       [-11, -7, -3, 4, 8, 11].forEach((rx) => {
@@ -1961,13 +2471,11 @@ export function drawCustomCreatorProp3D(
         ctx.lineTo(pt.x + rx * 0.85 * sc, pt.y - 4 * sc);
         ctx.stroke();
       });
-      // Hanging lantern on left bough
       ctx.fillStyle = '#fde047';
       ctx.beginPath();
       ctx.arc(pt.x - 11 * sc + breeze * 0.5, pt.y - 15 * sc, 2.5 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // Expansive shady banyan crown
       ctx.fillStyle = '#14532d';
       ctx.beginPath();
       ctx.ellipse(pt.x + breeze, pt.y - 27 * sc, 22 * sc, 11.5 * sc, 0, 0, Math.PI * 2);
@@ -1984,13 +2492,11 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'tree_palm_tropical': {
-      // Sandy island base + shells
       ctx.fillStyle = '#fde68a';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y + 1 * sc, 10 * sc, 4.8 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Segmented curved trunk
       ctx.strokeStyle = '#92400e';
       ctx.lineWidth = 5 * sc;
       ctx.lineCap = 'round';
@@ -2002,7 +2508,6 @@ export function drawCustomCreatorProp3D(
       const topX = pt.x + 2 * sc + breeze;
       const topY = pt.y - 33 * sc;
 
-      // Cluster of 3 Coconuts under fronds
       ctx.fillStyle = '#78350f';
       [
         [-2.2, 2],
@@ -2014,7 +2519,6 @@ export function drawCustomCreatorProp3D(
         ctx.fill();
       });
 
-      // Lush arched palm fronds
       [-16, -10, -4, 4, 10, 16].forEach((dx, idx) => {
         ctx.strokeStyle = idx % 2 === 0 ? '#16a34a' : '#22c55e';
         ctx.lineWidth = 3.2 * sc;
@@ -2032,7 +2536,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'tree_autumn_maple': {
-      // Fallen golden-orange leaves carpet
       ctx.fillStyle = 'rgba(249, 115, 22, 0.32)';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y + 1.5 * sc, 13 * sc, 6 * sc, 0, 0, Math.PI * 2);
@@ -2058,7 +2561,6 @@ export function drawCustomCreatorProp3D(
       break;
     }
 
-    // ---------------- TEMPAT DUDUK / BANGKU (5 MODEL + PROPERTI KEHIDUPAN) ----------------
     case 'bench_wood_classic':
     case 'bench_white_minimal':
     case 'bench_stone_marble':
@@ -2069,7 +2571,7 @@ export function drawCustomCreatorProp3D(
           : propModel === 'bench_stone_marble'
           ? '#e2e8f0'
           : propModel === 'bench_royal_gold'
-          ? '#dc2626' // Royal crimson velvet cushion with gold trim
+          ? '#dc2626'
           : '#d97706';
       const frameColor =
         propModel === 'bench_royal_gold'
@@ -2078,13 +2580,11 @@ export function drawCustomCreatorProp3D(
           ? '#475569'
           : '#1e293b';
 
-      // Paved stone pad under bench
       ctx.fillStyle = 'rgba(148, 163, 184, 0.45)';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y + 1.5 * sc, 16 * sc, 7 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Side flower pot next to bench (Supporting Refleksia park life)
       ctx.fillStyle = '#b45309';
       ctx.fillRect(pt.x + 13.5 * sc, pt.y - 5 * sc, 4.5 * sc, 5 * sc);
       ctx.fillStyle = '#22c55e';
@@ -2096,12 +2596,10 @@ export function drawCustomCreatorProp3D(
       ctx.arc(pt.x + 15.7 * sc, pt.y - 8.5 * sc, 1.5 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // Bench Legs & Armrests
       ctx.fillStyle = frameColor;
       ctx.fillRect(pt.x - 11 * sc, pt.y - 6 * sc, 2.5 * sc, 7 * sc);
       ctx.fillRect(pt.x + 8.5 * sc, pt.y - 6 * sc, 2.5 * sc, 7 * sc);
 
-      // Seat Planks (3D layered)
       ctx.fillStyle = seatColor;
       ctx.beginPath();
       ctx.roundRect(pt.x - 12.5 * sc, pt.y - 8.5 * sc, 25 * sc, 5 * sc, 2 * sc);
@@ -2110,14 +2608,12 @@ export function drawCustomCreatorProp3D(
       ctx.lineWidth = 1 * sc;
       ctx.stroke();
 
-      // Backrest with slat lines
       ctx.fillStyle = shadeHex(seatColor, -12);
       ctx.beginPath();
       ctx.roundRect(pt.x - 12 * sc, pt.y - 15 * sc, 24 * sc, 5.5 * sc, 2 * sc);
       ctx.fill();
       ctx.stroke();
 
-      // Open book / journal left on bench by a Refleksia citizen
       ctx.fillStyle = '#38bdf8';
       ctx.fillRect(pt.x - 7 * sc, pt.y - 8 * sc, 4.5 * sc, 3 * sc);
       ctx.fillStyle = '#ffffff';
@@ -2126,20 +2622,17 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'bench_picnic_table': {
-      // Grass/stone pad
       ctx.fillStyle = 'rgba(148, 163, 184, 0.38)';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y + 2 * sc, 19 * sc, 9 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Back & Front Benches
       ctx.fillStyle = '#92400e';
       ctx.beginPath();
       ctx.roundRect(pt.x - 15 * sc, pt.y - 10 * sc, 30 * sc, 3 * sc, 1.5 * sc);
       ctx.roundRect(pt.x - 16 * sc, pt.y - 3.5 * sc, 32 * sc, 3.5 * sc, 1.5 * sc);
       ctx.fill();
 
-      // A-Frame Legs
       ctx.strokeStyle = '#78350f';
       ctx.lineWidth = 2.4 * sc;
       ctx.beginPath();
@@ -2149,7 +2642,6 @@ export function drawCustomCreatorProp3D(
       ctx.lineTo(pt.x + 7 * sc, pt.y - 11 * sc);
       ctx.stroke();
 
-      // Main Table Top with wood plank lines
       ctx.fillStyle = '#d97706';
       ctx.beginPath();
       ctx.roundRect(pt.x - 13.5 * sc, pt.y - 12.5 * sc, 27 * sc, 6.5 * sc, 2 * sc);
@@ -2158,21 +2650,17 @@ export function drawCustomCreatorProp3D(
       ctx.lineWidth = 1 * sc;
       ctx.stroke();
 
-      // Picnic Basket & Drink Pitcher on Table
       ctx.fillStyle = '#fef3c7';
       ctx.strokeStyle = '#92400e';
       ctx.fillRect(pt.x - 6 * sc, pt.y - 15 * sc, 6 * sc, 4.2 * sc);
       ctx.strokeRect(pt.x - 6 * sc, pt.y - 15 * sc, 6 * sc, 4.2 * sc);
-      // Red checkered cloth peek
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(pt.x - 6.2 * sc, pt.y - 15.5 * sc, 6.4 * sc, 1.4 * sc);
-      // Orange juice pitcher
       ctx.fillStyle = '#fb923c';
       ctx.fillRect(pt.x + 3 * sc, pt.y - 15 * sc, 3.2 * sc, 4.2 * sc);
       break;
     }
 
-    // ---------------- AYUNAN (2 MODEL) ----------------
     case 'swing_wood_garden':
     case 'swing_cyan_modern': {
       const frameColor = propModel === 'swing_cyan_modern' ? '#0891b2' : '#92400e';
@@ -2180,37 +2668,30 @@ export function drawCustomCreatorProp3D(
       const swingSway1 = Math.sin(elapsed * 2.8 + wx) * 2.8 * sc;
       const swingSway2 = Math.sin(elapsed * 2.8 + wx + 1.4) * 2.4 * sc;
 
-      // Soft safety rubber/sand mat under swing
       ctx.fillStyle = propModel === 'swing_cyan_modern' ? 'rgba(56, 189, 248, 0.25)' : 'rgba(253, 230, 138, 0.45)';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y + 1.5 * sc, 18 * sc, 8 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Double A-frame legs (3D depth)
       ctx.strokeStyle = frameColor;
       ctx.lineWidth = 2.8 * sc;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      // Left A-frame
       ctx.moveTo(pt.x - 16 * sc, pt.y + 2 * sc);
       ctx.lineTo(pt.x - 12 * sc, pt.y - 25 * sc);
       ctx.lineTo(pt.x - 9 * sc, pt.y + 1 * sc);
-      // Right A-frame
       ctx.moveTo(pt.x + 9 * sc, pt.y + 1 * sc);
       ctx.lineTo(pt.x + 12 * sc, pt.y - 25 * sc);
       ctx.lineTo(pt.x + 16 * sc, pt.y + 2 * sc);
-      // Top crossbar
       ctx.moveTo(pt.x - 13 * sc, pt.y - 25 * sc);
       ctx.lineTo(pt.x + 13 * sc, pt.y - 25 * sc);
       ctx.stroke();
 
-      // Decorative Canopy Awning / Leaf Garland on top bar
       ctx.fillStyle = barColor;
       ctx.beginPath();
       ctx.roundRect(pt.x - 14 * sc, pt.y - 28 * sc, 28 * sc, 4 * sc, 2 * sc);
       ctx.fill();
 
-      // Two independent swinging seats with backrests
       [
         { sx: -5.5, sway: swingSway1, col: '#fbbf24' },
         { sx: 5.5, sway: swingSway2, col: '#f43f5e' },
@@ -2232,11 +2713,9 @@ export function drawCustomCreatorProp3D(
       break;
     }
 
-    // ---------------- API UNGGUN (2 MODEL + PARTIKEL BARA & KETTLE) ----------------
     case 'campfire_stone_ring':
     case 'campfire_royal_brazier': {
       if (propModel === 'campfire_royal_brazier') {
-        // Ornate pedestal & golden iron brazier bowl
         ctx.fillStyle = '#475569';
         ctx.fillRect(pt.x - 4 * sc, pt.y - 4 * sc, 8 * sc, 5 * sc);
         ctx.fillStyle = '#1e293b';
@@ -2247,12 +2726,10 @@ export function drawCustomCreatorProp3D(
         ctx.lineWidth = 2 * sc;
         ctx.stroke();
       } else {
-        // Ash bed
         ctx.fillStyle = '#334155';
         ctx.beginPath();
         ctx.ellipse(pt.x, pt.y, 10 * sc, 5 * sc, 0, 0, Math.PI * 2);
         ctx.fill();
-        // Crossed firewood logs
         ctx.strokeStyle = '#78350f';
         ctx.lineWidth = 3.2 * sc;
         ctx.lineCap = 'round';
@@ -2263,7 +2740,6 @@ export function drawCustomCreatorProp3D(
         ctx.lineTo(pt.x + 7 * sc, pt.y - 1 * sc);
         ctx.stroke();
 
-        // 10 River Stones in ring
         for (let i = 0; i < 10; i++) {
           const ang = (i / 10) * Math.PI * 2;
           ctx.fillStyle = i % 2 === 0 ? '#64748b' : '#94a3b8';
@@ -2278,7 +2754,6 @@ export function drawCustomCreatorProp3D(
           ctx.fill();
         }
 
-        // Campfire Cooking Tripod above fire
         ctx.strokeStyle = '#1e293b';
         ctx.lineWidth = 1.3 * sc;
         ctx.beginPath();
@@ -2288,7 +2763,6 @@ export function drawCustomCreatorProp3D(
         ctx.stroke();
       }
 
-      // Warm radial firelight glow on ground
       const flicker = Math.sin(elapsed * 10 + wx) * 1.8 * sc;
       const glow = ctx.createRadialGradient(pt.x, pt.y - 8 * sc, 1 * sc, pt.x, pt.y - 8 * sc, 21 * sc);
       glow.addColorStop(0, 'rgba(251, 191, 36, 0.62)');
@@ -2299,7 +2773,6 @@ export function drawCustomCreatorProp3D(
       ctx.arc(pt.x, pt.y - 8 * sc, 21 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // Outer red-orange flame
       ctx.fillStyle = '#ea580c';
       ctx.beginPath();
       ctx.moveTo(pt.x - 7 * sc, pt.y - 2 * sc);
@@ -2308,7 +2781,6 @@ export function drawCustomCreatorProp3D(
       ctx.closePath();
       ctx.fill();
 
-      // Inner bright yellow-white core flame
       ctx.fillStyle = '#fde047';
       ctx.beginPath();
       ctx.moveTo(pt.x - 4 * sc, pt.y - 2 * sc);
@@ -2317,7 +2789,6 @@ export function drawCustomCreatorProp3D(
       ctx.closePath();
       ctx.fill();
 
-      // Rising animated ember sparks
       for (let s = 0; s < 4; s++) {
         const sparkT = (elapsed * 1.6 + s * 0.25) % 1;
         const sx = pt.x + Math.sin(elapsed * 4 + s * 2) * 5 * sc;
@@ -2330,9 +2801,7 @@ export function drawCustomCreatorProp3D(
       break;
     }
 
-    // ---------------- PLAYGROUND ANAK (4 MODEL KOMPLEKS & INTERAKTIF) ----------------
     case 'playground_slide_colorful': {
-      // Soft safety rubber puzzle mat
       ctx.fillStyle = '#fef08a';
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = 1.4 * sc;
@@ -2341,12 +2810,10 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // 4 Tower Posts (Left side)
       ctx.fillStyle = '#dc2626';
       ctx.fillRect(pt.x - 14 * sc, pt.y - 24 * sc, 2.5 * sc, 24 * sc);
       ctx.fillRect(pt.x - 4.5 * sc, pt.y - 24 * sc, 2.5 * sc, 24 * sc);
 
-      // Climbing Ladder + Handrails (Left)
       ctx.strokeStyle = '#eab308';
       ctx.lineWidth = 1.8 * sc;
       for (let i = 0; i < 5; i++) {
@@ -2357,14 +2824,12 @@ export function drawCustomCreatorProp3D(
         ctx.stroke();
       }
 
-      // Platform Deck & Guardrails
       ctx.fillStyle = '#2563eb';
       ctx.fillRect(pt.x - 15 * sc, pt.y - 18.5 * sc, 13 * sc, 3.8 * sc);
       ctx.strokeStyle = '#22c55e';
       ctx.lineWidth = 1.6 * sc;
       ctx.strokeRect(pt.x - 14 * sc, pt.y - 22.5 * sc, 11 * sc, 4 * sc);
 
-      // Pitched Roof + Fluttering Pennant Flag
       ctx.fillStyle = '#facc15';
       ctx.beginPath();
       ctx.moveTo(pt.x - 8.5 * sc, pt.y - 32 * sc);
@@ -2376,7 +2841,6 @@ export function drawCustomCreatorProp3D(
       ctx.lineWidth = 1.2 * sc;
       ctx.stroke();
 
-      // Pennant flag on apex
       ctx.fillStyle = '#ec4899';
       ctx.beginPath();
       ctx.moveTo(pt.x - 8.5 * sc, pt.y - 32 * sc);
@@ -2385,7 +2849,6 @@ export function drawCustomCreatorProp3D(
       ctx.lineTo(pt.x - 8.5 * sc, pt.y - 33 * sc);
       ctx.fill();
 
-      // Curved Wave Slide Chute (3D rails + glossy slide bed)
       ctx.strokeStyle = '#0284c7';
       ctx.lineWidth = 7.2 * sc;
       ctx.lineCap = 'round';
@@ -2405,7 +2868,6 @@ export function drawCustomCreatorProp3D(
 
     case 'playground_seesaw_dual': {
       const tilt = Math.sin(elapsed * 2.5 + wx) * 4.5 * sc;
-      // Two-tone green safety pad
       ctx.fillStyle = '#dcfce7';
       ctx.strokeStyle = '#22c55e';
       ctx.lineWidth = 1.4 * sc;
@@ -2414,14 +2876,12 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // Shock absorber rubber tires under both ends
       ctx.fillStyle = '#334155';
       ctx.beginPath();
       ctx.ellipse(pt.x - 13 * sc, pt.y + 1 * sc, 3 * sc, 1.5 * sc, 0, 0, Math.PI * 2);
       ctx.ellipse(pt.x + 13 * sc, pt.y + 1 * sc, 3 * sc, 1.5 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Center Fulcrum A-frame & Heavy Spring
       ctx.fillStyle = '#2563eb';
       ctx.beginPath();
       ctx.moveTo(pt.x, pt.y - 10 * sc);
@@ -2434,7 +2894,6 @@ export function drawCustomCreatorProp3D(
       ctx.arc(pt.x, pt.y - 8.5 * sc, 2.2 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // Tilting Seesaw Beam
       ctx.strokeStyle = '#ef4444';
       ctx.lineWidth = 4 * sc;
       ctx.lineCap = 'round';
@@ -2443,7 +2902,6 @@ export function drawCustomCreatorProp3D(
       ctx.lineTo(pt.x + 16 * sc, pt.y - 8.5 * sc + tilt);
       ctx.stroke();
 
-      // Molded Ergonomic Seats with Backrests & Loop Handles
       ctx.fillStyle = '#facc15';
       ctx.fillRect(pt.x - 17 * sc, pt.y - 12 * sc - tilt, 5 * sc, 3 * sc);
       ctx.fillRect(pt.x + 12 * sc, pt.y - 12 * sc + tilt, 5 * sc, 3 * sc);
@@ -2463,7 +2921,6 @@ export function drawCustomCreatorProp3D(
       const bounce = Math.sin(elapsed * 4.5 + wy) * 2 * sc;
       const rock = Math.cos(elapsed * 4.5 + wy) * 1.2 * sc;
 
-      // Star-patterned playground safety pad
       ctx.fillStyle = '#e0f2fe';
       ctx.strokeStyle = '#0284c7';
       ctx.lineWidth = 1.5 * sc;
@@ -2472,7 +2929,6 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // Heavy steel coil spring
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = 2.4 * sc;
       ctx.beginPath();
@@ -2483,18 +2939,15 @@ export function drawCustomCreatorProp3D(
       ctx.lineTo(pt.x + rock, pt.y - 12 * sc + bounce);
       ctx.stroke();
 
-      // Detailed Pony Rider Body, Mane, Tail, Saddle & Handles
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
       ctx.ellipse(pt.x + rock, pt.y - 14 * sc + bounce, 7.5 * sc, 4.2 * sc, 0, 0, Math.PI * 2);
       ctx.arc(pt.x + 6 * sc + rock, pt.y - 19 * sc + bounce, 3.8 * sc, 0, Math.PI * 2);
       ctx.fill();
-      // White flowing tail & mane
       ctx.fillStyle = '#fef3c7';
       ctx.beginPath();
       ctx.ellipse(pt.x - 7.5 * sc + rock, pt.y - 15 * sc + bounce, 3 * sc, 1.6 * sc, -0.4, 0, Math.PI * 2);
       ctx.fill();
-      // Red saddle & blue handlebar
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(pt.x - 3 * sc + rock, pt.y - 17 * sc + bounce, 5.5 * sc, 2.8 * sc);
       ctx.strokeStyle = '#2563eb';
@@ -2507,7 +2960,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'playground_combo_castle': {
-      // Grand Playground Safety Mulch Arena
       ctx.fillStyle = '#fef3c7';
       ctx.strokeStyle = '#d97706';
       ctx.lineWidth = 1.5 * sc;
@@ -2516,19 +2968,16 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // Left & Right Castle Play Towers with Windows & Flags
       [
         { tx: -11, col: '#2563eb', roof: '#ef4444' },
         { tx: 7, col: '#059669', roof: '#f59e0b' },
       ].forEach(({ tx, col, roof }) => {
         ctx.fillStyle = col;
         ctx.fillRect(pt.x + tx * sc, pt.y - 23 * sc, 9 * sc, 21 * sc);
-        // Round castle window
         ctx.fillStyle = '#fef08a';
         ctx.beginPath();
         ctx.arc(pt.x + (tx + 4.5) * sc, pt.y - 17 * sc, 2.2 * sc, 0, Math.PI * 2);
         ctx.fill();
-        // Pyramid Castle Roof
         ctx.fillStyle = roof;
         ctx.beginPath();
         ctx.moveTo(pt.x + (tx + 4.5) * sc, pt.y - 33 * sc);
@@ -2536,19 +2985,16 @@ export function drawCustomCreatorProp3D(
         ctx.lineTo(pt.x + (tx + 11) * sc, pt.y - 23 * sc);
         ctx.closePath();
         ctx.fill();
-        // Flag on top
         ctx.fillStyle = '#ec4899';
         ctx.fillRect(pt.x + (tx + 4.5) * sc, pt.y - 37 * sc, 4.5 * sc, 2.5 * sc);
       });
 
-      // Suspension Rope Bridge connecting the two towers
       ctx.fillStyle = '#b45309';
       ctx.fillRect(pt.x - 2 * sc, pt.y - 14.5 * sc, 9 * sc, 3.5 * sc);
       ctx.strokeStyle = '#fde047';
       ctx.lineWidth = 1.2 * sc;
       ctx.strokeRect(pt.x - 2 * sc, pt.y - 18 * sc, 9 * sc, 3.5 * sc);
 
-      // Dual Slides (Left Yellow Wave Slide + Right Cyan Tube Slide)
       ctx.strokeStyle = '#facc15';
       ctx.lineWidth = 5 * sc;
       ctx.lineCap = 'round';
@@ -2566,7 +3012,6 @@ export function drawCustomCreatorProp3D(
       break;
     }
 
-    // ---------------- LAPANGAN OLAHRAGA & HAMPARAN TERBUKA (4 MODEL SUPER DETAIL) ----------------
     case 'court_basketball_full':
     case 'court_futsal_green':
     case 'court_badminton_pro':
@@ -2582,7 +3027,6 @@ export function drawCustomCreatorProp3D(
       const midW = { x: (cNW.x + cSW.x) * 0.5, y: (cNW.y + cSW.y) * 0.5 };
       const midE = { x: (cNE.x + cSE.x) * 0.5, y: (cNE.y + cSE.y) * 0.5 };
 
-      // Helper for bilinear interpolation on the isometric court surface (u: 0..1 W->E, v: 0..1 N->S)
       const courtPt = (u: number, v: number) => {
         const topX = cNW.x + (cNE.x - cNW.x) * u;
         const topY = cNW.y + (cNE.y - cNW.y) * u;
@@ -2594,7 +3038,6 @@ export function drawCustomCreatorProp3D(
         };
       };
 
-      // Outer Concrete Apron / Perimeter Border
       const apNW = project(wx - halfW * 1.08, wy - halfH * 1.08, 0.005);
       const apNE = project(wx + halfW * 1.08, wy - halfH * 1.08, 0.005);
       const apSE = project(wx + halfW * 1.08, wy + halfH * 1.08, 0.005);
@@ -2608,18 +3051,17 @@ export function drawCustomCreatorProp3D(
       ctx.closePath();
       ctx.fill();
 
-      // Main Court Surface Polygon
       if (propModel === 'court_basketball_full') {
-        ctx.fillStyle = '#c2410c'; // Streetball terracotta court
+        ctx.fillStyle = '#c2410c';
         ctx.strokeStyle = '#ffffff';
       } else if (propModel === 'court_futsal_green') {
-        ctx.fillStyle = '#15803d'; // Futsal synthetic turf
+        ctx.fillStyle = '#15803d';
         ctx.strokeStyle = '#ffffff';
       } else if (propModel === 'court_badminton_pro') {
-        ctx.fillStyle = '#0f766e'; // Pro BWF tournament mat
+        ctx.fillStyle = '#0f766e';
         ctx.strokeStyle = '#ffffff';
       } else {
-        ctx.fillStyle = '#4ade80'; // Lush open green meadow
+        ctx.fillStyle = '#4ade80';
         ctx.strokeStyle = '#22c55e';
       }
 
@@ -2633,7 +3075,6 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // Alternating mowed turf stripes for Futsal & Open Green Field
       if (propModel === 'court_futsal_green' || propModel === 'open_green_field') {
         ctx.fillStyle =
           propModel === 'court_futsal_green'
@@ -2657,14 +3098,12 @@ export function drawCustomCreatorProp3D(
       }
 
       if (propModel === 'open_green_field') {
-        // Corner wildflower patches, picnic blanket & fluttering community flags
         [cNW, cNE, cSE, cSW].forEach((corner, i) => {
           ctx.fillStyle = i % 2 === 0 ? '#facc15' : '#f472b6';
           ctx.beginPath();
           ctx.arc(corner.x, corner.y, 3 * sc, 0, Math.PI * 2);
           ctx.fill();
         });
-        // Picnic blanket in meadow
         const picP = courtPt(0.32, 0.55);
         ctx.fillStyle = '#ef4444';
         ctx.beginPath();
@@ -2675,7 +3114,6 @@ export function drawCustomCreatorProp3D(
         ctx.ellipse(picP.x, picP.y, 4 * sc, 2 * sc, 0.2, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        // Center line & Center circle for sports courts
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
         ctx.lineWidth = 1.5 * sc;
         ctx.beginPath();
@@ -2692,9 +3130,7 @@ export function drawCustomCreatorProp3D(
         ctx.stroke();
       }
 
-      // SPORT-SPECIFIC COURT LINES, 3D FIXTURES & LIVE BALL ANIMATIONS
       if (propModel === 'court_basketball_full') {
-        // Left & Right Key Lanes (Blue Paint)
         [
           [0, 0.22],
           [0.78, 1.0],
@@ -2716,7 +3152,6 @@ export function drawCustomCreatorProp3D(
           ctx.stroke();
         });
 
-        // Left & Right 3D Basketball Hoops (Padded Stanchion + Glass Backboard + Rim + Net)
         [midW, midE].forEach((hoopBase, idx) => {
           ctx.strokeStyle = '#1e293b';
           ctx.lineWidth = 2.8 * sc;
@@ -2725,31 +3160,20 @@ export function drawCustomCreatorProp3D(
           ctx.lineTo(hoopBase.x, hoopBase.y - 23 * sc);
           ctx.stroke();
 
-          // Tempered glass backboard with shooter's square
           ctx.fillStyle = 'rgba(248, 250, 252, 0.92)';
           ctx.strokeStyle = '#ef4444';
           ctx.lineWidth = 1.2 * sc;
           ctx.fillRect(hoopBase.x - 5 * sc, hoopBase.y - 27 * sc, 10 * sc, 6.5 * sc);
           ctx.strokeRect(hoopBase.x - 5 * sc, hoopBase.y - 27 * sc, 10 * sc, 6.5 * sc);
 
-          // Orange rim & white net mesh
           const rimOffset = idx === 0 ? 3.2 * sc : -3.2 * sc;
           ctx.strokeStyle = '#ea580c';
           ctx.lineWidth = 1.7 * sc;
           ctx.beginPath();
           ctx.ellipse(hoopBase.x + rimOffset, hoopBase.y - 20.5 * sc, 3.4 * sc, 1.7 * sc, 0, 0, Math.PI * 2);
           ctx.stroke();
-          ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-          ctx.lineWidth = 0.9 * sc;
-          ctx.beginPath();
-          ctx.moveTo(hoopBase.x + rimOffset - 2.5 * sc, hoopBase.y - 20 * sc);
-          ctx.lineTo(hoopBase.x + rimOffset - 1.5 * sc, hoopBase.y - 16 * sc);
-          ctx.moveTo(hoopBase.x + rimOffset + 2.5 * sc, hoopBase.y - 20 * sc);
-          ctx.lineTo(hoopBase.x + rimOffset + 1.5 * sc, hoopBase.y - 16 * sc);
-          ctx.stroke();
         });
 
-        // Sideline Digital Scoreboard
         ctx.fillStyle = '#0f172a';
         ctx.strokeStyle = '#facc15';
         ctx.lineWidth = 1.1 * sc;
@@ -2760,7 +3184,6 @@ export function drawCustomCreatorProp3D(
         ctx.textAlign = 'center';
         ctx.fillText('88 : 86', midN.x, midN.y - 8 * sc);
 
-        // Animated Bouncing Basketball on Court!
         const bPhase = (elapsed * 0.9) % 1;
         const bPos = courtPt(0.35 + Math.sin(elapsed * 1.4) * 0.25, 0.5);
         const bJump = Math.abs(Math.sin(bPhase * Math.PI * 2)) * 12 * sc;
@@ -2769,7 +3192,6 @@ export function drawCustomCreatorProp3D(
         ctx.arc(bPos.x, bPos.y - 3 * sc - bJump, 3 * sc, 0, Math.PI * 2);
         ctx.fill();
       } else if (propModel === 'court_futsal_green') {
-        // Penalty boxes on both ends
         [
           [0, 0.18],
           [0.82, 1.0],
@@ -2788,7 +3210,6 @@ export function drawCustomCreatorProp3D(
           ctx.stroke();
         });
 
-        // Left & Right 3D Futsal Goalposts with Netting
         [midW, midE].forEach((goalBase) => {
           ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
           ctx.beginPath();
@@ -2804,7 +3225,6 @@ export function drawCustomCreatorProp3D(
           ctx.stroke();
         });
 
-        // Animated Rolling Futsal Ball
         const ballPos = courtPt(0.5 + Math.sin(elapsed * 2.1) * 0.32, 0.5 + Math.cos(elapsed * 1.5) * 0.22);
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = '#0f172a';
@@ -2814,7 +3234,6 @@ export function drawCustomCreatorProp3D(
         ctx.fill();
         ctx.stroke();
       } else if (propModel === 'court_badminton_pro') {
-        // Short & Long Service Lines for Badminton
         [0.15, 0.36, 0.64, 0.85].forEach((uLine) => {
           const s0 = courtPt(uLine, 0);
           const s1 = courtPt(uLine, 1);
@@ -2826,7 +3245,6 @@ export function drawCustomCreatorProp3D(
           ctx.stroke();
         });
 
-        // Center Badminton Net & Posts
         ctx.strokeStyle = '#f8fafc';
         ctx.lineWidth = 2 * sc;
         ctx.beginPath();
@@ -2836,7 +3254,6 @@ export function drawCustomCreatorProp3D(
         ctx.lineTo(midS.x, midS.y - 12 * sc);
         ctx.stroke();
 
-        // Net mesh between midN and midS
         ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
         ctx.beginPath();
         ctx.moveTo(midN.x, midN.y - 11 * sc);
@@ -2852,9 +3269,8 @@ export function drawCustomCreatorProp3D(
         ctx.lineTo(midS.x, midS.y - 11 * sc);
         ctx.stroke();
 
-        // Animated Shuttlecock (Kok) arcing back and forth over the net!
         const shuttleU = 0.5 + Math.sin(elapsed * 2.8) * 0.28;
-        const shuttleArc = Math.cos( (shuttleU - 0.5) * Math.PI * 1.6 ) * 15 * sc;
+        const shuttleArc = Math.cos((shuttleU - 0.5) * Math.PI * 1.6) * 15 * sc;
         const sPt = courtPt(shuttleU, 0.5);
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
@@ -2864,9 +3280,7 @@ export function drawCustomCreatorProp3D(
       break;
     }
 
-    // ---------------- SEMAK & TANAMAN HIAS (5 MODEL) ----------------
     case 'shrub_flowering_azalea': {
-      // Stone garden border
       ctx.fillStyle = '#94a3b8';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y + 1 * sc, 13 * sc, 5.5 * sc, 0, 0, Math.PI * 2);
@@ -2900,7 +3314,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'shrub_topiary_spiral': {
-      // Ornate Terracotta Planter Box with Gold Band
       ctx.fillStyle = '#b45309';
       ctx.fillRect(pt.x - 6 * sc, pt.y - 8 * sc, 12 * sc, 8 * sc);
       ctx.fillStyle = '#fbbf24';
@@ -2908,11 +3321,9 @@ export function drawCustomCreatorProp3D(
       ctx.fillStyle = '#d97706';
       ctx.fillRect(pt.x - 7 * sc, pt.y - 9.5 * sc, 14 * sc, 2.2 * sc);
 
-      // Central wood stem
       ctx.fillStyle = '#78350f';
       ctx.fillRect(pt.x - 1.2 * sc, pt.y - 28 * sc, 2.4 * sc, 20 * sc);
 
-      // 3-tier manicured topiary spheres with highlight
       [
         { y: -13.5, r: 7.5, c: '#15803d', hi: '#22c55e' },
         { y: -21.5, r: 5.6, c: '#16a34a', hi: '#4ade80' },
@@ -2931,7 +3342,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'plant_monstera_pot': {
-      // Ribbed White Ceramic Designer Pot + Wood Stand
       ctx.fillStyle = '#92400e';
       ctx.fillRect(pt.x - 4.5 * sc, pt.y - 2 * sc, 2 * sc, 3 * sc);
       ctx.fillRect(pt.x + 2.5 * sc, pt.y - 2 * sc, 2 * sc, 3 * sc);
@@ -2943,7 +3353,6 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // Broad tropical monstera leaves
       const leaves = [
         [-9, -15, -0.5],
         [9, -15, 0.5],
@@ -2976,7 +3385,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'plant_flower_bed_trio': {
-      // Raised Timber Planter Box
       ctx.fillStyle = '#78350f';
       ctx.strokeStyle = '#451a03';
       ctx.lineWidth = 1 * sc;
@@ -2984,10 +3392,8 @@ export function drawCustomCreatorProp3D(
       ctx.roundRect(pt.x - 15 * sc, pt.y - 6.5 * sc, 30 * sc, 7 * sc, 2 * sc);
       ctx.fill();
       ctx.stroke();
-      // Rich foliage bed
       ctx.fillStyle = '#15803d';
       ctx.fillRect(pt.x - 13.5 * sc, pt.y - 9 * sc, 27 * sc, 3.5 * sc);
-      // Colorful Tulip & Marigold Blooms
       const bedColors = ['#facc15', '#f43f5e', '#a855f7', '#38bdf8', '#fb923c', '#ec4899'];
       bedColors.forEach((col, i) => {
         const fx = pt.x + (-11 + i * 4.4) * sc;
@@ -3000,7 +3406,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'shrub_bamboo_zen': {
-      // White Zen gravel & mossy river stones
       ctx.fillStyle = '#e2e8f0';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y + 1 * sc, 12 * sc, 5 * sc, 0, 0, Math.PI * 2);
@@ -3011,7 +3416,6 @@ export function drawCustomCreatorProp3D(
       ctx.arc(pt.x + 5 * sc, pt.y - 1 * sc, 3 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // 5 Segmented Bamboo Stalks with nodes & leaves
       [-7, -3.5, 0, 3.5, 7].forEach((bx, i) => {
         const h = (24 + (i % 3) * 4) * sc;
         ctx.strokeStyle = i % 2 === 0 ? '#16a34a' : '#15803d';
@@ -3037,9 +3441,7 @@ export function drawCustomCreatorProp3D(
       break;
     }
 
-    // ---------------- KOLAM, AIR MANCUR & ELEMEN AIR (4 MODEL HIDUP) ----------------
     case 'water_fountain_tiered': {
-      // Sculpted Marble Basin
       ctx.fillStyle = '#cbd5e1';
       ctx.strokeStyle = '#64748b';
       ctx.lineWidth = 1.8 * sc;
@@ -3048,7 +3450,6 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // Sparkling Blue Water + Expanding Ripple Ring
       ctx.fillStyle = '#0284c7';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y - 1 * sc, 17.5 * sc, 8.5 * sc, 0, 0, Math.PI * 2);
@@ -3061,7 +3462,6 @@ export function drawCustomCreatorProp3D(
       ctx.ellipse(pt.x, pt.y - 1 * sc, ripR, ripR * 0.48, 0, 0, Math.PI * 2);
       ctx.stroke();
 
-      // 3-Tier Marble Pedestal & Bowls
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(pt.x - 3.2 * sc, pt.y - 24 * sc, 6.4 * sc, 23 * sc);
       ctx.beginPath();
@@ -3069,7 +3469,6 @@ export function drawCustomCreatorProp3D(
       ctx.ellipse(pt.x, pt.y - 18 * sc, 7 * sc, 3.2 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Animated Water Arcs Spraying from Crown
       const sprayH = (28 + Math.sin(elapsed * 8) * 2.5) * sc;
       ctx.strokeStyle = '#e0f2fe';
       ctx.lineWidth = 1.7 * sc;
@@ -3083,19 +3482,16 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'water_koi_pond_lotus': {
-      // Natural Mossy Boulder Rim
       ctx.fillStyle = '#64748b';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y, 22 * sc, 11 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Deep Aqua Koi Pond Water
       ctx.fillStyle = '#0369a1';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y - 0.5 * sc, 19 * sc, 9.2 * sc, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 3 Swimming Koi Fish (Orange Kohaku, Gold Ogon, White-Red Sanke)
       const koiPalette = ['#f97316', '#facc15', '#f8fafc'];
       koiPalette.forEach((kCol, idx) => {
         const koiAng = elapsed * (1.2 + idx * 0.25) + idx * 2.1;
@@ -3109,7 +3505,6 @@ export function drawCustomCreatorProp3D(
         ctx.fill();
       });
 
-      // Green Lily Pads & Blooming Pink Lotus Flowers
       [
         [-8, -2.5],
         [7, 2.5],
@@ -3131,7 +3526,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'water_mini_waterfall': {
-      // Plunge Pool with Stone Rim
       ctx.fillStyle = '#0284c7';
       ctx.strokeStyle = '#475569';
       ctx.lineWidth = 2.2 * sc;
@@ -3140,7 +3534,6 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // Multi-tiered Slate Cliff Rocks + Moss Tufts
       ctx.fillStyle = '#475569';
       ctx.beginPath();
       ctx.arc(pt.x - 7 * sc, pt.y - 12 * sc, 8.5 * sc, 0, Math.PI * 2);
@@ -3153,11 +3546,10 @@ export function drawCustomCreatorProp3D(
       ctx.arc(pt.x + 8 * sc, pt.y - 16 * sc, 3.2 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // Cascading Waterfall Stream + Splash Mist
       ctx.fillStyle = '#38bdf8';
       ctx.fillRect(pt.x - 5 * sc, pt.y - 21 * sc, 10 * sc, 20 * sc);
       for (let f = 0; f < 3; f++) {
-        const foamOffset = ((elapsed * 16 + f * 6) % 18);
+        const foamOffset = (elapsed * 16 + f * 6) % 18;
         ctx.strokeStyle = '#e0f2fe';
         ctx.lineWidth = 1.5 * sc;
         ctx.beginPath();
@@ -3165,7 +3557,6 @@ export function drawCustomCreatorProp3D(
         ctx.lineTo(pt.x + 3.8 * sc, pt.y - (19 - foamOffset) * sc);
         ctx.stroke();
       }
-      // White splash foam at base of waterfall
       ctx.fillStyle = 'rgba(240, 249, 255, 0.85)';
       ctx.beginPath();
       ctx.ellipse(pt.x, pt.y - 0.5 * sc, (6 + Math.sin(elapsed * 9) * 1.5) * sc, 2.5 * sc, 0, 0, Math.PI * 2);
@@ -3174,7 +3565,6 @@ export function drawCustomCreatorProp3D(
     }
 
     case 'water_dancing_jets': {
-      // Illuminated Granite Plaza Pad
       ctx.fillStyle = '#1e293b';
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 1.6 * sc;
@@ -3183,10 +3573,8 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       ctx.stroke();
 
-      // 7 Choreographed Dancing Water Jets with LED Glow
       [-12, -8, -4, 0, 4, 8, 12].forEach((jx, idx) => {
         const jh = (8 + Math.abs(Math.sin(elapsed * 4.5 + idx * 0.75)) * 18) * sc;
-        // LED base ring
         ctx.fillStyle = idx % 2 === 0 ? '#38bdf8' : '#f472b6';
         ctx.beginPath();
         ctx.arc(pt.x + jx * sc, pt.y, 1.8 * sc, 0, Math.PI * 2);
@@ -3208,7 +3596,7 @@ export function drawCustomCreatorProp3D(
 }
 
 // ============================================================================
-// 5. CUSTOM ANIMALS + ACTIVITY & TIME CYCLES (10 DETAILED SPECIES)
+// 5. CUSTOM ANIMALS + ACTIVITY & TIME CYCLES
 // ============================================================================
 export function computeCreatorAnimalLivePose(
   animal: CreatorAnimalItem,
@@ -3366,7 +3754,6 @@ export function drawCustomCreatorAnimal3D(
     ctx.setLineDash([]);
   }
 
-  // Ground shadow
   ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
   ctx.beginPath();
   ctx.ellipse(pt.x, pt.y + 1.5 * sc, 8 * sc, 3.8 * sc, 0, 0, Math.PI * 2);
@@ -3385,7 +3772,6 @@ export function drawCustomCreatorAnimal3D(
           : animal.species === 'deer_doe'
           ? '#c2410c'
           : '#b45309';
-      // 4 Animated Legs
       ctx.strokeStyle = '#451a03';
       ctx.lineWidth = 1.5 * sc;
       ctx.beginPath();
@@ -3399,7 +3785,6 @@ export function drawCustomCreatorAnimal3D(
       ctx.lineTo(4.5 * sc + stepLeg, 1 * sc);
       ctx.stroke();
 
-      // Body & White Tail
       ctx.fillStyle = coat;
       ctx.beginPath();
       ctx.ellipse(0, -6.8 * sc, 6.8 * sc, 4 * sc, 0, 0, Math.PI * 2);
@@ -3409,7 +3794,6 @@ export function drawCustomCreatorAnimal3D(
       ctx.arc(-6.5 * sc, -7.8 * sc, 1.6 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // White spots on deer_doe
       if (animal.species === 'deer_doe') {
         ctx.fillStyle = '#ffedd5';
         [
@@ -3423,7 +3807,6 @@ export function drawCustomCreatorAnimal3D(
         });
       }
 
-      // Neck, Head, Eye & Ear
       ctx.fillStyle = coat;
       ctx.beginPath();
       ctx.arc(5.8 * sc, -10.8 * sc + headGraze, 3 * sc, 0, Math.PI * 2);
@@ -3433,7 +3816,6 @@ export function drawCustomCreatorAnimal3D(
       ctx.arc(6.8 * sc, -11.2 * sc + headGraze, 0.8 * sc, 0, Math.PI * 2);
       ctx.fill();
 
-      // Branched Golden Antlers for Stag
       if (animal.species === 'deer_stag') {
         ctx.strokeStyle = '#fde68a';
         ctx.lineWidth = 1.3 * sc;
@@ -3450,20 +3832,17 @@ export function drawCustomCreatorAnimal3D(
     }
 
     case 'rabbit': {
-      // Fluffy Cotton Tail + Plump Body + Head + Eye + Pink Ears
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.arc(-5 * sc, -4 * sc, 1.8 * sc, 0, Math.PI * 2);
       ctx.ellipse(0, -4.5 * sc, 5 * sc, 3.5 * sc, 0, 0, Math.PI * 2);
       ctx.arc(4.2 * sc, -6.8 * sc + headGraze * 0.6, 2.7 * sc, 0, Math.PI * 2);
       ctx.fill();
-      // Long ears
       ctx.fillStyle = '#fbcfe8';
       ctx.beginPath();
       ctx.ellipse(3.5 * sc, -11 * sc + headGraze * 0.6, 1.1 * sc, 3.2 * sc, -0.2, 0, Math.PI * 2);
       ctx.ellipse(4.8 * sc, -10.8 * sc + headGraze * 0.6, 1.1 * sc, 3 * sc, 0.15, 0, Math.PI * 2);
       ctx.fill();
-      // Ruby/dark eye
       ctx.fillStyle = '#e11d48';
       ctx.beginPath();
       ctx.arc(5.2 * sc, -7.2 * sc + headGraze * 0.6, 0.7 * sc, 0, Math.PI * 2);
@@ -3480,7 +3859,6 @@ export function drawCustomCreatorAnimal3D(
           : animal.species === 'cat'
           ? '#f59e0b'
           : '#b45309';
-      // Animated wagging bushy tail (with white tip for fox)
       const tailWag = Math.sin(elapsedSec * 5) * 0.15;
       ctx.fillStyle = shadeHex(bodyCol, -12);
       ctx.beginPath();
@@ -3492,7 +3870,6 @@ export function drawCustomCreatorAnimal3D(
         ctx.arc(-8.5 * sc, -8.5 * sc, 1.8 * sc, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Legs
       ctx.strokeStyle = shadeHex(bodyCol, -35);
       ctx.lineWidth = 1.4 * sc;
       ctx.beginPath();
@@ -3502,19 +3879,16 @@ export function drawCustomCreatorAnimal3D(
       ctx.lineTo(3 * sc + stepLeg, 1 * sc);
       ctx.stroke();
 
-      // Body, Head, Pointed Ears & Eye
       ctx.fillStyle = bodyCol;
       ctx.beginPath();
       ctx.ellipse(0, -4.8 * sc, 5.4 * sc, 3.3 * sc, 0, 0, Math.PI * 2);
       ctx.arc(4.6 * sc, -7.2 * sc + headGraze * 0.6, 2.8 * sc, 0, Math.PI * 2);
       ctx.fill();
-      // Ears
       ctx.beginPath();
       ctx.moveTo(3.5 * sc, -9 * sc + headGraze * 0.6);
       ctx.lineTo(4.2 * sc, -11.8 * sc + headGraze * 0.6);
       ctx.lineTo(5.2 * sc, -9 * sc + headGraze * 0.6);
       ctx.fill();
-      // Eye
       ctx.fillStyle = '#0f172a';
       ctx.beginPath();
       ctx.arc(5.6 * sc, -7.6 * sc + headGraze * 0.6, 0.7 * sc, 0, Math.PI * 2);
@@ -3525,7 +3899,6 @@ export function drawCustomCreatorAnimal3D(
     case 'swan':
     case 'ground_bird': {
       const birdCol = animal.species === 'swan' ? '#ffffff' : '#38bdf8';
-      // Body & folded wing
       ctx.fillStyle = birdCol;
       ctx.beginPath();
       ctx.ellipse(0, -4.6 * sc, 5.2 * sc, 3.3 * sc, 0, 0, Math.PI * 2);
@@ -3535,7 +3908,6 @@ export function drawCustomCreatorAnimal3D(
       ctx.beginPath();
       ctx.ellipse(-0.5 * sc, -4.8 * sc, 3.2 * sc, 1.8 * sc, -0.15, 0, Math.PI * 2);
       ctx.fill();
-      // Beak
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
       ctx.moveTo(6.2 * sc, -8.7 * sc + headGraze * 0.5);
@@ -3565,7 +3937,6 @@ export function drawCustomCreatorAnimal3D(
 
   ctx.restore();
 
-  // Floating Animal Name & Cycle Badge
   if (isSelectedInStudio || pose.isSleeping || pose.isFeeding) {
     ctx.save();
     const labelText = `${animal.name} • ${pose.cycleBadge}`;
@@ -3587,9 +3958,12 @@ export function drawCustomCreatorAnimal3D(
 }
 
 // ============================================================================
-// 6. CUSTOM TERRAIN / ROAD TILE OVERRIDE RENDERER
-//    (SUPPORTS HIGH-RESOLUTION AFFINE TEXTURE MAPPING FROM REFERENCE IMAGE)
+// 6. ULTRA-DETAILED TERRAIN & SMART ROAD / JUNCTION / TURN RENDERER
 // ============================================================================
+function isRoadType(t?: CreatorTerrainType): boolean {
+  return Boolean(t && t.startsWith('road_asphalt'));
+}
+
 export function drawCustomCreatorTerrainTile(
   ctx: CanvasRenderingContext2D,
   pN: { x: number; y: number },
@@ -3598,214 +3972,565 @@ export function drawCustomCreatorTerrainTile(
   pW: { x: number; y: number },
   terrainType: CreatorTerrainType,
   isNight: boolean,
-  elapsedSec: number
+  elapsedSec: number,
+  gx: number = 0,
+  gy: number = 0,
+  allTerrainTiles?: Record<string, CreatorTerrainTile>
 ) {
   const cx = (pN.x + pS.x) * 0.5;
   const cy = (pE.y + pW.y) * 0.5;
 
-  let fill = '#22c55e';
-  let stroke = '#16a34a';
+  // Bilinear interpolation across the isometric diamond tile:
+  // u in [0,1] goes from West (-X, pN->pW) to East (+X, pE->pS)
+  // v in [0,1] goes from North (-Y, pN->pE) to South (+Y, pW->pS)
+  const tilePt = (u: number, v: number) => {
+    const northX = pN.x + (pE.x - pN.x) * u;
+    const northY = pN.y + (pE.y - pN.y) * u;
+    const southX = pW.x + (pS.x - pW.x) * u;
+    const southY = pW.y + (pS.y - pW.y) * u;
+    return {
+      x: northX + (southX - northX) * v,
+      y: northY + (southY - northY) * v,
+    };
+  };
 
-  switch (terrainType) {
-    case 'road_asphalt':
-      fill = isNight ? '#1e293b' : '#334155';
-      stroke = isNight ? '#334155' : '#475569';
-      break;
-    case 'road_cobble':
-      fill = isNight ? '#475569' : '#94a3b8';
-      stroke = isNight ? '#334155' : '#64748b';
-      break;
-    case 'road_dirt':
-      fill = isNight ? '#78350f' : '#d97706';
-      stroke = isNight ? '#451a03' : '#b45309';
-      break;
-    case 'wood_deck':
-      fill = isNight ? '#713f12' : '#b45309';
-      stroke = isNight ? '#451a03' : '#78350f';
-      break;
-    case 'plaza_marble':
-      fill = isNight ? '#cbd5e1' : '#f8fafc';
-      stroke = isNight ? '#94a3b8' : '#cbd5e1';
-      break;
-    case 'sand_golden':
-      fill = isNight ? '#a16207' : '#fde047';
-      stroke = isNight ? '#854d0e' : '#facc15';
-      break;
-    case 'flower_garden':
-      fill = isNight ? '#065f46' : '#22c55e';
-      stroke = isNight ? '#047857' : '#16a34a';
-      break;
-    case 'grass_emerald':
-      fill = isNight ? '#047857' : '#4ade80';
-      stroke = isNight ? '#065f46' : '#22c55e';
-      break;
-    case 'grass_open_meadow':
-      fill = isNight ? '#15803d' : '#86efac';
-      stroke = isNight ? '#166534' : '#4ade80';
-      break;
-    case 'water_pond':
-      fill = isNight ? '#0369a1' : '#38bdf8';
-      stroke = isNight ? '#0284c7' : '#0ea5e9';
-      break;
-    case 'img_paving_herringbone_red':
-      fill = isNight ? '#7f1d1d' : '#b45346';
-      stroke = '#57534e';
-      break;
-    case 'img_paving_basketweave_brown':
-      fill = isNight ? '#78350f' : '#9a6b47';
-      stroke = '#5c4028';
-      break;
-    case 'img_paving_herringbone_grey':
-      fill = isNight ? '#64748b' : '#c7c6c1';
-      stroke = '#78716c';
-      break;
-    case 'img_paving_hex_blue':
-      fill = isNight ? '#475569' : '#93afd3';
-      stroke = '#7c5836';
-      break;
-    case 'img_stone_river_grey':
-      fill = isNight ? '#44403c' : '#787572';
-      stroke = '#57534e';
-      break;
-    case 'img_stone_pebble_cream':
-      fill = isNight ? '#a8a29e' : '#f3dfa8';
-      stroke = '#c2b280';
-      break;
-    case 'img_stone_flagstone_brown':
-      fill = isNight ? '#57534e' : '#735742';
-      stroke = '#453222';
-      break;
-    case 'img_tile_dotted_grey':
-      fill = isNight ? '#475569' : '#94999c';
-      stroke = '#52525b';
-      break;
-    case 'img_brick_running_pastel':
-      fill = isNight ? '#78716c' : '#cbb89d';
-      stroke = '#57534e';
-      break;
-    case 'img_paving_parquet_taupe':
-      fill = isNight ? '#78716c' : '#b89f8d';
-      stroke = '#57534e';
-      break;
-    case 'img_wood_plank_terracotta':
-      fill = isNight ? '#9a3412' : '#c87d44';
-      stroke = '#7c2d12';
-      break;
-    case 'img_brick_checker_red':
-      fill = isNight ? '#7f1d1d' : '#a94e45';
-      stroke = '#57534e';
-      break;
-    case 'img_cobble_rounded_cream':
-      fill = isNight ? '#57534e' : '#7c624c';
-      stroke = '#44403c';
-      break;
-    case 'img_brick_classic_orange':
-      fill = isNight ? '#9a3412' : '#e07a2a';
-      stroke = '#7c2d12';
-      break;
-    case 'img_paving_lattice_red':
-      fill = isNight ? '#7f1d1d' : '#a85148';
-      stroke = '#57534e';
-      break;
-    case 'img_tile_diamond_gold':
-      fill = isNight ? '#a16207' : '#ebd086';
-      stroke = '#785c2a';
-      break;
-  }
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(pN.x, pN.y);
-  ctx.lineTo(pE.x, pE.y);
-  ctx.lineTo(pS.x, pS.y);
-  ctx.lineTo(pW.x, pW.y);
-  ctx.closePath();
-
-  // Check if this tile belongs to the 16 Reference Image Textures and can be affine-mapped
-  const gridCell = TERRAIN_SPRITE_GRID_MAP[terrainType];
-  const atlas = gridCell ? getTerrainAtlasImage() : null;
-
-  if (gridCell && atlas && atlas.naturalWidth > 0) {
-    ctx.save();
-    ctx.clip();
-
-    // Map unit square [0,1]x[0,1] to isometric diamond (pN -> pE, pN -> pW)
-    const ux = pE.x - pN.x;
-    const uy = pE.y - pN.y;
-    const vx = pW.x - pN.x;
-    const vy = pW.y - pN.y;
-    ctx.transform(ux, uy, vx, vy, pN.x, pN.y);
-
-    const colSpec = COL_CROP_NORM[gridCell.col];
-    const rowSpec = ROW_CROP_NORM[gridCell.row];
-    const sx = colSpec.start * atlas.naturalWidth;
-    const sy = rowSpec.start * atlas.naturalHeight;
-    const sw = colSpec.size * atlas.naturalWidth;
-    const sh = rowSpec.size * atlas.naturalHeight;
-
-    ctx.drawImage(atlas, sx, sy, sw, sh, 0, 0, 1, 1);
-
-    if (isNight) {
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
-      ctx.fillRect(0, 0, 1, 1);
+  const fillIsoQuad = (u0: number, v0: number, u1: number, v1: number, color: string, strokeCol?: string) => {
+    const q0 = tilePt(u0, v0);
+    const q1 = tilePt(u1, v0);
+    const q2 = tilePt(u1, v1);
+    const q3 = tilePt(u0, v1);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(q0.x, q0.y);
+    ctx.lineTo(q1.x, q1.y);
+    ctx.lineTo(q2.x, q2.y);
+    ctx.lineTo(q3.x, q3.y);
+    ctx.closePath();
+    ctx.fill();
+    if (strokeCol) {
+      ctx.strokeStyle = strokeCol;
+      ctx.lineWidth = 0.65;
+      ctx.stroke();
     }
-    ctx.restore();
+  };
 
-    ctx.strokeStyle = stroke;
+  // 1. Check if this tile belongs to the 16 Reference Image Textures
+  const gridCell = TERRAIN_SPRITE_GRID_MAP[terrainType];
+  if (gridCell) {
+    const atlas = getTerrainAtlasImage();
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pN.x, pN.y);
+    ctx.lineTo(pE.x, pE.y);
+    ctx.lineTo(pS.x, pS.y);
+    ctx.lineTo(pW.x, pW.y);
+    ctx.closePath();
+
+    if (atlas && atlas.naturalWidth > 0) {
+      ctx.save();
+      ctx.clip();
+      const ux = pE.x - pN.x;
+      const uy = pE.y - pN.y;
+      const vx = pW.x - pN.x;
+      const vy = pW.y - pN.y;
+      ctx.transform(ux, uy, vx, vy, pN.x, pN.y);
+
+      const colSpec = COL_CROP_NORM[gridCell.col];
+      const rowSpec = ROW_CROP_NORM[gridCell.row];
+      const sx = colSpec.start * atlas.naturalWidth;
+      const sy = rowSpec.start * atlas.naturalHeight;
+      const sw = colSpec.size * atlas.naturalWidth;
+      const sh = rowSpec.size * atlas.naturalHeight;
+
+      ctx.drawImage(atlas, sx, sy, sw, sh, 0, 0, 1, 1);
+      if (isNight) {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+        ctx.fillRect(0, 0, 1, 1);
+      }
+      ctx.restore();
+    } else {
+      ctx.fillStyle = isNight ? '#475569' : '#94a3b8';
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
     ctx.lineWidth = 0.85;
     ctx.stroke();
     ctx.restore();
     return;
   }
 
-  // Fallback / Procedural Vector Tile Rendering
-  ctx.fillStyle = fill;
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = 1.1;
-  ctx.fill();
-  ctx.stroke();
+  ctx.save();
 
-  if (terrainType === 'road_asphalt') {
-    ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(cx - (pE.x - pW.x) * 0.15, cy - (pS.y - pN.y) * 0.15);
-    ctx.lineTo(cx + (pE.x - pW.x) * 0.15, cy + (pS.y - pN.y) * 0.15);
-    ctx.stroke();
-  } else if (terrainType === 'road_cobble') {
-    ctx.fillStyle = isNight ? '#64748b' : '#cbd5e1';
-    ctx.beginPath();
-    ctx.arc(cx - 4, cy - 1, 2.2, 0, Math.PI * 2);
-    ctx.arc(cx + 4, cy + 1, 2.2, 0, Math.PI * 2);
-    ctx.arc(cx, cy - 2.2, 2.0, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (terrainType === 'grass_open_meadow' || terrainType === 'grass_emerald') {
-    // Delicate grass blades
-    ctx.strokeStyle = '#15803d';
-    ctx.lineWidth = 1;
-    [-4, 0, 4].forEach((gx) => {
+  // 2. ROAD ASPHALT FAMILY (LURUS X, LURUS Y, PERTIGAAN, PEREMPATAN, BELOKAN + AUTO-CONNECT)
+  if (terrainType.startsWith('road_asphalt')) {
+    const asphaltFill = isNight ? '#1e293b' : '#334155';
+    const curbFill = isNight ? '#64748b' : '#cbd5e1';
+    const curbAccent = isNight ? '#475569' : '#94a3b8';
+    const lineYellow = isNight ? '#eab308' : '#facc15';
+    const lineWhite = isNight ? '#e2e8f0' : '#ffffff';
+
+    // Determine which of the 4 cardinal directions are open road connections:
+    // N (-Y, v=0), S (+Y, v=1), W (-X, u=0), E (+X, u=1)
+    let openN = false;
+    let openS = false;
+    let openW = false;
+    let openE = false;
+
+    if (terrainType === 'road_asphalt') {
+      // Smart Auto-Connect if neighbor road tiles exist, otherwise default to X-axis road
+      const hasN = isRoadType(allTerrainTiles?.[`${gx},${gy - 1}`]?.terrainType);
+      const hasS = isRoadType(allTerrainTiles?.[`${gx},${gy + 1}`]?.terrainType);
+      const hasW = isRoadType(allTerrainTiles?.[`${gx - 1},${gy}`]?.terrainType);
+      const hasE = isRoadType(allTerrainTiles?.[`${gx + 1},${gy}`]?.terrainType);
+      const connCount = (hasN ? 1 : 0) + (hasS ? 1 : 0) + (hasW ? 1 : 0) + (hasE ? 1 : 0);
+      if (connCount === 0) {
+        openW = true;
+        openE = true;
+      } else if (connCount === 1) {
+        if (hasN || hasS) {
+          openN = true;
+          openS = true;
+        } else {
+          openW = true;
+          openE = true;
+        }
+      } else {
+        openN = hasN;
+        openS = hasS;
+        openW = hasW;
+        openE = hasE;
+      }
+    } else if (terrainType === 'road_asphalt_y') {
+      openN = true;
+      openS = true;
+    } else if (terrainType === 'road_asphalt_cross') {
+      openN = true;
+      openS = true;
+      openW = true;
+      openE = true;
+    } else if (terrainType === 'road_asphalt_t_north') {
+      openW = true;
+      openE = true;
+      openN = true;
+    } else if (terrainType === 'road_asphalt_t_south') {
+      openW = true;
+      openE = true;
+      openS = true;
+    } else if (terrainType === 'road_asphalt_t_east') {
+      openN = true;
+      openS = true;
+      openE = true;
+    } else if (terrainType === 'road_asphalt_t_west') {
+      openN = true;
+      openS = true;
+      openW = true;
+    } else if (terrainType === 'road_asphalt_turn_ne') {
+      openN = true;
+      openE = true;
+    } else if (terrainType === 'road_asphalt_turn_nw') {
+      openN = true;
+      openW = true;
+    } else if (terrainType === 'road_asphalt_turn_se') {
+      openS = true;
+      openE = true;
+    } else if (terrainType === 'road_asphalt_turn_sw') {
+      openS = true;
+      openW = true;
+    }
+
+    // Base Asphalt Tile
+    fillIsoQuad(0, 0, 1, 1, asphaltFill, 'rgba(15,23,42,0.4)');
+
+    // Draw Sidewalk Curbs along closed edges & corner sidewalk blocks
+    const cw = 0.16; // Curb width in tile UV
+    if (!openN) {
+      fillIsoQuad(0, 0, 1, cw, curbFill, curbAccent);
+    }
+    if (!openS) {
+      fillIsoQuad(0, 1 - cw, 1, 1, curbFill, curbAccent);
+    }
+    if (!openW) {
+      fillIsoQuad(0, 0, cw, 1, curbFill, curbAccent);
+    }
+    if (!openE) {
+      fillIsoQuad(1 - cw, 0, 1, 1, curbFill, curbAccent);
+    }
+    // Corner sidewalk blocks when adjacent edges are open (for turns, T-junctions, 4-way crossroads)
+    if (openN && openW) fillIsoQuad(0, 0, cw, cw, curbFill, curbAccent);
+    if (openN && openE) fillIsoQuad(1 - cw, 0, 1, cw, curbFill, curbAccent);
+    if (openS && openW) fillIsoQuad(0, 1 - cw, cw, 1, curbFill, curbAccent);
+    if (openS && openE) fillIsoQuad(1 - cw, 1 - cw, 1, 1, curbFill, curbAccent);
+
+    // Draw Yellow Dashed Center Lane Lines & White Crosswalks/Stop Bars
+    const midCenter = tilePt(0.5, 0.5);
+    const mN = tilePt(0.5, 0.08);
+    const mS = tilePt(0.5, 0.92);
+    const mW = tilePt(0.08, 0.5);
+    const mE = tilePt(0.92, 0.5);
+
+    ctx.strokeStyle = lineYellow;
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([4, 3]);
+
+    const openTotal = (openN ? 1 : 0) + (openS ? 1 : 0) + (openW ? 1 : 0) + (openE ? 1 : 0);
+
+    if (openTotal === 2 && ((openW && openE) || (openN && openS))) {
+      // Straight X or Straight Y road
       ctx.beginPath();
-      ctx.moveTo(cx + gx, cy + 1);
-      ctx.lineTo(cx + gx - 1, cy - 2.5);
+      if (openW && openE) {
+        ctx.moveTo(mW.x, mW.y);
+        ctx.lineTo(mE.x, mE.y);
+      } else {
+        ctx.moveTo(mN.x, mN.y);
+        ctx.lineTo(mS.x, mS.y);
+      }
       ctx.stroke();
-    });
-  } else if (terrainType === 'flower_garden') {
-    const cols = ['#f43f5e', '#facc15', '#ec4899', '#38bdf8'];
-    cols.forEach((c, i) => {
-      const ang = (i / 4) * Math.PI * 2;
-      ctx.fillStyle = c;
+    } else if (openTotal === 2) {
+      // 90-degree Turn (Belokan) — Smooth curved dashed yellow center line!
+      const pStart = openN ? mN : mS;
+      const pEnd = openE ? mE : mW;
       ctx.beginPath();
-      ctx.arc(cx + Math.cos(ang) * 5.5, cy + Math.sin(ang) * 2.8, 1.9, 0, Math.PI * 2);
+      ctx.moveTo(pStart.x, pStart.y);
+      ctx.quadraticCurveTo(midCenter.x, midCenter.y, pEnd.x, pEnd.y);
+      ctx.stroke();
+    } else {
+      // T-Junction (Pertigaan) or 4-Way Crossroad (Perempatan)
+      ctx.beginPath();
+      if (openN) {
+        ctx.moveTo(mN.x, mN.y);
+        ctx.lineTo(midCenter.x, midCenter.y);
+      }
+      if (openS) {
+        ctx.moveTo(mS.x, mS.y);
+        ctx.lineTo(midCenter.x, midCenter.y);
+      }
+      if (openW) {
+        ctx.moveTo(mW.x, mW.y);
+        ctx.lineTo(midCenter.x, midCenter.y);
+      }
+      if (openE) {
+        ctx.moveTo(mE.x, mE.y);
+        ctx.lineTo(midCenter.x, midCenter.y);
+      }
+      ctx.stroke();
+
+      // White Zebra Crosswalk Stripes on Perempatan & Pertigaan
+      ctx.setLineDash([]);
+      ctx.strokeStyle = lineWhite;
+      ctx.lineWidth = 1.3;
+      if (openTotal === 4) {
+        // 4-way crosswalk bars
+        [0.32, 0.44, 0.56, 0.68].forEach((t) => {
+          const zN1 = tilePt(t, 0.16);
+          const zN2 = tilePt(t, 0.28);
+          const zS1 = tilePt(t, 0.72);
+          const zS2 = tilePt(t, 0.84);
+          ctx.beginPath();
+          ctx.moveTo(zN1.x, zN1.y);
+          ctx.lineTo(zN2.x, zN2.y);
+          ctx.moveTo(zS1.x, zS1.y);
+          ctx.lineTo(zS2.x, zS2.y);
+          ctx.stroke();
+        });
+      }
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
+
+  // 3. JALAN PAVING BATU (road_cobble) — Isometric 4x4 Interlocking Cobblestone Grid
+  if (terrainType === 'road_cobble') {
+    const mortarCol = isNight ? '#334155' : '#64748b';
+    fillIsoQuad(0, 0, 1, 1, mortarCol);
+
+    const cobbleTones = isNight
+      ? ['#475569', '#64748b', '#52525b']
+      : ['#cbd5e1', '#94a3b8', '#e2e8f0'];
+
+    for (let r = 0; r < 4; r++) {
+      const v0 = r * 0.25 + 0.03;
+      const v1 = (r + 1) * 0.25 - 0.03;
+      const shift = (r % 2) * 0.12;
+      for (let c = 0; c < 4; c++) {
+        const u0 = Math.min(0.96, c * 0.25 + shift + 0.03);
+        const u1 = Math.min(0.97, (c + 1) * 0.25 + shift - 0.03);
+        if (u1 > u0 + 0.05) {
+          fillIsoQuad(u0, v0, u1, v1, cobbleTones[(r + c) % cobbleTones.length]);
+        }
+      }
+    }
+    ctx.restore();
+    return;
+  }
+
+  // 4. JALAN TANAH SETAPAK (road_dirt) — Organic Earthen Trail with Grass Shoulders & Stepping Stones
+  if (terrainType === 'road_dirt') {
+    const grassEdge = isNight ? '#14532d' : '#22c55e';
+    const dirtMain = isNight ? '#78350f' : '#c28b59';
+    const dirtTrack = isNight ? '#451a03' : '#a36e3e';
+    fillIsoQuad(0, 0, 1, 1, grassEdge);
+    fillIsoQuad(0.08, 0.08, 0.92, 0.92, dirtMain);
+    // Footpath ruts & stepping stones
+    fillIsoQuad(0.18, 0.28, 0.82, 0.42, dirtTrack);
+    fillIsoQuad(0.18, 0.58, 0.82, 0.72, dirtTrack);
+    [
+      [0.3, 0.35],
+      [0.65, 0.62],
+      [0.5, 0.48],
+    ].forEach(([su, sv], idx) => {
+      const sp = tilePt(su, sv);
+      ctx.fillStyle = idx % 2 === 0 ? '#d6d3d1' : '#a8a29e';
+      ctx.beginPath();
+      ctx.ellipse(sp.x, sp.y, 3.2, 1.7, 0.2, 0, Math.PI * 2);
       ctx.fill();
     });
-  } else if (terrainType === 'water_pond') {
-    const rWave = 3.5 + Math.sin(elapsedSec * 3.2) * 1.5;
-    ctx.strokeStyle = 'rgba(224, 242, 254, 0.68)';
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, rWave * 1.8, rWave * 0.9, 0, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.restore();
+    return;
   }
+
+  // 5. DEK PAPAN KAYU (wood_deck) — 5 Isometric Timber Boardwalk Planks with Nail Heads & Grain
+  if (terrainType === 'wood_deck') {
+    const joistCol = isNight ? '#271202' : '#451a03';
+    fillIsoQuad(0, 0, 1, 1, joistCol);
+    const plankTones = isNight
+      ? ['#78350f', '#713f12', '#854d0e']
+      : ['#b45309', '#c26315', '#a14807'];
+
+    for (let i = 0; i < 5; i++) {
+      const v0 = i * 0.2 + 0.025;
+      const v1 = (i + 1) * 0.2 - 0.025;
+      fillIsoQuad(0.02, v0, 0.98, v1, plankTones[i % plankTones.length]);
+      // Brass nail heads on left & right ends of each plank
+      const nL = tilePt(0.08, (v0 + v1) * 0.5);
+      const nR = tilePt(0.92, (v0 + v1) * 0.5);
+      ctx.fillStyle = '#fde68a';
+      ctx.beginPath();
+      ctx.arc(nL.x, nL.y, 0.85, 0, Math.PI * 2);
+      ctx.arc(nR.x, nR.y, 0.85, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  // 6. UBIN PLAZA MARMER (plaza_marble) — 3x3 Polished Carrara Marble Sub-Tiles + Golden Compass Medallion
+  if (terrainType === 'plaza_marble') {
+    const baseMarble = isNight ? '#cbd5e1' : '#f8fafc';
+    const altMarble = isNight ? '#94a3b8' : '#e2e8f0';
+    const goldTrim = isNight ? '#ca8a04' : '#f59e0b';
+    fillIsoQuad(0, 0, 1, 1, goldTrim);
+
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        const u0 = c / 3 + 0.02;
+        const u1 = (c + 1) / 3 - 0.02;
+        const v0 = r / 3 + 0.02;
+        const v1 = (r + 1) / 3 - 0.02;
+        fillIsoQuad(u0, v0, u1, v1, (r + c) % 2 === 0 ? baseMarble : altMarble);
+      }
+    }
+    // Center Golden Diamond Inlay
+    const dN = tilePt(0.5, 0.34);
+    const dE = tilePt(0.66, 0.5);
+    const dS = tilePt(0.5, 0.66);
+    const dW = tilePt(0.34, 0.5);
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.moveTo(dN.x, dN.y);
+    ctx.lineTo(dE.x, dE.y);
+    ctx.lineTo(dS.x, dS.y);
+    ctx.lineTo(dW.x, dW.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  // 7. PASIR PANTAI EMAS (sand_golden) — Wind-Blown Sand Ripples, Seashell & Coral Starfish
+  if (terrainType === 'sand_golden') {
+    const sandBase = isNight ? '#a16207' : '#fde047';
+    const sandShadow = isNight ? '#854d0e' : '#facc15';
+    fillIsoQuad(0, 0, 1, 1, sandBase, sandShadow);
+
+    // Isometric sand ripple waves
+    ctx.strokeStyle = isNight ? '#ca8a04' : '#eab308';
+    ctx.lineWidth = 1.1;
+    [0.25, 0.52, 0.78].forEach((rv) => {
+      const rL = tilePt(0.15, rv);
+      const rM = tilePt(0.5, rv - 0.06);
+      const rR = tilePt(0.85, rv);
+      ctx.beginPath();
+      ctx.moveTo(rL.x, rL.y);
+      ctx.quadraticCurveTo(rM.x, rM.y, rR.x, rR.y);
+      ctx.stroke();
+    });
+    // Tiny coral starfish & white seashell on alternating tiles
+    if (Math.abs(gx + gy) % 2 === 0) {
+      const sf = tilePt(0.68, 0.36);
+      ctx.fillStyle = '#fb7185';
+      ctx.beginPath();
+      ctx.arc(sf.x, sf.y, 1.9, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const sh = tilePt(0.34, 0.66);
+      ctx.fillStyle = '#fffbeb';
+      ctx.beginPath();
+      ctx.arc(sh.x, sh.y, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  // 8. HAMPARAN RUMPUT LAPANGAN (grass_open_meadow) & RUMPUT HIJAU ZAMRUD (grass_emerald)
+  if (terrainType === 'grass_open_meadow' || terrainType === 'grass_emerald') {
+    const isMeadow = terrainType === 'grass_open_meadow';
+    const baseGreen = isNight
+      ? isMeadow
+        ? '#15803d'
+        : '#047857'
+      : isMeadow
+      ? '#86efac'
+      : '#22c55e';
+    const stripeGreen = isNight
+      ? isMeadow
+        ? '#166534'
+        : '#065f46'
+      : isMeadow
+      ? '#4ade80'
+      : '#16a34a';
+
+    fillIsoQuad(0, 0, 1, 1, baseGreen, stripeGreen);
+    // Mowed lawn stripes in isometric projection
+    fillIsoQuad(0, 0, 0.5, 1, stripeGreen);
+
+    // Multi-blade grass tufts swaying gently
+    const tuftCoords = [
+      [0.25, 0.3],
+      [0.72, 0.28],
+      [0.5, 0.52],
+      [0.28, 0.74],
+      [0.75, 0.72],
+    ];
+    ctx.strokeStyle = isNight ? '#052e16' : '#15803d';
+    ctx.lineWidth = 1.05;
+    const sway = Math.sin(elapsedSec * 2.4 + gx * 0.7 + gy * 0.5) * 1.2;
+    tuftCoords.forEach(([tu, tv], idx) => {
+      const tp = tilePt(tu, tv);
+      ctx.beginPath();
+      ctx.moveTo(tp.x, tp.y);
+      ctx.lineTo(tp.x - 1.8 + sway * 0.5, tp.y - 3.5);
+      ctx.moveTo(tp.x, tp.y);
+      ctx.lineTo(tp.x + 1.8 + sway * 0.5, tp.y - 3.2);
+      ctx.stroke();
+
+      // Tiny white clover / yellow dandelion blossoms in open meadow
+      if (isMeadow && idx % 2 === 0) {
+        ctx.fillStyle = idx === 0 ? '#ffffff' : '#fef08a';
+        ctx.beginPath();
+        ctx.arc(tp.x + 2, tp.y - 1.5, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+    ctx.restore();
+    return;
+  }
+
+  // 9. TANAH TAMAN BUNGA (flower_garden) — Manicured Hedge Border, Rich Mulch Bed & 9 Blooming Flowers
+  if (terrainType === 'flower_garden') {
+    const lawnBorder = isNight ? '#065f46' : '#16a34a';
+    const soilBed = isNight ? '#451a03' : '#78350f';
+    fillIsoQuad(0, 0, 1, 1, lawnBorder, '#15803d');
+    fillIsoQuad(0.14, 0.14, 0.86, 0.86, soilBed, '#92400e');
+
+    const flowerGrid = [
+      { u: 0.28, v: 0.28, col: '#f43f5e' },
+      { u: 0.5, v: 0.28, col: '#facc15' },
+      { u: 0.72, v: 0.28, col: '#ec4899' },
+      { u: 0.28, v: 0.5, col: '#a855f7' },
+      { u: 0.5, v: 0.5, col: '#38bdf8' },
+      { u: 0.72, v: 0.5, col: '#fb923c' },
+      { u: 0.28, v: 0.72, col: '#f472b6' },
+      { u: 0.5, v: 0.72, col: '#fde047' },
+      { u: 0.72, v: 0.72, col: '#ef4444' },
+    ];
+    flowerGrid.forEach(({ u, v, col }) => {
+      const fp = tilePt(u, v);
+      // Green leaf base
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.arc(fp.x, fp.y + 0.8, 2.3, 0, Math.PI * 2);
+      ctx.fill();
+      // Flower petals
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(fp.x, fp.y - 0.6, 2.0, 0, Math.PI * 2);
+      ctx.fill();
+      // Pollen center
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(fp.x, fp.y - 0.6, 0.75, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+    return;
+  }
+
+  // 10. KOLAM AIR JERNIH (water_pond) — Stone Coping Border, Deep Aqua Gradient, Caustics, Lily Pad & Koi Silhouette
+  if (terrainType === 'water_pond') {
+    const stoneRim = isNight ? '#475569' : '#cbd5e1';
+    const shallowWater = isNight ? '#0284c7' : '#38bdf8';
+    const deepWater = isNight ? '#0369a1' : '#0ea5e9';
+
+    // Check which neighbors are also water_pond so adjacent pond tiles merge seamlessly!
+    const waterN = allTerrainTiles?.[`${gx},${gy - 1}`]?.terrainType === 'water_pond';
+    const waterS = allTerrainTiles?.[`${gx},${gy + 1}`]?.terrainType === 'water_pond';
+    const waterW = allTerrainTiles?.[`${gx - 1},${gy}`]?.terrainType === 'water_pond';
+    const waterE = allTerrainTiles?.[`${gx + 1},${gy}`]?.terrainType === 'water_pond';
+
+    fillIsoQuad(0, 0, 1, 1, shallowWater);
+    fillIsoQuad(0.14, 0.14, 0.86, 0.86, deepWater);
+
+    const rimW = 0.1;
+    if (!waterN) fillIsoQuad(0, 0, 1, rimW, stoneRim);
+    if (!waterS) fillIsoQuad(0, 1 - rimW, 1, 1, stoneRim);
+    if (!waterW) fillIsoQuad(0, 0, rimW, 1, stoneRim);
+    if (!waterE) fillIsoQuad(1 - rimW, 0, 1, 1, stoneRim);
+
+    // Animated concentric water ripples
+    const rWave = 3.2 + Math.sin(elapsedSec * 3.2 + gx + gy) * 1.6;
+    ctx.strokeStyle = 'rgba(224, 242, 254, 0.72)';
+    ctx.lineWidth = 1.05;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rWave * 1.9, rWave * 0.95, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Floating Lily Pad & Lotus Bud on alternating pond tiles
+    if (Math.abs(gx * 3 + gy) % 2 === 0) {
+      const lp = tilePt(0.36, 0.42);
+      ctx.fillStyle = '#16a34a';
+      ctx.beginPath();
+      ctx.ellipse(lp.x, lp.y, 3.2, 1.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f472b6';
+      ctx.beginPath();
+      ctx.arc(lp.x, lp.y - 1, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Swimming orange fish silhouette beneath water
+      const fishT = elapsedSec * 1.5 + gx;
+      const fp = tilePt(0.5 + Math.cos(fishT) * 0.18, 0.5 + Math.sin(fishT) * 0.18);
+      ctx.fillStyle = 'rgba(249, 115, 22, 0.85)';
+      ctx.beginPath();
+      ctx.ellipse(fp.x, fp.y, 2.6, 1.1, fishT, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+    return;
+  }
+
   ctx.restore();
 }
 
@@ -3833,7 +4558,6 @@ export function drawCustomCreatorFence3D(
   ctx.save();
 
   if (fence.fenceModel === 'fence_hedge_bush') {
-    // Leafy Green Hedge Fence with Blooming Flowers
     const steps = Math.max(3, Math.round(len * 4));
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
@@ -3868,7 +4592,6 @@ export function drawCustomCreatorFence3D(
         ? '#94a3b8'
         : '#b45309';
 
-    // Top and bottom horizontal rails
     ctx.strokeStyle = railCol;
     ctx.lineWidth = fence.fenceModel === 'fence_stone_brick' ? 6 * sc : 2.4 * sc;
     ctx.beginPath();
@@ -3878,7 +4601,6 @@ export function drawCustomCreatorFence3D(
     ctx.lineTo(p2.x, p2.y - 4 * sc);
     ctx.stroke();
 
-    // Posts along segment with post caps & end-post warm lanterns
     const postCount = Math.max(2, Math.round(len * 2) + 1);
     for (let i = 0; i < postCount; i++) {
       const t = i / (postCount - 1);
@@ -3893,7 +4615,6 @@ export function drawCustomCreatorFence3D(
         ctx.arc(px, py - 14.5 * sc, 2.2 * sc, 0, Math.PI * 2);
         ctx.fill();
       } else if (i === 0 || i === postCount - 1) {
-        // Warm post-cap lantern on end posts
         ctx.fillStyle = '#fef08a';
         ctx.beginPath();
         ctx.arc(px, py - 15 * sc, 2 * sc, 0, Math.PI * 2);

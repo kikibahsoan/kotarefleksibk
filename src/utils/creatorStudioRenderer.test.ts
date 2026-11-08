@@ -8,10 +8,12 @@ import {
   drawCustomCreatorAnimal3D,
   drawCustomCreatorTerrainTile,
   drawCustomCreatorFence3D,
+  getCreatorPropInteractiveActions,
 } from './creatorStudioRenderer.ts';
 import {
   CreatorBuildingItem,
   CreatorPropItem,
+  CreatorPropCategory,
   CreatorAnimalItem,
   CreatorTerrainType,
   CreatorFenceItem,
@@ -86,7 +88,40 @@ test('computeCreatorAnimalLivePose respects diurnal/nocturnal sleep cycles and a
   assert.equal(dayPose.isSleeping, false);
 });
 
-test('all 14 building models, 32 prop models, 10 animal species, 26 terrain types, and 5 fence models render without error', () => {
+test('getCreatorPropInteractiveActions returns 3 rich avatar activities with XP rewards for every prop category', () => {
+  const categories: CreatorPropCategory[] = [
+    'tree',
+    'bench',
+    'swing',
+    'campfire',
+    'playground',
+    'sports_court',
+    'shrub_plant',
+    'water_feature',
+  ];
+
+  for (const cat of categories) {
+    const sampleProp: CreatorPropItem = {
+      id: `prop-${cat}`,
+      propCategory: cat,
+      propModel: 'tree_oak_apple',
+      name: `Uji ${cat}`,
+      wx: 0,
+      wy: 0,
+      facing: 'down-right',
+      scale: 1,
+    };
+    const actions = getCreatorPropInteractiveActions(sampleProp);
+    assert.equal(actions.length, 3, `Expected 3 interactive actions for category ${cat}`);
+    for (const act of actions) {
+      assert.ok(act.label.length > 0);
+      assert.ok(act.speechText.includes(sampleProp.name));
+      assert.ok(act.xpReward >= 2);
+    }
+  }
+});
+
+test('all 29 building models (including 15 built-in models), 32 prop models, 10 animal species, 36 terrain types, and 5 fence models render without error', () => {
   const ctx = createMockCanvasContext();
 
   const buildingModels: CreatorModelType[] = [
@@ -104,6 +139,21 @@ test('all 14 building models, 32 prop models, 10 animal species, 26 terrain type
     'fountain_plaza',
     'info_kiosk',
     'sakura_park',
+    'builtin_balai_kota',
+    'builtin_studio_onair',
+    'builtin_perpustakaan',
+    'builtin_pasar_prestasi',
+    'builtin_kantor_pos',
+    'builtin_taman_refleksi',
+    'builtin_lab_dkv',
+    'builtin_masjid',
+    'builtin_bank_materi',
+    'builtin_pencakar_langit',
+    'builtin_bandara',
+    'builtin_lapak_cafe',
+    'builtin_beringin_rumah_pohon',
+    'builtin_sudut_literasi',
+    'builtin_papan_pengumuman',
   ];
 
   for (const modelType of buildingModels) {
@@ -112,7 +162,7 @@ test('all 14 building models, 32 prop models, 10 animal species, 26 terrain type
       name: `Test ${modelType}`,
       tagline: 'Refleksia Test',
       icon: '🏛️',
-      category: 'gedung_kantor',
+      category: modelType.startsWith('builtin_') ? 'objek_bawaan' : 'gedung_kantor',
       modelType,
       wx: 0,
       wy: 0,
@@ -209,6 +259,16 @@ test('all 14 building models, 32 prop models, 10 animal species, 26 terrain type
 
   const terrainTypes: CreatorTerrainType[] = [
     'road_asphalt',
+    'road_asphalt_y',
+    'road_asphalt_cross',
+    'road_asphalt_t_north',
+    'road_asphalt_t_south',
+    'road_asphalt_t_east',
+    'road_asphalt_t_west',
+    'road_asphalt_turn_ne',
+    'road_asphalt_turn_nw',
+    'road_asphalt_turn_se',
+    'road_asphalt_turn_sw',
     'road_cobble',
     'road_dirt',
     'wood_deck',
@@ -236,6 +296,11 @@ test('all 14 building models, 32 prop models, 10 animal species, 26 terrain type
     'img_tile_diamond_gold',
   ];
 
+  const mockNeighborMap = {
+    '0,-1': { gx: 0, gy: -1, terrainType: 'road_asphalt_y' as CreatorTerrainType },
+    '1,0': { gx: 1, gy: 0, terrainType: 'road_asphalt' as CreatorTerrainType },
+  };
+
   for (const tt of terrainTypes) {
     drawCustomCreatorTerrainTile(
       ctx,
@@ -245,7 +310,10 @@ test('all 14 building models, 32 prop models, 10 animal species, 26 terrain type
       { x: 62, y: 99 },
       tt,
       false,
-      5.0
+      5.0,
+      0,
+      0,
+      mockNeighborMap
     );
   }
 

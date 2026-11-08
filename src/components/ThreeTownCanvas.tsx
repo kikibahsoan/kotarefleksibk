@@ -44,6 +44,8 @@ import {
   drawCustomCreatorTerrainTile,
   drawCustomCreatorFence3D,
   drawCreatorStudioMapGizmos,
+  getCreatorPropInteractiveActions,
+  PropAvatarActionOption,
 } from '../utils/creatorStudioRenderer.ts';
 import { WeeklyLeaderboardBalaiKota } from './WeeklyLeaderboardBalaiKota.tsx';
 import {
@@ -1536,6 +1538,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
   const [activeCreatorBuildingModal, setActiveCreatorBuildingModal] =
     useState<CreatorBuildingItem | null>(null);
+  const [activeCreatorPropModal, setActiveCreatorPropModal] =
+    useState<CreatorPropItem | null>(null);
 
   const creatorHoverGhostRef = useRef<{ wx: number; wy: number } | null>(null);
   const creatorDraggingRef = useRef<CreatorSelectedTarget>(null);
@@ -4079,6 +4083,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (isCreatorStudioOpenRef.current) {
             setCreatorSelectedTarget({ kind: 'custom_prop', id: cp.id });
           }
+          // Open the 3-choice Interactive Prop Activity Bar for all citizens
+          setActiveCreatorPropModal(cp);
+
           if (cp.propCategory === 'bench' || cp.propCategory === 'swing') {
             player.targetWx = cp.wx;
             player.targetWy = cp.wy;
@@ -7138,7 +7145,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               pW,
               customTile.terrainType,
               isNight,
-              currentTime / 1000
+              currentTime / 1000,
+              gx,
+              gy,
+              creatorStateRef.current.terrainTiles
             );
             continue;
           }
@@ -26080,6 +26090,100 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             setCreatorSelectedTarget({ kind: 'custom_building', id: bId });
           }}
         />
+      )}
+
+      {/* CITIZEN INTERACTIVE ACTIVITY PANEL FOR CUSTOM CREATOR PROPS (POHON & TAMAN) */}
+      {activeCreatorPropModal && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-30 w-[440px] max-w-[94vw] pointer-events-auto select-none">
+          <div className="rounded-2xl bg-slate-950/92 backdrop-blur-xl border border-emerald-500/40 shadow-[0_16px_45px_rgba(0,0,0,0.75)] p-3 text-slate-100">
+            <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-sm shrink-0">
+                  {getCreatorPropInteractiveActions(activeCreatorPropModal)[0]?.icon || '🌳'}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-emerald-300 truncate">
+                    Interaksi Avatar • {activeCreatorPropModal.name}
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">
+                    Pilih aktivitas interaktif avatar di elemen taman ini untuk mendapatkan XP!
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveCreatorPropModal(null)}
+                className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 cursor-pointer shrink-0"
+                title="Tutup Panel Interaksi"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5">
+              {getCreatorPropInteractiveActions(activeCreatorPropModal).map(
+                (act: PropAvatarActionOption) => (
+                  <button
+                    key={act.id}
+                    type="button"
+                    onClick={() => {
+                      sounds.playClick();
+                      const player = playerRef.current;
+                      const prop = activeCreatorPropModal;
+                      if (player) {
+                        const targetWx =
+                          act.emoteType === 'sit' ? prop.wx : prop.wx + (Math.random() - 0.5) * 0.35;
+                        const targetWy =
+                          act.emoteType === 'sit' ? prop.wy : prop.wy + 0.32 * (prop.scale || 1);
+                        player.targetWx = targetWx;
+                        player.targetWy = targetWy;
+                        player.isMoving =
+                          Math.hypot(player.wx - targetWx, player.wy - targetWy) > 0.08;
+                        if (act.emoteType === 'sit') {
+                          if (!player.isMoving) {
+                            setIsSitting(true);
+                          } else {
+                            pendingSeatRef.current = {
+                              seatId: 'fountain_1_a',
+                              facingDir: prop.facing || 'down-right',
+                              targetX: prop.wx,
+                              targetY: prop.wy,
+                            };
+                          }
+                        } else {
+                          setIsSitting(false);
+                          if (act.emoteType === 'sport' || act.emoteType === 'cheer') {
+                            player.isRunning = true;
+                            player.speed = 1.25;
+                          }
+                        }
+                      }
+                      playerSpeechRef.current = {
+                        text: act.speechText,
+                        expiresAt: Date.now() + 4500,
+                      };
+                      showToast(`${act.toastText} (+${act.xpReward} XP)`, 2800);
+                      if (onAddXpRef.current) {
+                        onAddXpRef.current(act.xpReward, `${act.label} di ${prop.name}`);
+                      }
+                    }}
+                    className="p-2 rounded-xl bg-slate-900/90 hover:bg-emerald-500/20 border border-slate-800 hover:border-emerald-400/50 flex flex-col items-center text-center gap-1 transition-all cursor-pointer group"
+                  >
+                    <span className="text-lg group-hover:scale-110 transition-transform">
+                      {act.icon}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-100 leading-tight">
+                      {act.label}
+                    </span>
+                    <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black">
+                      +{act.xpReward} XP
+                    </span>
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

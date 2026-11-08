@@ -420,9 +420,29 @@ export type CreatorModelType =
   | 'reading_gazebo'
   | 'fountain_plaza'
   | 'info_kiosk'
-  | 'sakura_park';
+  | 'sakura_park'
+  // 4. Model Objek Kota Bawaan (15 Model Asli Refleksia City)
+  | 'builtin_balai_kota'
+  | 'builtin_studio_onair'
+  | 'builtin_perpustakaan'
+  | 'builtin_pasar_prestasi'
+  | 'builtin_kantor_pos'
+  | 'builtin_taman_refleksi'
+  | 'builtin_lab_dkv'
+  | 'builtin_masjid'
+  | 'builtin_bank_materi'
+  | 'builtin_pencakar_langit'
+  | 'builtin_bandara'
+  | 'builtin_lapak_cafe'
+  | 'builtin_beringin_rumah_pohon'
+  | 'builtin_sudut_literasi'
+  | 'builtin_papan_pengumuman';
 
-export type CreatorBuildingCategory = 'gedung_kantor' | 'arena_hiburan' | 'fasilitas_taman';
+export type CreatorBuildingCategory =
+  | 'gedung_kantor'
+  | 'arena_hiburan'
+  | 'fasilitas_taman'
+  | 'objek_bawaan';
 
 export type CreatorTemplateType =
   | 'games'
@@ -605,6 +625,16 @@ export interface CreatorAnimalItem {
 
 export type CreatorTerrainType =
   | 'road_asphalt'
+  | 'road_asphalt_y'
+  | 'road_asphalt_cross'
+  | 'road_asphalt_t_north'
+  | 'road_asphalt_t_south'
+  | 'road_asphalt_t_east'
+  | 'road_asphalt_t_west'
+  | 'road_asphalt_turn_ne'
+  | 'road_asphalt_turn_nw'
+  | 'road_asphalt_turn_se'
+  | 'road_asphalt_turn_sw'
   | 'road_cobble'
   | 'road_dirt'
   | 'wood_deck'

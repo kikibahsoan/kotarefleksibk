@@ -231,6 +231,173 @@ export const CREATOR_STOCK_MODELS: StockModelDefinition[] = [
     defaultTemplate: 'facility_info',
     description: 'Taman pohon sakura merah muda dengan jembatan kecil dan lentera.',
   },
+
+  // Kategori 4: Model Objek Kota Bawaan (Siap Ditambahkan Baru ke Peta)
+  {
+    modelType: 'builtin_balai_kota',
+    category: 'objek_bawaan',
+    defaultName: 'Balai Kota Kubah Emas',
+    defaultTagline: 'Pusat Pemerintahan & Misi Warga',
+    icon: '🏛️',
+    accentColor: '#eab308',
+    roofColor: '#ca8a04',
+    defaultTemplate: 'community_mission',
+    description: 'Model asli Balai Kota Refleksia lengkap dengan 4 pilar klasik, jam menara, dan kubah emas.',
+  },
+  {
+    modelType: 'builtin_studio_onair',
+    category: 'objek_bawaan',
+    defaultName: 'Studio Podcast ON AIR',
+    defaultTagline: 'Penyiaran Suara, Diskusi & Kreativitas Warga',
+    icon: '🎙️',
+    accentColor: '#ef4444',
+    roofColor: '#1e1b4b',
+    defaultTemplate: 'ideas',
+    description: 'Model asli Studio ON AIR dengan menara pemancar radio dan papan neon menyala.',
+  },
+  {
+    modelType: 'builtin_perpustakaan',
+    category: 'objek_bawaan',
+    defaultName: 'Perpustakaan Kampus Biru',
+    defaultTagline: 'Pusat Literasi, Referensi & Modul',
+    icon: '📚',
+    accentColor: '#3b82f6',
+    roofColor: '#1d4ed8',
+    defaultTemplate: 'facility_info',
+    description: 'Model asli gedung Perpustakaan Kampus klasik dengan pediment segitiga & jendela lengkung.',
+  },
+  {
+    modelType: 'builtin_pasar_prestasi',
+    category: 'objek_bawaan',
+    defaultName: 'Pasar Prestasi & Galeri',
+    defaultTagline: 'Apresiasi Karya & Papan Peringkat Warga',
+    icon: '🏆',
+    accentColor: '#f97316',
+    roofColor: '#ea580c',
+    defaultTemplate: 'games',
+    description: 'Model asli Pasar Prestasi dengan kanopi belang meriah, etalase piala, dan bendera.',
+  },
+  {
+    modelType: 'builtin_kantor_pos',
+    category: 'objek_bawaan',
+    defaultName: 'Kantor Pos Kilat Kota',
+    defaultTagline: 'Layanan Surat, Aspirasi & Pesan Warga',
+    icon: '📮',
+    accentColor: '#f43f5e',
+    roofColor: '#be123c',
+    defaultTemplate: 'ideas',
+    description: 'Model asli Kantor Pos Refleksia lengkap dengan kotak surat merah ikonik di halaman.',
+  },
+  {
+    modelType: 'builtin_taman_refleksi',
+    category: 'objek_bawaan',
+    defaultName: 'Paviliun Pusat Refleksi',
+    defaultTagline: 'Ruang Kontemplasi & Jurnal Refleksi Warga',
+    icon: '🌍',
+    accentColor: '#10b981',
+    roofColor: '#047857',
+    defaultTemplate: 'community_mission',
+    description: 'Model asli Paviliun Kubah Kaca Hijau Zamrud dengan kristal refleksi berputar.',
+  },
+  {
+    modelType: 'builtin_lab_dkv',
+    category: 'objek_bawaan',
+    defaultName: 'Laboratorium DKV & Sains',
+    defaultTagline: 'Eksperimen Visual, Sains Atom & Kuis',
+    icon: '⚛️',
+    accentColor: '#06b6d4',
+    roofColor: '#0e7490',
+    defaultTemplate: 'games',
+    description: 'Model asli Lab DKV dengan instalasi cincin orbit elektron dan inti atom bercahaya.',
+  },
+  {
+    modelType: 'builtin_masjid',
+    category: 'objek_bawaan',
+    defaultName: 'Masjid Al-Hikmah',
+    defaultTagline: 'Pusat Ibadah, Kajian & Ketenangan Batin',
+    icon: '🕌',
+    accentColor: '#10b981',
+    roofColor: '#059669',
+    defaultTemplate: 'facility_info',
+    description: 'Model asli Masjid Al-Hikmah dengan kubah zamrud, bulan sabit emas, dan menara.',
+  },
+  {
+    modelType: 'builtin_bank_materi',
+    category: 'objek_bawaan',
+    defaultName: 'Gedung Bank Materi',
+    defaultTagline: 'Khazanah Modul, Kurikulum & Tantangan',
+    icon: '🏦',
+    accentColor: '#fbbf24',
+    roofColor: '#1e293b',
+    defaultTemplate: 'facility_info',
+    description: 'Model asli Bank Materi bergaya neoklasik dengan 4 pilar marmer dan mahkota emas.',
+  },
+  {
+    modelType: 'builtin_pencakar_langit',
+    category: 'objek_bawaan',
+    defaultName: 'Menara Pencakar Langit Timur',
+    defaultTagline: 'Mercusuar Cita-Cita & Karier Masa Depan',
+    icon: '🏙️',
+    accentColor: '#38bdf8',
+    roofColor: '#0284c7',
+    defaultTemplate: 'games',
+    description: 'Model asli Gedung Pencakar Langit bertingkat dengan fasad kaca siber dan puncak spire.',
+  },
+  {
+    modelType: 'builtin_bandara',
+    category: 'objek_bawaan',
+    defaultName: 'Terminal Bandara & Pesawat',
+    defaultTagline: 'Gerbang Penerbangan & Eksplorasi Global',
+    icon: '✈️',
+    accentColor: '#0ea5e9',
+    roofColor: '#0369a1',
+    defaultTemplate: 'facility_info',
+    description: 'Model asli Terminal Bandara Refleksia dengan menara ATC berputar dan pesawat jet.',
+  },
+  {
+    modelType: 'builtin_lapak_cafe',
+    category: 'objek_bawaan',
+    defaultName: 'Lapak Kuliner Refleksia',
+    defaultTagline: 'Kedai Kopi, Roti Hangat & Obrolan Warga',
+    icon: '☕',
+    accentColor: '#f97316',
+    roofColor: '#c2410c',
+    defaultTemplate: 'ideas',
+    description: 'Model asli Lapak Kafe Bawaan dengan kanopi terakota, meja bar, dan meja payung.',
+  },
+  {
+    modelType: 'builtin_beringin_rumah_pohon',
+    category: 'objek_bawaan',
+    defaultName: 'Pohon Beringin & Rumah Pohon',
+    defaultTagline: 'Pohon Raksasa Rindang Tempat Gantung Jurnal',
+    icon: '🌳',
+    accentColor: '#16a34a',
+    roofColor: '#15803d',
+    defaultTemplate: 'community_mission',
+    description: 'Model asli Pohon Beringin Agung lengkap dengan akar gantung, rumah pohon, dan tangga.',
+  },
+  {
+    modelType: 'builtin_sudut_literasi',
+    category: 'objek_bawaan',
+    defaultName: 'Pergola Sudut Literasi',
+    defaultTagline: 'Taman Baca Terbuka & Rak Buku Warga',
+    icon: '📖',
+    accentColor: '#14b8a6',
+    roofColor: '#0f766e',
+    defaultTemplate: 'facility_info',
+    description: 'Model asli Sudut Literasi dengan rak buku warna-warni, karpet baca, dan kanopi.',
+  },
+  {
+    modelType: 'builtin_papan_pengumuman',
+    category: 'objek_bawaan',
+    defaultName: 'Papan Pengumuman Kota',
+    defaultTagline: 'Informasi Resmi, Tata Tertib & Agenda Warga',
+    icon: '📋',
+    accentColor: '#f59e0b',
+    roofColor: '#78350f',
+    defaultTemplate: 'facility_info',
+    description: 'Model asli Papan Pengumuman beratap sirap kayu lengkap dengan kertas pengumuman.',
+  },
 ];
 
 // ============================================================================
@@ -807,14 +974,14 @@ export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
     spriteGridPos: { row: 3, col: 3 },
   },
 
-  // Hamparan Rumput & Tanah Kota Lainnya
+  // Hamparan Rumput, Taman, Kolam, Jalan Raya (X, Y, Pertigaan, Perempatan, Belokan), Paving, Dek, Ubin & Pasir
   {
     terrainType: 'grass_open_meadow',
     name: 'Hamparan Rumput Lapangan',
     icon: '🌱',
     previewColor: '#4ade80',
     borderColor: '#15803d',
-    description: 'Hamparan rumput lapangan terbuka dengan gradasi helai rumput segar.',
+    description: 'Hamparan rumput lapangan terbuka dengan jalur potong rumput (mowed stripes), helai bergoyang, dan bunga daisy.',
   },
   {
     terrainType: 'grass_emerald',
@@ -822,7 +989,7 @@ export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
     icon: '🟩',
     previewColor: '#22c55e',
     borderColor: '#16a34a',
-    description: 'Rumput hijau zamrud segar untuk menutup jalan atau membuat taman.',
+    description: 'Rumput hijau zamrud pekat berlapis daun semanggi (clover), lumut halus, dan helai rumput 3D.',
   },
   {
     terrainType: 'flower_garden',
@@ -830,23 +997,103 @@ export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
     icon: '🌷',
     previewColor: '#22c55e',
     borderColor: '#f472b6',
-    description: 'Petak rumput subur bertabur bunga warna-warni yang bermekaran.',
+    description: 'Petak tanah humus subur berbingkai semak rendah dengan 9 rumpun bunga mekar warna-warni.',
   },
   {
     terrainType: 'water_pond',
-    name: 'Kolam Air Jernih',
+    name: 'Kolam Air & Koi Jernih',
     icon: '💧',
     previewColor: '#0ea5e9',
     borderColor: '#7dd3fc',
-    description: 'Petak air kolam biru berkilau dengan efek riak air hidup.',
+    description: 'Kolam air jernih dengan tepian batu alam otomatis menyatu, kaustik air, teratai, dan bayangan ikan koi.',
   },
   {
     terrainType: 'road_asphalt',
-    name: 'Jalan Aspal Kota',
+    name: 'Jalan Aspal (Auto / Poros X)',
     icon: '🛣️',
     previewColor: '#334155',
     borderColor: '#facc15',
-    description: 'Jalan raya aspal gelap lengkap dengan garis marka kuning.',
+    description: 'Jalan raya aspal poros X (Timur-Barat) dengan trotoar yang otomatis menyambung jika bertemu petak jalan di sebelahnya.',
+  },
+  {
+    terrainType: 'road_asphalt_y',
+    name: 'Jalan Aspal Lurus (Poros Y)',
+    icon: '🛤️',
+    previewColor: '#334155',
+    borderColor: '#38bdf8',
+    description: 'Jalan raya aspal lurus arah poros Y (Utara-Selatan) lengkap dengan trotoar beton dan marka kuning putus-putus.',
+  },
+  {
+    terrainType: 'road_asphalt_cross',
+    name: 'Jalan Perempatan (+)',
+    icon: '➕',
+    previewColor: '#1e293b',
+    borderColor: '#facc15',
+    description: 'Simpang empat (Perempatan X & Y) lengkap dengan 4 zebra cross penyeberangan pejalan kaki dan sudut trotoar.',
+  },
+  {
+    terrainType: 'road_asphalt_t_north',
+    name: 'Jalan Pertigaan Utara (┻)',
+    icon: '┻',
+    previewColor: '#334155',
+    borderColor: '#fbbf24',
+    description: 'Simpang tiga (Pertigaan ke Utara, Timur, dan Barat) dengan marka pengarah dan zebra cross.',
+  },
+  {
+    terrainType: 'road_asphalt_t_south',
+    name: 'Jalan Pertigaan Selatan (┳)',
+    icon: '┳',
+    previewColor: '#334155',
+    borderColor: '#fbbf24',
+    description: 'Simpang tiga (Pertigaan ke Selatan, Timur, dan Barat) dengan marka pengarah dan zebra cross.',
+  },
+  {
+    terrainType: 'road_asphalt_t_east',
+    name: 'Jalan Pertigaan Timur (┣)',
+    icon: '┣',
+    previewColor: '#334155',
+    borderColor: '#fbbf24',
+    description: 'Simpang tiga (Pertigaan ke Utara, Selatan, dan Timur) dengan marka pengarah dan zebra cross.',
+  },
+  {
+    terrainType: 'road_asphalt_t_west',
+    name: 'Jalan Pertigaan Barat (┫)',
+    icon: '┫',
+    previewColor: '#334155',
+    borderColor: '#fbbf24',
+    description: 'Simpang tiga (Pertigaan ke Utara, Selatan, dan Barat) dengan marka pengarah dan zebra cross.',
+  },
+  {
+    terrainType: 'road_asphalt_turn_ne',
+    name: 'Jalan Belokan Utara-Timur (┗)',
+    icon: '┗',
+    previewColor: '#334155',
+    borderColor: '#a3e635',
+    description: 'Belokan jalan raya melengkung mulus 90 derajat yang menghubungkan arah Utara (-Y) dan Timur (+X).',
+  },
+  {
+    terrainType: 'road_asphalt_turn_nw',
+    name: 'Jalan Belokan Utara-Barat (┛)',
+    icon: '┛',
+    previewColor: '#334155',
+    borderColor: '#a3e635',
+    description: 'Belokan jalan raya melengkung mulus 90 derajat yang menghubungkan arah Utara (-Y) dan Barat (-X).',
+  },
+  {
+    terrainType: 'road_asphalt_turn_se',
+    name: 'Jalan Belokan Selatan-Timur (┏)',
+    icon: '┏',
+    previewColor: '#334155',
+    borderColor: '#a3e635',
+    description: 'Belokan jalan raya melengkung mulus 90 derajat yang menghubungkan arah Selatan (+Y) dan Timur (+X).',
+  },
+  {
+    terrainType: 'road_asphalt_turn_sw',
+    name: 'Jalan Belokan Selatan-Barat (┓)',
+    icon: '┓',
+    previewColor: '#334155',
+    borderColor: '#a3e635',
+    description: 'Belokan jalan raya melengkung mulus 90 derajat yang menghubungkan arah Selatan (+Y) dan Barat (-X).',
   },
   {
     terrainType: 'road_cobble',
@@ -854,7 +1101,7 @@ export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
     icon: '🧱',
     previewColor: '#94a3b8',
     borderColor: '#cbd5e1',
-    description: 'Jalan batu paving blok rapi untuk trotoar & kompleks gedung.',
+    description: 'Jalan batu paving blok 4x4 interlocking dengan bevel cahaya 3D dan tepian kanstin.',
   },
   {
     terrainType: 'road_dirt',
@@ -862,7 +1109,7 @@ export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
     icon: '🥾',
     previewColor: '#b58860',
     borderColor: '#966b46',
-    description: 'Jalur tanah taman alami dengan tekstur kerikil halus.',
+    description: 'Jalur tanah setapak alami dengan bahu rumput hijau, batu pijakan datar, dan kerikil.',
   },
   {
     terrainType: 'wood_deck',
@@ -870,7 +1117,7 @@ export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
     icon: '🪵',
     previewColor: '#92400e',
     borderColor: '#b45309',
-    description: 'Lantai papan kayu hangat untuk teras kafe, jembatan, atau dermaga.',
+    description: 'Lantai 5 bilah papan kayu jati lengkap dengan serat kayu, sambungan balok, dan paku kuningan.',
   },
   {
     terrainType: 'plaza_marble',
@@ -878,7 +1125,7 @@ export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
     icon: '⬜',
     previewColor: '#f1f5f9',
     borderColor: '#fbbf24',
-    description: 'Lantai marmer putih mewah dengan ornamen berlian emas di tengah.',
+    description: 'Lantai ubin marmer Carrara 3x3 dengan urat batu abu halus dan tatahan berlian emas di tengah.',
   },
   {
     terrainType: 'sand_golden',
@@ -886,7 +1133,7 @@ export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
     icon: '🏖️',
     previewColor: '#fde68a',
     borderColor: '#f59e0b',
-    description: 'Hamparan pasir pantai keemasan dengan gurat ombak halus.',
+    description: 'Hamparan pasir pantai keemasan dengan gurat gelombang angin, bintang laut, dan kerang mutiara.',
   },
 ];
 
@@ -1942,43 +2189,55 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
               {/* TAB 1: KATALOG STOCK BANGUNAN BARU */}
               {activeTab === 'catalog' && (
                 <div className="space-y-3">
-                  {/* Category Switcher */}
-                  <div className="grid grid-cols-3 gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                  {/* Category Switcher (4 Kategori termasuk Model Kota Bawaan) */}
+                  <div className="grid grid-cols-2 gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
                     <button
                       type="button"
                       onClick={() => setCatalogCategory('gedung_kantor')}
-                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                         catalogCategory === 'gedung_kantor'
                           ? 'bg-sky-500/25 text-sky-200 border border-sky-400/40'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       <Building2 className="w-3 h-3" />
-                      <span>Gedung/Lab</span>
+                      <span>Gedung & Lab (5)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setCatalogCategory('arena_hiburan')}
-                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                         catalogCategory === 'arena_hiburan'
                           ? 'bg-rose-500/25 text-rose-200 border border-rose-400/40'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       <Gamepad2 className="w-3 h-3" />
-                      <span>Games/Acara</span>
+                      <span>Games & Acara (4)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setCatalogCategory('fasilitas_taman')}
-                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                         catalogCategory === 'fasilitas_taman'
                           ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       <Trees className="w-3 h-3" />
-                      <span>Kafe/Taman</span>
+                      <span>Kafe & Plaza (5)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCatalogCategory('objek_bawaan')}
+                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                        catalogCategory === 'objek_bawaan'
+                          ? 'bg-amber-500/25 text-amber-200 border border-amber-400/40'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>🏛️ Model Bawaan (15)</span>
                     </button>
                   </div>
 
@@ -2097,7 +2356,7 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
               {activeTab === 'props' && (
                 <div className="space-y-3">
                   <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[10.5px] text-emerald-200 leading-relaxed">
-                    Buat, pindahkan (Drag & Drop), atau hapus <strong>Pohon, Kursi, Ayunan, Api Unggun, Playground Anak, Lapangan Olahraga, Semak/Tanaman Hias, serta Kolam & Air Mancur</strong>.
+                    Buat, pindahkan (Drag & Drop), atau hapus <strong>Pohon, Kursi, Ayunan, Api Unggun, Playground Anak, Lapangan Olahraga, Semak/Tanaman Hias, serta Kolam & Air Mancur</strong>. Seluruh elemen ini memiliki <strong>3 Pilihan Aktivitas Interaktif Avatar (+XP)</strong> saat diklik warga!
                   </div>
 
                   {/* Sub-category selector (8 kategori lengkap) */}
@@ -2706,6 +2965,61 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                         selectedTarget?.kind === 'existing_object' &&
                         selectedTarget.id === item.id;
 
+                      const builtinModelMap: Record<string, CreatorModelType> = {
+                        balai_kota: 'builtin_balai_kota',
+                        menara_mentor: 'builtin_studio_onair',
+                        perpustakaan: 'builtin_perpustakaan',
+                        pasar_prestasi: 'builtin_pasar_prestasi',
+                        kantor_pos: 'builtin_kantor_pos',
+                        taman_refleksi: 'builtin_taman_refleksi',
+                        bengkel_latihan: 'builtin_lab_dkv',
+                        masjid: 'builtin_masjid',
+                        bank_materi: 'builtin_bank_materi',
+                        monumen_warga: 'fountain_plaza',
+                        pencakar_langit: 'builtin_pencakar_langit',
+                        bandara: 'builtin_bandara',
+                        cafe: 'builtin_lapak_cafe',
+                        beringin: 'builtin_beringin_rumah_pohon',
+                        literacy_corner: 'builtin_sudut_literasi',
+                        announcement_board: 'builtin_papan_pengumuman',
+                        rules_board: 'builtin_papan_pengumuman',
+                      };
+                      const mappedStockModelType = builtinModelMap[item.id];
+                      const matchingStock = mappedStockModelType
+                        ? CREATOR_STOCK_MODELS.find((s) => s.modelType === mappedStockModelType)
+                        : null;
+
+                      const handleDuplicateExistingToMap = (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        clearAllPlacementModes();
+                        if (matchingStock) {
+                          handleQuickSpawnStock({
+                            ...matchingStock,
+                            defaultName: `${curName} Baru`,
+                          });
+                          return;
+                        }
+                        if (item.objectCategory === 'bench') {
+                          const benchEntry = CREATOR_PROP_CATALOG.find((p) => p.model === 'bench_wood_classic');
+                          if (benchEntry) handleQuickSpawnProp({ ...benchEntry, name: `${curName} Baru` });
+                          return;
+                        }
+                        if (item.objectCategory === 'swing') {
+                          const swingEntry = CREATOR_PROP_CATALOG.find((p) => p.model === 'swing_wood_garden');
+                          if (swingEntry) handleQuickSpawnProp({ ...swingEntry, name: `${curName} Baru` });
+                          return;
+                        }
+                        if (item.objectCategory === 'campfire') {
+                          const fireEntry = CREATOR_PROP_CATALOG.find((p) => p.model === 'campfire_stone_ring');
+                          if (fireEntry) handleQuickSpawnProp({ ...fireEntry, name: `${curName} Baru` });
+                          return;
+                        }
+                        if (item.objectCategory === 'tree') {
+                          const treeEntry = CREATOR_PROP_CATALOG.find((p) => p.model === 'tree_banyan_shady');
+                          if (treeEntry) handleQuickSpawnProp({ ...treeEntry, name: `${curName} Baru` });
+                        }
+                      };
+
                       return (
                         <div
                           key={item.id}
@@ -2742,7 +3056,17 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                               </div>
                             </div>
                           </div>
-                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={handleDuplicateExistingToMap}
+                              className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-400/40 text-[9.5px] font-bold cursor-pointer"
+                              title="Tambahkan duplikat model objek bawaan ini di dekat posisi avatar"
+                            >
+                              + Tambah Model
+                            </button>
+                            <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          </div>
                         </div>
                       );
                     })}
