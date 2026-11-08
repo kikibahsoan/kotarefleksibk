@@ -4066,13 +4066,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 0-CUSTOM-PROP: Check click on Custom Creator Props (Benches, Swings, Campfires, Playgrounds, Sports Courts, Shrubs, Water Features)
+      // 0-CUSTOM-PROP: Check click on Custom Creator Props (Benches, Swings, Campfires, Playgrounds, Sports Courts, Shrubs, Water Features, Trees)
       for (const cp of creatorStateRef.current.customProps || []) {
         const hitRad =
           cp.propCategory === 'sports_court'
-            ? 1.05 * (cp.scale || 1)
+            ? 1.15 * (cp.scale || 1)
             : cp.propCategory === 'playground' || cp.propCategory === 'water_feature'
-            ? 0.62 * (cp.scale || 1)
+            ? 0.65 * (cp.scale || 1)
             : 0.45 * (cp.scale || 1);
         if (Math.hypot(wx - cp.wx, wy - cp.wy) < hitRad) {
           sounds.playClick();
@@ -4083,6 +4083,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWx = cp.wx;
             player.targetWy = cp.wy;
             player.isMoving = Math.hypot(player.wx - cp.wx, player.wy - cp.wy) > 0.08;
+            playerSpeechRef.current = {
+              text:
+                cp.propCategory === 'swing'
+                  ? `🎠 Berayun santai menikmati angin di ${cp.name}...`
+                  : `🪑 Duduk beristirahat dan bercengkerama di ${cp.name}...`,
+              expiresAt: Date.now() + 4200,
+            };
             if (!player.isMoving) {
               setIsSitting(true);
             } else {
@@ -4101,6 +4108,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWx = standWx;
             player.targetWy = standWy;
             player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
+            playerSpeechRef.current = {
+              text: `🔥 Menghangatkan diri & berbagi cerita warga di ${cp.name}!`,
+              expiresAt: Date.now() + 4200,
+            };
             showToast(`🔥 Menghangatkan diri di dekat ${cp.name}`, 2500);
             return;
           }
@@ -4110,7 +4121,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWx = standWx;
             player.targetWy = standWy;
             player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
-            showToast(`🛝 Bermain seru di ${cp.name}!`, 2600);
+            const playMsg =
+              cp.propModel === 'playground_slide_colorful'
+                ? `🛝 Wushhh! Meluncur seru di ${cp.name}!`
+                : cp.propModel === 'playground_seesaw_dual'
+                ? `⚖️ Bermain jungkat-jungkit gembira di ${cp.name}!`
+                : cp.propModel === 'playground_spring_rider'
+                ? `🎠 Membal seru naik ${cp.name}!`
+                : `🏰 Menjelajahi wahana ${cp.name}!`;
+            playerSpeechRef.current = {
+              text: playMsg,
+              expiresAt: Date.now() + 4200,
+            };
+            showToast(playMsg, 2600);
             return;
           }
           if (cp.propCategory === 'sports_court') {
@@ -4119,7 +4142,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.isMoving = Math.hypot(player.wx - wx, player.wy - wy) > 0.08;
             player.isRunning = true;
             player.speed = 1.28;
-            showToast(`🏆 Berolahraga di ${cp.name}!`, 2600);
+            const sportMsg =
+              cp.propModel === 'court_basketball_full'
+                ? `🏀 Dribble & tembakan 3 poin di ${cp.name}!`
+                : cp.propModel === 'court_futsal_green'
+                ? `⚽ Menggiring bola & tendangan gol di ${cp.name}!`
+                : cp.propModel === 'court_badminton_pro'
+                ? `🏸 Jumping smash tajam di ${cp.name}!`
+                : `🌱 Beraktivitas segar bersama warga di ${cp.name}!`;
+            playerSpeechRef.current = {
+              text: sportMsg,
+              expiresAt: Date.now() + 4200,
+            };
+            showToast(sportMsg, 2600);
             return;
           }
           if (cp.propCategory === 'water_feature') {
@@ -4128,9 +4163,53 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWx = standWx;
             player.targetWy = standWy;
             player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
-            showToast(`⛲ Menikmati kesejukan ${cp.name}`, 2500);
+            const waterMsg =
+              cp.propModel === 'water_koi_pond_lotus'
+                ? `🪷 Memberi makan ikan koi & mengagumi bunga teratai di ${cp.name}...`
+                : cp.propModel === 'water_mini_waterfall'
+                ? `🏞️ Menikmati sejuknya gemericik ${cp.name}...`
+                : `⛲ Menikmati kesejukan pancuran ${cp.name}...`;
+            playerSpeechRef.current = {
+              text: waterMsg,
+              expiresAt: Date.now() + 4200,
+            };
+            showToast(waterMsg, 2600);
             return;
           }
+          if (cp.propCategory === 'shrub_plant' || cp.propCategory === 'tree') {
+            const standWx = cp.wx;
+            const standWy = cp.wy + 0.45 * (cp.scale || 1);
+            player.targetWx = standWx;
+            player.targetWy = standWy;
+            player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
+            playerSpeechRef.current = {
+              text: `🌿 Merawat keasrian ${cp.name} agar Refleksia makin hijau!`,
+              expiresAt: Date.now() + 3800,
+            };
+            showToast(`🌿 Menikmati keasrian ${cp.name}`, 2400);
+            return;
+          }
+        }
+      }
+
+      // 0-CUSTOM-ANIMAL: Check click on Custom Creator Animals (Feed / Greet Animal)
+      for (const ca of creatorStateRef.current.customAnimals || []) {
+        if (Math.hypot(wx - ca.homeWx, wy - ca.homeWy) < 0.58 * (ca.scale || 1)) {
+          sounds.playClick();
+          if (isCreatorStudioOpenRef.current) {
+            setCreatorSelectedTarget({ kind: 'custom_animal', id: ca.id });
+          }
+          const standWx = ca.homeWx;
+          const standWy = ca.homeWy + 0.48;
+          player.targetWx = standWx;
+          player.targetWy = standWy;
+          player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
+          playerSpeechRef.current = {
+            text: `🐾 Menyapa & memberi makan ${ca.name} di habitat asrinya!`,
+            expiresAt: Date.now() + 4000,
+          };
+          showToast(`🐾 Menyapa ${ca.name}`, 2400);
+          return;
         }
       }
 
