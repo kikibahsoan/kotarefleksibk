@@ -4066,9 +4066,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         }
       }
 
-      // 0-CUSTOM-PROP: Check click on Custom Creator Props (Benches, Swings, Campfires)
+      // 0-CUSTOM-PROP: Check click on Custom Creator Props (Benches, Swings, Campfires, Playgrounds, Sports Courts, Shrubs, Water Features)
       for (const cp of creatorStateRef.current.customProps || []) {
-        if (Math.hypot(wx - cp.wx, wy - cp.wy) < 0.45 * (cp.scale || 1)) {
+        const hitRad =
+          cp.propCategory === 'sports_court'
+            ? 1.05 * (cp.scale || 1)
+            : cp.propCategory === 'playground' || cp.propCategory === 'water_feature'
+            ? 0.62 * (cp.scale || 1)
+            : 0.45 * (cp.scale || 1);
+        if (Math.hypot(wx - cp.wx, wy - cp.wy) < hitRad) {
           sounds.playClick();
           if (isCreatorStudioOpenRef.current) {
             setCreatorSelectedTarget({ kind: 'custom_prop', id: cp.id });
@@ -4096,6 +4102,33 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWy = standWy;
             player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
             showToast(`🔥 Menghangatkan diri di dekat ${cp.name}`, 2500);
+            return;
+          }
+          if (cp.propCategory === 'playground') {
+            const standWx = cp.wx;
+            const standWy = cp.wy + 0.25;
+            player.targetWx = standWx;
+            player.targetWy = standWy;
+            player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
+            showToast(`🛝 Bermain seru di ${cp.name}!`, 2600);
+            return;
+          }
+          if (cp.propCategory === 'sports_court') {
+            player.targetWx = wx;
+            player.targetWy = wy;
+            player.isMoving = Math.hypot(player.wx - wx, player.wy - wy) > 0.08;
+            player.isRunning = true;
+            player.speed = 1.28;
+            showToast(`🏆 Berolahraga di ${cp.name}!`, 2600);
+            return;
+          }
+          if (cp.propCategory === 'water_feature') {
+            const standWx = cp.wx;
+            const standWy = cp.wy + 0.58 * (cp.scale || 1);
+            player.targetWx = standWx;
+            player.targetWy = standWy;
+            player.isMoving = Math.hypot(player.wx - standWx, player.wy - standWy) > 0.08;
+            showToast(`⛲ Menikmati kesejukan ${cp.name}`, 2500);
             return;
           }
         }
@@ -4896,9 +4929,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     let creatorDragStartPos: { x: number; y: number } | null = null;
 
     const findCreatorTargetAt = (wx: number, wy: number): CreatorSelectedTarget => {
-      // 1. Check Custom Props (Trees, Benches, Swings, Campfire)
+      // 1. Check Custom Props (Trees, Benches, Swings, Campfire, Playgrounds, Sports Courts, Shrubs, Water Features)
       for (const cp of creatorStateRef.current.customProps || []) {
-        if (Math.hypot(wx - cp.wx, wy - cp.wy) < 0.55 * (cp.scale || 1)) {
+        const hitRad =
+          cp.propCategory === 'sports_court'
+            ? 1.15 * (cp.scale || 1)
+            : cp.propCategory === 'playground' || cp.propCategory === 'water_feature'
+            ? 0.68 * (cp.scale || 1)
+            : 0.55 * (cp.scale || 1);
+        if (Math.hypot(wx - cp.wx, wy - cp.wy) < hitRad) {
           return { kind: 'custom_prop', id: cp.id };
         }
       }

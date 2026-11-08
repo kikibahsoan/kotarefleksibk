@@ -358,6 +358,133 @@ export const CREATOR_PROP_CATALOG: CreatorPropCatalogEntry[] = [
     icon: '🏮',
     description: 'Tungku obor perunggu berukir emas dengan nyala api berkobar.',
   },
+
+  // 4 Model Playground Anak (Perosotan, Jungkat-Jungkit, Kuda Pegas, Istana Playground)
+  {
+    model: 'playground_slide_colorful',
+    category: 'playground',
+    name: 'Perosotan Anak Pelangi',
+    icon: '🛝',
+    description: 'Perosotan anak warna-warni lengkap dengan tangga panjat dan atap menara.',
+  },
+  {
+    model: 'playground_seesaw_dual',
+    category: 'playground',
+    name: 'Jungkat-Jungkit Taman Ganda',
+    icon: '⚖️',
+    description: 'Permainan jungkat-jungkit 2 anak yang bergerak naik-turun secara dinamis.',
+  },
+  {
+    model: 'playground_spring_rider',
+    category: 'playground',
+    name: 'Kuda-Kudaan Pegas Taman',
+    icon: '🎠',
+    description: 'Wahana kuda pegas kuning ceria yang membal lembut di taman bermain.',
+  },
+  {
+    model: 'playground_combo_castle',
+    category: 'playground',
+    name: 'Istana Playground Anak Lengkap',
+    icon: '🏰',
+    description: 'Paket kombo rumah menara, jembatan gantung, dan perosotan ganda anak.',
+  },
+
+  // 4 Model Lapangan Olahraga & Hamparan Lapangan Terbuka (Basket, Futsal, Badminton, Rumput)
+  {
+    model: 'court_basketball_full',
+    category: 'sports_court',
+    name: 'Lapangan Basket Streetball',
+    icon: '🏀',
+    description: 'Lapangan basket lengkap dengan garis three-point, 2 tiang ring, dan bola memantul.',
+  },
+  {
+    model: 'court_futsal_green',
+    category: 'sports_court',
+    name: 'Lapangan Futsal Rumput Sintetis',
+    icon: '⚽',
+    description: 'Lapangan futsal rumput hijau bergaris putih dengan 2 gawang jaring dan bola.',
+  },
+  {
+    model: 'court_badminton_pro',
+    category: 'sports_court',
+    name: 'Lapangan Badminton / Bulu Tangkis',
+    icon: '🏸',
+    description: 'Karpet lapangan badminton hijau zamrud lengkap dengan tiang net tengah & shuttlecock.',
+  },
+  {
+    model: 'open_green_field',
+    category: 'sports_court',
+    name: 'Hamparan Rumput / Lapangan Terbuka',
+    icon: '⛳',
+    description: 'Hamparan lapangan rumput hijau terbuka bertekstur halus untuk upacara atau piknik.',
+  },
+
+  // 5 Model Semak & Tanaman Hias
+  {
+    model: 'shrub_flowering_azalea',
+    category: 'shrub_plant',
+    name: 'Semak Bunga Azalea Rimbun',
+    icon: '🌺',
+    description: 'Rumpun semak hijau bulat bertabur kelopak bunga azalea merah muda & putih.',
+  },
+  {
+    model: 'shrub_topiary_spiral',
+    category: 'shrub_plant',
+    name: 'Tanaman Hias Topiary Spiral',
+    icon: '🪴',
+    description: 'Pohon semak pangkas spiral artistik di dalam pot terakota taman.',
+  },
+  {
+    model: 'plant_monstera_pot',
+    category: 'shrub_plant',
+    name: 'Pot Tanaman Hias Monstera',
+    icon: '🌿',
+    description: 'Tanaman daun monstera tropis lebar di dalam pot keramik putih.',
+  },
+  {
+    model: 'plant_flower_bed_trio',
+    category: 'shrub_plant',
+    name: 'Petak Kotak Tanaman Bunga Hias',
+    icon: '🌷',
+    description: 'Kotak planter kayu berisi deretan tulip, lavender, dan marigold warna-warni.',
+  },
+  {
+    model: 'shrub_bamboo_zen',
+    category: 'shrub_plant',
+    name: 'Rumpun Bambu Hias Zen',
+    icon: '🎋',
+    description: 'Barisan batang bambu hijau segar dengan batu taman yang menenangkan.',
+  },
+
+  // 4 Model Kolam, Air Mancur & Elemen Air Lainnya
+  {
+    model: 'water_fountain_tiered',
+    category: 'water_feature',
+    name: 'Air Mancur Taman 3 Tingkat',
+    icon: '⛲',
+    description: 'Air mancur marmer klasik 3 tingkat dengan pancuran air aktif berkilau.',
+  },
+  {
+    model: 'water_koi_pond_lotus',
+    category: 'water_feature',
+    name: 'Kolam Ikan Koi & Bunga Teratai',
+    icon: '🪷',
+    description: 'Kolam batu alami berisi daun teratai mekar dan ikan koi yang berenang memutar.',
+  },
+  {
+    model: 'water_mini_waterfall',
+    category: 'water_feature',
+    name: 'Air Terjun Mini & Kolam Batu',
+    icon: '🏞️',
+    description: 'Tebing batu bertingkat dengan aliran air terjun mini yang jatuh ke kolam jernih.',
+  },
+  {
+    model: 'water_dancing_jets',
+    category: 'water_feature',
+    name: 'Air Mancur Menari Lantai Plaza',
+    icon: '💦',
+    description: '5 titik semburan air mancur lantai plaza yang menari naik-turun bergantian.',
+  },
 ];
 
 export function createDefaultPropItem(
@@ -530,9 +657,189 @@ export interface CreatorTerrainCatalogEntry {
   previewColor: string;
   borderColor: string;
   description: string;
+  spriteGridPos?: { row: number; col: number };
 }
 
 export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
+  // 16 Jenis Tanah & Paving Sesuai Gambar Referensi (Baris 1 - 4, Kolom 1 - 4)
+  {
+    terrainType: 'img_paving_herringbone_red',
+    name: '1. Paving Zigzag Merah-Abu',
+    icon: '🧱',
+    previewColor: '#b34d44',
+    borderColor: '#b8b6ae',
+    description: 'Pola paving herringbone merah bata dan abu-abu muda sesuai gambar (Baris 1 Kolom 1).',
+    spriteGridPos: { row: 0, col: 0 },
+  },
+  {
+    terrainType: 'img_paving_basketweave_brown',
+    name: '2. Paving Anyaman Cokelat',
+    icon: '🟫',
+    previewColor: '#c07136',
+    borderColor: '#7a583b',
+    description: 'Pola paving anyaman keranjang cokelat tanah & terakota (Baris 1 Kolom 2).',
+    spriteGridPos: { row: 0, col: 1 },
+  },
+  {
+    terrainType: 'img_paving_herringbone_grey',
+    name: '3. Paving Herringbone Abu',
+    icon: '⬜',
+    previewColor: '#babab4',
+    borderColor: '#6b6b66',
+    description: 'Paving blok abu-abu klasik pola tulang ikan rapi (Baris 1 Kolom 3).',
+    spriteGridPos: { row: 0, col: 2 },
+  },
+  {
+    terrainType: 'img_paving_hex_blue',
+    name: '4. Mozaik Heksagonal Biru',
+    icon: '🔷',
+    previewColor: '#91aedc',
+    borderColor: '#8d6e53',
+    description: 'Ubin heksagonal biru langit dengan aksen bintang cokelat (Baris 1 Kolom 4).',
+    spriteGridPos: { row: 0, col: 3 },
+  },
+  {
+    terrainType: 'img_stone_river_grey',
+    name: '5. Batu Kali Bulat Abu',
+    icon: '🪨',
+    previewColor: '#7a7c78',
+    borderColor: '#a3a5a0',
+    description: 'Permukaan tanah batu kali bulat abu-abu natural (Baris 2 Kolom 1).',
+    spriteGridPos: { row: 1, col: 0 },
+  },
+  {
+    terrainType: 'img_stone_pebble_cream',
+    name: '6. Batu Koral Krem Taman',
+    icon: ' pebbles',
+    previewColor: '#f3dfb4',
+    borderColor: '#a29b79',
+    description: 'Hamparan batu koral taman di atas pasir krem hangat (Baris 2 Kolom 2).',
+    spriteGridPos: { row: 1, col: 1 },
+  },
+  {
+    terrainType: 'img_stone_flagstone_brown',
+    name: '7. Batu Alam Lempeng Cokelat',
+    icon: '🤎',
+    previewColor: '#725649',
+    borderColor: '#dfc69c',
+    description: 'Susunan batu alam lempeng poligonal cokelat & krem (Baris 2 Kolom 3).',
+    spriteGridPos: { row: 1, col: 2 },
+  },
+  {
+    terrainType: 'img_tile_dotted_grey',
+    name: '8. Ubin Kotak Abu Kancing',
+    icon: '🔘',
+    previewColor: '#929699',
+    borderColor: '#dfd9cc',
+    description: 'Ubin trotoar kotak abu-abu dengan ornamen bulatan krem di persimpangan (Baris 2 Kolom 4).',
+    spriteGridPos: { row: 1, col: 3 },
+  },
+  {
+    terrainType: 'img_brick_running_pastel',
+    name: '9. Bata Susun Pastel',
+    icon: '🧱',
+    previewColor: '#b7ac9a',
+    borderColor: '#8b99a7',
+    description: 'Susunan bata memanjang warna pastel krem, abu kebiruan, dan cokelat muda (Baris 3 Kolom 1).',
+    spriteGridPos: { row: 2, col: 0 },
+  },
+  {
+    terrainType: 'img_paving_parquet_taupe',
+    name: '10. Paving Parket Taupe',
+    icon: '🪟',
+    previewColor: '#a69f95',
+    borderColor: '#b28f79',
+    description: 'Paving blok susun parket vertikal-horizontal warna taupe elegan (Baris 3 Kolom 2).',
+    spriteGridPos: { row: 2, col: 1 },
+  },
+  {
+    terrainType: 'img_wood_plank_terracotta',
+    name: '11. Papan Kayu Terakota',
+    icon: '🪵',
+    previewColor: '#c37b42',
+    borderColor: '#693c18',
+    description: 'Lantai bilah papan kayu memanjang warna cokelat terakota hangat (Baris 3 Kolom 3).',
+    spriteGridPos: { row: 2, col: 2 },
+  },
+  {
+    terrainType: 'img_brick_checker_red',
+    name: '12. Bata Kotak Merah-Tan',
+    icon: '🟥',
+    previewColor: '#ad4842',
+    borderColor: '#b29b7a',
+    description: 'Susunan bata kotak rapat selang-seling merah marun dan cokelat muda (Baris 3 Kolom 4).',
+    spriteGridPos: { row: 2, col: 3 },
+  },
+  {
+    terrainType: 'img_cobble_rounded_cream',
+    name: '13. Batu Cobble Krem Halus',
+    icon: '🥟',
+    previewColor: '#d7c3aa',
+    borderColor: '#7f6d5c',
+    description: 'Batu cobble sudut membulat warna krem gading dengan nat cokelat tua (Baris 4 Kolom 1).',
+    spriteGridPos: { row: 3, col: 0 },
+  },
+  {
+    terrainType: 'img_brick_classic_orange',
+    name: '14. Bata Terakota Oranye',
+    icon: '🟧',
+    previewColor: '#e28025',
+    borderColor: '#b75526',
+    description: 'Susunan bata klasik warna oranye terakota cerah menyala (Baris 4 Kolom 2).',
+    spriteGridPos: { row: 3, col: 1 },
+  },
+  {
+    terrainType: 'img_paving_lattice_red',
+    name: '15. Paving Anyaman Merah-Krem',
+    icon: '🧶',
+    previewColor: '#9b4343',
+    borderColor: '#cfc5bd',
+    description: 'Paving pola kisi anyaman merah bata dengan titik kotak krem di tengah (Baris 4 Kolom 3).',
+    spriteGridPos: { row: 3, col: 2 },
+  },
+  {
+    terrainType: 'img_tile_diamond_gold',
+    name: '16. Ubin Berlian Kuning Emas',
+    icon: '🔶',
+    previewColor: '#edd282',
+    borderColor: '#c7b07c',
+    description: 'Ubin keramik diagonal motif berlian kuning keemasan dan krem (Baris 4 Kolom 4).',
+    spriteGridPos: { row: 3, col: 3 },
+  },
+
+  // Hamparan Rumput & Tanah Kota Lainnya
+  {
+    terrainType: 'grass_open_meadow',
+    name: 'Hamparan Rumput Lapangan',
+    icon: '🌱',
+    previewColor: '#4ade80',
+    borderColor: '#15803d',
+    description: 'Hamparan rumput lapangan terbuka dengan gradasi helai rumput segar.',
+  },
+  {
+    terrainType: 'grass_emerald',
+    name: 'Rumput Hijau Zamrud',
+    icon: '🟩',
+    previewColor: '#22c55e',
+    borderColor: '#16a34a',
+    description: 'Rumput hijau zamrud segar untuk menutup jalan atau membuat taman.',
+  },
+  {
+    terrainType: 'flower_garden',
+    name: 'Tanah Taman Bunga',
+    icon: '🌷',
+    previewColor: '#22c55e',
+    borderColor: '#f472b6',
+    description: 'Petak rumput subur bertabur bunga warna-warni yang bermekaran.',
+  },
+  {
+    terrainType: 'water_pond',
+    name: 'Kolam Air Jernih',
+    icon: '💧',
+    previewColor: '#0ea5e9',
+    borderColor: '#7dd3fc',
+    description: 'Petak air kolam biru berkilau dengan efek riak air hidup.',
+  },
   {
     terrainType: 'road_asphalt',
     name: 'Jalan Aspal Kota',
@@ -580,30 +887,6 @@ export const CREATOR_TERRAIN_CATALOG: CreatorTerrainCatalogEntry[] = [
     previewColor: '#fde68a',
     borderColor: '#f59e0b',
     description: 'Hamparan pasir pantai keemasan dengan gurat ombak halus.',
-  },
-  {
-    terrainType: 'flower_garden',
-    name: 'Tanah Taman Bunga',
-    icon: '🌷',
-    previewColor: '#22c55e',
-    borderColor: '#f472b6',
-    description: 'Petak rumput subur bertabur bunga warna-warni yang bermekaran.',
-  },
-  {
-    terrainType: 'grass_emerald',
-    name: 'Rumput Hijau Zamrud',
-    icon: '🟩',
-    previewColor: '#4ade80',
-    borderColor: '#16a34a',
-    description: 'Rumput hijau zamrud segar untuk menutup jalan atau membuat lapangan.',
-  },
-  {
-    terrainType: 'water_pond',
-    name: 'Kolam Air Jernih',
-    icon: '💧',
-    previewColor: '#0ea5e9',
-    borderColor: '#7dd3fc',
-    description: 'Petak air kolam biru berkilau dengan efek riak air hidup.',
   },
 ];
 
@@ -1810,19 +2093,19 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                 </div>
               )}
 
-              {/* TAB 2: POHON, TEMPAT DUDUK, AYUNAN & API UNGGUN */}
+              {/* TAB 2: POHON, TEMPAT DUDUK, AYUNAN, API UNGGUN, PLAYGROUND, LAPANGAN, TANAMAN & KOLAM */}
               {activeTab === 'props' && (
                 <div className="space-y-3">
                   <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[10.5px] text-emerald-200 leading-relaxed">
-                    Buat, pindahkan (Drag & Drop), atau hapus <strong>Pohon berbagai model, Tempat Duduk/Bangku, Ayunan, dan Api Unggun</strong>. Untuk memindahkan pohon/bangku/ayunan bawaan kota, buka tab <strong>Objek Kota Bawaan</strong>.
+                    Buat, pindahkan (Drag & Drop), atau hapus <strong>Pohon, Kursi, Ayunan, Api Unggun, Playground Anak, Lapangan Olahraga, Semak/Tanaman Hias, serta Kolam & Air Mancur</strong>.
                   </div>
 
-                  {/* Sub-category selector */}
+                  {/* Sub-category selector (8 kategori lengkap) */}
                   <div className="grid grid-cols-4 gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
                     <button
                       type="button"
                       onClick={() => setPropSubCategory('tree')}
-                      className={`py-1.5 px-1 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all ${
+                      className={`py-1.5 px-1 rounded-lg text-[9.5px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
                         propSubCategory === 'tree'
                           ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40'
                           : 'text-slate-400 hover:text-slate-200'
@@ -1834,7 +2117,7 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                     <button
                       type="button"
                       onClick={() => setPropSubCategory('bench')}
-                      className={`py-1.5 px-1 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all ${
+                      className={`py-1.5 px-1 rounded-lg text-[9.5px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
                         propSubCategory === 'bench'
                           ? 'bg-amber-500/25 text-amber-200 border border-amber-400/40'
                           : 'text-slate-400 hover:text-slate-200'
@@ -1846,7 +2129,7 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                     <button
                       type="button"
                       onClick={() => setPropSubCategory('swing')}
-                      className={`py-1.5 px-1 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all ${
+                      className={`py-1.5 px-1 rounded-lg text-[9.5px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
                         propSubCategory === 'swing'
                           ? 'bg-sky-500/25 text-sky-200 border border-sky-400/40'
                           : 'text-slate-400 hover:text-slate-200'
@@ -1858,7 +2141,7 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                     <button
                       type="button"
                       onClick={() => setPropSubCategory('campfire')}
-                      className={`py-1.5 px-1 rounded-lg text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all ${
+                      className={`py-1.5 px-1 rounded-lg text-[9.5px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
                         propSubCategory === 'campfire'
                           ? 'bg-orange-500/25 text-orange-200 border border-orange-400/40'
                           : 'text-slate-400 hover:text-slate-200'
@@ -1866,6 +2149,54 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                     >
                       <Flame className="w-3.5 h-3.5" />
                       <span>Api (2)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPropSubCategory('playground')}
+                      className={`py-1.5 px-1 rounded-lg text-[9.5px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
+                        propSubCategory === 'playground'
+                          ? 'bg-pink-500/25 text-pink-200 border border-pink-400/40'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span>🛝</span>
+                      <span>Playground (4)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPropSubCategory('sports_court')}
+                      className={`py-1.5 px-1 rounded-lg text-[9.5px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
+                        propSubCategory === 'sports_court'
+                          ? 'bg-indigo-500/25 text-indigo-200 border border-indigo-400/40'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span>🏀</span>
+                      <span>Lapangan (4)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPropSubCategory('shrub_plant')}
+                      className={`py-1.5 px-1 rounded-lg text-[9.5px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
+                        propSubCategory === 'shrub_plant'
+                          ? 'bg-lime-500/25 text-lime-200 border border-lime-400/40'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span>🌺</span>
+                      <span>Semak/Hias (5)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPropSubCategory('water_feature')}
+                      className={`py-1.5 px-1 rounded-lg text-[9.5px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
+                        propSubCategory === 'water_feature'
+                          ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400/40'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span>⛲</span>
+                      <span>Kolam/Air (4)</span>
                     </button>
                   </div>
 
@@ -2104,10 +2435,22 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                     </div>
 
                     <p className="text-[10px] text-slate-400 leading-relaxed">
-                      Pilih model tanah atau jalan di bawah, lalu <strong>klik atau tahan & geser di peta</strong> untuk membuat jalan raya, trotoar batu, lantai plaza, kolam, atau taman bunga.
+                      Pilih model tanah atau paving (termasuk <strong>16 motif tanah dari referensi gambar</strong> & hamparan rumput lapangan) di bawah, lalu <strong>klik atau tahan & geser di peta</strong> untuk mengecat lantai kota.
                     </p>
 
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center gap-2.5">
+                      <img
+                        src="/assets/aistudio/Jenis_Tanah_Tambahan_d5b803e2.jpg"
+                        alt="16 Motif Tanah Referensi"
+                        className="w-12 h-12 rounded-lg object-cover border border-teal-500/40 shrink-0"
+                      />
+                      <div className="text-[10px] text-slate-300 leading-snug">
+                        <span className="font-bold text-teal-300 block">16 Tekstur Paving & Batu Referensi Aktif</span>
+                        Motif #1 s/d #16 di bawah menggunakan tekstur persis sesuai kisi gambar referensi (4x4).
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-1">
                       {CREATOR_TERRAIN_CATALOG.map((t) => {
                         const isBrushActive = activeTerrainBrush === t.terrainType;
                         return (
@@ -2118,23 +2461,36 @@ export const CreatorStudioFloatingDock: React.FC<CreatorStudioFloatingDockProps>
                               clearAllPlacementModes();
                               onSelectTerrainBrush?.(isBrushActive ? null : t.terrainType);
                             }}
+                            title={t.description}
                             className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
                               isBrushActive
                                 ? 'bg-teal-500/25 border-teal-400 text-white shadow-sm'
                                 : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-200'
                             }`}
                           >
-                            <div
-                              className="w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0 border"
-                              style={{
-                                backgroundColor: t.previewColor,
-                                borderColor: t.borderColor,
-                              }}
-                            >
-                              {t.icon}
-                            </div>
+                            {t.spriteGridPos ? (
+                              <div
+                                className="w-7 h-7 rounded-lg shrink-0 border overflow-hidden"
+                                style={{
+                                  borderColor: t.borderColor,
+                                  backgroundImage: 'url(/assets/aistudio/Jenis_Tanah_Tambahan_d5b803e2.jpg)',
+                                  backgroundSize: '400% 400%',
+                                  backgroundPosition: `${t.spriteGridPos.col * 33.333}% ${t.spriteGridPos.row * 33.333}%`,
+                                }}
+                              />
+                            ) : (
+                              <div
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0 border"
+                                style={{
+                                  backgroundColor: t.previewColor,
+                                  borderColor: t.borderColor,
+                                }}
+                              >
+                                {t.icon}
+                              </div>
+                            )}
                             <div className="min-w-0">
-                              <div className="text-[10.5px] font-bold truncate">{t.name}</div>
+                              <div className="text-[10px] font-bold truncate">{t.name}</div>
                               <div className="text-[9px] text-slate-400 truncate">
                                 {isBrushActive ? 'Kuas Aktif' : 'Klik & Cat Peta'}
                               </div>

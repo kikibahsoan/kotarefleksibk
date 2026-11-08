@@ -505,7 +505,15 @@ export interface ExistingObjectOverride {
   isHidden?: boolean;
 }
 
-export type CreatorPropCategory = 'tree' | 'bench' | 'swing' | 'campfire';
+export type CreatorPropCategory =
+  | 'tree'
+  | 'bench'
+  | 'swing'
+  | 'campfire'
+  | 'playground'
+  | 'sports_court'
+  | 'shrub_plant'
+  | 'water_feature';
 
 export type CreatorPropModel =
   // Pohon (6 model)
@@ -526,7 +534,28 @@ export type CreatorPropModel =
   | 'swing_cyan_modern'
   // Api Unggun (2 model)
   | 'campfire_stone_ring'
-  | 'campfire_royal_brazier';
+  | 'campfire_royal_brazier'
+  // Playground Anak (4 model)
+  | 'playground_slide_colorful'
+  | 'playground_seesaw_dual'
+  | 'playground_spring_rider'
+  | 'playground_combo_castle'
+  // Lapangan Olahraga & Hamparan Terbuka (4 model)
+  | 'court_basketball_full'
+  | 'court_futsal_green'
+  | 'court_badminton_pro'
+  | 'open_green_field'
+  // Semak & Tanaman Hias (5 model)
+  | 'shrub_flowering_azalea'
+  | 'shrub_topiary_spiral'
+  | 'plant_monstera_pot'
+  | 'plant_flower_bed_trio'
+  | 'shrub_bamboo_zen'
+  // Kolam, Air Mancur & Elemen Air (4 model)
+  | 'water_fountain_tiered'
+  | 'water_koi_pond_lotus'
+  | 'water_mini_waterfall'
+  | 'water_dancing_jets';
 
 export interface CreatorPropItem {
   id: string;
@@ -583,7 +612,25 @@ export type CreatorTerrainType =
   | 'sand_golden'
   | 'flower_garden'
   | 'grass_emerald'
-  | 'water_pond';
+  | 'grass_open_meadow'
+  | 'water_pond'
+  // 16 Jenis Tanah & Paving dari Gambar Referensi (4x4 Grid)
+  | 'img_paving_herringbone_red'
+  | 'img_paving_basketweave_brown'
+  | 'img_paving_herringbone_grey'
+  | 'img_paving_hex_blue'
+  | 'img_stone_river_grey'
+  | 'img_stone_pebble_cream'
+  | 'img_stone_flagstone_brown'
+  | 'img_tile_dotted_grey'
+  | 'img_brick_running_pastel'
+  | 'img_paving_parquet_taupe'
+  | 'img_wood_plank_terracotta'
+  | 'img_brick_checker_red'
+  | 'img_cobble_rounded_cream'
+  | 'img_brick_classic_orange'
+  | 'img_paving_lattice_red'
+  | 'img_tile_diamond_gold';
 
 export interface CreatorTerrainTile {
   gx: number;

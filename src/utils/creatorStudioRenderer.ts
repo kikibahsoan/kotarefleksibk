@@ -1327,6 +1327,595 @@ export function drawCustomCreatorProp3D(
       ctx.fill();
       break;
     }
+
+    // ---------------- PLAYGROUND ANAK (4 MODEL) ----------------
+    case 'playground_slide_colorful': {
+      // Soft rubber mat base
+      ctx.fillStyle = '#fef08a';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.2 * sc;
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y + 1 * sc, 20 * sc, 10 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Tower posts (left side)
+      ctx.fillStyle = '#dc2626';
+      ctx.fillRect(pt.x - 13 * sc, pt.y - 23 * sc, 2.5 * sc, 23 * sc);
+      ctx.fillRect(pt.x - 4 * sc, pt.y - 23 * sc, 2.5 * sc, 23 * sc);
+
+      // Climbing ladder steps (left)
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.8 * sc;
+      for (let i = 0; i < 4; i++) {
+        const ly = pt.y - (4 + i * 4) * sc;
+        ctx.beginPath();
+        ctx.moveTo(pt.x - 16 * sc + i * 1 * sc, ly);
+        ctx.lineTo(pt.x - 11 * sc, ly);
+        ctx.stroke();
+      }
+
+      // Platform deck
+      ctx.fillStyle = '#2563eb';
+      ctx.fillRect(pt.x - 14 * sc, pt.y - 18 * sc, 12 * sc, 3.5 * sc);
+
+      // Yellow pyramid roof over tower
+      ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.moveTo(pt.x - 8 * sc, pt.y - 31 * sc);
+      ctx.lineTo(pt.x - 16 * sc, pt.y - 22 * sc);
+      ctx.lineTo(pt.x, pt.y - 22 * sc);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#ea580c';
+      ctx.lineWidth = 1.1 * sc;
+      ctx.stroke();
+
+      // Curved slide chute (sky blue & cyan)
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 6.5 * sc;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(pt.x - 4 * sc, pt.y - 16 * sc);
+      ctx.bezierCurveTo(pt.x + 3 * sc, pt.y - 15 * sc, pt.x + 7 * sc, pt.y - 3 * sc, pt.x + 15 * sc, pt.y);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 4.2 * sc;
+      ctx.beginPath();
+      ctx.moveTo(pt.x - 4 * sc, pt.y - 16 * sc);
+      ctx.bezierCurveTo(pt.x + 3 * sc, pt.y - 15 * sc, pt.x + 7 * sc, pt.y - 3 * sc, pt.x + 15 * sc, pt.y);
+      ctx.stroke();
+      break;
+    }
+
+    case 'playground_seesaw_dual': {
+      const tilt = Math.sin(elapsed * 2.4 + wx) * 4.2 * sc;
+      // Base pad
+      ctx.fillStyle = '#dcfce7';
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 1.2 * sc;
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y + 1 * sc, 18 * sc, 8.5 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Center fulcrum triangle
+      ctx.fillStyle = '#2563eb';
+      ctx.beginPath();
+      ctx.moveTo(pt.x, pt.y - 9 * sc);
+      ctx.lineTo(pt.x - 4.5 * sc, pt.y + 1 * sc);
+      ctx.lineTo(pt.x + 4.5 * sc, pt.y + 1 * sc);
+      ctx.closePath();
+      ctx.fill();
+
+      // Tilting plank
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3.6 * sc;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(pt.x - 15 * sc, pt.y - 8 * sc - tilt);
+      ctx.lineTo(pt.x + 15 * sc, pt.y - 8 * sc + tilt);
+      ctx.stroke();
+
+      // Seats & handles on both ends
+      ctx.fillStyle = '#facc15';
+      ctx.fillRect(pt.x - 16 * sc, pt.y - 11 * sc - tilt, 4.5 * sc, 2.5 * sc);
+      ctx.fillRect(pt.x + 11.5 * sc, pt.y - 11 * sc + tilt, 4.5 * sc, 2.5 * sc);
+
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1.5 * sc;
+      ctx.beginPath();
+      ctx.moveTo(pt.x - 11 * sc, pt.y - 8 * sc - tilt * 0.75);
+      ctx.lineTo(pt.x - 11 * sc, pt.y - 13 * sc - tilt * 0.75);
+      ctx.moveTo(pt.x + 11 * sc, pt.y - 8 * sc + tilt * 0.75);
+      ctx.lineTo(pt.x + 11 * sc, pt.y - 13 * sc + tilt * 0.75);
+      ctx.stroke();
+      break;
+    }
+
+    case 'playground_spring_rider': {
+      const bounce = Math.sin(elapsed * 4.2 + wy) * 1.8 * sc;
+      // Merry-go-round / spring base
+      ctx.fillStyle = '#e0f2fe';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.4 * sc;
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y + 1 * sc, 15 * sc, 7.5 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Spiral spring
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 2.2 * sc;
+      ctx.beginPath();
+      ctx.moveTo(pt.x, pt.y);
+      ctx.lineTo(pt.x - 2 * sc, pt.y - 4 * sc);
+      ctx.lineTo(pt.x + 2 * sc, pt.y - 8 * sc);
+      ctx.lineTo(pt.x, pt.y - 11 * sc + bounce);
+      ctx.stroke();
+
+      // Colorful pony/rider body
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y - 13 * sc + bounce, 7 * sc, 4 * sc, 0, 0, Math.PI * 2);
+      ctx.arc(pt.x + 5.5 * sc, pt.y - 18 * sc + bounce, 3.5 * sc, 0, Math.PI * 2);
+      ctx.fill();
+      // Red saddle
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(pt.x - 3 * sc, pt.y - 16 * sc + bounce, 5 * sc, 2.5 * sc);
+      break;
+    }
+
+    case 'playground_combo_castle': {
+      // Multi-tower castle playground
+      ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y + 2 * sc, 25 * sc, 12 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Left & Right towers
+      [-10, 8].forEach((tx, idx) => {
+        ctx.fillStyle = idx === 0 ? '#3b82f6' : '#10b981';
+        ctx.fillRect(pt.x + tx * sc, pt.y - 22 * sc, 8 * sc, 20 * sc);
+        // Castle roof
+        ctx.fillStyle = idx === 0 ? '#ef4444' : '#f59e0b';
+        ctx.beginPath();
+        ctx.moveTo(pt.x + (tx + 4) * sc, pt.y - 31 * sc);
+        ctx.lineTo(pt.x + (tx - 2) * sc, pt.y - 22 * sc);
+        ctx.lineTo(pt.x + (tx + 10) * sc, pt.y - 22 * sc);
+        ctx.closePath();
+        ctx.fill();
+      });
+
+      // Bridge connecting towers
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(pt.x - 2 * sc, pt.y - 14 * sc, 10 * sc, 3.5 * sc);
+
+      // Dual slides
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 4.5 * sc;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(pt.x - 9 * sc, pt.y - 12 * sc);
+      ctx.lineTo(pt.x - 20 * sc, pt.y + 1 * sc);
+      ctx.moveTo(pt.x + 15 * sc, pt.y - 12 * sc);
+      ctx.lineTo(pt.x + 23 * sc, pt.y + 1 * sc);
+      ctx.stroke();
+      break;
+    }
+
+    // ---------------- LAPANGAN OLAHRAGA & HAMPARAN TERBUKA (4 MODEL) ----------------
+    case 'court_basketball_full':
+    case 'court_futsal_green':
+    case 'court_badminton_pro':
+    case 'open_green_field': {
+      const halfW = 1.45 * (scale || 1.0);
+      const halfH = 0.95 * (scale || 1.0);
+      const cNW = project(wx - halfW, wy - halfH, 0.01);
+      const cNE = project(wx + halfW, wy - halfH, 0.01);
+      const cSE = project(wx + halfW, wy + halfH, 0.01);
+      const cSW = project(wx - halfW, wy + halfH, 0.01);
+      const midN = { x: (cNW.x + cNE.x) * 0.5, y: (cNW.y + cNE.y) * 0.5 };
+      const midS = { x: (cSW.x + cSE.x) * 0.5, y: (cSW.y + cSE.y) * 0.5 };
+      const midW = { x: (cNW.x + cSW.x) * 0.5, y: (cNW.y + cSW.y) * 0.5 };
+      const midE = { x: (cNE.x + cSE.x) * 0.5, y: (cNE.y + cSE.y) * 0.5 };
+
+      // Court surface polygon
+      if (propModel === 'court_basketball_full') {
+        ctx.fillStyle = '#c2410c'; // Terracotta orange basketball court
+        ctx.strokeStyle = '#ffffff';
+      } else if (propModel === 'court_futsal_green') {
+        ctx.fillStyle = '#15803d'; // Deep futsal turf green
+        ctx.strokeStyle = '#ffffff';
+      } else if (propModel === 'court_badminton_pro') {
+        ctx.fillStyle = '#0f766e'; // Tournament teal-green badminton mat
+        ctx.strokeStyle = '#ffffff';
+      } else {
+        ctx.fillStyle = '#4ade80'; // Lush open green meadow field
+        ctx.strokeStyle = '#16a34a';
+      }
+
+      ctx.lineWidth = 2 * sc;
+      ctx.beginPath();
+      ctx.moveTo(cNW.x, cNW.y);
+      ctx.lineTo(cNE.x, cNE.y);
+      ctx.lineTo(cSE.x, cSE.y);
+      ctx.lineTo(cSW.x, cSW.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      if (propModel === 'open_green_field') {
+        // Inner lawn stripes & corner stones
+        ctx.strokeStyle = 'rgba(22, 163, 74, 0.35)';
+        ctx.lineWidth = 1.4 * sc;
+        ctx.beginPath();
+        ctx.moveTo(midN.x, midN.y);
+        ctx.lineTo(midS.x, midS.y);
+        ctx.stroke();
+        [cNW, cNE, cSE, cSW].forEach((corner) => {
+          ctx.fillStyle = '#e2e8f0';
+          ctx.beginPath();
+          ctx.arc(corner.x, corner.y, 2.8 * sc, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else {
+        // Center line & center circle for courts
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 1.4 * sc;
+        ctx.beginPath();
+        ctx.moveTo(midN.x, midN.y);
+        ctx.lineTo(midS.x, midS.y);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.ellipse(pt.x, pt.y, 10 * sc, 5 * sc, 0, 0, Math.PI * 2);
+        if (propModel === 'court_basketball_full') {
+          ctx.fillStyle = '#2563eb';
+          ctx.fill();
+        }
+        ctx.stroke();
+      }
+
+      // 3D Fixtures per sport
+      if (propModel === 'court_basketball_full') {
+        // Left & Right Basketball Hoops (poles + backboards + orange rims)
+        [midW, midE].forEach((hoopBase, idx) => {
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 2.4 * sc;
+          ctx.beginPath();
+          ctx.moveTo(hoopBase.x, hoopBase.y);
+          ctx.lineTo(hoopBase.x, hoopBase.y - 22 * sc);
+          ctx.stroke();
+
+          // White backboard
+          ctx.fillStyle = '#f8fafc';
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 1.1 * sc;
+          ctx.fillRect(hoopBase.x - 4.5 * sc, hoopBase.y - 26 * sc, 9 * sc, 6 * sc);
+          ctx.strokeRect(hoopBase.x - 4.5 * sc, hoopBase.y - 26 * sc, 9 * sc, 6 * sc);
+
+          // Orange rim
+          const rimOffset = idx === 0 ? 3 * sc : -3 * sc;
+          ctx.strokeStyle = '#ea580c';
+          ctx.lineWidth = 1.6 * sc;
+          ctx.beginPath();
+          ctx.ellipse(hoopBase.x + rimOffset, hoopBase.y - 20 * sc, 3.2 * sc, 1.6 * sc, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+      } else if (propModel === 'court_futsal_green') {
+        // Left & Right Futsal Goalposts
+        [midW, midE].forEach((goalBase) => {
+          ctx.strokeStyle = '#f8fafc';
+          ctx.lineWidth = 2.2 * sc;
+          ctx.beginPath();
+          ctx.moveTo(goalBase.x - 5 * sc, goalBase.y + 3 * sc);
+          ctx.lineTo(goalBase.x - 5 * sc, goalBase.y - 10 * sc);
+          ctx.lineTo(goalBase.x + 5 * sc, goalBase.y - 13 * sc);
+          ctx.lineTo(goalBase.x + 5 * sc, goalBase.y - 1 * sc);
+          ctx.stroke();
+        });
+      } else if (propModel === 'court_badminton_pro') {
+        // Center Badminton Net & Posts
+        ctx.strokeStyle = '#f8fafc';
+        ctx.lineWidth = 1.8 * sc;
+        ctx.beginPath();
+        ctx.moveTo(midN.x, midN.y);
+        ctx.lineTo(midN.x, midN.y - 11 * sc);
+        ctx.moveTo(midS.x, midS.y);
+        ctx.lineTo(midS.x, midS.y - 11 * sc);
+        ctx.stroke();
+
+        // Net mesh between midN and midS
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+        ctx.beginPath();
+        ctx.moveTo(midN.x, midN.y - 10 * sc);
+        ctx.lineTo(midS.x, midS.y - 10 * sc);
+        ctx.lineTo(midS.x, midS.y - 4 * sc);
+        ctx.lineTo(midN.x, midN.y - 4 * sc);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5 * sc;
+        ctx.beginPath();
+        ctx.moveTo(midN.x, midN.y - 10 * sc);
+        ctx.lineTo(midS.x, midS.y - 10 * sc);
+        ctx.stroke();
+      }
+      break;
+    }
+
+    // ---------------- SEMAK & TANAMAN HIAS (5 MODEL) ----------------
+    case 'shrub_flowering_azalea': {
+      ctx.fillStyle = '#15803d';
+      ctx.beginPath();
+      ctx.arc(pt.x - 6 * sc, pt.y - 6 * sc, 7.5 * sc, 0, Math.PI * 2);
+      ctx.arc(pt.x + 6 * sc, pt.y - 6 * sc, 7.5 * sc, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y - 10 * sc, 8.5 * sc, 0, Math.PI * 2);
+      ctx.fill();
+      // Pink & magenta azalea blossoms
+      const flowers = [
+        [-6, -8, '#f472b6'],
+        [0, -13, '#ec4899'],
+        [6, -7, '#f43f5e'],
+        [-2, -5, '#fbcfe8'],
+        [4, -11, '#f472b6'],
+      ] as const;
+      flowers.forEach(([fx, fy, fc]) => {
+        ctx.fillStyle = fc;
+        ctx.beginPath();
+        ctx.arc(pt.x + fx * sc, pt.y + fy * sc, 2.2 * sc, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      break;
+    }
+
+    case 'shrub_topiary_spiral': {
+      // Terracotta / stone planter pot
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(pt.x - 5.5 * sc, pt.y - 7 * sc, 11 * sc, 7 * sc);
+      ctx.fillStyle = '#d97706';
+      ctx.fillRect(pt.x - 6.5 * sc, pt.y - 8.5 * sc, 13 * sc, 2 * sc);
+      // 3-tier manicured topiary spheres
+      [
+        { y: -13, r: 7, c: '#15803d' },
+        { y: -21, r: 5.2, c: '#16a34a' },
+        { y: -27.5, r: 3.5, c: '#22c55e' },
+      ].forEach((tier) => {
+        ctx.fillStyle = tier.c;
+        ctx.beginPath();
+        ctx.arc(pt.x + breeze * 0.3, pt.y + tier.y * sc, tier.r * sc, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      break;
+    }
+
+    case 'plant_monstera_pot': {
+      // Ceramic pot
+      ctx.fillStyle = '#f8fafc';
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1 * sc;
+      ctx.beginPath();
+      ctx.roundRect(pt.x - 5 * sc, pt.y - 8 * sc, 10 * sc, 8 * sc, 2 * sc);
+      ctx.fill();
+      ctx.stroke();
+
+      // Broad tropical monstera leaves
+      const leaves = [
+        [-8, -15, -0.5],
+        [8, -15, 0.5],
+        [-4, -20, -0.2],
+        [4, -20, 0.2],
+        [0, -23, 0],
+      ];
+      leaves.forEach(([lx, ly, rot], idx) => {
+        ctx.fillStyle = idx % 2 === 0 ? '#16a34a' : '#15803d';
+        ctx.beginPath();
+        ctx.ellipse(
+          pt.x + lx * sc + breeze * 0.4,
+          pt.y + ly * sc,
+          4.5 * sc,
+          2.6 * sc,
+          rot,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      });
+      break;
+    }
+
+    case 'plant_flower_bed_trio': {
+      // Wooden planter box
+      ctx.fillStyle = '#78350f';
+      ctx.beginPath();
+      ctx.roundRect(pt.x - 14 * sc, pt.y - 6 * sc, 28 * sc, 6.5 * sc, 2 * sc);
+      ctx.fill();
+      // Rich soil & foliage
+      ctx.fillStyle = '#166534';
+      ctx.fillRect(pt.x - 12.5 * sc, pt.y - 8 * sc, 25 * sc, 3 * sc);
+      // Colorful flower row
+      const bedColors = ['#facc15', '#f43f5e', '#a855f7', '#38bdf8', '#fb923c'];
+      bedColors.forEach((col, i) => {
+        const fx = pt.x + (-10 + i * 5) * sc;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(fx + breeze * 0.3, pt.y - 10 * sc, 2.8 * sc, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      break;
+    }
+
+    case 'shrub_bamboo_zen': {
+      // Zen stones at base
+      ctx.fillStyle = '#94a3b8';
+      ctx.beginPath();
+      ctx.arc(pt.x - 5 * sc, pt.y - 2 * sc, 3.5 * sc, 0, Math.PI * 2);
+      ctx.arc(pt.x + 5 * sc, pt.y - 1.5 * sc, 3 * sc, 0, Math.PI * 2);
+      ctx.fill();
+      // 4 Green bamboo stalks
+      [-6, -2, 2, 6].forEach((bx, i) => {
+        const h = (24 + (i % 2) * 5) * sc;
+        ctx.strokeStyle = '#16a34a';
+        ctx.lineWidth = 2.4 * sc;
+        ctx.beginPath();
+        ctx.moveTo(pt.x + bx * sc, pt.y);
+        ctx.lineTo(pt.x + bx * sc + breeze * 0.6, pt.y - h);
+        ctx.stroke();
+
+        // Leaf tufts
+        ctx.fillStyle = '#4ade80';
+        ctx.beginPath();
+        ctx.ellipse(
+          pt.x + (bx + 2.5) * sc + breeze * 0.6,
+          pt.y - h + 3 * sc,
+          4 * sc,
+          1.6 * sc,
+          0.3,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      });
+      break;
+    }
+
+    // ---------------- KOLAM, AIR MANCUR & ELEMEN AIR (4 MODEL) ----------------
+    case 'water_fountain_tiered': {
+      // Outer marble basin
+      ctx.fillStyle = '#cbd5e1';
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1.6 * sc;
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y, 19 * sc, 9.5 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Sparkling blue water pool
+      ctx.fillStyle = '#0ea5e9';
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y - 1 * sc, 16.5 * sc, 8 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3-tier pedestal
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(pt.x - 3 * sc, pt.y - 22 * sc, 6 * sc, 21 * sc);
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y - 10 * sc, 10 * sc, 4.5 * sc, 0, 0, Math.PI * 2);
+      ctx.ellipse(pt.x, pt.y - 18 * sc, 6.5 * sc, 3 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Animated water arcs spraying from top
+      const sprayH = (26 + Math.sin(elapsed * 8) * 2.5) * sc;
+      ctx.strokeStyle = '#bae6fd';
+      ctx.lineWidth = 1.6 * sc;
+      [-8, -4, 4, 8].forEach((sx) => {
+        ctx.beginPath();
+        ctx.moveTo(pt.x, pt.y - 22 * sc);
+        ctx.quadraticCurveTo(pt.x + sx * 0.6 * sc, pt.y - sprayH, pt.x + sx * sc, pt.y - 6 * sc);
+        ctx.stroke();
+      });
+      break;
+    }
+
+    case 'water_koi_pond_lotus': {
+      // Natural stone rim
+      ctx.fillStyle = '#64748b';
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y, 21 * sc, 10.5 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Clear aqua pond water
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y - 0.5 * sc, 18.5 * sc, 9 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Swimming orange/white Koi fish
+      const koiAng = elapsed * 1.4;
+      const kx = pt.x + Math.cos(koiAng) * 8 * sc;
+      const ky = pt.y - 1 * sc + Math.sin(koiAng) * 3.8 * sc;
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.ellipse(kx, ky, 3.2 * sc, 1.5 * sc, koiAng + Math.PI / 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Green lotus pads & pink lotus flower
+      [
+        [-7, -2],
+        [6, 2],
+        [2, -4],
+      ].forEach(([lx, ly], idx) => {
+        ctx.fillStyle = '#16a34a';
+        ctx.beginPath();
+        ctx.ellipse(pt.x + lx * sc, pt.y + ly * sc, 3.8 * sc, 2 * sc, 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (idx === 0) {
+          ctx.fillStyle = '#f472b6';
+          ctx.beginPath();
+          ctx.arc(pt.x + lx * sc, pt.y + (ly - 1.5) * sc, 2.1 * sc, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+      break;
+    }
+
+    case 'water_mini_waterfall': {
+      // Bottom pool
+      ctx.fillStyle = '#0284c7';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 2 * sc;
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y + 1 * sc, 18 * sc, 8.5 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Stacked rock cliff at back
+      ctx.fillStyle = '#475569';
+      ctx.beginPath();
+      ctx.arc(pt.x - 6 * sc, pt.y - 12 * sc, 8 * sc, 0, Math.PI * 2);
+      ctx.arc(pt.x + 6 * sc, pt.y - 11 * sc, 7.5 * sc, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y - 18 * sc, 8.5 * sc, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cascading water stream
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(pt.x - 4.5 * sc, pt.y - 20 * sc, 9 * sc, 19 * sc);
+      // Animated white foam lines
+      const foamOffset = (elapsed * 18) % 16;
+      ctx.strokeStyle = '#e0f2fe';
+      ctx.lineWidth = 1.4 * sc;
+      ctx.beginPath();
+      ctx.moveTo(pt.x - 3 * sc, pt.y - (18 - foamOffset) * sc);
+      ctx.lineTo(pt.x + 3 * sc, pt.y - (18 - foamOffset) * sc);
+      ctx.stroke();
+      break;
+    }
+
+    case 'water_dancing_jets': {
+      // Modern plaza circular pad
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5 * sc;
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y, 17 * sc, 8.5 * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 5 Dancing water jets with staggered heights
+      [-10, -5, 0, 5, 10].forEach((jx, idx) => {
+        const jh = (10 + Math.abs(Math.sin(elapsed * 4.5 + idx * 0.9)) * 16) * sc;
+        ctx.strokeStyle = idx % 2 === 0 ? '#7dd3fc' : '#e0f2fe';
+        ctx.lineWidth = 2.2 * sc;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(pt.x + jx * sc, pt.y);
+        ctx.lineTo(pt.x + jx * sc, pt.y - jh);
+        ctx.stroke();
+      });
+      break;
+    }
   }
 
   ctx.restore();
@@ -1694,9 +2283,78 @@ export function drawCustomCreatorTerrainTile(
       fill = isNight ? '#047857' : '#4ade80';
       stroke = isNight ? '#065f46' : '#22c55e';
       break;
+    case 'grass_open_meadow':
+      fill = isNight ? '#15803d' : '#86efac';
+      stroke = isNight ? '#166534' : '#4ade80';
+      break;
     case 'water_pond':
       fill = isNight ? '#0369a1' : '#38bdf8';
       stroke = isNight ? '#0284c7' : '#0ea5e9';
+      break;
+    // 16 Jenis Tanah & Paving dari Gambar Referensi
+    case 'img_paving_herringbone_red':
+      fill = isNight ? '#7f1d1d' : '#b45346';
+      stroke = '#57534e';
+      break;
+    case 'img_paving_basketweave_brown':
+      fill = isNight ? '#78350f' : '#9a6b47';
+      stroke = '#5c4028';
+      break;
+    case 'img_paving_herringbone_grey':
+      fill = isNight ? '#64748b' : '#c7c6c1';
+      stroke = '#78716c';
+      break;
+    case 'img_paving_hex_blue':
+      fill = isNight ? '#475569' : '#93afd3';
+      stroke = '#7c5836';
+      break;
+    case 'img_stone_river_grey':
+      fill = isNight ? '#44403c' : '#787572';
+      stroke = '#57534e';
+      break;
+    case 'img_stone_pebble_cream':
+      fill = isNight ? '#a8a29e' : '#f3dfa8';
+      stroke = '#c2b280';
+      break;
+    case 'img_stone_flagstone_brown':
+      fill = isNight ? '#57534e' : '#735742';
+      stroke = '#453222';
+      break;
+    case 'img_tile_dotted_grey':
+      fill = isNight ? '#475569' : '#94999c';
+      stroke = '#52525b';
+      break;
+    case 'img_brick_running_pastel':
+      fill = isNight ? '#78716c' : '#cbb89d';
+      stroke = '#57534e';
+      break;
+    case 'img_paving_parquet_taupe':
+      fill = isNight ? '#78716c' : '#b89f8d';
+      stroke = '#57534e';
+      break;
+    case 'img_wood_plank_terracotta':
+      fill = isNight ? '#9a3412' : '#c87d44';
+      stroke = '#7c2d12';
+      break;
+    case 'img_brick_checker_red':
+      fill = isNight ? '#7f1d1d' : '#a94e45';
+      stroke = '#57534e';
+      break;
+    case 'img_cobble_rounded_cream':
+      fill = isNight ? '#57534e' : '#7c624c';
+      stroke = '#44403c';
+      break;
+    case 'img_brick_classic_orange':
+      fill = isNight ? '#9a3412' : '#e07a2a';
+      stroke = '#7c2d12';
+      break;
+    case 'img_paving_lattice_red':
+      fill = isNight ? '#7f1d1d' : '#a85148';
+      stroke = '#57534e';
+      break;
+    case 'img_tile_diamond_gold':
+      fill = isNight ? '#a16207' : '#ebd086';
+      stroke = '#785c2a';
       break;
   }
 
@@ -1743,6 +2401,106 @@ export function drawCustomCreatorTerrainTile(
     ctx.beginPath();
     ctx.ellipse(cx, cy, rWave * 1.8, rWave * 0.9, 0, 0, Math.PI * 2);
     ctx.stroke();
+  } else if (
+    terrainType === 'img_paving_herringbone_red' ||
+    terrainType === 'img_brick_checker_red' ||
+    terrainType === 'img_paving_lattice_red'
+  ) {
+    // Alternating grey/cream & red brick pattern
+    ctx.fillStyle = '#c8c6bd';
+    ctx.fillRect(cx - 6, cy - 2.5, 4.5, 2.5);
+    ctx.fillRect(cx + 1.5, cy + 0.5, 4.5, 2.5);
+    ctx.fillRect(cx - 2, cy - 4, 4, 2);
+  } else if (
+    terrainType === 'img_paving_basketweave_brown' ||
+    terrainType === 'img_wood_plank_terracotta' ||
+    terrainType === 'img_brick_classic_orange'
+  ) {
+    // Terracotta / orange brick & wood plank joints
+    ctx.fillStyle = '#d48236';
+    ctx.fillRect(cx - 6.5, cy - 2, 5, 2.5);
+    ctx.fillRect(cx + 1.5, cy - 2, 5, 2.5);
+    ctx.strokeStyle = 'rgba(69, 26, 3, 0.55)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo((pN.x + pW.x) * 0.5, (pN.y + pW.y) * 0.5);
+    ctx.lineTo((pE.x + pS.x) * 0.5, (pE.y + pS.y) * 0.5);
+    ctx.stroke();
+  } else if (
+    terrainType === 'img_paving_herringbone_grey' ||
+    terrainType === 'img_paving_parquet_taupe' ||
+    terrainType === 'img_brick_running_pastel'
+  ) {
+    // Interlocking stone / pastel brick blocks
+    ctx.fillStyle = terrainType === 'img_brick_running_pastel' ? '#93a2ad' : '#d6d3cd';
+    ctx.fillRect(cx - 5.5, cy - 2.5, 4.5, 2.2);
+    ctx.fillStyle = '#e5dccb';
+    ctx.fillRect(cx + 1, cy + 0.5, 4.5, 2.2);
+  } else if (terrainType === 'img_paving_hex_blue') {
+    // Blue hexagon & brown star/triangle mosaic
+    ctx.fillStyle = '#9db7db';
+    ctx.beginPath();
+    ctx.arc(cx - 4, cy, 2.8, 0, Math.PI * 2);
+    ctx.arc(cx + 4, cy, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8b6543';
+    ctx.beginPath();
+    ctx.arc(cx, cy - 2.5, 1.6, 0, Math.PI * 2);
+    ctx.arc(cx, cy + 2.5, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (
+    terrainType === 'img_stone_river_grey' ||
+    terrainType === 'img_stone_pebble_cream' ||
+    terrainType === 'img_stone_flagstone_brown' ||
+    terrainType === 'img_cobble_rounded_cream'
+  ) {
+    // River pebbles, flagstones, or rounded cream cobblestones
+    const stoneCol1 =
+      terrainType === 'img_stone_river_grey'
+        ? '#9ca3af'
+        : terrainType === 'img_stone_pebble_cream'
+        ? '#c7b897'
+        : terrainType === 'img_cobble_rounded_cream'
+        ? '#dfd1bd'
+        : '#d3bd97';
+    const stoneCol2 =
+      terrainType === 'img_stone_river_grey'
+        ? '#a89f81'
+        : terrainType === 'img_stone_pebble_cream'
+        ? '#988f7a'
+        : '#bda07e';
+    ctx.fillStyle = stoneCol1;
+    ctx.beginPath();
+    ctx.ellipse(cx - 4.5, cy - 1, 3.6, 2.1, 0.2, 0, Math.PI * 2);
+    ctx.ellipse(cx + 4.2, cy + 1.2, 3.5, 2.0, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = stoneCol2;
+    ctx.beginPath();
+    ctx.ellipse(cx + 0.5, cy - 2.5, 2.8, 1.6, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx - 0.5, cy + 2.5, 2.8, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (terrainType === 'img_tile_dotted_grey') {
+    // Grey grid with cream dots at intersections
+    ctx.fillStyle = '#e7dec8';
+    [
+      [-4.5, -1.5],
+      [4.5, -1.5],
+      [0, 2],
+    ].forEach(([dx, dy]) => {
+      ctx.beginPath();
+      ctx.arc(cx + dx, cy + dy, 2.0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  } else if (terrainType === 'img_tile_diamond_gold') {
+    // Golden diamond tiles
+    ctx.fillStyle = '#c8b27c';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 3.5);
+    ctx.lineTo(cx + 6, cy);
+    ctx.lineTo(cx, cy + 3.5);
+    ctx.lineTo(cx - 6, cy);
+    ctx.closePath();
+    ctx.fill();
   }
   ctx.restore();
 }
