@@ -101,6 +101,21 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
+  // 2c. Aksi Khusus Escape Room Menara (Polling 2-3 Detik + Anti-Peek Kunci Jawaban)
+  if (action === "get_escape_tower") {
+    var roleEsc = (e && e.parameter && e.parameter.role) ? String(e.parameter.role) : "siswa";
+    var pinEsc = (e && e.parameter && e.parameter.teacherPin) ? String(e.parameter.teacherPin) : "";
+    var groupEsc = (e && e.parameter && e.parameter.kelompok) ? Number(e.parameter.kelompok) : 1;
+    var isGuruEsc = (roleEsc === "guru" && isValidTeacherPin(ss, pinEsc));
+    var escapeData = getEscapeTowerState(ss, isGuruEsc, groupEsc);
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      isTeacherVerified: isGuruEsc,
+      escapeTower: escapeData,
+      timestamp: new Date().toISOString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   // 3. Aksi Lengkap Semua Data v3.0 (Refleksi, Feedback, Pesan Kantor Pos, Obrolan Warga, Jurnal Pohon Beringin, Podcast, Hasil Tes Lab DKV, Leaderboard Mingguan 7 Hari, Pasar Prestasi, Bank Materi Guru AI & Kotak Saran Wisma)
   var reflections = getReflections(ss);
   var feedbacks = getFeedbacks(ss);
@@ -218,6 +233,36 @@ function doPost(e) {
       saveGameSkorRows(ss, data.skorList);
       return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
         .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_escape_konfigurasi") {
+      if (!isValidTeacherAccountOrPin(ss, data.teacherId, data.teacherName, data.teacherPin)) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Akses ditolak: Hanya akun Guru resmi yang dapat mengatur konfigurasi Escape Room Menara." }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      saveEscapeKonfigurasiRows(ss, data.konfigurasi);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_escape_sesi") {
+      if (!isValidTeacherAccountOrPin(ss, data.teacherId, data.teacherName, data.teacherPin)) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Akses ditolak: Hanya akun Guru resmi yang dapat mengatur sesi Escape Room Menara." }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      saveEscapeSesiRow(ss, data.sesi);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_escape_progres") {
+      saveEscapeProgresRow(ss, data.progres);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_escape_skor") {
+      saveEscapeSkorRows(ss, data.skorList);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "check_escape_answer") {
+      var checkResult = checkEscapeAnswerInGAS(ss, data.nomor_lantai, data.jawaban_siswa);
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        hasil: checkResult ? "benar" : "salah"
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     return ContentService.createTextOutput(JSON.stringify({ success: true, message: "Aksi berhasil diproses" }))
@@ -1432,6 +1477,238 @@ function getMysteryArenaState(ss, isTeacherVerified) {
     currentRound: safeRound,
     choices: raw.choices || [],
     scores: raw.scores || []
+  };
+}
+
+// -------------------------------------------------------------
+// ESCAPE ROOM MENARA (4 SHEET BARU TERPISAH: Escape_Konfigurasi, Escape_Sesi, Escape_Progres, Escape_Skor)
+// KUNCI JAWABAN TIDAK PERNAH DIKIRIM KE SISI SISWA
+// -------------------------------------------------------------
+function getOrCreateEscapeKonfigurasiSheet(ss) {
+  var sheet = ss.getSheetByName("Escape_Konfigurasi");
+  if (!sheet) {
+    sheet = ss.insertSheet("Escape_Konfigurasi");
+    sheet.appendRow(["nomor_lantai", "judul", "cerita", "soal", "jenis", "hint", "kunci_jawaban", "batas_waktu"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateEscapeSesiSheet(ss) {
+  var sheet = ss.getSheetByName("Escape_Sesi");
+  if (!sheet) {
+    sheet = ss.insertSheet("Escape_Sesi");
+    sheet.appendRow(["id_sesi", "status", "waktu_mulai"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateEscapeProgresSheet(ss) {
+  var sheet = ss.getSheetByName("Escape_Progres");
+  if (!sheet) {
+    sheet = ss.insertSheet("Escape_Progres");
+    sheet.appendRow(["id_sesi", "kelompok", "lantai_sekarang", "jumlah_salah", "hint_dipakai", "waktu_selesai"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateEscapeSkorSheet(ss) {
+  var sheet = ss.getSheetByName("Escape_Skor");
+  if (!sheet) {
+    sheet = ss.insertSheet("Escape_Skor");
+    sheet.appendRow(["kelompok", "total_poin"]);
+    sheet.setFrozenRows(1);
+    for (var k = 1; k <= 8; k++) {
+      sheet.appendRow(["Kelompok " + k, 0]);
+    }
+  }
+  return sheet;
+}
+
+function saveEscapeKonfigurasiRows(ss, konfigurasiList) {
+  if (!Array.isArray(konfigurasiList)) return;
+  var sheet = getOrCreateEscapeKonfigurasiSheet(ss);
+  if (sheet.getLastRow() > 1) {
+    sheet.deleteRows(2, sheet.getLastRow() - 1);
+  }
+  for (var i = 0; i < konfigurasiList.length; i++) {
+    var fl = konfigurasiList[i] || {};
+    sheet.appendRow([
+      Number(fl.nomor_lantai) || (i + 1),
+      String(fl.judul || ""),
+      String(fl.cerita || ""),
+      String(fl.soal || ""),
+      String(fl.jenis || "isian_singkat"),
+      String(fl.hint || ""),
+      String(fl.kunci_jawaban || ""),
+      Number(fl.batas_waktu) || 120
+    ]);
+  }
+  try {
+    CacheService.getScriptCache().remove("ESCAPE_TOWER_RAW_CACHE");
+  } catch (e) {}
+}
+
+function saveEscapeSesiRow(ss, sesi) {
+  if (!sesi || !sesi.id_sesi) return;
+  var sheet = getOrCreateEscapeSesiSheet(ss);
+  var rows = sheet.getDataRange().getValues();
+  var foundRow = -1;
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(sesi.id_sesi)) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+  var rowValues = [
+    String(sesi.id_sesi),
+    String(sesi.status || "menunggu"),
+    String(sesi.waktu_mulai || new Date().toLocaleString("id-ID"))
+  ];
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
+  }
+  try {
+    CacheService.getScriptCache().remove("ESCAPE_TOWER_RAW_CACHE");
+  } catch (e) {}
+}
+
+function saveEscapeProgresRow(ss, prog) {
+  if (!prog || !prog.id_sesi || !prog.kelompok) return;
+  var sheet = getOrCreateEscapeProgresSheet(ss);
+  var rows = sheet.getDataRange().getValues();
+  var foundRow = -1;
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(prog.id_sesi) && String(rows[i][1]) === String(prog.kelompok)) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+  var rowValues = [
+    String(prog.id_sesi),
+    String(prog.kelompok),
+    Number(prog.lantai_sekarang) || 1,
+    Number(prog.jumlah_salah) || 0,
+    Number(prog.hint_dipakai) || 0,
+    String(prog.waktu_selesai || "-")
+  ];
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
+  }
+  try {
+    CacheService.getScriptCache().remove("ESCAPE_TOWER_RAW_CACHE");
+  } catch (e) {}
+}
+
+function saveEscapeSkorRows(ss, skorList) {
+  if (!Array.isArray(skorList)) return;
+  var sheet = getOrCreateEscapeSkorSheet(ss);
+  if (sheet.getLastRow() > 1) {
+    sheet.deleteRows(2, sheet.getLastRow() - 1);
+  }
+  for (var i = 0; i < skorList.length; i++) {
+    var item = skorList[i] || {};
+    var kNum = Number(item.kelompok) || (i + 1);
+    sheet.appendRow(["Kelompok " + kNum, Number(item.total_poin) || 0]);
+  }
+  try {
+    CacheService.getScriptCache().remove("ESCAPE_TOWER_RAW_CACHE");
+  } catch (e) {}
+}
+
+function normalizeEscapeAnswerGAS(str) {
+  return String(str || "").trim().toLowerCase().replace(/\\s+/g, " ");
+}
+
+function checkEscapeAnswerInGAS(ss, nomorLantai, jawabanSiswa) {
+  var kSheet = getOrCreateEscapeKonfigurasiSheet(ss);
+  var rows = kSheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (Number(rows[i][0]) === Number(nomorLantai)) {
+      var kunci = normalizeEscapeAnswerGAS(rows[i][6]);
+      var jwb = normalizeEscapeAnswerGAS(jawabanSiswa);
+      return kunci !== "" && kunci === jwb;
+    }
+  }
+  return false;
+}
+
+function getEscapeTowerState(ss, isTeacherVerified, kelompokViewer) {
+  var kSheet = getOrCreateEscapeKonfigurasiSheet(ss);
+  var sSheet = getOrCreateEscapeSesiSheet(ss);
+  var pSheet = getOrCreateEscapeProgresSheet(ss);
+  var skSheet = getOrCreateEscapeSkorSheet(ss);
+
+  var kRows = kSheet.getDataRange().getValues();
+  var konfigList = [];
+  for (var i = 1; i < kRows.length; i++) {
+    var kr = kRows[i];
+    if (!kr[0]) continue;
+    konfigList.push({
+      nomor_lantai: Number(kr[0]) || i,
+      judul: String(kr[1] || ""),
+      cerita: String(kr[2] || ""),
+      soal: String(kr[3] || ""),
+      jenis: String(kr[4] || "isian_singkat"),
+      hint: String(kr[5] || ""),
+      // KEAMANAN: Kunci jawaban TIDAK BOLEH dikirim ke sisi siswa!
+      kunci_jawaban: isTeacherVerified ? String(kr[6] || "") : null,
+      batas_waktu: Number(kr[7]) || 120
+    });
+  }
+
+  var sRows = sSheet.getDataRange().getValues();
+  var latestSesi = null;
+  if (sRows.length > 1) {
+    var ls = sRows[sRows.length - 1];
+    latestSesi = {
+      id_sesi: String(ls[0] || "SESI-1"),
+      status: String(ls[1] || "menunggu"),
+      waktu_mulai: String(ls[2] || "")
+    };
+  }
+
+  var pRows = pSheet.getDataRange().getValues();
+  var progresList = [];
+  for (var p = 1; p < pRows.length; p++) {
+    var pr = pRows[p];
+    if (!pr[0]) continue;
+    if (!latestSesi || String(pr[0]) === latestSesi.id_sesi) {
+      var kNum = Number(String(pr[1]).replace(/[^0-9]/g, "")) || 1;
+      progresList.push({
+        id_sesi: String(pr[0]),
+        kelompok: kNum,
+        lantai_sekarang: Number(pr[2]) || 1,
+        jumlah_salah: Number(pr[3]) || 0,
+        hint_dipakai: Number(pr[4]) || 0,
+        waktu_selesai: String(pr[5] || "-")
+      });
+    }
+  }
+
+  var skRows = skSheet.getDataRange().getValues();
+  var skorList = [];
+  for (var m = 1; m < skRows.length; m++) {
+    var sr = skRows[m];
+    if (!sr[0]) continue;
+    var kg = Number(String(sr[0]).replace(/[^0-9]/g, "")) || m;
+    skorList.push({
+      kelompok: kg,
+      total_poin: Number(sr[1]) || 0
+    });
+  }
+
+  return {
+    sesi: latestSesi,
+    konfigurasi: konfigList,
+    progres: progresList,
+    skor: skorList
   };
 }`;
 

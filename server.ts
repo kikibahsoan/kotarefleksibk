@@ -3110,6 +3110,1161 @@ app.post('/api/mystery-arena/student-action', (req, res) => {
   });
 });
 
+// ============================================================================
+// ESCAPE ROOM MENARA (GEDUNG PENCAKAR LANGIT TERTINGGI • REFLEKSIA TIMUR)
+// Server-Authoritative State, Role Check, Anti-Peek Answer Verification & Sync
+// ============================================================================
+const ESCAPE_TOWER_FILE_PATH = path.join(__dirname, 'server_escape_tower.json');
+
+interface ServerEscapeTowerStore {
+  sesi: {
+    id_sesi: string;
+    status: 'menunggu' | 'berjalan' | 'jeda' | 'selesai';
+    waktu_mulai: string;
+    waktu_mulai_ms: number | null;
+    waktu_jeda_ms: number | null;
+    total_durasi_jeda_ms: number;
+    jumlah_kelompok: number;
+    poin_dasar: number;
+    bonus_kecepatan: number;
+    pengurang_hint: number;
+    pengurang_salah: number;
+    penalti_waktu_salah_detik: number;
+    guru_pembuat: string;
+  };
+  konfigurasi: Array<{
+    nomor_lantai: 1 | 2 | 3 | 4 | 5;
+    judul: string;
+    cerita: string;
+    soal: string;
+    jenis: 'pilihan_ganda' | 'isian_singkat' | 'urutan_langkah' | 'sandi_kode';
+    opsi?: string[];
+    hint: string;
+    kunci_jawaban: string;
+    batas_waktu: number;
+  }>;
+  progres: Record<
+    number,
+    {
+      id_sesi: string;
+      kelompok: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+      lantai_sekarang: 1 | 2 | 3 | 4 | 5 | 6;
+      jumlah_salah: number;
+      hint_dipakai: number;
+      hint_terbuka_lantai: Array<1 | 2 | 3 | 4 | 5>;
+      waktu_selesai: string;
+      durasi_detik: number | null;
+      peringkat_atap: number | null;
+      penalti_waktu_detik: number;
+      cooldown_sampai_ms: number | null;
+      draft_jawaban: string;
+      terakhir_dijawab_oleh: string;
+      status_jawaban_terakhir: 'benar' | 'salah' | null;
+      pesan_jawaban_terakhir: string;
+    }
+  >;
+  skor: Array<{
+    kelompok: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    total_poin: number;
+    waktu_selesai: string;
+    durasi_detik: number | null;
+    hint_dipakai: number;
+    jumlah_salah: number;
+    peringkat: number | null;
+  }>;
+  studentGroupMap: Record<string, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>;
+  groupMembers: Record<
+    number,
+    Array<{
+      studentId: string;
+      studentName: string;
+      className: string;
+      gender: 'L' | 'P';
+    }>
+  >;
+  towerPlayers: Record<
+    string,
+    {
+      studentId: string;
+      studentName: string;
+      className: string;
+      gender: 'L' | 'P';
+      isTeacher: boolean;
+      kelompok: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | null;
+      lantai_sekarang: 1 | 2 | 3 | 4 | 5 | 6;
+      lastSeen: number;
+    }
+  >;
+  groupChats: Array<{
+    id: string;
+    kelompok: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    senderId: string;
+    senderName: string;
+    content: string;
+    timestamp: string;
+    createdAt: number;
+  }>;
+  winningGroups: Array<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>;
+}
+
+function getDefaultEscapeFloors(): ServerEscapeTowerStore['konfigurasi'] {
+  return [
+    {
+      nomor_lantai: 1,
+      judul: 'Lantai 1 • Lobi Keamanan Visual',
+      cerita:
+        'Pintu utama Menara Pencakar Langit terkunci rapat! Sistem keamanan meminta kelompokmu mengidentifikasi prinsip dasar komposisi visual agar lift menuju Lantai 2 aktif.',
+      soal: 'Prinsip desain yang mengatur urutan perhatian mata pembaca dari elemen terpenting (judul utama) ke informasi pendukung disebut...',
+      jenis: 'pilihan_ganda',
+      opsi: [
+        'A. Hirarki Visual (Visual Hierarchy)',
+        'B. Distorsi Perspektif',
+        'C. Redundansi Piksel',
+        'D. Monotonisasi Ruang',
+      ],
+      hint: 'Ingat istilah untuk menyusun prioritas informasi dari yang paling besar/kontras ke yang terkecil.',
+      kunci_jawaban: 'A',
+      batas_waktu: 120,
+    },
+    {
+      nomor_lantai: 2,
+      judul: 'Lantai 2 • Laboratorium Warna Cetak',
+      cerita:
+        'Lift berhenti di Lantai 2. Mesin cetak offset raksasa memblokir lorong darurat dan meminta kode singkatan 4 warna tinta utama percetakan.',
+      soal: 'Ketik singkatan 4 huruf model warna subtraktif yang wajib digunakan saat menyiapkan file desain untuk dicetak di mesin percetakan (Cyan, Magenta, Yellow, Key/Black):',
+      jenis: 'isian_singkat',
+      opsi: [],
+      hint: 'Terdiri dari 4 huruf kapital: dimulai dengan huruf C dan diakhiri huruf K.',
+      kunci_jawaban: 'CMYK',
+      batas_waktu: 120,
+    },
+    {
+      nomor_lantai: 3,
+      judul: 'Lantai 3 • Ruang Algoritma Produksi Desain',
+      cerita:
+        'Panel jembatan menuju tangga Lantai 4 teracak! Susun kembali urutan alur kerja (workflow) proyek desain komunikasi visual dari tahap paling awal hingga akhir.',
+      soal: 'Susun urutan langkah kerja desainer profesional berikut dari langkah pertama (1) hingga terakhir (4) dengan menggeser (drag & drop) atau tombol panah:',
+      jenis: 'urutan_langkah',
+      opsi: [
+        'Memahami Brief Klien & Riset Target Audiens',
+        'Membuat Moodboard & Sketsa Kasar (Thumbnail)',
+        'Eksekusi Desain Digital & Tipografi',
+        'Revisi Akhir & Ekspor File Siap Cetak/Publikasi',
+      ],
+      hint: 'Selalu mulai dari memahami brief/riset, lalu sketsa/moodboard, kemudian eksekusi digital, dan terakhir ekspor final.',
+      kunci_jawaban:
+        'Memahami Brief Klien & Riset Target Audiens -> Membuat Moodboard & Sketsa Kasar (Thumbnail) -> Eksekusi Desain Digital & Tipografi -> Revisi Akhir & Ekspor File Siap Cetak/Publikasi',
+      batas_waktu: 150,
+    },
+    {
+      nomor_lantai: 4,
+      judul: 'Lantai 4 • Brankas Enkripsi Resolusi',
+      cerita:
+        'Tinggal satu lantai sebelum puncak! Pintu baja Lantai 4 dikunci dengan keypad sandi angka 3 digit yang biasa dipakai desainer untuk standar resolusi cetak tajam.',
+      soal: 'Masukkan sandi angka 3 digit: Berapa nilai standar resolusi DPI (Dots Per Inch) minimal agar hasil cetak poster/majalah terlihat tajam dan tidak pecah?',
+      jenis: 'sandi_kode',
+      opsi: [],
+      hint: 'Angka ratusan bulat yang berada di antara 250 dan 350 DPI (bukan 72 DPI untuk layar).',
+      kunci_jawaban: '300',
+      batas_waktu: 120,
+    },
+    {
+      nomor_lantai: 5,
+      judul: 'Lantai 5 • Ruang Kontrol Pintu Atap',
+      cerita:
+        'Kelompokmu tiba di lantai tertinggi tepat di bawah Pintu Atap Helipad! Jawab teka-teki terakhir ini untuk membuka kunci hidrolik Pintu Atap dan mengibarkan bendera kemenangan.',
+      soal: 'Kumpulan karya terbaik seorang desainer yang disusun secara rapi dan terkurasi untuk ditunjukkan kepada klien atau perusahaan saat melamar kerja disebut...',
+      jenis: 'isian_singkat',
+      opsi: [],
+      hint: 'Kata benda 10 huruf yang diawali dengan "PORTO..." dan diakhiri "...FOLIO".',
+      kunci_jawaban: 'PORTOFOLIO',
+      batas_waktu: 120,
+    },
+  ];
+}
+
+function createInitialEscapeTowerStore(): ServerEscapeTowerStore {
+  const nowStr = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+  const sesiId = 'escape-1';
+  const progres: ServerEscapeTowerStore['progres'] = {};
+  const skor: ServerEscapeTowerStore['skor'] = [];
+  const groupMembers: ServerEscapeTowerStore['groupMembers'] = {};
+
+  for (let g = 1; g <= 8; g++) {
+    const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    progres[grp] = {
+      id_sesi: sesiId,
+      kelompok: grp,
+      lantai_sekarang: 1,
+      jumlah_salah: 0,
+      hint_dipakai: 0,
+      hint_terbuka_lantai: [],
+      waktu_selesai: '-',
+      durasi_detik: null,
+      peringkat_atap: null,
+      penalti_waktu_detik: 0,
+      cooldown_sampai_ms: null,
+      draft_jawaban: '',
+      terakhir_dijawab_oleh: '',
+      status_jawaban_terakhir: null,
+      pesan_jawaban_terakhir: '',
+    };
+    skor.push({
+      kelompok: grp,
+      total_poin: 0,
+      waktu_selesai: '-',
+      durasi_detik: null,
+      hint_dipakai: 0,
+      jumlah_salah: 0,
+      peringkat: null,
+    });
+    groupMembers[grp] = [];
+  }
+
+  return {
+    sesi: {
+      id_sesi: sesiId,
+      status: 'menunggu',
+      waktu_mulai: nowStr,
+      waktu_mulai_ms: null,
+      waktu_jeda_ms: null,
+      total_durasi_jeda_ms: 0,
+      jumlah_kelompok: 8,
+      poin_dasar: 100,
+      bonus_kecepatan: 50,
+      pengurang_hint: 10,
+      pengurang_salah: 5,
+      penalti_waktu_salah_detik: 5,
+      guru_pembuat: 'Guru Pembimbing DKV',
+    },
+    konfigurasi: getDefaultEscapeFloors(),
+    progres,
+    skor,
+    studentGroupMap: {},
+    groupMembers,
+    towerPlayers: {},
+    groupChats: [],
+    winningGroups: [],
+  };
+}
+
+function loadEscapeTowerFromFile(): ServerEscapeTowerStore {
+  try {
+    if (fs.existsSync(ESCAPE_TOWER_FILE_PATH)) {
+      const raw = fs.readFileSync(ESCAPE_TOWER_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.sesi && Array.isArray(parsed.konfigurasi)) {
+        return {
+          ...createInitialEscapeTowerStore(),
+          ...parsed,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[server.ts] Could not read server_escape_tower.json:', err);
+  }
+  return createInitialEscapeTowerStore();
+}
+
+let escapeTowerStore: ServerEscapeTowerStore = loadEscapeTowerFromFile();
+let lastEscapeSaveMs = 0;
+
+function saveEscapeTowerToFile(force = false) {
+  const now = Date.now();
+  if (!force && now - lastEscapeSaveMs < 800) return;
+  lastEscapeSaveMs = now;
+  try {
+    fs.writeFileSync(ESCAPE_TOWER_FILE_PATH, JSON.stringify(escapeTowerStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[server.ts] Failed writing server_escape_tower.json:', err);
+  }
+}
+
+function normalizeEscapeAnswer(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function checkEscapeFloorAnswerServerSide(
+  floor: ServerEscapeTowerStore['konfigurasi'][number],
+  rawSubmitted: string
+): boolean {
+  const submitted = normalizeEscapeAnswer(rawSubmitted);
+  const key = normalizeEscapeAnswer(floor.kunci_jawaban);
+  if (!submitted || !key) return false;
+
+  if (submitted === key) return true;
+
+  if (floor.jenis === 'pilihan_ganda') {
+    // Allow matching "A" or "A. Hirarki Visual..."
+    const subFirstLetter = submitted.replace(/^([a-e])[\.\)\s].*$/i, '$1').trim();
+    const keyFirstLetter = key.replace(/^([a-e])[\.\)\s].*$/i, '$1').trim();
+    if (
+      subFirstLetter.length === 1 &&
+      keyFirstLetter.length === 1 &&
+      subFirstLetter === keyFirstLetter
+    ) {
+      return true;
+    }
+    // Or match against the full option text corresponding to key letter
+    const matchedOpt = (floor.opsi || []).find((o) =>
+      normalizeEscapeAnswer(o).startsWith(keyFirstLetter + '.')
+    );
+    if (matchedOpt && normalizeEscapeAnswer(matchedOpt) === submitted) {
+      return true;
+    }
+  }
+
+  if (floor.jenis === 'urutan_langkah') {
+    const cleanSub = submitted
+      .split(/->|\||,|\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(' -> ');
+    const cleanKey = key
+      .split(/->|\||,|\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(' -> ');
+    if (cleanSub === cleanKey) return true;
+  }
+
+  if (floor.jenis === 'sandi_kode') {
+    const cleanSubCode = submitted.replace(/[^a-z0-9]/gi, '');
+    const cleanKeyCode = key.replace(/[^a-z0-9]/gi, '');
+    if (cleanSubCode && cleanSubCode === cleanKeyCode) return true;
+  }
+
+  return false;
+}
+
+function recalculateEscapeTowerScores() {
+  const sesi = escapeTowerStore.sesi;
+  const maxGroup = Math.max(1, Math.min(8, sesi.jumlah_kelompok || 8));
+
+  // Rank groups that reached rooftop (lantai_sekarang === 6) by durasi_detik ascending
+  const finishedGroups = Object.values(escapeTowerStore.progres)
+    .filter((p) => p.kelompok <= maxGroup && p.lantai_sekarang === 6 && p.durasi_detik !== null)
+    .sort((a, b) => (a.durasi_detik || 999999) - (b.durasi_detik || 999999));
+
+  finishedGroups.forEach((p, idx) => {
+    p.peringkat_atap = idx + 1;
+  });
+
+  escapeTowerStore.winningGroups = finishedGroups.map((p) => p.kelompok);
+
+  for (let g = 1; g <= 8; g++) {
+    const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    const prog = escapeTowerStore.progres[grp];
+    const skorRow = escapeTowerStore.skor.find((s) => s.kelompok === grp);
+    if (!prog || !skorRow) continue;
+
+    // Speed bonus based on roof arrival rank (1st = 100% bonus, 2nd = 75%, 3rd = 50%, 4th+ = 25%)
+    let speedBonus = 0;
+    if (prog.lantai_sekarang === 6 && prog.peringkat_atap) {
+      const rankMultipliers = [1.0, 0.75, 0.5, 0.35, 0.25, 0.2, 0.15, 0.1];
+      const mult = rankMultipliers[prog.peringkat_atap - 1] ?? 0.1;
+      speedBonus = Math.round(sesi.bonus_kecepatan * mult);
+    }
+
+    // Partial floor progress points if not yet on roof (each solved floor gives 15% of poin_dasar)
+    const floorsSolved = Math.max(0, prog.lantai_sekarang - 1);
+    const basePointsEarned =
+      prog.lantai_sekarang === 6
+        ? sesi.poin_dasar
+        : Math.round((floorsSolved / 5) * (sesi.poin_dasar * 0.75));
+
+    const hintPenalty = prog.hint_dipakai * sesi.pengurang_hint;
+    const wrongPenalty = prog.jumlah_salah * sesi.pengurang_salah;
+
+    const totalPoin =
+      floorsSolved === 0 && prog.hint_dipakai === 0 && prog.jumlah_salah === 0
+        ? 0
+        : Math.max(0, basePointsEarned + speedBonus - hintPenalty - wrongPenalty);
+
+    skorRow.total_poin = totalPoin;
+    skorRow.waktu_selesai = prog.waktu_selesai;
+    skorRow.durasi_detik = prog.durasi_detik;
+    skorRow.hint_dipakai = prog.hint_dipakai;
+    skorRow.jumlah_salah = prog.jumlah_salah;
+    skorRow.peringkat = prog.peringkat_atap;
+  }
+}
+
+function syncEscapeTowerWithCityOnlinePlayers() {
+  const now = Date.now();
+  // Bridge online citizens standing near Gedung Pencakar Langit (wx: 10.5..17.5, wy: -12.0..-7.5)
+  for (const [, cityPlayer] of onlinePlayersMap.entries()) {
+    if (!cityPlayer || !cityPlayer.id || now - cityPlayer.lastSeen > 40000) continue;
+    const isNearSkyscraper =
+      cityPlayer.wx >= 10.5 &&
+      cityPlayer.wx <= 17.5 &&
+      cityPlayer.wy >= -12.0 &&
+      cityPlayer.wy <= -7.5;
+    const isTeacherRole = cityPlayer.role === 'guru';
+
+    const existingEntry = Object.values(escapeTowerStore.towerPlayers).find(
+      (tp) =>
+        tp.studentId === cityPlayer.id ||
+        tp.studentName.trim().toLowerCase() === cityPlayer.name.trim().toLowerCase()
+    );
+
+    if (existingEntry) {
+      existingEntry.lastSeen = Math.max(existingEntry.lastSeen, cityPlayer.lastSeen);
+    } else if (isNearSkyscraper) {
+      const pKey = cityPlayer.id;
+      const existingGrp = isTeacherRole
+        ? null
+        : escapeTowerStore.studentGroupMap[pKey] || (1 as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8);
+      if (!isTeacherRole && existingGrp && !escapeTowerStore.studentGroupMap[pKey]) {
+        escapeTowerStore.studentGroupMap[pKey] = existingGrp;
+        const list = escapeTowerStore.groupMembers[existingGrp] || [];
+        if (!list.some((m) => m.studentId === pKey)) {
+          list.push({
+            studentId: pKey,
+            studentName: cityPlayer.name,
+            className: cityPlayer.roleLabel || 'X DKV',
+            gender: cityPlayer.gender === 'P' ? 'P' : 'L',
+          });
+          escapeTowerStore.groupMembers[existingGrp] = list;
+        }
+      }
+      const currentFloor = existingGrp
+        ? escapeTowerStore.progres[existingGrp]?.lantai_sekarang || 1
+        : 1;
+      escapeTowerStore.towerPlayers[pKey] = {
+        studentId: pKey,
+        studentName: cityPlayer.name,
+        className: cityPlayer.roleLabel || (isTeacherRole ? 'Dewan Guru' : 'X DKV'),
+        gender: cityPlayer.gender === 'P' ? 'P' : 'L',
+        isTeacher: isTeacherRole,
+        kelompok: existingGrp,
+        lantai_sekarang: currentFloor,
+        lastSeen: cityPlayer.lastSeen,
+      };
+    }
+  }
+
+  for (const [sid, p] of Object.entries(escapeTowerStore.towerPlayers)) {
+    if (now - p.lastSeen > 45000) {
+      delete escapeTowerStore.towerPlayers[sid];
+    }
+  }
+}
+
+function buildSanitizedEscapeTowerPayload(params: {
+  viewerId?: string;
+  isVerifiedTeacher: boolean;
+  viewerGroup?: number | null;
+}) {
+  syncEscapeTowerWithCityOnlinePlayers();
+  recalculateEscapeTowerScores();
+
+  const { isVerifiedTeacher, viewerGroup } = params;
+  const effectiveGroup = (viewerGroup ||
+    (params.viewerId ? escapeTowerStore.studentGroupMap[params.viewerId] : null) ||
+    1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+  const myProg = escapeTowerStore.progres[effectiveGroup];
+  const myCurrentFloor = myProg?.lantai_sekarang || 1;
+  const myUnlockedHints = myProg?.hint_terbuka_lantai || [];
+
+  // CRITICAL ANTI-PEEK SECURITY:
+  // 1. kunci_jawaban TIDAK PERNAH dikirim ke siswa!
+  // 2. Siswa hanya bisa melihat soal & cerita untuk lantai yang sedang dikerjakan atau sudah dilewati kelompoknya.
+  // 3. Hint hanya dikirim ke siswa jika kelompoknya sudah menekan "Minta Petunjuk" di lantai tersebut.
+  const sanitizedKonfigurasi = escapeTowerStore.konfigurasi.map((f) => {
+    if (isVerifiedTeacher) {
+      return { ...f };
+    }
+    const isFloorUnlockedForGroup = f.nomor_lantai <= myCurrentFloor;
+    const isHintUnlocked = myUnlockedHints.includes(f.nomor_lantai);
+
+    // Shuffle steps for urutan_langkah when sent to students so it isn't pre-sorted in the answer order
+    let studentOpsi = f.opsi ? [...f.opsi] : [];
+    if (f.jenis === 'urutan_langkah' && studentOpsi.length > 1) {
+      // Deterministic rotation based on floor number so all group members see the same initial shuffled list
+      studentOpsi = studentOpsi.slice(1).concat(studentOpsi.slice(0, 1));
+    }
+
+    return {
+      nomor_lantai: f.nomor_lantai,
+      judul: f.judul,
+      cerita: isFloorUnlockedForGroup
+        ? f.cerita
+        : '🔒 Lantai ini masih terkunci! Selesaikan teka-teki lantai sebelumnya terlebih dahulu.',
+      soal: isFloorUnlockedForGroup
+        ? f.soal
+        : '🔒 Soal terkunci sampai kelompokmu berhasil membuka pintu lantai sebelumnya.',
+      jenis: f.jenis,
+      opsi: isFloorUnlockedForGroup ? studentOpsi : [],
+      hint: isFloorUnlockedForGroup && isHintUnlocked ? f.hint : null,
+      kunci_jawaban: null, // NEVER sent to students!
+      batas_waktu: f.batas_waktu,
+    };
+  });
+
+  // Sanitize progres: students can see which floor each group is on (for the live tower visual)
+  // but CANNOT see draft_jawaban or detailed answer messages of other groups!
+  const sanitizedProgres: Record<number, any> = {};
+  for (let g = 1; g <= 8; g++) {
+    const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    const p = escapeTowerStore.progres[grp];
+    if (!p) continue;
+    const isOwnGroupOrTeacher = isVerifiedTeacher || grp === effectiveGroup;
+    sanitizedProgres[grp] = {
+      ...p,
+      draft_jawaban: isOwnGroupOrTeacher ? p.draft_jawaban : '',
+      pesan_jawaban_terakhir: isOwnGroupOrTeacher ? p.pesan_jawaban_terakhir : '',
+    };
+  }
+
+  // Ensure all online student towerPlayers are reflected in groupMembers
+  Object.values(escapeTowerStore.towerPlayers).forEach((tp) => {
+    if (!tp.isTeacher && tp.kelompok && tp.kelompok >= 1 && tp.kelompok <= 8) {
+      const grp = tp.kelompok;
+      escapeTowerStore.studentGroupMap[tp.studentId] = grp;
+      const list = escapeTowerStore.groupMembers[grp] || [];
+      if (!list.some((m) => m.studentId === tp.studentId)) {
+        list.push({
+          studentId: tp.studentId,
+          studentName: tp.studentName,
+          className: tp.className || 'X DKV',
+          gender: tp.gender === 'P' ? 'P' : 'L',
+        });
+        escapeTowerStore.groupMembers[grp] = list;
+      }
+    }
+  });
+
+  const enrichedGroupMembers: Record<number, any[]> = {};
+  for (let g = 1; g <= 8; g++) {
+    const members = escapeTowerStore.groupMembers[g] || [];
+    enrichedGroupMembers[g] = members.map((m) => ({
+      ...m,
+      isOnline: Boolean(
+        escapeTowerStore.towerPlayers[m.studentId] ||
+          Object.values(escapeTowerStore.towerPlayers).some(
+            (tp) => tp.studentName.trim().toLowerCase() === m.studentName.trim().toLowerCase()
+          )
+      ),
+    }));
+  }
+
+  const filteredChats = isVerifiedTeacher
+    ? escapeTowerStore.groupChats.slice(-80)
+    : escapeTowerStore.groupChats.filter((c) => c.kelompok === effectiveGroup).slice(-50);
+
+  return {
+    sesi: escapeTowerStore.sesi,
+    konfigurasi: sanitizedKonfigurasi,
+    progres: sanitizedProgres,
+    skor: escapeTowerStore.skor,
+    studentGroupMap: escapeTowerStore.studentGroupMap,
+    groupMembers: enrichedGroupMembers,
+    towerPlayers: Object.values(escapeTowerStore.towerPlayers),
+    groupChats: filteredChats,
+    winningGroups: escapeTowerStore.winningGroups,
+    serverTime: Date.now(),
+  };
+}
+
+// GET /api/escape-tower/state (Polled every 2-3s + SSE / Mesh real-time trigger)
+app.get('/api/escape-tower/state', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const viewerId = String(req.query.studentId || '').trim();
+  const viewerName = String(req.query.studentName || '').trim();
+  const viewerClass = String(req.query.className || 'X DKV').trim();
+  const viewerGender: 'L' | 'P' = String(req.query.gender || 'L').trim() === 'P' ? 'P' : 'L';
+  const isTeacherFlag = req.query.isTeacher === 'true';
+  const studentNumber = String(req.query.studentNumber || '').trim();
+  const viewerGroup = req.query.kelompok ? Number(req.query.kelompok) : null;
+
+  const isVerifiedTeacher = verifyTeacherAccountServerSide({
+    teacherId: viewerId,
+    teacherName: viewerName,
+    isTeacher: isTeacherFlag,
+    studentNumber,
+  });
+
+  const now = Date.now();
+  if (viewerId && viewerName) {
+    const existingPlayer = escapeTowerStore.towerPlayers[viewerId];
+    const resolvedGroup = isVerifiedTeacher
+      ? null
+      : ((viewerGroup && viewerGroup >= 1 && viewerGroup <= 8
+          ? viewerGroup
+          : existingPlayer?.kelompok || escapeTowerStore.studentGroupMap[viewerId] || 1) as
+          | 1
+          | 2
+          | 3
+          | 4
+          | 5
+          | 6
+          | 7
+          | 8);
+
+    if (!isVerifiedTeacher && resolvedGroup) {
+      escapeTowerStore.studentGroupMap[viewerId] = resolvedGroup;
+      for (let g = 1; g <= 8; g++) {
+        if (g !== resolvedGroup) {
+          escapeTowerStore.groupMembers[g] = (escapeTowerStore.groupMembers[g] || []).filter(
+            (m) => m.studentId !== viewerId
+          );
+        }
+      }
+      const grpList = escapeTowerStore.groupMembers[resolvedGroup] || [];
+      if (!grpList.some((m) => m.studentId === viewerId)) {
+        grpList.push({
+          studentId: viewerId,
+          studentName: viewerName,
+          className: viewerClass || 'X DKV',
+          gender: viewerGender,
+        });
+        escapeTowerStore.groupMembers[resolvedGroup] = grpList;
+      }
+    }
+
+    const currentFloor = resolvedGroup
+      ? escapeTowerStore.progres[resolvedGroup]?.lantai_sekarang || 1
+      : 1;
+
+    escapeTowerStore.towerPlayers[viewerId] = {
+      studentId: viewerId,
+      studentName: viewerName,
+      className: viewerClass || (isVerifiedTeacher ? 'Dewan Guru' : 'X DKV'),
+      gender: viewerGender,
+      isTeacher: isVerifiedTeacher,
+      kelompok: resolvedGroup,
+      lantai_sekarang: currentFloor,
+      lastSeen: now,
+    };
+  }
+
+  return res.json({
+    success: true,
+    isVerifiedTeacher,
+    data: buildSanitizedEscapeTowerPayload({
+      viewerId,
+      isVerifiedTeacher,
+      viewerGroup,
+    }),
+  });
+});
+
+// POST /api/escape-tower/teacher-action (Strictly verified on server!)
+app.post('/api/escape-tower/teacher-action', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const {
+    teacherId,
+    teacherName,
+    isTeacher,
+    studentNumber,
+    actionType,
+    konfigurasi,
+    pengaturan,
+    targetStudentId,
+    targetStudentName,
+    targetStudentClass,
+    targetStudentGender,
+    targetGroup,
+  } = req.body || {};
+
+  const isVerifiedTeacher = verifyTeacherAccountServerSide({
+    teacherId,
+    teacherName,
+    isTeacher,
+    studentNumber,
+  });
+
+  if (!isVerifiedTeacher) {
+    return res.status(403).json({
+      success: false,
+      error:
+        'Akses Ditolak (Server Security): Hanya akun Guru resmi yang diizinkan mengontrol Panel Guru Escape Room Menara!',
+    });
+  }
+
+  const now = Date.now();
+  const nowStr = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+  if (actionType === 'save_konfigurasi') {
+    if (Array.isArray(konfigurasi) && konfigurasi.length === 5) {
+      escapeTowerStore.konfigurasi = konfigurasi.map((f: any, idx: number) => ({
+        nomor_lantai: (idx + 1) as 1 | 2 | 3 | 4 | 5,
+        judul: String(f.judul || `Lantai ${idx + 1}`).trim(),
+        cerita: String(f.cerita || '').trim(),
+        soal: String(f.soal || '').trim(),
+        jenis: (['pilihan_ganda', 'isian_singkat', 'urutan_langkah', 'sandi_kode'].includes(f.jenis)
+          ? f.jenis
+          : 'isian_singkat') as 'pilihan_ganda' | 'isian_singkat' | 'urutan_langkah' | 'sandi_kode',
+        opsi: Array.isArray(f.opsi) ? f.opsi.map((o: any) => String(o)) : [],
+        hint: String(f.hint || '').trim(),
+        kunci_jawaban: String(f.kunci_jawaban || '').trim(),
+        batas_waktu: Math.max(15, Math.min(900, Number(f.batas_waktu) || 120)),
+      }));
+    }
+    if (pengaturan && typeof pengaturan === 'object') {
+      escapeTowerStore.sesi.jumlah_kelompok = Math.max(
+        1,
+        Math.min(8, Number(pengaturan.jumlah_kelompok) || 8)
+      );
+      escapeTowerStore.sesi.poin_dasar = Math.max(
+        10,
+        Math.min(500, Number(pengaturan.poin_dasar) || 100)
+      );
+      escapeTowerStore.sesi.bonus_kecepatan = Math.max(
+        0,
+        Math.min(300, Number(pengaturan.bonus_kecepatan) || 50)
+      );
+      escapeTowerStore.sesi.pengurang_hint = Math.max(
+        0,
+        Math.min(100, Number(pengaturan.pengurang_hint) || 10)
+      );
+      escapeTowerStore.sesi.pengurang_salah = Math.max(
+        0,
+        Math.min(100, Number(pengaturan.pengurang_salah) || 5)
+      );
+      escapeTowerStore.sesi.penalti_waktu_salah_detik = Math.max(
+        1,
+        Math.min(60, Number(pengaturan.penalti_waktu_salah_detik) || 5)
+      );
+    }
+    recalculateEscapeTowerScores();
+    saveEscapeTowerToFile(true);
+  } else if (actionType === 'start_game') {
+    if (escapeTowerStore.sesi.status === 'menunggu' || escapeTowerStore.sesi.status === 'selesai') {
+      const nextNum =
+        (parseInt(escapeTowerStore.sesi.id_sesi.replace('escape-', ''), 10) || 1) +
+        (escapeTowerStore.sesi.status === 'selesai' ? 1 : 0);
+      const sesiId = `escape-${nextNum}`;
+      escapeTowerStore.sesi.id_sesi = sesiId;
+      escapeTowerStore.sesi.waktu_mulai = nowStr;
+      escapeTowerStore.sesi.waktu_mulai_ms = now;
+      escapeTowerStore.sesi.waktu_jeda_ms = null;
+      escapeTowerStore.sesi.total_durasi_jeda_ms = 0;
+      escapeTowerStore.sesi.guru_pembuat = teacherName || 'Guru DKV';
+      escapeTowerStore.winningGroups = [];
+
+      for (let g = 1; g <= 8; g++) {
+        const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+        escapeTowerStore.progres[grp] = {
+          id_sesi: sesiId,
+          kelompok: grp,
+          lantai_sekarang: 1,
+          jumlah_salah: 0,
+          hint_dipakai: 0,
+          hint_terbuka_lantai: [],
+          waktu_selesai: '-',
+          durasi_detik: null,
+          peringkat_atap: null,
+          penalti_waktu_detik: 0,
+          cooldown_sampai_ms: null,
+          draft_jawaban: '',
+          terakhir_dijawab_oleh: '',
+          status_jawaban_terakhir: null,
+          pesan_jawaban_terakhir: '',
+        };
+      }
+      Object.values(escapeTowerStore.towerPlayers).forEach((tp) => {
+        tp.lantai_sekarang = 1;
+      });
+    }
+    escapeTowerStore.sesi.status = 'berjalan';
+    if (!escapeTowerStore.sesi.waktu_mulai_ms) {
+      escapeTowerStore.sesi.waktu_mulai_ms = now;
+    }
+    recalculateEscapeTowerScores();
+    saveEscapeTowerToFile(true);
+  } else if (actionType === 'pause_game') {
+    if (escapeTowerStore.sesi.status === 'berjalan') {
+      escapeTowerStore.sesi.status = 'jeda';
+      escapeTowerStore.sesi.waktu_jeda_ms = now;
+      saveEscapeTowerToFile(true);
+    }
+  } else if (actionType === 'resume_game') {
+    if (escapeTowerStore.sesi.status === 'jeda') {
+      if (escapeTowerStore.sesi.waktu_jeda_ms) {
+        escapeTowerStore.sesi.total_durasi_jeda_ms +=
+          now - escapeTowerStore.sesi.waktu_jeda_ms;
+      }
+      escapeTowerStore.sesi.waktu_jeda_ms = null;
+      escapeTowerStore.sesi.status = 'berjalan';
+      saveEscapeTowerToFile(true);
+    }
+  } else if (actionType === 'end_game') {
+    escapeTowerStore.sesi.status = 'selesai';
+    escapeTowerStore.sesi.waktu_jeda_ms = null;
+    recalculateEscapeTowerScores();
+    saveEscapeTowerToFile(true);
+  } else if (actionType === 'reset_game') {
+    const nextNum = (parseInt(escapeTowerStore.sesi.id_sesi.replace('escape-', ''), 10) || 1) + 1;
+    const newId = `escape-${nextNum}`;
+    escapeTowerStore.sesi.id_sesi = newId;
+    escapeTowerStore.sesi.status = 'menunggu';
+    escapeTowerStore.sesi.waktu_mulai = nowStr;
+    escapeTowerStore.sesi.waktu_mulai_ms = null;
+    escapeTowerStore.sesi.waktu_jeda_ms = null;
+    escapeTowerStore.sesi.total_durasi_jeda_ms = 0;
+    escapeTowerStore.winningGroups = [];
+
+    for (let g = 1; g <= 8; g++) {
+      const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+      escapeTowerStore.progres[grp] = {
+        id_sesi: newId,
+        kelompok: grp,
+        lantai_sekarang: 1,
+        jumlah_salah: 0,
+        hint_dipakai: 0,
+        hint_terbuka_lantai: [],
+        waktu_selesai: '-',
+        durasi_detik: null,
+        peringkat_atap: null,
+        penalti_waktu_detik: 0,
+        cooldown_sampai_ms: null,
+        draft_jawaban: '',
+        terakhir_dijawab_oleh: '',
+        status_jawaban_terakhir: null,
+        pesan_jawaban_terakhir: '',
+      };
+    }
+    Object.values(escapeTowerStore.towerPlayers).forEach((tp) => {
+      tp.lantai_sekarang = 1;
+    });
+    recalculateEscapeTowerScores();
+    saveEscapeTowerToFile(true);
+  } else if (actionType === 'assign_group') {
+    const grp = Math.max(1, Math.min(8, Number(targetGroup) || 1)) as
+      | 1
+      | 2
+      | 3
+      | 4
+      | 5
+      | 6
+      | 7
+      | 8;
+    const sid = String(targetStudentId || '').trim();
+    if (sid) {
+      escapeTowerStore.studentGroupMap[sid] = grp;
+      for (let g = 1; g <= 8; g++) {
+        escapeTowerStore.groupMembers[g] = (escapeTowerStore.groupMembers[g] || []).filter(
+          (m) => m.studentId !== sid
+        );
+      }
+      escapeTowerStore.groupMembers[grp].push({
+        studentId: sid,
+        studentName: String(targetStudentName || 'Siswa DKV'),
+        className: String(targetStudentClass || 'X DKV'),
+        gender: targetStudentGender === 'P' ? 'P' : 'L',
+      });
+      if (escapeTowerStore.towerPlayers[sid]) {
+        escapeTowerStore.towerPlayers[sid].kelompok = grp;
+        escapeTowerStore.towerPlayers[sid].lantai_sekarang =
+          escapeTowerStore.progres[grp]?.lantai_sekarang || 1;
+      }
+      saveEscapeTowerToFile(true);
+    }
+  }
+
+  broadcastPresence({
+    type: 'escape_tower_tick',
+    sesiId: escapeTowerStore.sesi.id_sesi,
+    status: escapeTowerStore.sesi.status,
+    timestamp: now,
+  });
+
+  return res.json({
+    success: true,
+    isVerifiedTeacher: true,
+    data: buildSanitizedEscapeTowerPayload({
+      viewerId: teacherId,
+      isVerifiedTeacher: true,
+    }),
+  });
+});
+
+// POST /api/escape-tower/student-action (Join group, update shared draft, request hint, submit answer, group chat)
+app.post('/api/escape-tower/student-action', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const {
+    studentId,
+    studentName,
+    className,
+    gender,
+    isTeacher,
+    studentNumber,
+    actionType,
+    kelompok,
+    jawaban,
+    draft_jawaban,
+    chatContent,
+  } = req.body || {};
+
+  if (!studentId) {
+    return res.status(400).json({ success: false, error: 'ID pengguna diperlukan.' });
+  }
+
+  const sid = String(studentId);
+  const sName = String(studentName || 'Siswa DKV');
+  const sClass = String(className || 'X DKV');
+  const sGender: 'L' | 'P' = gender === 'P' ? 'P' : 'L';
+  const verifiedTeacher = verifyTeacherAccountServerSide({
+    teacherId: sid,
+    teacherName: sName,
+    isTeacher,
+    studentNumber,
+  });
+
+  const now = Date.now();
+  const nowStr = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+  const maxAllowedGroup = Math.max(1, Math.min(8, escapeTowerStore.sesi.jumlah_kelompok || 8));
+
+  if (!escapeTowerStore.towerPlayers[sid]) {
+    const existingGrp = verifiedTeacher
+      ? null
+      : escapeTowerStore.studentGroupMap[sid] || (1 as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8);
+    escapeTowerStore.towerPlayers[sid] = {
+      studentId: sid,
+      studentName: sName,
+      className: sClass,
+      gender: sGender,
+      isTeacher: verifiedTeacher,
+      kelompok: existingGrp,
+      lantai_sekarang: existingGrp
+        ? escapeTowerStore.progres[existingGrp]?.lantai_sekarang || 1
+        : 1,
+      lastSeen: now,
+    };
+  } else {
+    escapeTowerStore.towerPlayers[sid].lastSeen = now;
+    escapeTowerStore.towerPlayers[sid].studentName = sName;
+    escapeTowerStore.towerPlayers[sid].isTeacher = verifiedTeacher;
+  }
+
+  const player = escapeTowerStore.towerPlayers[sid];
+  let answerResult: 'benar' | 'salah' | null = null;
+  let answerFeedback = '';
+  let unlockedFloor: number | null = null;
+  let reachedRoof = false;
+
+  if (actionType === 'join_group') {
+    if (verifiedTeacher) {
+      delete escapeTowerStore.studentGroupMap[sid];
+      for (let g = 1; g <= 8; g++) {
+        escapeTowerStore.groupMembers[g] = (escapeTowerStore.groupMembers[g] || []).filter(
+          (m) => m.studentId !== sid
+        );
+      }
+      player.kelompok = null;
+    } else {
+      const grp = Math.max(1, Math.min(maxAllowedGroup, Number(kelompok) || 1)) as
+        | 1
+        | 2
+        | 3
+        | 4
+        | 5
+        | 6
+        | 7
+        | 8;
+      escapeTowerStore.studentGroupMap[sid] = grp;
+      for (let g = 1; g <= 8; g++) {
+        escapeTowerStore.groupMembers[g] = (escapeTowerStore.groupMembers[g] || []).filter(
+          (m) => m.studentId !== sid
+        );
+      }
+      escapeTowerStore.groupMembers[grp].push({
+        studentId: sid,
+        studentName: sName,
+        className: sClass,
+        gender: sGender,
+      });
+      player.kelompok = grp;
+      player.lantai_sekarang = escapeTowerStore.progres[grp]?.lantai_sekarang || 1;
+    }
+    saveEscapeTowerToFile(true);
+  } else if (actionType === 'sync_draft') {
+    const grp =
+      player.kelompok ||
+      escapeTowerStore.studentGroupMap[sid] ||
+      (Math.max(1, Math.min(8, Number(kelompok) || 1)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8);
+    if (grp && escapeTowerStore.progres[grp]) {
+      escapeTowerStore.progres[grp].draft_jawaban = String(draft_jawaban ?? '').slice(0, 500);
+      escapeTowerStore.progres[grp].terakhir_dijawab_oleh = sName;
+    }
+  } else if (actionType === 'request_hint') {
+    const grp =
+      player.kelompok ||
+      escapeTowerStore.studentGroupMap[sid] ||
+      (Math.max(1, Math.min(8, Number(kelompok) || 1)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8);
+    const prog = grp ? escapeTowerStore.progres[grp] : null;
+    if (!prog) {
+      return res.status(400).json({ success: false, error: 'Pilih kelompok terlebih dahulu.' });
+    }
+    if (escapeTowerStore.sesi.status !== 'berjalan') {
+      return res.status(400).json({
+        success: false,
+        error: 'Permainan harus berstatus BERJALAN untuk membuka petunjuk (Hint).',
+      });
+    }
+    if (prog.lantai_sekarang <= 5) {
+      const currentFl = prog.lantai_sekarang as 1 | 2 | 3 | 4 | 5;
+      if (!prog.hint_terbuka_lantai.includes(currentFl)) {
+        prog.hint_terbuka_lantai.push(currentFl);
+        prog.hint_dipakai += 1;
+        recalculateEscapeTowerScores();
+        saveEscapeTowerToFile(true);
+      }
+    }
+  } else if (actionType === 'submit_answer') {
+    const grp =
+      player.kelompok ||
+      escapeTowerStore.studentGroupMap[sid] ||
+      (Math.max(1, Math.min(8, Number(kelompok) || 1)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8);
+    const prog = grp ? escapeTowerStore.progres[grp] : null;
+    if (!prog) {
+      return res.status(400).json({ success: false, error: 'Pilih kelompok terlebih dahulu.' });
+    }
+    if (escapeTowerStore.sesi.status !== 'berjalan') {
+      return res.status(400).json({
+        success: false,
+        error:
+          escapeTowerStore.sesi.status === 'jeda'
+            ? '⏸️ Permainan sedang dijeda oleh Guru.'
+            : '⏳ Permainan belum dimulai oleh Guru.',
+      });
+    }
+    if (prog.lantai_sekarang >= 6) {
+      return res.status(400).json({
+        success: false,
+        error: '🏆 Kelompokmu sudah berhasil membuka Pintu Atap!',
+      });
+    }
+    if (prog.cooldown_sampai_ms && now < prog.cooldown_sampai_ms) {
+      const waitSec = Math.ceil((prog.cooldown_sampai_ms - now) / 1000);
+      return res.status(400).json({
+        success: false,
+        error: `⏳ Penalti waktu aktif! Tunggu ${waitSec} detik sebelum mencoba lagi.`,
+      });
+    }
+
+    const currentFloorNum = prog.lantai_sekarang as 1 | 2 | 3 | 4 | 5;
+    const floorConfig = escapeTowerStore.konfigurasi.find(
+      (f) => f.nomor_lantai === currentFloorNum
+    );
+    if (!floorConfig) {
+      return res.status(400).json({ success: false, error: 'Konfigurasi lantai tidak ditemukan.' });
+    }
+
+    const isCorrect = checkEscapeFloorAnswerServerSide(floorConfig, String(jawaban || ''));
+    if (isCorrect) {
+      answerResult = 'benar';
+      unlockedFloor = currentFloorNum + 1;
+      prog.lantai_sekarang = (currentFloorNum + 1) as 1 | 2 | 3 | 4 | 5 | 6;
+      prog.draft_jawaban = '';
+      prog.cooldown_sampai_ms = null;
+      prog.terakhir_dijawab_oleh = sName;
+      prog.status_jawaban_terakhir = 'benar';
+
+      // Update all online members of this group to the new floor
+      Object.values(escapeTowerStore.towerPlayers).forEach((tp) => {
+        if (tp.kelompok === grp) {
+          tp.lantai_sekarang = prog.lantai_sekarang;
+        }
+      });
+
+      if (prog.lantai_sekarang === 6) {
+        reachedRoof = true;
+        prog.waktu_selesai = nowStr;
+        const startMs = escapeTowerStore.sesi.waktu_mulai_ms || now;
+        const rawElapsedSec = Math.max(
+          1,
+          Math.round((now - startMs - escapeTowerStore.sesi.total_durasi_jeda_ms) / 1000)
+        );
+        prog.durasi_detik = rawElapsedSec + prog.penalti_waktu_detik;
+        prog.pesan_jawaban_terakhir = `🎉 LUAR BIASA! ${sName} membuka PINTU ATAP untuk Kelompok ${grp}!`;
+        answerFeedback = prog.pesan_jawaban_terakhir;
+      } else {
+        prog.pesan_jawaban_terakhir = `✅ Jawaban Benar oleh ${sName}! Pintu Lift Lantai ${prog.lantai_sekarang} terbuka!`;
+        answerFeedback = prog.pesan_jawaban_terakhir;
+      }
+      recalculateEscapeTowerScores();
+      saveEscapeTowerToFile(true);
+    } else {
+      answerResult = 'salah';
+      const penaltiSec = escapeTowerStore.sesi.penalti_waktu_salah_detik || 5;
+      prog.jumlah_salah += 1;
+      prog.penalti_waktu_detik += penaltiSec;
+      prog.cooldown_sampai_ms = now + penaltiSec * 1000;
+      prog.terakhir_dijawab_oleh = sName;
+      prog.status_jawaban_terakhir = 'salah';
+      prog.pesan_jawaban_terakhir = `❌ Jawaban belum tepat, coba lagi! (Penalti +${penaltiSec} detik & -${escapeTowerStore.sesi.pengurang_salah} poin)`;
+      answerFeedback = prog.pesan_jawaban_terakhir;
+      recalculateEscapeTowerScores();
+      saveEscapeTowerToFile(true);
+    }
+  } else if (actionType === 'send_group_chat') {
+    const grp =
+      (kelompok ? (Math.max(1, Math.min(8, Number(kelompok))) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8) : null) ||
+      player.kelompok ||
+      escapeTowerStore.studentGroupMap[sid];
+    const text = String(chatContent || '').trim().slice(0, 160);
+    if (!grp || !text) {
+      return res.status(400).json({
+        success: false,
+        error: 'Pilih kelompok terlebih dahulu dan pastikan pesan tidak kosong.',
+      });
+    }
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    escapeTowerStore.groupChats.push({
+      id: `echat-${now}-${Math.random().toString(36).slice(2, 6)}`,
+      kelompok: grp,
+      senderId: sid,
+      senderName: sName,
+      content: text,
+      timestamp: `${hh}.${mm}`,
+      createdAt: now,
+    });
+    if (escapeTowerStore.groupChats.length > 200) {
+      escapeTowerStore.groupChats = escapeTowerStore.groupChats.slice(-200);
+    }
+    saveEscapeTowerToFile();
+  }
+
+  broadcastPresence({
+    type: 'escape_tower_tick',
+    sesiId: escapeTowerStore.sesi.id_sesi,
+    status: escapeTowerStore.sesi.status,
+    timestamp: now,
+  });
+
+  return res.json({
+    success: true,
+    hasil: answerResult,
+    message: answerFeedback,
+    unlockedFloor,
+    reachedRoof,
+    data: buildSanitizedEscapeTowerPayload({
+      viewerId: sid,
+      isVerifiedTeacher: verifiedTeacher,
+      viewerGroup: player.kelompok,
+    }),
+  });
+});
+
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
@@ -3138,4 +4293,5 @@ export default app;
 if (!process.env.VERCEL) {
   startServer();
 }
+
 

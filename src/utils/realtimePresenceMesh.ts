@@ -154,10 +154,13 @@ export interface PresenceMeshMessage {
     | 'request_sync'
     | 'creator_state_update'
     | 'mystery_arena_event'
-    | 'mystery_arena_request';
+    | 'mystery_arena_request'
+    | 'escape_tower_event'
+    | 'escape_tower_request';
   player?: any;
   creatorState?: any;
   arenaPayload?: any;
+  escapePayload?: any;
   id?: string;
   senderId?: string;
   ts?: number;

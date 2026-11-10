@@ -254,14 +254,14 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     const col = idx % 4;
     const row = Math.floor(idx / 4);
     const x = 0.2 + col * 0.2 + (row % 2 === 1 ? 0.02 : -0.02);
-    const y = 0.56 + row * 0.13;
+    const y = 0.58 + row * 0.13;
     return { x, y };
   }, []);
 
   const getHouseDoorCoords = useCallback((houseNum: MysteryHouseNumber) => {
     const idx = houseNum - 1;
     const x = 0.14 + idx * 0.18;
-    const y = 0.27;
+    const y = 0.31;
     return { x, y };
   }, []);
 
@@ -1647,7 +1647,28 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
               </div>
             </div>
 
-            {/* LIVE ISOMETRIC ARENA CANVAS */}
+            {/* DEDICATED ARENA LAYOUT BAR (OUTSIDE SIMULATION CANVAS SO IT NEVER COVERS THE ARENA) */}
+            <div className="bg-slate-950/90 border border-slate-700/80 rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-200 shrink-0">
+              <div className="font-extrabold text-amber-300 flex items-center gap-1.5">
+                <span>🗺️ Tata Letak Arena:</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10.5px] text-slate-300">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  <span><strong>Belakang:</strong> Rumah Misteri 1–5 (Klik untuk masuk)</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-sky-400" />
+                  <span><strong>Tengah:</strong> Area Berkumpul Kelompok 1–8</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span><strong>Depan:</strong> Podium Guru</span>
+                </span>
+              </div>
+            </div>
+
+            {/* LIVE ISOMETRIC ARENA CANVAS (CLEAN & UNOBSTRUCTED) */}
             <div className="relative w-full h-[270px] sm:h-[320px] rounded-2xl overflow-hidden border border-slate-700 shadow-inner bg-slate-950 shrink-0">
               <canvas
                 ref={arenaCanvasRef}
@@ -1666,14 +1687,6 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
                   </div>
                 </div>
               )}
-
-              {/* Top-left Legend inside Canvas */}
-              <div className="absolute top-2.5 left-2.5 bg-slate-950/75 backdrop-blur-xs border border-slate-700/80 rounded-xl px-2.5 py-1.5 text-[10px] text-slate-200 pointer-events-none">
-                <div className="font-extrabold text-amber-300">🗺️ Tata Letak Arena:</div>
-                <div>• Belakang: Rumah Misteri 1–5 (Klik untuk masuk)</div>
-                <div>• Tengah: Area Berkumpul Kelompok 1–8</div>
-                <div>• Depan: Podium Guru</div>
-              </div>
             </div>
 
             {/* LIVE PARTICIPANTS ROSTER STRIP (TERBACA REAL-TIME) */}

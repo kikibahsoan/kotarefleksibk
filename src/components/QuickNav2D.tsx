@@ -41,7 +41,7 @@ const BUILDING_DESCRIPTIONS: Partial<Record<BuildingId, string>> = {
   masjid: 'Belajar membaca Iqro (Jilid 1 s.d. 6) bersuara tajwid/makhraj serta panduan lengkap Tuntunan Sholat & Wudhu.',
   bank_materi: 'Khusus Guru • Input Mata Pelajaran, Elemen, TP, Materi Esensial & Generate AI otomatis tersebar ke seluruh bangunan kota + Spreadsheet.',
   monumen_warga: 'Sapa & obrolan langsung sesama warga dan teman kelas di tengah kota.',
-  pencakar_langit: 'Pusat Kota (Setelah Sungai) • Tantangan karier, plaza, dan cita-cita masa depan.',
+  pencakar_langit: 'Refleksia Timur • Escape Room Menara (Game Kelompok Lantai 1–5 Membuka Pintu Atap) & Peta Karier Masa Depan.',
   latihan_tentara: 'Pusat Kota (Setelah Sungai) • Lapangan latihan disiplin waktu, tanggung jawab, dan kerja tim.',
   museum_seni: 'Pusat Kota (Setelah Sungai) • Galeri pameran karya visual dan apresiasi kreativitas.',
   panggung_kota: 'Pusat Kota (Setelah Sungai) • Panggung terbuka untuk presentasi karya dan pengumuman kelas.',

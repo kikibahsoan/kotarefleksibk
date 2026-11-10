@@ -23,6 +23,10 @@ import {
   GameRondeRow,
   GamePilihanRow,
   GameSkorRow,
+  EscapeKonfigurasiFloor,
+  EscapeSesiRow,
+  EscapeProgresRow,
+  EscapeSkorRow,
 } from '../types/index.ts';
 import {
   INITIAL_MATERI,
@@ -3282,7 +3286,120 @@ export const StorageService = {
       return false;
     }
   },
+
+  // ==========================================================================
+  // SINKRONISASI ESCAPE ROOM MENARA KE GOOGLE SPREADSHEET (APPS SCRIPT)
+  // Sheet Baru: Escape_Konfigurasi, Escape_Sesi, Escape_Progres, Escape_Skor
+  // ==========================================================================
+
+  async syncEscapeKonfigurasiToGAS(params: {
+    konfigurasi: EscapeKonfigurasiFloor[];
+    teacherId: string;
+    teacherName: string;
+    teacherPin?: string;
+  }): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_escape_konfigurasi',
+          teacherId: params.teacherId,
+          teacherName: params.teacherName,
+          teacherPin: params.teacherPin || settings.teacherPin || '1234',
+          konfigurasi: params.konfigurasi,
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Escape_Konfigurasi ke Spreadsheet:', e);
+      return false;
+    }
+  },
+
+  async syncEscapeSesiToGAS(params: {
+    sesi: EscapeSesiRow;
+    teacherId: string;
+    teacherName: string;
+    teacherPin?: string;
+  }): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_escape_sesi',
+          teacherId: params.teacherId,
+          teacherName: params.teacherName,
+          teacherPin: params.teacherPin || settings.teacherPin || '1234',
+          sesi: params.sesi,
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Escape_Sesi ke Spreadsheet:', e);
+      return false;
+    }
+  },
+
+  async syncEscapeProgresToGAS(progres: EscapeProgresRow): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_escape_progres',
+          progres: {
+            id_sesi: progres.id_sesi,
+            kelompok: `Kelompok ${progres.kelompok}`,
+            lantai_sekarang: progres.lantai_sekarang,
+            jumlah_salah: progres.jumlah_salah,
+            hint_dipakai: progres.hint_dipakai,
+            waktu_selesai: progres.waktu_selesai,
+          },
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Escape_Progres ke Spreadsheet:', e);
+      return false;
+    }
+  },
+
+  async syncEscapeSkorToGAS(skorList: EscapeSkorRow[]): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_escape_skor',
+          skorList,
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Escape_Skor ke Spreadsheet:', e);
+      return false;
+    }
+  },
 };
+
 
 
 

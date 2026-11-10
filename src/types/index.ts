@@ -833,4 +833,133 @@ export interface MysteryArenaState {
   serverTime: number;
 }
 
+// ============================================================================
+// ESCAPE ROOM MENARA (GEDUNG PENCAKAR LANGIT TERTINGGI • REFLEKSIA TIMUR)
+// Sheet Baru: Escape_Konfigurasi, Escape_Sesi, Escape_Progres, Escape_Skor
+// ============================================================================
+
+export type EscapeSessionStatus = 'menunggu' | 'berjalan' | 'jeda' | 'selesai';
+export type EscapeFloorNumber = 1 | 2 | 3 | 4 | 5;
+export type EscapeQuestionType =
+  | 'pilihan_ganda'
+  | 'isian_singkat'
+  | 'urutan_langkah'
+  | 'sandi_kode';
+
+/** Representasi baris pada Sheet "Escape_Konfigurasi" */
+export interface EscapeKonfigurasiFloor {
+  nomor_lantai: EscapeFloorNumber;
+  judul: string;
+  cerita: string;
+  soal: string;
+  jenis: EscapeQuestionType;
+  /** Opsi untuk pilihan_ganda atau langkah acak untuk urutan_langkah */
+  opsi?: string[];
+  /**
+   * PENTING: hint hanya dikirim ke siswa jika kelompoknya sudah menekan "Minta Petunjuk"
+   * pada lantai tersebut.
+   */
+  hint: string | null;
+  /**
+   * PENTING KEAMANAN: kunci_jawaban TIDAK BOLEH dikirim ke sisi siswa!
+   * Bernilai null pada payload siswa; hanya guru terverifikasi yang dapat melihat/mengedit.
+   */
+  kunci_jawaban: string | null;
+  batas_waktu: number; // detik per lantai
+}
+
+/** Representasi baris pada Sheet "Escape_Sesi" */
+export interface EscapeSesiRow {
+  id_sesi: string;
+  status: EscapeSessionStatus;
+  waktu_mulai: string;
+  waktu_mulai_ms: number | null;
+  waktu_jeda_ms: number | null;
+  total_durasi_jeda_ms: number;
+  jumlah_kelompok: number; // 1 - 8
+  poin_dasar: number;
+  bonus_kecepatan: number;
+  pengurang_hint: number;
+  pengurang_salah: number;
+  penalti_waktu_salah_detik: number;
+  guru_pembuat?: string;
+}
+
+/** Representasi baris pada Sheet "Escape_Progres" */
+export interface EscapeProgresRow {
+  id_sesi: string;
+  kelompok: MysteryGroupNumber;
+  /** 1..5 = sedang di Lantai 1..5; 6 = sudah mencapai Pintu Atap (Selesai!) */
+  lantai_sekarang: 1 | 2 | 3 | 4 | 5 | 6;
+  jumlah_salah: number;
+  hint_dipakai: number;
+  /** Daftar lantai yang petunjuknya sudah dibuka oleh kelompok ini */
+  hint_terbuka_lantai: EscapeFloorNumber[];
+  /** Waktu selesai format teks (atau "-" jika belum sampai atap) */
+  waktu_selesai: string;
+  /** Durasi total detik dari mulai hingga sampai atap (null jika belum selesai) */
+  durasi_detik: number | null;
+  /** Urutan peringkat sampai atap (1 = tercepat pertama, dst.) */
+  peringkat_atap: number | null;
+  /** Penalti waktu tambah (detik) akibat jawaban salah */
+  penalti_waktu_detik: number;
+  /** Cooldown timestamp (ms) sampai kelompok boleh mengirim jawaban lagi setelah salah */
+  cooldown_sampai_ms?: number | null;
+  /** Draft jawaban bersama satu kelompok secara real-time */
+  draft_jawaban?: string;
+  terakhir_dijawab_oleh?: string;
+  status_jawaban_terakhir?: 'benar' | 'salah' | null;
+  pesan_jawaban_terakhir?: string;
+}
+
+/** Representasi baris pada Sheet "Escape_Skor" */
+export interface EscapeSkorRow {
+  kelompok: MysteryGroupNumber;
+  total_poin: number;
+  waktu_selesai?: string;
+  durasi_detik?: number | null;
+  hint_dipakai?: number;
+  jumlah_salah?: number;
+  peringkat?: number | null;
+}
+
+export interface EscapeTowerPlayerPresence {
+  studentId: string;
+  studentName: string;
+  className: string;
+  gender: 'L' | 'P';
+  isTeacher: boolean;
+  kelompok: MysteryGroupNumber | null;
+  lantai_sekarang: 1 | 2 | 3 | 4 | 5 | 6;
+  lastSeen: number;
+}
+
+export interface EscapeTowerState {
+  sesi: EscapeSesiRow;
+  /**
+   * Untuk Guru: berisi ke-5 lantai lengkap dengan kunci_jawaban.
+   * Untuk Siswa: hanya berisi lantai yang sedang dikerjakan kelompoknya (atau yang sudah dibuka),
+   * TANPA kunci_jawaban, dan hint hanya tampil jika sudah dibuka kelompoknya.
+   */
+  konfigurasi: EscapeKonfigurasiFloor[];
+  progres: Record<number, EscapeProgresRow>;
+  skor: EscapeSkorRow[];
+  studentGroupMap: Record<string, MysteryGroupNumber>;
+  groupMembers: Record<
+    number,
+    Array<{
+      studentId: string;
+      studentName: string;
+      className: string;
+      gender: 'L' | 'P';
+      isOnline?: boolean;
+    }>
+  >;
+  towerPlayers: EscapeTowerPlayerPresence[];
+  groupChats: MysteryArenaGroupChatMsg[];
+  winningGroups: MysteryGroupNumber[];
+  serverTime: number;
+}
+
+
 

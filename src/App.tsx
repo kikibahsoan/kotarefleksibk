@@ -42,6 +42,7 @@ import { MasjidModal } from './components/modals/MasjidModal.tsx';
 import { BankMateriModal } from './components/modals/BankMateriModal.tsx';
 import { PusatKotaBuildingModal } from './components/modals/PusatKotaBuildingModal.tsx';
 import { ArenaRumahMisteriModal } from './components/modals/ArenaRumahMisteriModal.tsx';
+import { EscapeRoomMenaraModal } from './components/modals/EscapeRoomMenaraModal.tsx';
 import { isPusatKotaBuilding } from './utils/aturanBakuKota.ts';
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
 import { LofiAudioControl } from './components/LofiAudioControl.tsx';
@@ -178,6 +179,7 @@ export default function App() {
 
   // Atmospheric weather automatic change notification with smooth fade-in/fade-out
   const [weatherChangeToast, setWeatherChangeToast] = useState<{ icon: string; title: string; desc: string } | null>(null);
+  const [showCareerModalInSkyscraper, setShowCareerModalInSkyscraper] = useState(false);
   const prevWeatherForToastRef = useRef<WeatherType>(weatherType);
 
   useEffect(() => {
@@ -1458,6 +1460,18 @@ export default function App() {
         />
       )}
 
+      {activeBuilding === 'pencakar_langit' && !showCareerModalInSkyscraper && (
+        <EscapeRoomMenaraModal
+          onClose={() => {
+            setShowCareerModalInSkyscraper(false);
+            setActiveBuilding(null);
+          }}
+          student={student}
+          onAddXp={handleAddPoints}
+          onOpenCareerBuildingModal={() => setShowCareerModalInSkyscraper(true)}
+        />
+      )}
+
       {activeBuilding === 'bank_materi' && student.isTeacher && (
         <BankMateriModal
           onClose={() => setActiveBuilding(null)}
@@ -1484,15 +1498,23 @@ export default function App() {
         />
       )}
 
-      {activeBuilding && isPusatKotaBuilding(activeBuilding) && (
-        <PusatKotaBuildingModal
-          buildingId={activeBuilding}
-          student={student}
-          materis={materis}
-          objectives={objectives}
-          reflections={reflections}
-          messages={messages}
-          onClose={() => setActiveBuilding(null)}
+      {activeBuilding &&
+        isPusatKotaBuilding(activeBuilding) &&
+        (activeBuilding !== 'pencakar_langit' || showCareerModalInSkyscraper) && (
+          <PusatKotaBuildingModal
+            buildingId={activeBuilding}
+            student={student}
+            materis={materis}
+            objectives={objectives}
+            reflections={reflections}
+            messages={messages}
+            onClose={() => {
+              if (activeBuilding === 'pencakar_langit' && showCareerModalInSkyscraper) {
+                setShowCareerModalInSkyscraper(false);
+              } else {
+                setActiveBuilding(null);
+              }
+            }}
           onSubmitReflection={(materiId, scale, answers, moodEmoji) => {
             const matchedMat = materis.find((m) => m.id === materiId);
             const nowStr = new Date().toLocaleString('id-ID');

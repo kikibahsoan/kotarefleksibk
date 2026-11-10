@@ -115,7 +115,7 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'masjid', name: 'Masjid Al-Hikmah', tagline: 'Belajar Iqro (1-6) & Tuntunan Sholat', position: [5.45, 0, -4.85], color: 0x10b981, icon: '🕌' },
   { id: 'bank_materi', name: 'Bank Materi Guru', tagline: 'Khusus Guru • Input TP, Materi Esensial & Generate AI', position: [-5.35, 0, -4.85], color: 0x6366f1, icon: '🏦' },
   { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
-  { id: 'pencakar_langit', name: 'Gedung Pencakar Langit', tagline: 'Refleksia Timur • Tantangan Karier & Cita-cita Masa Depan', position: [14.0, 0, -10.5], color: 0x0284c7, icon: '🏙️' },
+  { id: 'pencakar_langit', name: 'Gedung Pencakar Langit (Escape Room Menara)', tagline: 'Refleksia Timur • Escape Room Menara (Lantai 1–5) & Tantangan Karier', position: [14.0, 0, -10.5], color: 0x0284c7, icon: '🏙️' },
   { id: 'bandara', name: 'Bandara Refleksia Timur', tagline: 'Gerbang Udara • Landasan Pacu, Pesawat Terbang & Target Masa Depan', position: [10.8, 0, -11.8], color: 0x38bdf8, icon: '✈️' },
   { id: 'arena_rumah_misteri', name: 'Arena Rumah Misteri', tagline: 'Refleksia Timur Depan • Game Kelompok Langsung (Rumah 1–5)', position: [13.5, 0, 3.6], color: 0xf43f5e, icon: '🏠' },
 ];
@@ -16637,7 +16637,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             drawIsoBoxSky(ctx, bx, by + 1.2, 0, 2.2, 0.75, 7.5, '#0284c7', '#0369a1', '#075985', camera.x, camera.y);
             drawIsoBoxSky(ctx, bx, by + 1.2, 7.5, 2.4, 0.85, 2.0, '#38bdf8', '#0284c7', '#0369a1', camera.x, camera.y);
 
-            // Glowing Signboard "🏙️ REFLEKSIA TIMUR • PENCAKAR LANGIT"
+            // Glowing Signboard "🏙️ REFLEKSIA TIMUR • PENCAKAR LANGIT" + "🔐 ESCAPE ROOM MENARA"
             ctx.fillStyle = '#0f172a';
             ctx.beginPath();
             ctx.roundRect(canopyC.x - 48 * z, canopyC.y - 18 * z, 96 * z, 13 * z, 3.5 * z);
@@ -16651,6 +16651,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('🏙️ REFLEKSIA TIMUR • PENCAKAR LANGIT', canopyC.x, canopyC.y - 12 * z);
+
+            // Escape Room Menara Badge right above the main canopy sign
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+            ctx.beginPath();
+            ctx.roundRect(canopyC.x - 44 * z, canopyC.y - 31 * z, 88 * z, 11 * z, 3.5 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.0 * z;
+            ctx.stroke();
+
+            ctx.fillStyle = '#fde047';
+            ctx.font = `bold ${Math.round(4.3 * z)}px sans-serif`;
+            ctx.fillText('🔐 ESCAPE ROOM MENARA • LANTAI 1–5', canopyC.x, canopyC.y - 25.5 * z);
           } else if (b.id === 'bandara') {
             // =========================================================================
             // 12. BANDARA REFLEKSIA TIMUR (Terminal, Menara ATC, Landasan Pacu & 2 Pesawat Parkir)
