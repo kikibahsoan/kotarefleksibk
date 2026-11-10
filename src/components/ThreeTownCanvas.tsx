@@ -117,6 +117,7 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
   { id: 'pencakar_langit', name: 'Gedung Pencakar Langit', tagline: 'Refleksia Timur • Tantangan Karier & Cita-cita Masa Depan', position: [14.0, 0, -10.5], color: 0x0284c7, icon: '🏙️' },
   { id: 'bandara', name: 'Bandara Refleksia Timur', tagline: 'Gerbang Udara • Landasan Pacu, Pesawat Terbang & Target Masa Depan', position: [10.8, 0, -11.8], color: 0x38bdf8, icon: '✈️' },
+  { id: 'arena_rumah_misteri', name: 'Arena Rumah Misteri', tagline: 'Refleksia Timur Depan • Game Kelompok Langsung (Rumah 1–5)', position: [13.5, 0, 3.6], color: 0xf43f5e, icon: '🏠' },
 ];
 
 export const DEFAULT_BUILDINGS_SNAPSHOT = BUILDINGS_INFO.map((b) => ({
@@ -4715,6 +4716,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const isScreenHit = Math.abs(sx - bPt.x) < 65 * z && sy >= bPt.y - 105 * z && sy <= bPt.y + 30 * z;
           const isWorldHit = wx >= 8.8 && wx <= 12.2 && wy >= -13.2 && wy <= -10.5;
           isDirectHit = isDirectHit || isScreenHit || isWorldHit;
+        } else if (b.id === 'arena_rumah_misteri') {
+          const bPt = toScreen(bx, by, 0, camera.x, camera.y);
+          const isScreenHit = Math.abs(sx - bPt.x) < 88 * z && sy >= bPt.y - 95 * z && sy <= bPt.y + 42 * z;
+          const isWorldHit = wx >= 11.2 && wx <= 15.8 && wy >= 1.6 && wy <= 5.0;
+          isDirectHit = isDirectHit || isScreenHit || isWorldHit;
         }
         if (isDirectHit) {
           sounds.playClick();
@@ -4748,6 +4754,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           } else if (b.id === 'bandara') {
             player.targetWx = 10.8;
             player.targetWy = -10.9;
+          } else if (b.id === 'arena_rumah_misteri') {
+            player.targetWx = 13.5;
+            player.targetWy = 4.4;
           } else {
             player.targetWx = bx * 0.68;
             player.targetWy = by * 0.68;
@@ -5780,6 +5789,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               isNear = player.wx >= 10.5 && player.wx <= 17.5 && player.wy >= -11.5 && player.wy <= -7.5;
             } else if (b.id === 'bandara') {
               isNear = player.wx >= 8.5 && player.wx <= 13.0 && player.wy >= -13.5 && player.wy <= -9.8;
+            } else if (b.id === 'arena_rumah_misteri') {
+              isNear = player.wx >= 11.0 && player.wx <= 16.0 && player.wy >= 1.4 && player.wy <= 5.2;
             } else {
               const bDist = Math.hypot(player.wx - bx, player.wy - by);
               const threshold = b.id === 'monumen_warga' ? 1.45 : 1.75;
@@ -5865,6 +5876,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                   if (player.wx < 9.8 || player.wx > 18.2 || player.wy < -12.2 || player.wy > -7.0) away = true;
                 } else if (prevB.id === 'bandara') {
                   if (player.wx < 8.0 || player.wx > 13.5 || player.wy < -14.0 || player.wy > -9.2) away = true;
+                } else if (prevB.id === 'arena_rumah_misteri') {
+                  if (player.wx < 10.4 || player.wx > 16.6 || player.wy < 0.8 || player.wy > 5.8) away = true;
                 } else {
                   const d = Math.hypot(player.wx - prevB.position[0], player.wy - prevB.position[2]);
                   if (d > 2.15 || (prevB.id === 'balai_kota' && player.wy < -4.65)) away = true;
@@ -6945,8 +6958,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if ((gx === 2 || gx === 3) && gy === -4) return true;
         // Paved corner patio for relocated Toko Roti & Kafe behind Lab DKV at [4..5, 4..5]
         if ((gx === 4 || gx === 5) && (gy === 4 || gy === 5)) return true;
-        // Jalan setapak rapi dari jembatan penyeberangan [8, 0] menuju kawasan Refleksia Timur
-        if (gy === 0 && gx >= 8 && gx <= 11) return true;
+        // Jalan setapak rapi dari jembatan penyeberangan [8, 0] menuju kawasan Refleksia Timur & Arena Rumah Misteri di Refleksia Timur Depan [13.5, 3.6]
+        if (gy === 0 && gx >= 8 && gx <= 13) return true;
+        if (gx === 13 && gy >= 0 && gy <= 4) return true;
         return false;
       };
 
@@ -16953,6 +16967,162 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
             // Pesawat 2: Regional Express Jet (SkyRefleksia • PK-XSMK) di Stand Parkir 2
             drawLowPolyAirplane(16.3, -12.1, 2.0, 2.1, '#059669', '#047857', 'PK-XSMK');
+          } else if (b.id === 'arena_rumah_misteri') {
+            // =========================================================================
+            // ARENA RUMAH MISTERI (REFLEKSIA TIMUR DEPAN [wx: 13.5, wy: 3.6])
+            // Plaza Isometrik Game Kelompok:
+            // - Belakang: 5 Rumah Misteri Berjajar (Rumah 1 - 5)
+            // - Tengah: Area Kelompok di Depan Guru
+            // - Depan: Podium Guru & Gerbang Arena Terhubung ke Jalan
+            // =========================================================================
+            const drawIsoBoxArena = (
+              cx: number,
+              cy: number,
+              zBase: number,
+              w: number,
+              d: number,
+              h: number,
+              topCol: string,
+              leftCol: string,
+              rightCol: string
+            ) => {
+              const hw = w / 2;
+              const hd = d / 2;
+              const bS = toScreen(cx + hw, cy + hd, zBase, camera.x, camera.y);
+              const bW = toScreen(cx - hw, cy + hd, zBase, camera.x, camera.y);
+              const bE = toScreen(cx + hw, cy - hd, zBase, camera.x, camera.y);
+              const tS = toScreen(cx + hw, cy + hd, zBase + h, camera.x, camera.y);
+              const tW = toScreen(cx - hw, cy + hd, zBase + h, camera.x, camera.y);
+              const tE = toScreen(cx + hw, cy - hd, zBase + h, camera.x, camera.y);
+              const tN = toScreen(cx - hw, cy - hd, zBase + h, camera.x, camera.y);
+
+              ctx.fillStyle = leftCol;
+              ctx.beginPath();
+              ctx.moveTo(bW.x, bW.y);
+              ctx.lineTo(bS.x, bS.y);
+              ctx.lineTo(tS.x, tS.y);
+              ctx.lineTo(tW.x, tW.y);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.fillStyle = rightCol;
+              ctx.beginPath();
+              ctx.moveTo(bS.x, bS.y);
+              ctx.lineTo(bE.x, bE.y);
+              ctx.lineTo(tE.x, tE.y);
+              ctx.lineTo(tS.x, tS.y);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.fillStyle = topCol;
+              ctx.beginPath();
+              ctx.moveTo(tN.x, tN.y);
+              ctx.lineTo(tE.x, tE.y);
+              ctx.lineTo(tS.x, tS.y);
+              ctx.lineTo(tW.x, tW.y);
+              ctx.closePath();
+              ctx.fill();
+            };
+
+            const drawIsoRoofArena = (
+              cx: number,
+              cy: number,
+              zBase: number,
+              w: number,
+              d: number,
+              h: number,
+              leftCol: string,
+              rightCol: string
+            ) => {
+              const hw = w / 2;
+              const hd = d / 2;
+              const bS = toScreen(cx + hw, cy + hd, zBase, camera.x, camera.y);
+              const bW = toScreen(cx - hw, cy + hd, zBase, camera.x, camera.y);
+              const bE = toScreen(cx + hw, cy - hd, zBase, camera.x, camera.y);
+              const bN = toScreen(cx - hw, cy - hd, zBase, camera.x, camera.y);
+              const peak = toScreen(cx, cy, zBase + h, camera.x, camera.y);
+
+              ctx.fillStyle = leftCol;
+              ctx.beginPath();
+              ctx.moveTo(bN.x, bN.y);
+              ctx.lineTo(bW.x, bW.y);
+              ctx.lineTo(peak.x, peak.y);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.fillStyle = leftCol;
+              ctx.beginPath();
+              ctx.moveTo(bW.x, bW.y);
+              ctx.lineTo(bS.x, bS.y);
+              ctx.lineTo(peak.x, peak.y);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.fillStyle = rightCol;
+              ctx.beginPath();
+              ctx.moveTo(bS.x, bS.y);
+              ctx.lineTo(bE.x, bE.y);
+              ctx.lineTo(peak.x, peak.y);
+              ctx.closePath();
+              ctx.fill();
+            };
+
+            // 1. Isometric Stone Plaza Base
+            drawIsoBoxArena(bx, by, 0, 3.9, 2.9, 3, isNight ? '#334155' : '#e2e8f0', isNight ? '#1e293b' : '#cbd5e1', isNight ? '#0f172a' : '#94a3b8');
+            drawIsoBoxArena(bx, by, 3, 3.65, 2.65, 2, isNight ? '#1e293b' : '#f8fafc', isNight ? '#0f172a' : '#e2e8f0', isNight ? '#020617' : '#cbd5e1');
+
+            // 2. 5 Mystery Houses Lined Up at the Back (Rumah 1 - 5)
+            const mysteryHouseSpecs = [
+              { num: 1, dx: -1.36, roofL: '#ef4444', roofR: '#b91c1c', wallL: '#fef2f2', wallR: '#fee2e2' },
+              { num: 2, dx: -0.68, roofL: '#f59e0b', roofR: '#b45309', wallL: '#fffbeb', wallR: '#fef3c7' },
+              { num: 3, dx: 0.0,   roofL: '#10b981', roofR: '#047857', wallL: '#ecfdf5', wallR: '#d1fae5' },
+              { num: 4, dx: 0.68,  roofL: '#3b82f6', roofR: '#1d4ed8', wallL: '#eff6ff', wallR: '#dbeafe' },
+              { num: 5, dx: 1.36,  roofL: '#8b5cf6', roofR: '#6d28d9', wallL: '#f5f3ff', wallR: '#ede9fe' },
+            ];
+            mysteryHouseSpecs.forEach((mh) => {
+              const hx = bx + mh.dx;
+              const hy = by - 0.72;
+              drawIsoBoxArena(hx, hy, 5, 0.52, 0.52, 16, '#f8fafc', mh.wallL, mh.wallR);
+              drawIsoRoofArena(hx, hy, 21, 0.62, 0.62, 11, mh.roofL, mh.roofR);
+              const roofPt = toScreen(hx, hy, 34, camera.x, camera.y);
+              ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+              ctx.beginPath();
+              ctx.roundRect(roofPt.x - 10 * z, roofPt.y - 6 * z, 20 * z, 10 * z, 3 * z);
+              ctx.fill();
+              ctx.fillStyle = '#fde047';
+              ctx.font = `bold ${Math.max(6, Math.round(6.5 * z))}px sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(`R${mh.num}`, roofPt.x, roofPt.y - 1 * z);
+            });
+
+            // 3. Group Gathering Pads in the Middle (Area Kelompok di Depan Guru)
+            for (let gIdx = 0; gIdx < 4; gIdx++) {
+              const gxPad = bx - 1.05 + gIdx * 0.7;
+              const gyPad = by + 0.1;
+              drawIsoBoxArena(gxPad, gyPad, 5, 0.46, 0.36, 1.5, '#38bdf8', '#0284c7', '#0369a1');
+            }
+
+            // 4. Teacher Podium at the Front of the Arena
+            const podWx = bx;
+            const podWy = by + 0.86;
+            drawIsoBoxArena(podWx, podWy, 5, 0.85, 0.48, 6, '#fbbf24', '#d97706', '#b45309');
+            drawIsoBoxArena(podWx, podWy, 11, 0.35, 0.28, 8, '#fde047', '#f59e0b', '#92400e');
+
+            // 5. Grand Archway Banner Signboard "ARENA RUMAH MISTERI"
+            const archPt = toScreen(bx, by + 1.05, 26, camera.x, camera.y);
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            ctx.beginPath();
+            ctx.roundRect(archPt.x - 52 * z, archPt.y - 9 * z, 104 * z, 16 * z, 6 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 1.2 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#fef08a';
+            ctx.font = `bold ${Math.max(7, Math.round(7.5 * z))}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🏠 ARENA RUMAH MISTERI', archPt.x, archPt.y - 1 * z);
           }
 
           // Floating Building Label ONLY when touched, hovered or active (compact & semi-transparent, fades after 5s stationary)
@@ -16961,7 +17131,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           if (shouldShowLabel) {
             ctx.save();
             ctx.globalAlpha = (ctx.globalAlpha || 1.0) * tagAlpha;
-            const tagY = pt.y - (b.id === 'pencakar_langit' ? 145 : b.id === 'bandara' ? 76 : b.id === 'balai_kota' ? 86 : b.id === 'masjid' || b.id === 'bank_materi' ? 78 : b.id === 'menara_mentor' || b.id === 'bengkel_latihan' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
+            const tagY = pt.y - (b.id === 'pencakar_langit' ? 145 : b.id === 'bandara' ? 76 : b.id === 'arena_rumah_misteri' ? 68 : b.id === 'balai_kota' ? 86 : b.id === 'masjid' || b.id === 'bank_materi' ? 78 : b.id === 'menara_mentor' || b.id === 'bengkel_latihan' ? 62 : b.id === 'taman_refleksi' ? 60 : 52) * z;
             const labelText = `${b.icon} ${b.name}`;
             ctx.font = `bold ${Math.round(8.2 * z)}px sans-serif`;
             const tMetrics = ctx.measureText(labelText);

@@ -2076,6 +2076,851 @@ app.post('/api/wisma-suggestions', (req, res) => {
   });
 });
 
+// ============================================================================
+// ARENA RUMAH MISTERI (LIVE MULTIPLAYER GROUP GAME DI REFLEKSIA TIMUR DEPAN)
+// Server-Authoritative State, Role Verification, Anti-Peek & Spreadsheet Sync
+// ============================================================================
+const MYSTERY_ARENA_FILE_PATH = path.join(__dirname, 'server_mystery_arena.json');
+
+const AUTHORIZED_TEACHER_USERNAMES = new Set([
+  'kikybahsoan',
+  'guru.dkv',
+  'irfan.syahrul',
+  'nurlaila.doda',
+  'abdul.rahman',
+  'patria.wumu',
+  'syahrul.ramadhan',
+  'sarifin.ahmad',
+  'rizal.abdul',
+  'ayunita.tuliabu',
+  'naziefah',
+]);
+
+const AUTHORIZED_TEACHER_NAMES = [
+  'KIKYBAHSOAN',
+  'MOHAMAD RIZKI BAHSOAN',
+  'IRFAN SYAHRUL BASRI',
+  'NURLAILA DODA',
+  'ABDUL RAHMAN BAHSOAN',
+  'PATRIA WUMU',
+  'SYAHRUL RAMADHAN',
+  'SARIFIN AHMAD',
+  'RIZAL ABDUL',
+  'AYUNITA TULIABU',
+  'NAZIEFAH',
+];
+
+function verifyTeacherAccountServerSide(payload: {
+  teacherId?: string;
+  teacherName?: string;
+  isTeacher?: boolean;
+  studentNumber?: string;
+}): boolean {
+  if (!payload) return false;
+  const rawId = String(payload.teacherId || '').trim().toLowerCase();
+  const rawName = String(payload.teacherName || '').trim().toUpperCase();
+  const rawNum = String(payload.studentNumber || '').trim().toUpperCase();
+
+  if (rawId.startsWith('std-') || rawId.startsWith('guest-')) {
+    return false;
+  }
+
+  if (rawId.startsWith('teacher-')) {
+    const uname = rawId.replace(/^teacher-/, '');
+    if (AUTHORIZED_TEACHER_USERNAMES.has(uname) || uname === 'guru' || uname.includes('kikybahsoan')) {
+      return true;
+    }
+  }
+
+  if (AUTHORIZED_TEACHER_USERNAMES.has(rawId)) {
+    return true;
+  }
+
+  if (
+    payload.isTeacher === true &&
+    (rawNum === 'MASTER-DKV' ||
+      rawNum === 'GURU-DKV' ||
+      AUTHORIZED_TEACHER_NAMES.some((n) => rawName.includes(n)))
+  ) {
+    return true;
+  }
+
+  if (AUTHORIZED_TEACHER_NAMES.some((n) => rawName.includes(n)) && rawId.includes('teacher')) {
+    return true;
+  }
+
+  return false;
+}
+
+interface ServerMysteryArenaStore {
+  currentRound: {
+    id_ronde: string;
+    soal: string;
+    rumah_benar: 1 | 2 | 3 | 4 | 5;
+    status: 'menunggu' | 'buka' | 'tutup' | 'meledak';
+    waktu: string;
+    poin_benar: number;
+    timer_detik: number;
+    timer_berakhir_ms: number | null;
+    ledakan_mulai_ms: number | null;
+    guru_pembuat: string;
+  };
+  choices: Record<
+    number,
+    {
+      id_ronde: string;
+      kelompok: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+      rumah_dipilih: 1 | 2 | 3 | 4 | 5 | null;
+      waktu: string;
+      diwakili_oleh?: string;
+    }
+  >;
+  scores: Array<{
+    kelompok: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    total_poin: number;
+    ronde_menang: number;
+    waktu_update: string;
+  }>;
+  studentGroupMap: Record<string, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>;
+  groupMembers: Record<
+    number,
+    Array<{
+      studentId: string;
+      studentName: string;
+      className: string;
+      gender: 'L' | 'P';
+    }>
+  >;
+  arenaPlayers: Record<
+    string,
+    {
+      studentId: string;
+      studentName: string;
+      className: string;
+      gender: 'L' | 'P';
+      isTeacher: boolean;
+      kelompok: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | null;
+      arenaWx: number;
+      arenaWy: number;
+      rumah_dipilih: 1 | 2 | 3 | 4 | 5 | null;
+      lastSeen: number;
+    }
+  >;
+  groupChats: Array<{
+    id: string;
+    kelompok: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    senderId: string;
+    senderName: string;
+    content: string;
+    timestamp: string;
+    createdAt: number;
+  }>;
+  roundHistory: Array<{
+    id_ronde: string;
+    soal: string;
+    rumah_benar: 1 | 2 | 3 | 4 | 5;
+    status: 'menunggu' | 'buka' | 'tutup' | 'meledak';
+    waktu: string;
+    poin_benar: number;
+    timer_detik: number;
+    guru_pembuat?: string;
+  }>;
+  lastAwardedRoundId: string | null;
+  winningGroups: Array<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>;
+}
+
+function createInitialMysteryArenaStore(): ServerMysteryArenaStore {
+  const nowStr = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+  const roundId = 'ronde-1';
+  const choices: ServerMysteryArenaStore['choices'] = {};
+  const scores: ServerMysteryArenaStore['scores'] = [];
+  const groupMembers: ServerMysteryArenaStore['groupMembers'] = {};
+
+  for (let g = 1; g <= 8; g++) {
+    const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    choices[grp] = {
+      id_ronde: roundId,
+      kelompok: grp,
+      rumah_dipilih: null,
+      waktu: nowStr,
+      diwakili_oleh: '',
+    };
+    scores.push({
+      kelompok: grp,
+      total_poin: 0,
+      ronde_menang: 0,
+      waktu_update: nowStr,
+    });
+    groupMembers[grp] = [];
+  }
+
+  return {
+    currentRound: {
+      id_ronde: roundId,
+      soal: 'Dalam desain poster publikasi DKV, elemen visual yang dibuat paling besar dan kontras agar dilihat pertama kali dalam 3 detik disebut?\n\n🏠 Rumah 1: Watermark\n🏠 Rumah 2: Headline / Focal Point\n🏠 Rumah 3: Catatan Kaki (Footnote)\n🏠 Rumah 4: Garis Margin\n🏠 Rumah 5: Nomor Halaman',
+      rumah_benar: 2,
+      status: 'menunggu',
+      waktu: nowStr,
+      poin_benar: 20,
+      timer_detik: 45,
+      timer_berakhir_ms: null,
+      ledakan_mulai_ms: null,
+      guru_pembuat: 'Guru Pembimbing DKV',
+    },
+    choices,
+    scores,
+    studentGroupMap: {},
+    groupMembers,
+    arenaPlayers: {},
+    groupChats: [],
+    roundHistory: [],
+    lastAwardedRoundId: null,
+    winningGroups: [],
+  };
+}
+
+function loadMysteryArenaFromFile(): ServerMysteryArenaStore {
+  try {
+    if (fs.existsSync(MYSTERY_ARENA_FILE_PATH)) {
+      const raw = fs.readFileSync(MYSTERY_ARENA_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.currentRound && parsed.scores) {
+        return {
+          ...createInitialMysteryArenaStore(),
+          ...parsed,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[server.ts] Could not read server_mystery_arena.json:', err);
+  }
+  return createInitialMysteryArenaStore();
+}
+
+let mysteryArenaStore: ServerMysteryArenaStore = loadMysteryArenaFromFile();
+let lastMysterySaveMs = 0;
+
+function saveMysteryArenaToFile(force = false) {
+  const now = Date.now();
+  if (!force && now - lastMysterySaveMs < 800) return;
+  lastMysterySaveMs = now;
+  try {
+    fs.writeFileSync(MYSTERY_ARENA_FILE_PATH, JSON.stringify(mysteryArenaStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[server.ts] Failed writing server_mystery_arena.json:', err);
+  }
+}
+
+// Helper: Get default arena coordinates for a group (1..8) in the Group Gathering Zone in front of Teacher
+function getGroupGatheringCoords(kelompok: number | null, memberIndex = 0): { wx: number; wy: number } {
+  if (!kelompok || kelompok < 1 || kelompok > 8) {
+    return { wx: 0, wy: 2.2 };
+  }
+  // 8 group pads arranged in 2 rows of 4 in front of the teacher podium
+  const col = (kelompok - 1) % 4; // 0..3
+  const row = Math.floor((kelompok - 1) / 4); // 0..1
+  const baseWx = (col - 1.5) * 2.2; // -3.3, -1.1, +1.1, +3.3
+  const baseWy = 0.6 + row * 1.45; // 0.6, 2.05
+  const jitterX = ((memberIndex % 3) - 1) * 0.28;
+  const jitterY = (Math.floor(memberIndex / 3) % 2) * 0.24;
+  return { wx: baseWx + jitterX, wy: baseWy + jitterY };
+}
+
+// Helper: Get arena coordinates for a Mystery House (1..5) lined up at the back
+function getMysteryHouseCoords(houseNum: number, memberIndex = 0): { wx: number; wy: number } {
+  const clamped = Math.max(1, Math.min(5, houseNum));
+  const baseWx = (clamped - 3) * 2.4; // -4.8, -2.4, 0, +2.4, +4.8
+  const baseWy = -2.35;
+  const jitterX = ((memberIndex % 3) - 1) * 0.25;
+  const jitterY = (Math.floor(memberIndex / 3) % 2) * 0.22;
+  return { wx: baseWx + jitterX, wy: baseWy + jitterY };
+}
+
+function checkAndAdvanceMysteryArenaTimer() {
+  const now = Date.now();
+  // 1. Auto-lock choices if countdown timer expired while status === 'buka'
+  if (
+    mysteryArenaStore.currentRound.status === 'buka' &&
+    mysteryArenaStore.currentRound.timer_berakhir_ms &&
+    now >= mysteryArenaStore.currentRound.timer_berakhir_ms
+  ) {
+    mysteryArenaStore.currentRound.status = 'tutup';
+    mysteryArenaStore.currentRound.timer_berakhir_ms = null;
+    saveMysteryArenaToFile(true);
+    broadcastPresence({
+      type: 'mystery_arena_tick',
+      roundId: mysteryArenaStore.currentRound.id_ronde,
+      status: 'tutup',
+      timestamp: now,
+    });
+  }
+
+  // 2. Purge inactive arena players older than 35 seconds
+  for (const [sid, p] of Object.entries(mysteryArenaStore.arenaPlayers)) {
+    if (now - p.lastSeen > 35000) {
+      delete mysteryArenaStore.arenaPlayers[sid];
+    }
+  }
+}
+
+function buildSanitizedMysteryArenaPayload(params: {
+  viewerId?: string;
+  isVerifiedTeacher: boolean;
+  viewerGroup?: number | null;
+}) {
+  checkAndAdvanceMysteryArenaTimer();
+  const { isVerifiedTeacher, viewerGroup } = params;
+  const round = mysteryArenaStore.currentRound;
+
+  // CRITICAL ANTI-PEEK RULE:
+  // rumah_benar TIDAK BOLEH dikirim ke sisi siswa sebelum status === 'meledak'!
+  const canSeeCorrectHouse = isVerifiedTeacher || round.status === 'meledak';
+
+  const sanitizedRound = {
+    ...round,
+    rumah_benar: canSeeCorrectHouse ? round.rumah_benar : null,
+  };
+
+  // Enrich groupMembers with online status
+  const enrichedGroupMembers: Record<number, any[]> = {};
+  for (let g = 1; g <= 8; g++) {
+    const members = mysteryArenaStore.groupMembers[g] || [];
+    enrichedGroupMembers[g] = members.map((m) => ({
+      ...m,
+      isOnline: Boolean(mysteryArenaStore.arenaPlayers[m.studentId]),
+    }));
+  }
+
+  // Filter groupChats: teacher sees all or selected group; student only sees their own group's chat
+  const effectiveGroup =
+    viewerGroup ||
+    (params.viewerId ? mysteryArenaStore.studentGroupMap[params.viewerId] : null) ||
+    null;
+
+  const filteredChats = isVerifiedTeacher
+    ? mysteryArenaStore.groupChats.slice(-80)
+    : effectiveGroup
+    ? mysteryArenaStore.groupChats.filter((c) => c.kelompok === effectiveGroup).slice(-50)
+    : [];
+
+  return {
+    currentRound: sanitizedRound,
+    choices: mysteryArenaStore.choices,
+    scores: mysteryArenaStore.scores,
+    studentGroupMap: mysteryArenaStore.studentGroupMap,
+    groupMembers: enrichedGroupMembers,
+    arenaPlayers: Object.values(mysteryArenaStore.arenaPlayers),
+    groupChats: filteredChats,
+    roundHistory: mysteryArenaStore.roundHistory.slice(0, 15).map((r) => ({
+      ...r,
+      rumah_benar: isVerifiedTeacher || r.status === 'meledak' ? r.rumah_benar : null,
+    })),
+    lastAwardedRoundId: mysteryArenaStore.lastAwardedRoundId,
+    winningGroups: round.status === 'meledak' ? mysteryArenaStore.winningGroups : [],
+    serverTime: Date.now(),
+  };
+}
+
+// GET /api/mystery-arena/state (Polled every 1-2s by clients)
+app.get('/api/mystery-arena/state', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-store');
+
+  const viewerId = req.query.studentId ? String(req.query.studentId) : undefined;
+  const viewerName = req.query.studentName ? String(req.query.studentName) : undefined;
+  const isTeacherParam = req.query.isTeacher === 'true' || req.query.isTeacher === '1';
+  const studentNumber = req.query.studentNumber ? String(req.query.studentNumber) : undefined;
+  const viewerGroup = req.query.kelompok ? Number(req.query.kelompok) : undefined;
+
+  const isVerifiedTeacher = verifyTeacherAccountServerSide({
+    teacherId: viewerId,
+    teacherName: viewerName,
+    isTeacher: isTeacherParam,
+    studentNumber,
+  });
+
+  const data = buildSanitizedMysteryArenaPayload({
+    viewerId,
+    isVerifiedTeacher,
+    viewerGroup,
+  });
+
+  return res.json({
+    success: true,
+    isVerifiedTeacher,
+    data,
+  });
+});
+
+// POST /api/mystery-arena/teacher-action (Strictly verified on server!)
+app.post('/api/mystery-arena/teacher-action', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const {
+    teacherId,
+    teacherName,
+    isTeacher,
+    studentNumber,
+    actionType,
+    soal,
+    rumah_benar,
+    poin_benar,
+    timer_detik,
+    openImmediately,
+    targetStudentId,
+    targetStudentName,
+    targetStudentClass,
+    targetStudentGender,
+    targetKelompok,
+  } = req.body || {};
+
+  // Server-side role verification (bukan sekadar menyembunyikan tombol di UI)
+  const isVerified = verifyTeacherAccountServerSide({
+    teacherId,
+    teacherName,
+    isTeacher,
+    studentNumber,
+  });
+
+  if (!isVerified) {
+    return res.status(403).json({
+      success: false,
+      error: 'Akses Ditolak (403): Hanya akun Guru resmi yang diizinkan mengontrol Panel Guru Arena Rumah Misteri.',
+    });
+  }
+
+  const now = Date.now();
+  const nowStr = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+  if (actionType === 'start_round') {
+    const cleanSoal = String(soal || '').trim();
+    if (!cleanSoal) {
+      return res.status(400).json({ success: false, error: 'Soal ronde tidak boleh kosong.' });
+    }
+    const houseNum = Math.max(1, Math.min(5, Number(rumah_benar) || 1)) as 1 | 2 | 3 | 4 | 5;
+    const pointsVal = Math.max(1, Math.min(500, Number(poin_benar) || 20));
+    const timerSec = Math.max(0, Math.min(600, Number(timer_detik) || 0));
+    const nextRoundId = `ronde-${Date.now().toString(36)}`;
+    const initialStatus = openImmediately ? 'buka' : 'menunggu';
+
+    // Archive previous round if it was detonated
+    if (mysteryArenaStore.currentRound.status === 'meledak') {
+      mysteryArenaStore.roundHistory = [
+        { ...mysteryArenaStore.currentRound },
+        ...mysteryArenaStore.roundHistory.filter(
+          (r) => r.id_ronde !== mysteryArenaStore.currentRound.id_ronde
+        ),
+      ].slice(0, 20);
+    }
+
+    mysteryArenaStore.currentRound = {
+      id_ronde: nextRoundId,
+      soal: cleanSoal,
+      rumah_benar: houseNum,
+      status: initialStatus,
+      waktu: nowStr,
+      poin_benar: pointsVal,
+      timer_detik: timerSec,
+      timer_berakhir_ms: initialStatus === 'buka' && timerSec > 0 ? now + timerSec * 1000 : null,
+      ledakan_mulai_ms: null,
+      guru_pembuat: String(teacherName || 'Guru DKV'),
+    };
+
+    // Reset all group choices & return all students to group gathering zone
+    for (let g = 1; g <= 8; g++) {
+      const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+      mysteryArenaStore.choices[grp] = {
+        id_ronde: nextRoundId,
+        kelompok: grp,
+        rumah_dipilih: null,
+        waktu: nowStr,
+        diwakili_oleh: '',
+      };
+    }
+
+    Object.values(mysteryArenaStore.arenaPlayers).forEach((p, idx) => {
+      p.rumah_dipilih = null;
+      if (!p.isTeacher) {
+        const coords = getGroupGatheringCoords(p.kelompok, idx);
+        p.arenaWx = coords.wx;
+        p.arenaWy = coords.wy;
+      }
+    });
+
+    mysteryArenaStore.winningGroups = [];
+    saveMysteryArenaToFile(true);
+  } else if (actionType === 'open_choices') {
+    const timerSec =
+      typeof timer_detik === 'number'
+        ? Math.max(0, Math.min(600, timer_detik))
+        : mysteryArenaStore.currentRound.timer_detik;
+    mysteryArenaStore.currentRound.timer_detik = timerSec;
+    mysteryArenaStore.currentRound.status = 'buka';
+    mysteryArenaStore.currentRound.timer_berakhir_ms =
+      timerSec > 0 ? now + timerSec * 1000 : null;
+    mysteryArenaStore.currentRound.ledakan_mulai_ms = null;
+    mysteryArenaStore.currentRound.waktu = nowStr;
+    saveMysteryArenaToFile(true);
+  } else if (actionType === 'close_choices') {
+    mysteryArenaStore.currentRound.status = 'tutup';
+    mysteryArenaStore.currentRound.timer_berakhir_ms = null;
+    mysteryArenaStore.currentRound.waktu = nowStr;
+    saveMysteryArenaToFile(true);
+  } else if (actionType === 'detonate') {
+    // Requirement: "LEDAKKAN": aktif hanya setelah pilihan ditutup. Meledakkan 4 rumah salah.
+    if (mysteryArenaStore.currentRound.status !== 'tutup') {
+      return res.status(400).json({
+        success: false,
+        error: 'Tombol LEDAKKAN hanya dapat diaktifkan setelah pilihan ditutup!',
+      });
+    }
+
+    mysteryArenaStore.currentRound.status = 'meledak';
+    mysteryArenaStore.currentRound.ledakan_mulai_ms = now;
+    mysteryArenaStore.currentRound.waktu = nowStr;
+
+    const correctHouse = mysteryArenaStore.currentRound.rumah_benar;
+    const rewardPts = mysteryArenaStore.currentRound.poin_benar || 20;
+    const winners: Array<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8> = [];
+
+    if (mysteryArenaStore.lastAwardedRoundId !== mysteryArenaStore.currentRound.id_ronde) {
+      for (let g = 1; g <= 8; g++) {
+        const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+        const choice = mysteryArenaStore.choices[grp];
+        if (choice && choice.rumah_dipilih === correctHouse) {
+          winners.push(grp);
+          const scoreRow = mysteryArenaStore.scores.find((s) => s.kelompok === grp);
+          if (scoreRow) {
+            scoreRow.total_poin += rewardPts;
+            scoreRow.ronde_menang = (scoreRow.ronde_menang || 0) + 1;
+            scoreRow.waktu_update = nowStr;
+          }
+        }
+      }
+      mysteryArenaStore.lastAwardedRoundId = mysteryArenaStore.currentRound.id_ronde;
+    }
+
+    mysteryArenaStore.winningGroups = winners;
+
+    // Groups in the 4 wrong houses get knocked back to the group gathering zone!
+    Object.values(mysteryArenaStore.arenaPlayers).forEach((p, idx) => {
+      if (!p.isTeacher && p.rumah_dipilih && p.rumah_dipilih !== correctHouse) {
+        const coords = getGroupGatheringCoords(p.kelompok, idx);
+        p.arenaWx = coords.wx;
+        p.arenaWy = coords.wy;
+      }
+    });
+
+    saveMysteryArenaToFile(true);
+  } else if (actionType === 'next_round' || actionType === 'reset_arena') {
+    // Archive finished round
+    if (mysteryArenaStore.currentRound.status === 'meledak') {
+      mysteryArenaStore.roundHistory = [
+        { ...mysteryArenaStore.currentRound },
+        ...mysteryArenaStore.roundHistory.filter(
+          (r) => r.id_ronde !== mysteryArenaStore.currentRound.id_ronde
+        ),
+      ].slice(0, 20);
+    }
+
+    const nextNum = mysteryArenaStore.roundHistory.length + 1;
+    const nextRoundId = `ronde-${nextNum}-${Date.now().toString(36).slice(-3)}`;
+
+    mysteryArenaStore.currentRound = {
+      ...mysteryArenaStore.currentRound,
+      id_ronde: nextRoundId,
+      status: 'menunggu',
+      timer_berakhir_ms: null,
+      ledakan_mulai_ms: null,
+      waktu: nowStr,
+    };
+
+    for (let g = 1; g <= 8; g++) {
+      const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+      mysteryArenaStore.choices[grp] = {
+        id_ronde: nextRoundId,
+        kelompok: grp,
+        rumah_dipilih: null,
+        waktu: nowStr,
+        diwakili_oleh: '',
+      };
+    }
+
+    Object.values(mysteryArenaStore.arenaPlayers).forEach((p, idx) => {
+      p.rumah_dipilih = null;
+      if (!p.isTeacher) {
+        const coords = getGroupGatheringCoords(p.kelompok, idx);
+        p.arenaWx = coords.wx;
+        p.arenaWy = coords.wy;
+      }
+    });
+
+    mysteryArenaStore.winningGroups = [];
+    saveMysteryArenaToFile(true);
+  } else if (actionType === 'assign_student_group') {
+    const sid = String(targetStudentId || '').trim();
+    const grp = Math.max(1, Math.min(8, Number(targetKelompok) || 1)) as
+      | 1
+      | 2
+      | 3
+      | 4
+      | 5
+      | 6
+      | 7
+      | 8;
+    if (sid) {
+      mysteryArenaStore.studentGroupMap[sid] = grp;
+      for (let g = 1; g <= 8; g++) {
+        mysteryArenaStore.groupMembers[g] = (mysteryArenaStore.groupMembers[g] || []).filter(
+          (m) => m.studentId !== sid
+        );
+      }
+      mysteryArenaStore.groupMembers[grp].push({
+        studentId: sid,
+        studentName: String(targetStudentName || 'Siswa DKV'),
+        className: String(targetStudentClass || 'X DKV'),
+        gender: targetStudentGender === 'P' ? 'P' : 'L',
+      });
+      if (mysteryArenaStore.arenaPlayers[sid]) {
+        mysteryArenaStore.arenaPlayers[sid].kelompok = grp;
+        const chosenHouse = mysteryArenaStore.choices[grp]?.rumah_dipilih || null;
+        mysteryArenaStore.arenaPlayers[sid].rumah_dipilih = chosenHouse;
+        const coords = chosenHouse
+          ? getMysteryHouseCoords(chosenHouse, 0)
+          : getGroupGatheringCoords(grp, 0);
+        mysteryArenaStore.arenaPlayers[sid].arenaWx = coords.wx;
+        mysteryArenaStore.arenaPlayers[sid].arenaWy = coords.wy;
+      }
+      saveMysteryArenaToFile(true);
+    }
+  } else if (actionType === 'reset_scores') {
+    for (let g = 1; g <= 8; g++) {
+      const grp = g as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+      const row = mysteryArenaStore.scores.find((s) => s.kelompok === grp);
+      if (row) {
+        row.total_poin = 0;
+        row.ronde_menang = 0;
+        row.waktu_update = nowStr;
+      }
+    }
+    mysteryArenaStore.lastAwardedRoundId = null;
+    saveMysteryArenaToFile(true);
+  }
+
+  broadcastPresence({
+    type: 'mystery_arena_tick',
+    roundId: mysteryArenaStore.currentRound.id_ronde,
+    status: mysteryArenaStore.currentRound.status,
+    timestamp: now,
+  });
+
+  return res.json({
+    success: true,
+    isVerifiedTeacher: true,
+    data: buildSanitizedMysteryArenaPayload({
+      viewerId: teacherId,
+      isVerifiedTeacher: true,
+    }),
+  });
+});
+
+// POST /api/mystery-arena/student-action (Join group, choose house, move avatar, send group chat)
+app.post('/api/mystery-arena/student-action', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  checkAndAdvanceMysteryArenaTimer();
+
+  const {
+    studentId,
+    studentName,
+    className,
+    gender,
+    isTeacher,
+    studentNumber,
+    actionType,
+    kelompok,
+    rumah_dipilih,
+    arenaWx,
+    arenaWy,
+    chatContent,
+  } = req.body || {};
+
+  if (!studentId) {
+    return res.status(400).json({ success: false, error: 'ID pengguna diperlukan.' });
+  }
+
+  const sid = String(studentId);
+  const sName = String(studentName || 'Siswa DKV');
+  const sClass = String(className || 'X DKV');
+  const sGender: 'L' | 'P' = gender === 'P' ? 'P' : 'L';
+  const verifiedTeacher = verifyTeacherAccountServerSide({
+    teacherId: sid,
+    teacherName: sName,
+    isTeacher,
+    studentNumber,
+  });
+
+  const now = Date.now();
+  const nowStr = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+  // Ensure player presence entry exists
+  if (!mysteryArenaStore.arenaPlayers[sid]) {
+    const existingGrp = mysteryArenaStore.studentGroupMap[sid] || null;
+    const defaultCoords = verifiedTeacher
+      ? { wx: 0, wy: 3.65 } // Teacher stands at the front podium!
+      : getGroupGatheringCoords(existingGrp, Object.keys(mysteryArenaStore.arenaPlayers).length);
+    mysteryArenaStore.arenaPlayers[sid] = {
+      studentId: sid,
+      studentName: sName,
+      className: sClass,
+      gender: sGender,
+      isTeacher: verifiedTeacher,
+      kelompok: existingGrp,
+      arenaWx: defaultCoords.wx,
+      arenaWy: defaultCoords.wy,
+      rumah_dipilih: existingGrp ? mysteryArenaStore.choices[existingGrp]?.rumah_dipilih || null : null,
+      lastSeen: now,
+    };
+  } else {
+    mysteryArenaStore.arenaPlayers[sid].lastSeen = now;
+    mysteryArenaStore.arenaPlayers[sid].studentName = sName;
+    mysteryArenaStore.arenaPlayers[sid].isTeacher = verifiedTeacher;
+  }
+
+  const player = mysteryArenaStore.arenaPlayers[sid];
+
+  if (actionType === 'join_group') {
+    const grp = Math.max(1, Math.min(8, Number(kelompok) || 1)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+    mysteryArenaStore.studentGroupMap[sid] = grp;
+    for (let g = 1; g <= 8; g++) {
+      mysteryArenaStore.groupMembers[g] = (mysteryArenaStore.groupMembers[g] || []).filter(
+        (m) => m.studentId !== sid
+      );
+    }
+    mysteryArenaStore.groupMembers[grp].push({
+      studentId: sid,
+      studentName: sName,
+      className: sClass,
+      gender: sGender,
+    });
+
+    player.kelompok = grp;
+    const currentGroupHouse = mysteryArenaStore.choices[grp]?.rumah_dipilih || null;
+    player.rumah_dipilih = currentGroupHouse;
+    const memberIdx = mysteryArenaStore.groupMembers[grp].length - 1;
+    const targetCoords = currentGroupHouse
+      ? getMysteryHouseCoords(currentGroupHouse, memberIdx)
+      : getGroupGatheringCoords(grp, memberIdx);
+    player.arenaWx = targetCoords.wx;
+    player.arenaWy = targetCoords.wy;
+    saveMysteryArenaToFile();
+  } else if (actionType === 'select_house') {
+    const grp = player.kelompok || mysteryArenaStore.studentGroupMap[sid];
+    if (!grp) {
+      return res.status(400).json({
+        success: false,
+        error: 'Silakan bergabung ke salah satu Kelompok (1-8) terlebih dahulu!',
+      });
+    }
+
+    // Enforce rule: Boleh pindah rumah selama pilihan dibuka; setelah ditutup, posisi terkunci!
+    if (mysteryArenaStore.currentRound.status !== 'buka') {
+      return res.status(400).json({
+        success: false,
+        error:
+          mysteryArenaStore.currentRound.status === 'tutup'
+            ? '🔒 Pilihan sudah ditutup oleh Guru! Posisi kelompok terkunci.'
+            : '⏳ Pilihan rumah belum dibuka oleh Guru.',
+      });
+    }
+
+    const houseNum =
+      rumah_dipilih === null || rumah_dipilih === 0
+        ? null
+        : (Math.max(1, Math.min(5, Number(rumah_dipilih))) as 1 | 2 | 3 | 4 | 5);
+
+    // Satu kelompok hanya di satu rumah
+    mysteryArenaStore.choices[grp] = {
+      id_ronde: mysteryArenaStore.currentRound.id_ronde,
+      kelompok: grp,
+      rumah_dipilih: houseNum,
+      waktu: nowStr,
+      diwakili_oleh: sName,
+    };
+
+    // Move all online members of this group into the chosen house (or back to group area)
+    let mIdx = 0;
+    Object.values(mysteryArenaStore.arenaPlayers).forEach((p) => {
+      if (p.kelompok === grp && !p.isTeacher) {
+        p.rumah_dipilih = houseNum;
+        const coords = houseNum
+          ? getMysteryHouseCoords(houseNum, mIdx)
+          : getGroupGatheringCoords(grp, mIdx);
+        p.arenaWx = coords.wx;
+        p.arenaWy = coords.wy;
+        mIdx++;
+      }
+    });
+
+    saveMysteryArenaToFile(true);
+    broadcastPresence({
+      type: 'mystery_arena_tick',
+      roundId: mysteryArenaStore.currentRound.id_ronde,
+      status: mysteryArenaStore.currentRound.status,
+      timestamp: now,
+    });
+  } else if (actionType === 'move_avatar') {
+    if (typeof arenaWx === 'number' && typeof arenaWy === 'number') {
+      player.arenaWx = Math.max(-6.2, Math.min(6.2, arenaWx));
+      player.arenaWy = Math.max(-3.6, Math.min(4.2, arenaWy));
+    }
+  } else if (actionType === 'send_group_chat') {
+    const grp =
+      (kelompok ? (Math.max(1, Math.min(8, Number(kelompok))) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8) : null) ||
+      player.kelompok ||
+      mysteryArenaStore.studentGroupMap[sid];
+    const text = String(chatContent || '').trim().slice(0, 160);
+    if (!grp || !text) {
+      return res.status(400).json({
+        success: false,
+        error: 'Pilih kelompok terlebih dahulu dan pastikan pesan tidak kosong.',
+      });
+    }
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    mysteryArenaStore.groupChats.push({
+      id: `gchat-${now}-${Math.random().toString(36).slice(2, 6)}`,
+      kelompok: grp,
+      senderId: sid,
+      senderName: sName,
+      content: text,
+      timestamp: `${hh}.${mm}`,
+      createdAt: now,
+    });
+    if (mysteryArenaStore.groupChats.length > 200) {
+      mysteryArenaStore.groupChats = mysteryArenaStore.groupChats.slice(-200);
+    }
+    saveMysteryArenaToFile();
+  }
+
+  return res.json({
+    success: true,
+    data: buildSanitizedMysteryArenaPayload({
+      viewerId: sid,
+      isVerifiedTeacher: verifiedTeacher,
+      viewerGroup: player.kelompok,
+    }),
+  });
+});
+
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
@@ -2104,3 +2949,4 @@ export default app;
 if (!process.env.VERCEL) {
   startServer();
 }
+

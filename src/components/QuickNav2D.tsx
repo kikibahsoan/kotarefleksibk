@@ -27,6 +27,7 @@ const BUILDING_ICONS: Partial<Record<BuildingId, string>> = {
   panggung_kota: '🎭',
   mall_kota: '🛍️',
   bandara: '✈️',
+  arena_rumah_misteri: '🏠',
 };
 
 const BUILDING_DESCRIPTIONS: Partial<Record<BuildingId, string>> = {
@@ -46,6 +47,7 @@ const BUILDING_DESCRIPTIONS: Partial<Record<BuildingId, string>> = {
   panggung_kota: 'Pusat Kota (Setelah Sungai) • Panggung terbuka untuk presentasi karya dan pengumuman kelas.',
   mall_kota: 'Pusat Kota (Setelah Sungai) • Etalase belanja atribut warga dan literasi finansial bijak.',
   bandara: 'Pusat Kota (Setelah Sungai) • Terminal perjalanan belajar dan target jangka panjang.',
+  arena_rumah_misteri: 'Refleksia Timur Depan • Game Kelompok Langsung: Diskusi soal, pilih Rumah 1–5 & bertahan dari ledakan 4 rumah salah!',
 };
 
 export const QuickNav2D: React.FC<QuickNav2DProps> = ({

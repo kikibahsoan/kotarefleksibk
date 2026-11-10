@@ -20,6 +20,9 @@ import {
   CreatorBuildingItem,
   CreatorIdeaItem,
   CreatorMissionSubmission,
+  GameRondeRow,
+  GamePilihanRow,
+  GameSkorRow,
 } from '../types/index.ts';
 import {
   INITIAL_MATERI,
@@ -3198,6 +3201,86 @@ export const StorageService = {
       };
     });
     return this.saveCreatorCityState({ ...state, customBuildings: updatedBuildings });
+  },
+
+  // -------------------------------------------------------------
+  // SINKRONISASI ARENA RUMAH MISTERI KE GOOGLE SPREADSHEET
+  // Sheet baru: Game_Ronde, Game_Pilihan, Game_Skor
+  // -------------------------------------------------------------
+  async syncMysteryArenaRondeToGAS(params: {
+    ronde: GameRondeRow;
+    teacherId: string;
+    teacherName: string;
+    teacherPin?: string;
+  }): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_mystery_arena_ronde',
+          teacherId: params.teacherId,
+          teacherName: params.teacherName,
+          teacherPin: params.teacherPin || settings.teacherPin || '1234',
+          ronde: params.ronde,
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Game_Ronde ke Spreadsheet:', e);
+      return false;
+    }
+  },
+
+  async syncMysteryArenaPilihanToGAS(pilihan: GamePilihanRow): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_mystery_arena_pilihan',
+          pilihan: {
+            id_ronde: pilihan.id_ronde,
+            kelompok: `Kelompok ${pilihan.kelompok}`,
+            rumah_dipilih: pilihan.rumah_dipilih,
+            waktu: pilihan.waktu,
+          },
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Game_Pilihan ke Spreadsheet:', e);
+      return false;
+    }
+  },
+
+  async syncMysteryArenaSkorToGAS(skorList: GameSkorRow[]): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_mystery_arena_skor',
+          skorList,
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Game_Skor ke Spreadsheet:', e);
+      return false;
+    }
   },
 };
 

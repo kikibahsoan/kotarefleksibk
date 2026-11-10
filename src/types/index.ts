@@ -14,7 +14,8 @@ export type BuildingId =
   | 'museum_seni'
   | 'panggung_kota'
   | 'mall_kota'
-  | 'bandara';
+  | 'bandara'
+  | 'arena_rumah_misteri';
 
 export interface PublicChatMessage {
   id: string;
@@ -741,4 +742,95 @@ export interface CityCreatorState {
   terrainTiles?: Record<string, CreatorTerrainTile>;
   customFences?: CreatorFenceItem[];
 }
+
+// ============================================================================
+// ARENA RUMAH MISTERI (LIVE MULTIPLAYER GROUP GAME DI REFLEKSIA TIMUR DEPAN)
+// Sheet Baru: Game_Ronde, Game_Pilihan, Game_Skor
+// ============================================================================
+
+export type MysteryRoundStatus = 'menunggu' | 'buka' | 'tutup' | 'meledak';
+export type MysteryGroupNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type MysteryHouseNumber = 1 | 2 | 3 | 4 | 5;
+
+/** Representasi baris pada Sheet "Game_Ronde" */
+export interface GameRondeRow {
+  id_ronde: string;
+  soal: string;
+  /**
+   * PENTING: rumah_benar bernilai null ketika dikirim ke siswa sebelum status === 'meledak'
+   * agar tidak bisa diintip lewat Inspect Browser / Network Tab.
+   */
+  rumah_benar: MysteryHouseNumber | null;
+  status: MysteryRoundStatus;
+  waktu: string;
+  poin_benar: number;
+  timer_detik: number;
+  timer_berakhir_ms?: number | null;
+  ledakan_mulai_ms?: number | null;
+  guru_pembuat?: string;
+}
+
+/** Representasi baris pada Sheet "Game_Pilihan" */
+export interface GamePilihanRow {
+  id_ronde: string;
+  kelompok: MysteryGroupNumber;
+  rumah_dipilih: MysteryHouseNumber | null;
+  waktu: string;
+  diwakili_oleh?: string;
+}
+
+/** Representasi baris pada Sheet "Game_Skor" */
+export interface GameSkorRow {
+  kelompok: MysteryGroupNumber;
+  total_poin: number;
+  ronde_menang?: number;
+  waktu_update?: string;
+}
+
+export interface MysteryArenaGroupChatMsg {
+  id: string;
+  kelompok: MysteryGroupNumber;
+  senderId: string;
+  senderName: string;
+  content: string;
+  timestamp: string;
+  createdAt: number;
+}
+
+export interface MysteryArenaPlayerPresence {
+  studentId: string;
+  studentName: string;
+  className: string;
+  gender: 'L' | 'P';
+  isTeacher: boolean;
+  kelompok: MysteryGroupNumber | null;
+  arenaWx: number;
+  arenaWy: number;
+  rumah_dipilih: MysteryHouseNumber | null;
+  lastSeen: number;
+}
+
+export interface MysteryArenaState {
+  currentRound: GameRondeRow;
+  choices: Record<number, GamePilihanRow>;
+  scores: GameSkorRow[];
+  studentGroupMap: Record<string, MysteryGroupNumber>;
+  groupMembers: Record<
+    number,
+    Array<{
+      studentId: string;
+      studentName: string;
+      className: string;
+      gender: 'L' | 'P';
+      isOnline?: boolean;
+    }>
+  >;
+  arenaPlayers: MysteryArenaPlayerPresence[];
+  groupChats: MysteryArenaGroupChatMsg[];
+  roundHistory: GameRondeRow[];
+  lastAwardedRoundId?: string | null;
+  winningGroups?: MysteryGroupNumber[];
+  serverTime: number;
+}
+
 

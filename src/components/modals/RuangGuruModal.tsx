@@ -87,6 +87,20 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
+  // 2b. Aksi Khusus Arena Rumah Misteri (Polling Cepat 1-2 Detik + CacheService + Anti-Peek Rumah Benar)
+  if (action === "get_mystery_arena") {
+    var roleParam = (e && e.parameter && e.parameter.role) ? String(e.parameter.role) : "siswa";
+    var teacherPinParam = (e && e.parameter && e.parameter.teacherPin) ? String(e.parameter.teacherPin) : "";
+    var isTeacherVerified = (roleParam === "guru" && isValidTeacherPin(ss, teacherPinParam));
+    var arenaData = getMysteryArenaState(ss, isTeacherVerified);
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      isTeacherVerified: isTeacherVerified,
+      arena: arenaData,
+      timestamp: new Date().toISOString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   // 3. Aksi Lengkap Semua Data v3.0 (Refleksi, Feedback, Pesan Kantor Pos, Obrolan Warga, Jurnal Pohon Beringin, Podcast, Hasil Tes Lab DKV, Leaderboard Mingguan 7 Hari, Pasar Prestasi, Bank Materi Guru AI & Kotak Saran Wisma)
   var reflections = getReflections(ss);
   var feedbacks = getFeedbacks(ss);
@@ -186,6 +200,22 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     } else if (action === "sync_city_buildings") {
       saveCityBuildingsSheet(ss, data.buildings);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_mystery_arena_ronde") {
+      if (!isValidTeacherAccountOrPin(ss, data.teacherId, data.teacherName, data.teacherPin)) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Akses ditolak: Hanya akun Guru resmi yang dapat mengatur ronde Arena Rumah Misteri." }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      saveGameRondeRow(ss, data.ronde);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_mystery_arena_pilihan") {
+      saveGamePilihanRow(ss, data.pilihan);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_mystery_arena_skor") {
+      saveGameSkorRows(ss, data.skorList);
       return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
         .setMimeType(ContentService.MimeType.JSON);
     }
@@ -1191,6 +1221,218 @@ function getWismaSuggestions(ss) {
     });
   }
   return list;
+}
+
+// -------------------------------------------------------------
+// ARENA RUMAH MISTERI (3 SHEET BARU TERPISAH: Game_Ronde, Game_Pilihan, Game_Skor)
+// Rumah benar TIDAK dikirim ke sisi siswa sebelum status === "meledak"
+// -------------------------------------------------------------
+function isValidTeacherPin(ss, pin) {
+  var p = String(pin || "").trim();
+  return p === "1234" || p === "2025" || p === "guru123" || p === "dkv2025" || p === "refleksia";
+}
+
+function isValidTeacherAccountOrPin(ss, teacherId, teacherName, teacherPin) {
+  if (isValidTeacherPin(ss, teacherPin)) return true;
+  var tid = String(teacherId || "").toLowerCase();
+  var tname = String(teacherName || "").toLowerCase();
+  if (tid.indexOf("teacher-") === 0 || tname === "kikybahsoan" || tname.indexOf("rizki bahsoan") !== -1 || tname.indexOf("zulfitriani") !== -1 || tname.indexOf("winarni") !== -1 || tname.indexOf("satria") !== -1 || tname.indexOf("wahyudin") !== -1 || tname.indexOf("sufri") !== -1) {
+    return true;
+  }
+  return false;
+}
+
+function getOrCreateGameRondeSheet(ss) {
+  var sheet = ss.getSheetByName("Game_Ronde");
+  if (!sheet) {
+    sheet = ss.insertSheet("Game_Ronde");
+    sheet.appendRow(["id_ronde", "soal", "rumah_benar", "status", "waktu", "poin_benar", "durasi_detik"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateGamePilihanSheet(ss) {
+  var sheet = ss.getSheetByName("Game_Pilihan");
+  if (!sheet) {
+    sheet = ss.insertSheet("Game_Pilihan");
+    sheet.appendRow(["id_ronde", "kelompok", "rumah_dipilih", "waktu"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateGameSkorSheet(ss) {
+  var sheet = ss.getSheetByName("Game_Skor");
+  if (!sheet) {
+    sheet = ss.insertSheet("Game_Skor");
+    sheet.appendRow(["kelompok", "total_poin"]);
+    sheet.setFrozenRows(1);
+    for (var k = 1; k <= 8; k++) {
+      sheet.appendRow(["Kelompok " + k, 0]);
+    }
+  }
+  return sheet;
+}
+
+function saveGameRondeRow(ss, ronde) {
+  if (!ronde || !ronde.id_ronde) return;
+  var sheet = getOrCreateGameRondeSheet(ss);
+  var rows = sheet.getDataRange().getValues();
+  var foundRow = -1;
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(ronde.id_ronde)) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+  var rowValues = [
+    String(ronde.id_ronde),
+    String(ronde.soal || ""),
+    Number(ronde.rumah_benar) || 1,
+    String(ronde.status || "menunggu"),
+    String(ronde.waktu || new Date().toLocaleString("id-ID")),
+    Number(ronde.poin_benar) || 10,
+    Number(ronde.durasi_detik) || 0
+  ];
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
+  }
+  try {
+    CacheService.getScriptCache().remove("MYSTERY_ARENA_RAW_CACHE");
+  } catch (e) {}
+}
+
+function saveGamePilihanRow(ss, pilihan) {
+  if (!pilihan || !pilihan.id_ronde || !pilihan.kelompok) return;
+  var sheet = getOrCreateGamePilihanSheet(ss);
+  var rows = sheet.getDataRange().getValues();
+  var foundRow = -1;
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(pilihan.id_ronde) && String(rows[i][1]) === String(pilihan.kelompok)) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+  var rowValues = [
+    String(pilihan.id_ronde),
+    String(pilihan.kelompok),
+    Number(pilihan.rumah_dipilih) || 1,
+    String(pilihan.waktu || new Date().toLocaleString("id-ID"))
+  ];
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
+  }
+  try {
+    CacheService.getScriptCache().remove("MYSTERY_ARENA_RAW_CACHE");
+  } catch (e) {}
+}
+
+function saveGameSkorRows(ss, skorList) {
+  if (!Array.isArray(skorList)) return;
+  var sheet = getOrCreateGameSkorSheet(ss);
+  if (sheet.getLastRow() > 1) {
+    sheet.deleteRows(2, sheet.getLastRow() - 1);
+  }
+  for (var i = 0; i < skorList.length; i++) {
+    var item = skorList[i] || {};
+    var kNum = Number(item.kelompok) || (i + 1);
+    sheet.appendRow(["Kelompok " + kNum, Number(item.total_poin) || 0]);
+  }
+  try {
+    CacheService.getScriptCache().remove("MYSTERY_ARENA_RAW_CACHE");
+  } catch (e) {}
+}
+
+function getMysteryArenaState(ss, isTeacherVerified) {
+  var raw = null;
+  try {
+    var cached = CacheService.getScriptCache().get("MYSTERY_ARENA_RAW_CACHE");
+    if (cached) raw = JSON.parse(cached);
+  } catch (e) {}
+
+  if (!raw) {
+    var rSheet = getOrCreateGameRondeSheet(ss);
+    var pSheet = getOrCreateGamePilihanSheet(ss);
+    var sSheet = getOrCreateGameSkorSheet(ss);
+
+    var rRows = rSheet.getDataRange().getValues();
+    var latestRonde = null;
+    if (rRows.length > 1) {
+      var lr = rRows[rRows.length - 1];
+      latestRonde = {
+        id_ronde: String(lr[0] || "RONDE-1"),
+        soal: String(lr[1] || ""),
+        rumah_benar: Number(lr[2]) || 1,
+        status: String(lr[3] || "menunggu"),
+        waktu: String(lr[4] || ""),
+        poin_benar: Number(lr[5]) || 10,
+        durasi_detik: Number(lr[6]) || 0
+      };
+    }
+
+    var pRows = pSheet.getDataRange().getValues();
+    var pilihanList = [];
+    for (var i = 1; i < pRows.length; i++) {
+      var pr = pRows[i];
+      if (!pr[0]) continue;
+      if (!latestRonde || String(pr[0]) === latestRonde.id_ronde) {
+        var kRaw = String(pr[1] || "1").replace(/[^0-9]/g, "");
+        pilihanList.push({
+          id_ronde: String(pr[0]),
+          kelompok: Number(kRaw) || 1,
+          rumah_dipilih: Number(pr[2]) || 1,
+          waktu: String(pr[3] || "")
+        });
+      }
+    }
+
+    var sRows = sSheet.getDataRange().getValues();
+    var skorList = [];
+    for (var j = 1; j < sRows.length; j++) {
+      var sr = sRows[j];
+      if (!sr[0]) continue;
+      var kNum = Number(String(sr[0]).replace(/[^0-9]/g, "")) || j;
+      skorList.push({
+        kelompok: kNum,
+        total_poin: Number(sr[1]) || 0
+      });
+    }
+
+    raw = {
+      currentRound: latestRonde,
+      choices: pilihanList,
+      scores: skorList
+    };
+    try {
+      CacheService.getScriptCache().put("MYSTERY_ARENA_RAW_CACHE", JSON.stringify(raw), 1);
+    } catch (e) {}
+  }
+
+  // KEAMANAN ANTI-INTIP: Rumah benar TIDAK BOLEH dikirim ke sisi siswa sebelum status === "meledak"
+  var safeRound = null;
+  if (raw.currentRound) {
+    var canReveal = isTeacherVerified || raw.currentRound.status === "meledak";
+    safeRound = {
+      id_ronde: raw.currentRound.id_ronde,
+      soal: raw.currentRound.soal,
+      rumah_benar: canReveal ? raw.currentRound.rumah_benar : null,
+      status: raw.currentRound.status,
+      waktu: raw.currentRound.waktu,
+      poin_benar: raw.currentRound.poin_benar,
+      durasi_detik: raw.currentRound.durasi_detik
+    };
+  }
+
+  return {
+    currentRound: safeRound,
+    choices: raw.choices || [],
+    scores: raw.scores || []
+  };
 }`;
 
 export interface RuangGuruModalProps {

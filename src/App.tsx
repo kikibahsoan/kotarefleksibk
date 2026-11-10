@@ -41,6 +41,7 @@ import { MonumenWargaChatModal } from './components/modals/MonumenWargaChatModal
 import { MasjidModal } from './components/modals/MasjidModal.tsx';
 import { BankMateriModal } from './components/modals/BankMateriModal.tsx';
 import { PusatKotaBuildingModal } from './components/modals/PusatKotaBuildingModal.tsx';
+import { ArenaRumahMisteriModal } from './components/modals/ArenaRumahMisteriModal.tsx';
 import { isPusatKotaBuilding } from './utils/aturanBakuKota.ts';
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
 import { LofiAudioControl } from './components/LofiAudioControl.tsx';
@@ -1302,6 +1303,18 @@ export default function App() {
               )}
             </button>
 
+            {/* Tombol Teleport / Menu Cepat Lokasi Kota (Termasuk Arena Rumah Misteri) */}
+            <button
+              type="button"
+              onClick={() => setIsQuickNavOpen(true)}
+              className="flex items-center gap-1 bg-[#121e2c]/68 hover:bg-[#1a293b]/85 backdrop-blur-md text-sky-300 hover:text-white border border-sky-500/50 hover:border-sky-400 rounded-full px-2 sm:px-2.5 py-1 sm:py-1.5 shadow-lg text-[10px] sm:text-xs font-extrabold transition active:scale-95 shrink-0 cursor-pointer"
+              title="Teleport Cepat ke Bangunan & Arena Rumah Misteri"
+              aria-label="Teleport Cepat"
+            >
+              <Compass className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              <span className="hidden sm:inline">Teleport</span>
+            </button>
+
             {/* Radio Background Music Controller (Dynamic 5 Time-of-Day Stations) */}
             <LofiAudioControl timePeriod={timePeriod} />
 
@@ -1434,6 +1447,14 @@ export default function App() {
           student={student}
           onAddXp={handleAddPoints}
           onCompleteMasjidMission={() => completeMissionIfActive('m_masjid')}
+        />
+      )}
+
+      {activeBuilding === 'arena_rumah_misteri' && (
+        <ArenaRumahMisteriModal
+          onClose={() => setActiveBuilding(null)}
+          student={student}
+          onAddXp={handleAddPoints}
         />
       )}
 

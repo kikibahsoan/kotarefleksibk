@@ -299,6 +299,23 @@ export const CITY_BUILDINGS_GOVERNANCE: Record<BuildingId, BuildingGovernanceSpe
     dailyXpCap: 9,
     defaultOpen: true,
   },
+  arena_rumah_misteri: {
+    id: 'arena_rumah_misteri',
+    name: 'Arena Rumah Misteri',
+    zone: 'Pusat Kota (Seberang Sungai)',
+    icon: '🏠',
+    wx: 13.5,
+    wy: 3.6,
+    tileFootprint: 2,
+    category: 'Game Kelompok Langsung • Refleksia Timur Depan',
+    shortDescription: 'Arena permainan kelompok real-time 5 Rumah Misteri dengan diskusi tim, hitung mundur, dan ledakan rumah salah.',
+    learningObjective: 'Melatih kolaborasi tim (Kelompok 1-8), pemecahan masalah cepat, dan pengambilan keputusan bersama.',
+    capacity: 64,
+    openingHours: '06.00 - 22.00 WITA',
+    xpRewardPerActivity: 5,
+    dailyXpCap: 25,
+    defaultOpen: true,
+  },
 };
 
 export const PUSAT_KOTA_BUILDING_IDS: BuildingId[] = [
