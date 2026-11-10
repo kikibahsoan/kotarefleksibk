@@ -725,12 +725,18 @@ export const isSolidCollision = (
     return true;
   }
 
-  // Long Flowing River channel between Main Town and Far Bank (wx: 6.82 .. 8.28)
-  // ONLY the single wooden footbridge near the front at |wy| < 0.72 allows crossing over the river!
-  if (wx > 6.82 - padding && wx < 8.28 + padding) {
-    if (Math.abs(wy) >= 0.72) {
+  // Long Flowing River channel between Main Town and Far Bank (wx: 6.88 .. 8.22)
+  // Leaves a generous walkable wooden footbridge corridor at |wy| < 0.92 so all citizens can cross smoothly!
+  if (wx > 6.88 - padding && wx < 8.22 + padding) {
+    if (Math.abs(wy) >= 0.92) {
       return true;
     }
+    return false;
+  }
+
+  // Keep the bridge entrance and deck corridor (wx: 6.25..8.85, |wy| < 0.92) always clear for all citizens
+  if (wx >= 6.25 && wx <= 8.85 && Math.abs(wy) < 0.92) {
+    return false;
   }
 
   // Central Fountain pool (Air Mancur Pusat)
@@ -4854,6 +4860,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       let targetX = Math.max(-8.05, Math.min(18.15, wx));
       let targetY = Math.max(-13.85, Math.min(8.05, wy));
 
+      // Jika mengklik di sekitar jembatan kayu (wx: 6.55..8.55, |wy| <= 1.45), arahkan mulus ke jalur tengah jembatan
+      if (targetX >= 6.55 && targetX <= 8.55 && Math.abs(targetY) <= 1.45) {
+        targetY = Math.max(-0.35, Math.min(0.35, targetY));
+      } else if (targetX > 6.72 && targetX < 8.38 && Math.abs(targetY) > 1.45) {
+        // Jika mengklik aliran sungai, otomatis seberangkan warga melalui jembatan ke tepi seberang
+        targetX = player.wx < 7.55 ? 8.75 : 6.35;
+      }
+
       // Jika belum punya akses Hutan Refleksia (Tamu atau Siswa belum bayar 5 XP) dan mengklik area di balik pagar (wy < -7.45) di sisi barat sungai (targetX <= 6.85),
       // arahkan ke depan pintu gerbang yang dijaga @Sufri
       if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.18 && targetX <= 6.85) {
@@ -4871,7 +4885,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           expiresAt: Date.now() + 4500,
         };
       } else if (isSolidCollision(targetX, targetY, 0.08, canAccessWilderness)) {
-        // Jika kursor tepat mengklik rintangan padat (air dalam danau, sungai tak berjembatan, tebing gunung, air mancur),
+        // Jika kursor tepat mengklik rintangan padat (air dalam danau, tebing gunung, air mancur),
         // telusuri garis lurus menuju posisi avatar untuk mendapatkan koordinat tanah/tepi terdekat yang dapat dipijak
         const dirX = player.wx - targetX;
         const dirY = player.wy - targetY;
@@ -5528,28 +5542,50 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               }
             }
 
-            // Route avatar smoothly across the single wooden footbridge over the river at wy = 0.0 (spanning wx: 6.82..8.28)
-            const needsCrossBridgeEast = player.wx < 8.55 && player.targetWx >= 8.25;
-            const needsCrossBridgeWest = player.wx > 6.65 && player.targetWx <= 6.85;
-            if (needsCrossBridgeEast) {
-              if (player.wx < 6.55) {
-                // Tahap 1: Sejajarkan ke pintu masuk jembatan sisi barat
-                activeTargetWx = 6.55;
-                activeTargetWy = 0.0;
-              } else {
-                // Tahap 2: Menyeberangi jembatan lurus di wy = 0.0 sampai tiba di daratan timur
-                activeTargetWx = 8.65;
-                activeTargetWy = 0.0;
+            // Anti-wedge safety near riverbanks: ensure avatar near the river outside the bridge corridor is never trapped in river padding
+            if (Math.abs(player.wy) >= 0.82) {
+              if (player.wx > 6.64 && player.wx < 7.55) {
+                player.wx = 6.62;
+              } else if (player.wx >= 7.55 && player.wx < 8.46) {
+                player.wx = 8.48;
               }
-            } else if (needsCrossBridgeWest) {
-              if (player.wx > 8.55) {
-                // Tahap 1: Sejajarkan ke pintu masuk jembatan sisi timur
-                activeTargetWx = 8.55;
-                activeTargetWy = 0.0;
-              } else {
-                // Tahap 2: Menyeberangi jembatan lurus di wy = 0.0 sampai tiba di daratan barat
+            }
+
+            // Route all citizens (Siswa, Guru, Tamu/Wartawan) smoothly across the wooden footbridge at wy = 0.0 (spanning wx: 6.72..8.38)
+            const needsCrossBridgeEast =
+              player.wx < 8.50 &&
+              player.targetWx >= 6.70 &&
+              (player.targetWx > 8.20 || (player.wx < 6.70 && Math.abs(player.wy) > 0.45));
+            const needsCrossBridgeWest =
+              player.wx > 6.60 &&
+              player.targetWx <= 8.40 &&
+              (player.targetWx < 6.90 || (player.wx > 8.40 && Math.abs(player.wy) > 0.45));
+
+            if (needsCrossBridgeEast && player.targetWx > player.wx) {
+              if (player.wx < 6.45 || (player.wx < 6.88 && Math.abs(player.wy) > 0.42)) {
+                // Tahap 1: Sejajarkan ke mulut jembatan sisi barat (wx = 6.45, wy = 0.0)
                 activeTargetWx = 6.45;
                 activeTargetWy = 0.0;
+              } else if (player.targetWx > 8.38 && player.wx < 8.50) {
+                // Tahap 2: Menyeberangi dek jembatan lurus di wy = 0.0 sampai tiba di daratan timur (wx = 8.65)
+                activeTargetWx = 8.65;
+                activeTargetWy = 0.0;
+              } else {
+                activeTargetWx = player.targetWx;
+                activeTargetWy = Math.max(-0.35, Math.min(0.35, player.targetWy));
+              }
+            } else if (needsCrossBridgeWest && player.targetWx < player.wx) {
+              if (player.wx > 8.65 || (player.wx > 8.22 && Math.abs(player.wy) > 0.42)) {
+                // Tahap 1: Sejajarkan ke mulut jembatan sisi timur (wx = 8.65, wy = 0.0)
+                activeTargetWx = 8.65;
+                activeTargetWy = 0.0;
+              } else if (player.targetWx < 6.72 && player.wx > 6.60) {
+                // Tahap 2: Menyeberangi dek jembatan lurus di wy = 0.0 sampai tiba di daratan barat (wx = 6.45)
+                activeTargetWx = 6.45;
+                activeTargetWy = 0.0;
+              } else {
+                activeTargetWx = player.targetWx;
+                activeTargetWy = Math.max(-0.35, Math.min(0.35, player.targetWy));
               }
             }
 
@@ -6110,16 +6146,41 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               const r = npc.wanderRadius ?? 2.0;
               const angle = Math.random() * Math.PI * 2;
               const dist = 0.25 + Math.random() * r;
-              npc.targetWx = Math.max(-6.5, Math.min(6.5, ax + Math.cos(angle) * dist));
-              npc.targetWy = Math.max(-6.5, Math.min(6.5, ay + Math.sin(angle) * dist));
+              const minWxBound = ax > 7.55 ? 8.55 : -6.5;
+              const maxWxBound = ax > 7.55 ? 17.5 : 6.5;
+              npc.targetWx = Math.max(minWxBound, Math.min(maxWxBound, ax + Math.cos(angle) * dist));
+              npc.targetWy = Math.max(-12.5, Math.min(6.5, ay + Math.sin(angle) * dist));
             }
           }
         } else {
-          const dx = npc.targetWx - npc.wx;
-          const dy = npc.targetWy - npc.wy;
-          const dist = Math.hypot(dx, dy);
+          const totalDx = npc.targetWx - npc.wx;
+          const totalDy = npc.targetWy - npc.wy;
+          const totalDist = Math.hypot(totalDx, totalDy);
 
-          if (dist > 0.1) {
+          if (totalDist > 0.1) {
+            let activeNpcTargetWx = npc.targetWx;
+            let activeNpcTargetWy = npc.targetWy;
+            // Route NPCs across the wooden bridge at wy = 0.0 if their waypoint crosses the river
+            if (npc.wx < 8.50 && npc.targetWx >= 8.20) {
+              if (npc.wx < 6.45 || Math.abs(npc.wy) > 0.45) {
+                activeNpcTargetWx = 6.45;
+                activeNpcTargetWy = 0.0;
+              } else {
+                activeNpcTargetWx = 8.65;
+                activeNpcTargetWy = 0.0;
+              }
+            } else if (npc.wx > 6.60 && npc.targetWx <= 6.85) {
+              if (npc.wx > 8.65 || Math.abs(npc.wy) > 0.45) {
+                activeNpcTargetWx = 8.65;
+                activeNpcTargetWy = 0.0;
+              } else {
+                activeNpcTargetWx = 6.45;
+                activeNpcTargetWy = 0.0;
+              }
+            }
+            const dx = activeNpcTargetWx - npc.wx;
+            const dy = activeNpcTargetWy - npc.wy;
+            const dist = Math.hypot(dx, dy) || totalDist;
             const step = Math.min(dist, npc.speed * delta);
             npc.wx += (dx / dist) * step;
             npc.wy += (dy / dist) * step;
@@ -6148,13 +6209,38 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           return;
         }
 
-        const rdx = rem.targetWx - rem.wx;
-        const rdy = rem.targetWy - rem.wy;
-        const rdist = Math.hypot(rdx, rdy);
+        const totalRdx = rem.targetWx - rem.wx;
+        const totalRdy = rem.targetWy - rem.wy;
+        const totalRdist = Math.hypot(totalRdx, totalRdy);
 
-        if (rdist > 0.04) {
+        if (totalRdist > 0.04) {
+          let activeRemTargetWx = rem.targetWx;
+          let activeRemTargetWy = rem.targetWy;
+          // Route remote online citizens smoothly across the wooden bridge at wy = 0.0 when crossing between West & East
+          if (rem.wx < 8.50 && rem.targetWx >= 8.20) {
+            if (rem.wx < 6.45 || (rem.wx < 6.88 && Math.abs(rem.wy) > 0.45)) {
+              activeRemTargetWx = 6.45;
+              activeRemTargetWy = 0.0;
+            } else {
+              activeRemTargetWx = 8.65;
+              activeRemTargetWy = 0.0;
+            }
+          } else if (rem.wx > 6.60 && rem.targetWx <= 6.85) {
+            if (rem.wx > 8.65 || (rem.wx > 8.22 && Math.abs(rem.wy) > 0.45)) {
+              activeRemTargetWx = 8.65;
+              activeRemTargetWy = 0.0;
+            } else {
+              activeRemTargetWx = 6.45;
+              activeRemTargetWy = 0.0;
+            }
+          }
+
+          const rdx = activeRemTargetWx - rem.wx;
+          const rdy = activeRemTargetWy - rem.wy;
+          const rdist = Math.hypot(rdx, rdy) || totalRdist;
+
           // Smooth catch-up speed if slightly behind, otherwise natural walking speed
-          const catchupMultiplier = rdist > 1.0 ? 1.35 : 1.0;
+          const catchupMultiplier = totalRdist > 1.0 ? 1.35 : 1.0;
           const rstep = Math.min(rdist, (rem.speed || 1.35) * catchupMultiplier * delta);
           rem.wx += (rdx / rdist) * rstep;
           rem.wy += (rdy / rdist) * rstep;
@@ -23469,8 +23555,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                                   setIsSitting(false);
                                   setSittingSeat(null);
                                 }
-                                const destWx = Math.max(-6.8, Math.min(6.8, coords.wx + 0.42));
-                                const destWy = Math.max(-6.8, Math.min(6.8, coords.wy + 0.35));
+                                const destWx = Math.max(-7.8, Math.min(17.8, coords.wx + 0.42));
+                                const destWy = Math.max(-13.5, Math.min(7.8, coords.wy + 0.35));
                                 if (isMasterKikyRef.current && masterMoveModeRef.current === 'teleport') {
                                   teleportFlashRef.current = {
                                     fromWx: playerRef.current.wx,
