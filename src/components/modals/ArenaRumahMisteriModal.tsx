@@ -28,6 +28,7 @@ import {
 } from '../../types/index.ts';
 import { StorageService } from '../../utils/storage.ts';
 import { sounds } from '../../utils/audio.ts';
+import { RealtimePresenceMesh } from '../../utils/realtimePresenceMesh.ts';
 
 interface ArenaRumahMisteriModalProps {
   onClose: () => void;
@@ -167,6 +168,56 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
   const explosionStartMsRef = useRef<number | null>(null);
   const particlesRef = useRef<ExplosionParticle[]>([]);
 
+  // Unique per-tab identity if multiple tabs share the same account in the same browser
+  const participantIdentity = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return { id: student.id, name: student.name };
+    }
+    try {
+      let tabId = sessionStorage.getItem('mystery_arena_tab_id');
+      if (!tabId) {
+        tabId = Math.random().toString(36).slice(2, 6);
+        sessionStorage.setItem('mystery_arena_tab_id', tabId);
+      }
+      const regKey = `mystery_arena_active_tabs_${student.id}`;
+      const now = Date.now();
+      let activeTabs: Record<string, number> = {};
+      try {
+        activeTabs = JSON.parse(localStorage.getItem(regKey) || '{}') || {};
+      } catch {}
+      // Purge stale tabs older than 5s
+      for (const [tid, ts] of Object.entries(activeTabs)) {
+        if (now - Number(ts) > 5000) {
+          delete activeTabs[tid];
+        }
+      }
+      const otherTabIds = Object.keys(activeTabs).filter((tid) => tid !== tabId);
+      activeTabs[tabId] = now;
+      localStorage.setItem(regKey, JSON.stringify(activeTabs));
+
+      if (otherTabIds.length > 0 && !student.isTeacher) {
+        return {
+          id: `${student.id}_${tabId}`,
+          name: `${student.name} (${tabId.slice(0, 2).toUpperCase()})`,
+          tabId,
+          regKey,
+        };
+      }
+      return { id: student.id, name: student.name, tabId, regKey };
+    } catch {
+      return { id: student.id, name: student.name, tabId: 'default', regKey: '' };
+    }
+  }, [student.id, student.isTeacher, student.name]);
+
+  const effectiveStudentId = participantIdentity.id;
+  const effectiveStudentName = participantIdentity.name;
+
+  // Live peers discovered via Global WebSocket Mesh (WSS MQTT) or BroadcastChannel across URLs/tabs
+  const [meshPeersVersion, setMeshPeersVersion] = useState<number>(0);
+  const meshPeersRef = useRef<Map<string, MysteryArenaPlayerPresence>>(new Map());
+  const meshRef = useRef<RealtimePresenceMesh | null>(null);
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
+
   // Isometric Arena Canvas Ref
   const arenaCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const localAvatarPosRef = useRef<{ x: number; y: number; targetX: number; targetY: number }>({
@@ -177,6 +228,8 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
   });
   const arenaStateRef = useRef<MysteryArenaState | null>(null);
   arenaStateRef.current = arenaState;
+  const selectedGroupRef = useRef<MysteryGroupNumber>(selectedGroup);
+  selectedGroupRef.current = selectedGroup;
 
   const settings = useMemo(() => StorageService.getSettings(), []);
 
@@ -311,8 +364,11 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
   // Sync local avatar target whenever group choice or round status changes
   useEffect(() => {
     if (!arenaState) return;
-    const assignedGroup = arenaState.studentGroupMap?.[student.id] || selectedGroup;
-    if (assignedGroup !== selectedGroup) {
+    const assignedGroup =
+      arenaState.studentGroupMap?.[effectiveStudentId] ||
+      arenaState.studentGroupMap?.[student.id] ||
+      selectedGroup;
+    if (!student.isTeacher && assignedGroup !== selectedGroup) {
       setSelectedGroup(assignedGroup);
     }
 
@@ -344,7 +400,7 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
       localAvatarPosRef.current.targetX = pad.x;
       localAvatarPosRef.current.targetY = pad.y;
     }
-  }, [arenaState, getGroupGatheringCoords, getHouseDoorCoords, selectedGroup, student.id, student.isTeacher]);
+  }, [arenaState, effectiveStudentId, getGroupGatheringCoords, getHouseDoorCoords, selectedGroup, student.id, student.isTeacher]);
 
   // Trigger explosion sequence if round is 'meledak'
   useEffect(() => {
@@ -357,17 +413,57 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     }
   }, [arenaState, triggerExplosionSequence]);
 
-  // 1.5-second real-time polling + presence heartbeat
+  // Publish Mystery Arena event over Global WSS Mesh + Local BroadcastChannel
+  const publishArenaMeshEvent = useCallback(
+    (arenaPayload: Record<string, any>) => {
+      const fullPayload = {
+        ...arenaPayload,
+        senderId: effectiveStudentId,
+        ts: Date.now(),
+      };
+      try {
+        meshRef.current?.publish({
+          type: 'mystery_arena_event',
+          senderId: effectiveStudentId,
+          arenaPayload: fullPayload,
+        });
+      } catch {}
+      try {
+        broadcastChannelRef.current?.postMessage({
+          type: 'mystery_arena_event',
+          senderId: effectiveStudentId,
+          arenaPayload: fullPayload,
+        });
+      } catch {}
+    },
+    [effectiveStudentId]
+  );
+
+  // 1.2-second real-time polling + presence heartbeat
   const fetchArenaState = useCallback(async () => {
     try {
+      // Keep local tab registry fresh
+      if (participantIdentity.regKey && participantIdentity.tabId) {
+        try {
+          const activeTabs = JSON.parse(localStorage.getItem(participantIdentity.regKey) || '{}') || {};
+          activeTabs[participantIdentity.tabId] = Date.now();
+          localStorage.setItem(participantIdentity.regKey, JSON.stringify(activeTabs));
+        } catch {}
+      }
+
       const query = new URLSearchParams({
-        studentId: student.id,
-        studentName: student.name,
+        studentId: effectiveStudentId,
+        studentName: effectiveStudentName,
+        className: student.className || 'X DKV',
+        gender: student.gender === 'P' ? 'P' : 'L',
         isTeacher: student.isTeacher ? 'true' : 'false',
         studentNumber: student.studentNumber || '',
-        kelompok: String(selectedGroup),
+        kelompok: String(selectedGroupRef.current),
+        _t: String(Date.now()),
       });
-      const res = await fetch(`/api/mystery-arena/state?${query.toString()}`);
+      const res = await fetch(`/api/mystery-arena/state?${query.toString()}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) return;
       const json = await res.json();
       if (json && json.data) {
@@ -377,22 +473,232 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     } catch {
       // ignore transient network errors during polling
     }
-  }, [selectedGroup, student.id, student.isTeacher, student.name, student.studentNumber]);
+  }, [
+    effectiveStudentId,
+    effectiveStudentName,
+    participantIdentity.regKey,
+    participantIdentity.tabId,
+    student.className,
+    student.gender,
+    student.isTeacher,
+    student.studentNumber,
+  ]);
 
+  // 4-Layer Real-Time Synchronization:
+  // 1. Global WSS MQTT Presence Mesh (connects ais-dev, ais-pre, mobile & laptop in <50ms)
+  // 2. Local BroadcastChannel
+  // 3. Express SSE (/api/presence/stream)
+  // 4. Fast 1.2s HTTP Polling (/api/mystery-arena/state)
   useEffect(() => {
-    fetchArenaState();
-    const interval = window.setInterval(fetchArenaState, 1500);
-    return () => window.clearInterval(interval);
-  }, [fetchArenaState]);
+    let isMounted = true;
 
-  // Auto-join group on first open
+    const announceSelfOnMesh = () => {
+      if (!isMounted) return;
+      const myHouse =
+        arenaStateRef.current?.choices?.[selectedGroupRef.current]?.rumah_dipilih || null;
+      publishArenaMeshEvent({
+        eventType: 'participant_presence',
+        studentId: effectiveStudentId,
+        studentName: effectiveStudentName,
+        className: student.className || (student.isTeacher ? 'Dewan Guru' : 'X DKV'),
+        gender: student.gender === 'P' ? 'P' : 'L',
+        isTeacher: Boolean(student.isTeacher),
+        studentNumber: student.studentNumber || '',
+        kelompok: student.isTeacher ? null : selectedGroupRef.current,
+        rumah_dipilih: student.isTeacher ? null : myHouse,
+        arenaWx: localAvatarPosRef.current.x,
+        arenaWy: localAvatarPosRef.current.y,
+      });
+    };
+
+    const handleIncomingMeshPayload = (payload: any) => {
+      if (!isMounted || !payload) return;
+      const now = Date.now();
+
+      if (
+        payload.eventType === 'participant_presence' ||
+        payload.eventType === 'student_action'
+      ) {
+        const pid = String(payload.studentId || '').trim();
+        if (!pid || pid === effectiveStudentId) return;
+
+        const pIsTeacher = Boolean(payload.isTeacher);
+        const pGroup = pIsTeacher
+          ? null
+          : ((Math.max(1, Math.min(8, Number(payload.kelompok) || 1)) as MysteryGroupNumber) || 1);
+        const pHouse =
+          payload.rumah_dipilih && Number(payload.rumah_dipilih) >= 1 && Number(payload.rumah_dipilih) <= 5
+            ? (Number(payload.rumah_dipilih) as MysteryHouseNumber)
+            : null;
+
+        meshPeersRef.current.set(pid, {
+          studentId: pid,
+          studentName: String(payload.studentName || 'Siswa DKV'),
+          className: String(payload.className || 'X DKV'),
+          gender: payload.gender === 'P' ? 'P' : 'L',
+          isTeacher: pIsTeacher,
+          kelompok: pGroup,
+          arenaWx: typeof payload.arenaWx === 'number' ? payload.arenaWx : 0.5,
+          arenaWy: typeof payload.arenaWy === 'number' ? payload.arenaWy : 0.65,
+          rumah_dipilih: pHouse,
+          lastSeen: now,
+        });
+        setMeshPeersVersion((v) => v + 1);
+
+        // Bridge cross-URL / cross-instance peer action to our local Express server so server state is 100% synced
+        const actType = payload.actionType || 'join_group';
+        fetch('/api/mystery-arena/student-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: pid,
+            studentName: payload.studentName || 'Siswa DKV',
+            className: payload.className || 'X DKV',
+            gender: payload.gender === 'P' ? 'P' : 'L',
+            isTeacher: pIsTeacher,
+            studentNumber: payload.studentNumber || '',
+            actionType: actType,
+            kelompok: pGroup || 1,
+            rumah_dipilih: pHouse,
+            chatContent: payload.chatContent,
+          }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (isMounted && d?.data) {
+              setArenaState(d.data);
+            }
+          })
+          .catch(() => {});
+      } else if (payload.eventType === 'teacher_state_broadcast' && payload.sanitizedState) {
+        // Instant round status update from teacher across devices/URLs
+        const incomingState = payload.sanitizedState as MysteryArenaState;
+        setArenaState((prev) => {
+          if (!prev) return incomingState;
+          return {
+            ...prev,
+            currentRound: {
+              ...incomingState.currentRound,
+              // Preserve teacher's rumah_benar if this viewer is a verified teacher
+              rumah_benar:
+                student.isTeacher && prev.currentRound?.rumah_benar
+                  ? incomingState.currentRound.rumah_benar ?? prev.currentRound.rumah_benar
+                  : incomingState.currentRound.rumah_benar,
+            },
+            choices: incomingState.choices || prev.choices,
+            scores: incomingState.scores || prev.scores,
+            studentGroupMap: { ...(prev.studentGroupMap || {}), ...(incomingState.studentGroupMap || {}) },
+            winningGroups: incomingState.winningGroups || prev.winningGroups,
+          };
+        });
+        fetchArenaState();
+      }
+    };
+
+    // 1. Global WSS MQTT Mesh
+    const mesh = new RealtimePresenceMesh(
+      `arena_${effectiveStudentId}`,
+      (msg) => {
+        if (!isMounted) return;
+        if (msg.type === 'mystery_arena_event' && msg.arenaPayload) {
+          handleIncomingMeshPayload(msg.arenaPayload);
+        } else if (msg.type === 'mystery_arena_request' && msg.senderId !== effectiveStudentId) {
+          announceSelfOnMesh();
+        }
+      },
+      () => {
+        if (!isMounted) return;
+        mesh.publish({ type: 'mystery_arena_request', senderId: effectiveStudentId });
+        announceSelfOnMesh();
+      }
+    );
+    meshRef.current = mesh;
+
+    // 2. Local BroadcastChannel across browser tabs
+    const bc =
+      typeof window !== 'undefined' && 'BroadcastChannel' in window
+        ? new BroadcastChannel('kota_refleksi_mystery_arena')
+        : null;
+    broadcastChannelRef.current = bc;
+    if (bc) {
+      bc.onmessage = (ev) => {
+        if (!isMounted) return;
+        if (ev.data?.type === 'mystery_arena_event' && ev.data.arenaPayload) {
+          handleIncomingMeshPayload(ev.data.arenaPayload);
+        } else if (ev.data?.type === 'mystery_arena_request' && ev.data.senderId !== effectiveStudentId) {
+          announceSelfOnMesh();
+        }
+      };
+      try {
+        bc.postMessage({ type: 'mystery_arena_request', senderId: effectiveStudentId });
+      } catch {}
+    }
+
+    // 3. Server-Sent Events (/api/presence/stream) for instant same-server triggers
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource('/api/presence/stream');
+      es.onmessage = (ev) => {
+        if (!isMounted) return;
+        try {
+          const parsed = JSON.parse(ev.data);
+          if (parsed?.type === 'mystery_arena_tick') {
+            fetchArenaState();
+          }
+        } catch {}
+      };
+    } catch {}
+
+    // 4. Initial & periodic HTTP poll + mesh heartbeat
+    fetchArenaState();
+    announceSelfOnMesh();
+    const pollInterval = window.setInterval(fetchArenaState, 1200);
+    const meshPingInterval = window.setInterval(() => {
+      announceSelfOnMesh();
+      // Purge stale mesh peers older than 40s
+      const now = Date.now();
+      let changed = false;
+      for (const [pid, peer] of meshPeersRef.current.entries()) {
+        if (now - peer.lastSeen > 40000) {
+          meshPeersRef.current.delete(pid);
+          changed = true;
+        }
+      }
+      if (changed && isMounted) {
+        setMeshPeersVersion((v) => v + 1);
+      }
+    }, 2800);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(pollInterval);
+      window.clearInterval(meshPingInterval);
+      try {
+        es?.close();
+      } catch {}
+      try {
+        bc?.close();
+      } catch {}
+    };
+  }, [
+    effectiveStudentId,
+    effectiveStudentName,
+    fetchArenaState,
+    publishArenaMeshEvent,
+    student.className,
+    student.gender,
+    student.isTeacher,
+    student.studentNumber,
+  ]);
+
+  // Register presence / auto-join group on open or when selectedGroup changes
   useEffect(() => {
     fetch('/api/mystery-arena/student-action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        studentId: student.id,
-        studentName: student.name,
+        studentId: effectiveStudentId,
+        studentName: effectiveStudentName,
         className: student.className,
         gender: student.gender,
         isTeacher: student.isTeacher,
@@ -406,7 +712,28 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
         if (d?.data) setArenaState(d.data);
       })
       .catch(() => {});
-  }, [selectedGroup, student.className, student.gender, student.id, student.isTeacher, student.name, student.studentNumber]);
+
+    publishArenaMeshEvent({
+      eventType: 'student_action',
+      actionType: 'join_group',
+      studentId: effectiveStudentId,
+      studentName: effectiveStudentName,
+      className: student.className || (student.isTeacher ? 'Dewan Guru' : 'X DKV'),
+      gender: student.gender === 'P' ? 'P' : 'L',
+      isTeacher: Boolean(student.isTeacher),
+      studentNumber: student.studentNumber || '',
+      kelompok: student.isTeacher ? null : selectedGroup,
+    });
+  }, [
+    effectiveStudentId,
+    effectiveStudentName,
+    publishArenaMeshEvent,
+    selectedGroup,
+    student.className,
+    student.gender,
+    student.isTeacher,
+    student.studentNumber,
+  ]);
 
   // Teacher Action Handler (Verified on Server)
   const handleTeacherAction = async (
@@ -444,6 +771,21 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
       const nextState: MysteryArenaState = json.data;
       setArenaState(nextState);
       sounds.playClick();
+
+      // Broadcast sanitized state over Mesh & BroadcastChannel (anti-peek: hide rumah_benar unless status === 'meledak')
+      publishArenaMeshEvent({
+        eventType: 'teacher_state_broadcast',
+        sanitizedState: {
+          ...nextState,
+          currentRound: {
+            ...nextState.currentRound,
+            rumah_benar:
+              nextState.currentRound.status === 'meledak'
+                ? nextState.currentRound.rumah_benar
+                : null,
+          },
+        },
+      });
 
       // Sync to Google Spreadsheet (Game_Ronde & Game_Skor) without blocking UI
       if (nextState.currentRound) {
@@ -493,13 +835,25 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     localAvatarPosRef.current.targetX = pad.x;
     localAvatarPosRef.current.targetY = pad.y;
 
+    publishArenaMeshEvent({
+      eventType: 'student_action',
+      actionType: 'join_group',
+      studentId: effectiveStudentId,
+      studentName: effectiveStudentName,
+      className: student.className || 'X DKV',
+      gender: student.gender === 'P' ? 'P' : 'L',
+      isTeacher: Boolean(student.isTeacher),
+      studentNumber: student.studentNumber || '',
+      kelompok,
+    });
+
     try {
       const res = await fetch('/api/mystery-arena/student-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: student.id,
-          studentName: student.name,
+          studentId: effectiveStudentId,
+          studentName: effectiveStudentName,
           className: student.className,
           gender: student.gender,
           isTeacher: student.isTeacher,
@@ -530,13 +884,26 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     localAvatarPosRef.current.targetX = door.x;
     localAvatarPosRef.current.targetY = door.y + 0.03;
 
+    publishArenaMeshEvent({
+      eventType: 'student_action',
+      actionType: 'select_house',
+      studentId: effectiveStudentId,
+      studentName: effectiveStudentName,
+      className: student.className || 'X DKV',
+      gender: student.gender === 'P' ? 'P' : 'L',
+      isTeacher: Boolean(student.isTeacher),
+      studentNumber: student.studentNumber || '',
+      kelompok: selectedGroup,
+      rumah_dipilih: rumah,
+    });
+
     try {
       const res = await fetch('/api/mystery-arena/student-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: student.id,
-          studentName: student.name,
+          studentId: effectiveStudentId,
+          studentName: effectiveStudentName,
           className: student.className,
           gender: student.gender,
           isTeacher: student.isTeacher,
@@ -573,13 +940,26 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     setChatText('');
     sounds.playClick();
 
+    publishArenaMeshEvent({
+      eventType: 'student_action',
+      actionType: 'send_group_chat',
+      studentId: effectiveStudentId,
+      studentName: effectiveStudentName,
+      className: student.className || 'X DKV',
+      gender: student.gender === 'P' ? 'P' : 'L',
+      isTeacher: Boolean(student.isTeacher),
+      studentNumber: student.studentNumber || '',
+      kelompok: selectedGroup,
+      chatContent: trimmed,
+    });
+
     try {
       const res = await fetch('/api/mystery-arena/student-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: student.id,
-          studentName: student.name,
+          studentId: effectiveStudentId,
+          studentName: effectiveStudentName,
           className: student.className,
           gender: student.gender,
           isTeacher: student.isTeacher,
@@ -873,12 +1253,20 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
       loc.x += (loc.targetX - loc.x) * 0.14;
       loc.y += (loc.targetY - loc.y) * 0.14;
 
-      // 7. Render All Online Players in the Arena (Students + Teacher)
-      const playersToDraw: MysteryArenaPlayerPresence[] = [...(state?.arenaPlayers || [])];
-      if (!playersToDraw.some((p) => p.studentId === student.id)) {
-        playersToDraw.push({
-          studentId: student.id,
-          studentName: student.name,
+      // 7. Render All Online Players in the Arena (Server + Global Mesh Peers + Local Player)
+      const playerMap = new Map<string, MysteryArenaPlayerPresence>();
+      (state?.arenaPlayers || []).forEach((p) => {
+        if (p && p.studentId) playerMap.set(p.studentId, p);
+      });
+      meshPeersRef.current.forEach((peer, pid) => {
+        if (!playerMap.has(pid)) {
+          playerMap.set(pid, peer);
+        }
+      });
+      if (!playerMap.has(effectiveStudentId)) {
+        playerMap.set(effectiveStudentId, {
+          studentId: effectiveStudentId,
+          studentName: effectiveStudentName,
           className: student.className || 'X DKV',
           gender: student.gender === 'P' ? 'P' : 'L',
           isTeacher: Boolean(student.isTeacher),
@@ -889,9 +1277,10 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
           lastSeen: Date.now(),
         });
       }
+      const playersToDraw: MysteryArenaPlayerPresence[] = Array.from(playerMap.values());
 
       playersToDraw.forEach((p, idx) => {
-        const isSelf = p.studentId === student.id;
+        const isSelf = p.studentId === effectiveStudentId || p.studentId === student.id;
         const pGroup: MysteryGroupNumber =
           (p.kelompok || state?.studentGroupMap?.[p.studentId] || 1) as MysteryGroupNumber;
         const choice = state?.choices?.[pGroup];
@@ -1017,6 +1406,119 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     return Object.values(arenaState.choices);
   }, [arenaState?.choices]);
 
+  // Unified real-time list of all online participants (Server + Global Mesh + Self)
+  const allOnlineParticipants = useMemo(() => {
+    void meshPeersVersion;
+    const map = new Map<string, MysteryArenaPlayerPresence>();
+    (arenaState?.arenaPlayers || []).forEach((p) => {
+      if (p && p.studentId) {
+        map.set(p.studentId, p);
+      }
+    });
+    meshPeersRef.current.forEach((peer, pid) => {
+      const existing = map.get(pid);
+      if (!existing || peer.lastSeen > existing.lastSeen) {
+        map.set(pid, peer);
+      }
+    });
+    map.set(effectiveStudentId, {
+      studentId: effectiveStudentId,
+      studentName: effectiveStudentName,
+      className: student.className || (student.isTeacher ? 'Dewan Guru' : 'X DKV'),
+      gender: student.gender === 'P' ? 'P' : 'L',
+      isTeacher: Boolean(student.isTeacher),
+      kelompok: student.isTeacher ? null : selectedGroup,
+      arenaWx: localAvatarPosRef.current.x,
+      arenaWy: localAvatarPosRef.current.y,
+      rumah_dipilih: student.isTeacher ? null : myGroupChoice?.rumah_dipilih || null,
+      lastSeen: Date.now(),
+    });
+    return Array.from(map.values());
+  }, [
+    arenaState?.arenaPlayers,
+    effectiveStudentId,
+    effectiveStudentName,
+    meshPeersVersion,
+    myGroupChoice?.rumah_dipilih,
+    selectedGroup,
+    student.className,
+    student.gender,
+    student.isTeacher,
+  ]);
+
+  // Unified real-time group member roster (Kelompok 1 - 8)
+  const groupRosterMap = useMemo(() => {
+    const map: Record<
+      MysteryGroupNumber,
+      Array<{ studentId: string; studentName: string; className: string; isOnline: boolean }>
+    > = {
+      1: [],
+      2: [],
+      3: [],
+      4: [],
+      5: [],
+      6: [],
+      7: [],
+      8: [],
+    };
+
+    // 1. Add members from server groupMembers
+    GROUP_NUMBERS.forEach((gNum) => {
+      const serverMembers = arenaState?.groupMembers?.[gNum] || [];
+      serverMembers.forEach((m: any) => {
+        if (!m || !m.studentId) return;
+        const isOnline = allOnlineParticipants.some(
+          (ap) =>
+            ap.studentId === m.studentId ||
+            ap.studentName.trim().toLowerCase() === String(m.studentName || '').trim().toLowerCase()
+        );
+        if (!map[gNum].some((existing) => existing.studentId === m.studentId)) {
+          map[gNum].push({
+            studentId: m.studentId,
+            studentName: m.studentName,
+            className: m.className || 'X DKV',
+            isOnline,
+          });
+        }
+      });
+    });
+
+    // 2. Ensure all online student participants are in their active group
+    allOnlineParticipants.forEach((ap) => {
+      if (ap.isTeacher) return;
+      const gNum = (ap.kelompok ||
+        arenaState?.studentGroupMap?.[ap.studentId] ||
+        1) as MysteryGroupNumber;
+      if (gNum >= 1 && gNum <= 8) {
+        // Remove from other groups if they switched
+        GROUP_NUMBERS.forEach((otherG) => {
+          if (otherG !== gNum) {
+            map[otherG] = map[otherG].filter((m) => m.studentId !== ap.studentId);
+          }
+        });
+        const existingIdx = map[gNum].findIndex((m) => m.studentId === ap.studentId);
+        if (existingIdx >= 0) {
+          map[gNum][existingIdx].isOnline = true;
+          map[gNum][existingIdx].studentName = ap.studentName;
+        } else {
+          map[gNum].push({
+            studentId: ap.studentId,
+            studentName: ap.studentName,
+            className: ap.className || 'X DKV',
+            isOnline: true,
+          });
+        }
+      }
+    });
+
+    return map;
+  }, [allOnlineParticipants, arenaState?.groupMembers, arenaState?.studentGroupMap]);
+
+  const onlineStudentsList = useMemo(
+    () => allOnlineParticipants.filter((p) => !p.isTeacher),
+    [allOnlineParticipants]
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-backdrop-fade">
       <div
@@ -1037,7 +1539,9 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
                 </h2>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>{arenaState?.arenaPlayers?.length || 1} Pemain Online</span>
+                  <span>
+                    {allOnlineParticipants.length} Peserta Online ({onlineStudentsList.length} Siswa)
+                  </span>
                 </span>
                 {currentRound && (
                   <span
@@ -1169,6 +1673,54 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
                 <div>• Belakang: Rumah Misteri 1–5 (Klik untuk masuk)</div>
                 <div>• Tengah: Area Berkumpul Kelompok 1–8</div>
                 <div>• Depan: Podium Guru</div>
+              </div>
+            </div>
+
+            {/* LIVE PARTICIPANTS ROSTER STRIP (TERBACA REAL-TIME) */}
+            <div className="bg-slate-950/80 border border-emerald-500/30 rounded-2xl p-2.5">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="text-[11px] font-extrabold text-emerald-300 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span>
+                    Peserta Bergabung Real-Time ({allOnlineParticipants.length} Orang •{' '}
+                    {onlineStudentsList.length} Siswa)
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  Sinkronisasi Otomatis Multi-Perangkat
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-[68px] overflow-y-auto pr-1">
+                {allOnlineParticipants.map((p) => {
+                  const isMe = p.studentId === effectiveStudentId || p.studentId === student.id;
+                  const pGrp = p.kelompok || arenaState?.studentGroupMap?.[p.studentId];
+                  const grpHouse = pGrp ? arenaState?.choices?.[pGrp]?.rumah_dipilih : null;
+                  return (
+                    <span
+                      key={p.studentId}
+                      className={`px-2 py-0.5 rounded-lg text-[10.5px] font-bold flex items-center gap-1 border ${
+                        p.isTeacher
+                          ? 'bg-amber-500/20 border-amber-400/50 text-amber-200'
+                          : isMe
+                          ? 'bg-sky-500/25 border-sky-400 text-white'
+                          : 'bg-slate-900 border-slate-700 text-slate-200'
+                      }`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span>{p.isTeacher ? `👨‍🏫 ${p.studentName}` : p.studentName}</span>
+                      {!p.isTeacher && pGrp && (
+                        <span className="px-1 rounded bg-slate-800 text-sky-300 text-[9.5px] font-extrabold">
+                          K{pGrp}
+                        </span>
+                      )}
+                      {!p.isTeacher && grpHouse && (
+                        <span className="px-1 rounded bg-amber-500/25 text-amber-300 text-[9.5px] font-extrabold">
+                          🏠R{grpHouse}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })}
               </div>
             </div>
 
@@ -1458,42 +2010,75 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
                     </button>
                   </div>
 
-                  {/* Daftar Kelompok & Rumah yang Dipilih (Terlihat oleh Guru) */}
+                  {/* Daftar Kelompok, Anggota Bergabung & Rumah yang Dipilih (Terlihat oleh Guru) */}
                   <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3">
                     <div className="text-xs font-extrabold text-amber-300 mb-2 flex items-center justify-between">
-                      <span>📋 Pantauan Pilihan Kelompok (1–8)</span>
+                      <span>📋 Pantauan Kelompok, Peserta &amp; Pilihan (1–8)</span>
                       <span className="text-[10.5px] text-slate-400">
                         Rumah Benar Server: Rumah {currentRound?.rumah_benar ?? rumahBenarInput}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
                       {GROUP_NUMBERS.map((gNum) => {
                         const choice = arenaState?.choices?.[gNum];
+                        const members = groupRosterMap[gNum] || [];
                         return (
                           <div
                             key={gNum}
-                            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between"
+                            className="p-2 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-1"
                           >
-                            <span className="font-bold text-slate-200">Kelompok {gNum}</span>
-                            {choice?.rumah_dipilih ? (
-                              <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-extrabold">
-                                Rumah {choice.rumah_dipilih}
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-extrabold text-slate-100 flex items-center gap-1">
+                                <span>Kelompok {gNum}</span>
+                                <span className="px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-300 text-[9.5px]">
+                                  👥 {members.length}
+                                </span>
                               </span>
-                            ) : (
-                              <span className="text-slate-500 italic">Belum pilih</span>
-                            )}
+                              {choice?.rumah_dipilih ? (
+                                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-extrabold text-[10px]">
+                                  🏠 Rumah {choice.rumah_dipilih}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 italic text-[10px]">Belum pilih</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {members.length === 0 ? (
+                                <span className="text-[10px] text-slate-500 italic">
+                                  Belum ada siswa bergabung
+                                </span>
+                              ) : (
+                                members.map((m) => (
+                                  <span
+                                    key={m.studentId}
+                                    className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-700 text-[10px] text-emerald-200 flex items-center gap-1"
+                                  >
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full ${
+                                        m.isOnline ? 'bg-emerald-400' : 'bg-slate-500'
+                                      }`}
+                                    />
+                                    <span className="truncate max-w-[110px]">{m.studentName}</span>
+                                  </span>
+                                ))
+                              )}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Penempatan Kelompok Siswa oleh Guru (Opsional) */}
-                  {arenaState && arenaState.arenaPlayers.filter((p) => !p.isTeacher).length > 0 && (
-                    <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 space-y-2">
-                      <div className="text-xs font-extrabold text-sky-300">
-                        👥 Atur Kelompok Siswa Online (Oleh Guru):
+                  {/* Penempatan Kelompok Siswa oleh Guru */}
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 space-y-2">
+                    <div className="text-xs font-extrabold text-sky-300 flex items-center justify-between">
+                      <span>👥 Atur Kelompok Siswa Online ({onlineStudentsList.length} Siswa):</span>
+                    </div>
+                    {onlineStudentsList.length === 0 ? (
+                      <div className="text-[11px] text-slate-400 italic py-1">
+                        Menunggu siswa bergabung ke Arena Rumah Misteri... Begitu siswa membuka arena atau berjalan ke plaza arena, nama mereka langsung tampil real-time di sini.
                       </div>
+                    ) : (
                       <div className="flex items-center gap-2">
                         <select
                           value={assignStudentId}
@@ -1501,13 +2086,11 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
                           className="flex-1 rounded-xl bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-xs text-white"
                         >
                           <option value="">-- Pilih Siswa Online --</option>
-                          {arenaState.arenaPlayers
-                            .filter((p) => !p.isTeacher)
-                            .map((p) => (
-                              <option key={p.studentId} value={p.studentId}>
-                                {p.studentName} (Kelompok {p.kelompok || 1})
-                              </option>
-                            ))}
+                          {onlineStudentsList.map((p) => (
+                            <option key={p.studentId} value={p.studentId}>
+                              {p.studentName} (Kelompok {p.kelompok || 1})
+                            </option>
+                          ))}
                         </select>
                         <select
                           value={assignGroupNum}
@@ -1524,7 +2107,7 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
                           type="button"
                           onClick={() => {
                             if (!assignStudentId) return;
-                            const targetPlayer = arenaState.arenaPlayers.find(
+                            const targetPlayer = onlineStudentsList.find(
                               (p) => p.studentId === assignStudentId
                             );
                             handleTeacherAction('assign_student_group', {
@@ -1540,8 +2123,8 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
                           Atur
                         </button>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1549,8 +2132,8 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
               {activeRightTab === 'diskusi' && (
                 <div className="flex flex-col h-full space-y-3">
                   {/* Pilih Kelompok (1-8) */}
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3">
-                    <div className="text-xs font-extrabold text-white mb-2 flex items-center justify-between">
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 space-y-2.5">
+                    <div className="text-xs font-extrabold text-white flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <Users className="w-4 h-4 text-sky-400" />
                         <span>Pilih Kelompok Belajar (1–8):</span>
@@ -1562,21 +2145,54 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
                     <div className="grid grid-cols-4 gap-1.5">
                       {GROUP_NUMBERS.map((gNum) => {
                         const isSelected = selectedGroup === gNum;
+                        const memberCount = (groupRosterMap[gNum] || []).length;
                         return (
                           <button
                             key={gNum}
                             type="button"
                             onClick={() => handleSelectGroup(gNum)}
-                            className={`py-1.5 px-2 rounded-xl text-xs font-extrabold border transition cursor-pointer ${
+                            className={`py-1.5 px-2 rounded-xl text-xs font-extrabold border transition cursor-pointer flex flex-col items-center gap-0.5 ${
                               isSelected
                                 ? 'bg-sky-500/25 border-sky-400 text-white shadow'
                                 : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                             }`}
                           >
-                            Kelompok {gNum}
+                            <span>Kelompok {gNum}</span>
+                            <span className="text-[9.5px] text-emerald-300 font-bold">
+                              👥 {memberCount} Siswa
+                            </span>
                           </button>
                         );
                       })}
+                    </div>
+
+                    {/* Daftar Anggota di Kelompok yang Dipilih */}
+                    <div className="pt-1.5 border-t border-slate-800/80">
+                      <div className="text-[10.5px] font-bold text-slate-300 mb-1">
+                        👥 Anggota Kelompok {selectedGroup} Saat Ini (
+                        {(groupRosterMap[selectedGroup] || []).length} Siswa):
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {(groupRosterMap[selectedGroup] || []).length === 0 ? (
+                          <span className="text-[10px] text-slate-500 italic">
+                            Belum ada anggota di Kelompok {selectedGroup}
+                          </span>
+                        ) : (
+                          (groupRosterMap[selectedGroup] || []).map((m) => (
+                            <span
+                              key={m.studentId}
+                              className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700 text-[10.5px] font-bold text-emerald-200 flex items-center gap-1"
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  m.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                                }`}
+                              />
+                              <span>{m.studentName}</span>
+                            </span>
+                          ))
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1596,7 +2212,8 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
                         </div>
                       ) : (
                         myGroupChats.map((msg) => {
-                          const isMe = msg.senderId === student.id;
+                          const isMe =
+                            msg.senderId === effectiveStudentId || msg.senderId === student.id;
                           return (
                             <div
                               key={msg.id}

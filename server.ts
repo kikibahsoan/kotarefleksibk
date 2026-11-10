@@ -2339,6 +2339,74 @@ function getMysteryHouseCoords(houseNum: number, memberIndex = 0): { wx: number;
   return { wx: baseWx + jitterX, wy: baseWy + jitterY };
 }
 
+function syncMysteryArenaWithCityOnlinePlayers() {
+  const now = Date.now();
+  // Bridge online players from city map (/api/presence/heartbeat) who are standing at Arena Rumah Misteri
+  // or who have already joined a group in Mystery Arena
+  for (const [, cityPlayer] of onlinePlayersMap.entries()) {
+    if (!cityPlayer || !cityPlayer.id || now - cityPlayer.lastSeen > 40000) continue;
+    const isNearArenaOnMap =
+      cityPlayer.wx >= 10.2 &&
+      cityPlayer.wx <= 16.8 &&
+      cityPlayer.wy >= 0.8 &&
+      cityPlayer.wy <= 6.0;
+    const isTeacherRole = cityPlayer.role === 'guru';
+
+    // Match by ID or name in existing arenaPlayers / studentGroupMap
+    const existingArenaEntry = Object.values(mysteryArenaStore.arenaPlayers).find(
+      (ap) =>
+        ap.studentId === cityPlayer.id ||
+        ap.studentName.trim().toLowerCase() === cityPlayer.name.trim().toLowerCase()
+    );
+
+    if (existingArenaEntry) {
+      existingArenaEntry.lastSeen = Math.max(existingArenaEntry.lastSeen, cityPlayer.lastSeen);
+    } else if (isNearArenaOnMap) {
+      const pKey = cityPlayer.id;
+      const existingGrp = isTeacherRole
+        ? null
+        : mysteryArenaStore.studentGroupMap[pKey] || (1 as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8);
+      if (!isTeacherRole && existingGrp && !mysteryArenaStore.studentGroupMap[pKey]) {
+        mysteryArenaStore.studentGroupMap[pKey] = existingGrp;
+        const alreadyInGrp = (mysteryArenaStore.groupMembers[existingGrp] || []).some(
+          (m) =>
+            m.studentId === pKey ||
+            m.studentName.trim().toLowerCase() === cityPlayer.name.trim().toLowerCase()
+        );
+        if (!alreadyInGrp) {
+          mysteryArenaStore.groupMembers[existingGrp].push({
+            studentId: pKey,
+            studentName: cityPlayer.name,
+            className: cityPlayer.roleLabel || 'X DKV',
+            gender: cityPlayer.gender === 'P' ? 'P' : 'L',
+          });
+        }
+      }
+      const chosenHouse = existingGrp
+        ? mysteryArenaStore.choices[existingGrp]?.rumah_dipilih || null
+        : null;
+      const coords = isTeacherRole
+        ? { wx: 0, wy: 3.65 }
+        : chosenHouse
+        ? getMysteryHouseCoords(chosenHouse, Object.keys(mysteryArenaStore.arenaPlayers).length)
+        : getGroupGatheringCoords(existingGrp, Object.keys(mysteryArenaStore.arenaPlayers).length);
+
+      mysteryArenaStore.arenaPlayers[pKey] = {
+        studentId: pKey,
+        studentName: cityPlayer.name,
+        className: cityPlayer.roleLabel || (isTeacherRole ? 'Dewan Guru' : 'X DKV'),
+        gender: cityPlayer.gender === 'P' ? 'P' : 'L',
+        isTeacher: isTeacherRole,
+        kelompok: existingGrp,
+        arenaWx: coords.wx,
+        arenaWy: coords.wy,
+        rumah_dipilih: chosenHouse,
+        lastSeen: cityPlayer.lastSeen,
+      };
+    }
+  }
+}
+
 function checkAndAdvanceMysteryArenaTimer() {
   const now = Date.now();
   // 1. Auto-lock choices if countdown timer expired while status === 'buka'
@@ -2358,9 +2426,11 @@ function checkAndAdvanceMysteryArenaTimer() {
     });
   }
 
-  // 2. Purge inactive arena players older than 35 seconds
+  syncMysteryArenaWithCityOnlinePlayers();
+
+  // 2. Purge inactive arena players older than 45 seconds
   for (const [sid, p] of Object.entries(mysteryArenaStore.arenaPlayers)) {
-    if (now - p.lastSeen > 35000) {
+    if (now - p.lastSeen > 45000) {
       delete mysteryArenaStore.arenaPlayers[sid];
     }
   }
@@ -2384,13 +2454,36 @@ function buildSanitizedMysteryArenaPayload(params: {
     rumah_benar: canSeeCorrectHouse ? round.rumah_benar : null,
   };
 
+  // Ensure all online student arenaPlayers are reflected in groupMembers so no participant is ever missing
+  Object.values(mysteryArenaStore.arenaPlayers).forEach((ap) => {
+    if (!ap.isTeacher && ap.kelompok && ap.kelompok >= 1 && ap.kelompok <= 8) {
+      const grp = ap.kelompok;
+      mysteryArenaStore.studentGroupMap[ap.studentId] = grp;
+      const list = mysteryArenaStore.groupMembers[grp] || [];
+      if (!list.some((m) => m.studentId === ap.studentId)) {
+        list.push({
+          studentId: ap.studentId,
+          studentName: ap.studentName,
+          className: ap.className || 'X DKV',
+          gender: ap.gender === 'P' ? 'P' : 'L',
+        });
+        mysteryArenaStore.groupMembers[grp] = list;
+      }
+    }
+  });
+
   // Enrich groupMembers with online status
   const enrichedGroupMembers: Record<number, any[]> = {};
   for (let g = 1; g <= 8; g++) {
     const members = mysteryArenaStore.groupMembers[g] || [];
     enrichedGroupMembers[g] = members.map((m) => ({
       ...m,
-      isOnline: Boolean(mysteryArenaStore.arenaPlayers[m.studentId]),
+      isOnline: Boolean(
+        mysteryArenaStore.arenaPlayers[m.studentId] ||
+          Object.values(mysteryArenaStore.arenaPlayers).some(
+            (ap) => ap.studentName.trim().toLowerCase() === m.studentName.trim().toLowerCase()
+          )
+      ),
     }));
   }
 
@@ -2424,16 +2517,18 @@ function buildSanitizedMysteryArenaPayload(params: {
   };
 }
 
-// GET /api/mystery-arena/state (Polled every 1-2s by clients)
+// GET /api/mystery-arena/state (Polled every 1-2s by clients + acts as live presence heartbeat!)
 app.get('/api/mystery-arena/state', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'no-store');
 
-  const viewerId = req.query.studentId ? String(req.query.studentId) : undefined;
-  const viewerName = req.query.studentName ? String(req.query.studentName) : undefined;
+  const viewerId = req.query.studentId ? String(req.query.studentId).trim() : undefined;
+  const viewerName = req.query.studentName ? String(req.query.studentName).trim() : undefined;
+  const viewerClass = req.query.className ? String(req.query.className).trim() : 'X DKV';
+  const viewerGender: 'L' | 'P' = req.query.gender === 'P' ? 'P' : 'L';
   const isTeacherParam = req.query.isTeacher === 'true' || req.query.isTeacher === '1';
   const studentNumber = req.query.studentNumber ? String(req.query.studentNumber) : undefined;
-  const viewerGroup = req.query.kelompok ? Number(req.query.kelompok) : undefined;
+  const viewerGroupRaw = req.query.kelompok ? Number(req.query.kelompok) : undefined;
 
   const isVerifiedTeacher = verifyTeacherAccountServerSide({
     teacherId: viewerId,
@@ -2442,10 +2537,78 @@ app.get('/api/mystery-arena/state', (req, res) => {
     studentNumber,
   });
 
+  // Upsert & refresh live participant presence on every poll so participants are ALWAYS read in real-time
+  if (viewerId && viewerName) {
+    const now = Date.now();
+    if (isVerifiedTeacher) {
+      // Ensure teacher is never mistakenly listed as a student in groupMembers
+      delete mysteryArenaStore.studentGroupMap[viewerId];
+      for (let g = 1; g <= 8; g++) {
+        mysteryArenaStore.groupMembers[g] = (mysteryArenaStore.groupMembers[g] || []).filter(
+          (m) => m.studentId !== viewerId
+        );
+      }
+      mysteryArenaStore.arenaPlayers[viewerId] = {
+        studentId: viewerId,
+        studentName: viewerName,
+        className: viewerClass || 'Dewan Guru',
+        gender: viewerGender,
+        isTeacher: true,
+        kelompok: null,
+        arenaWx: 0,
+        arenaWy: 3.65,
+        rumah_dipilih: null,
+        lastSeen: now,
+      };
+    } else {
+      const assignedGrp =
+        mysteryArenaStore.studentGroupMap[viewerId] ||
+        (viewerGroupRaw && viewerGroupRaw >= 1 && viewerGroupRaw <= 8
+          ? (viewerGroupRaw as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8)
+          : 1);
+
+      mysteryArenaStore.studentGroupMap[viewerId] = assignedGrp;
+      const grpList = mysteryArenaStore.groupMembers[assignedGrp] || [];
+      if (!grpList.some((m) => m.studentId === viewerId)) {
+        for (let g = 1; g <= 8; g++) {
+          mysteryArenaStore.groupMembers[g] = (mysteryArenaStore.groupMembers[g] || []).filter(
+            (m) => m.studentId !== viewerId
+          );
+        }
+        mysteryArenaStore.groupMembers[assignedGrp].push({
+          studentId: viewerId,
+          studentName: viewerName,
+          className: viewerClass,
+          gender: viewerGender,
+        });
+      }
+
+      const currentHouse = mysteryArenaStore.choices[assignedGrp]?.rumah_dipilih || null;
+      const existingPlayer = mysteryArenaStore.arenaPlayers[viewerId];
+      const memberIdx = Math.max(0, mysteryArenaStore.groupMembers[assignedGrp].length - 1);
+      const coords = currentHouse
+        ? getMysteryHouseCoords(currentHouse, memberIdx)
+        : getGroupGatheringCoords(assignedGrp, memberIdx);
+
+      mysteryArenaStore.arenaPlayers[viewerId] = {
+        studentId: viewerId,
+        studentName: viewerName,
+        className: viewerClass,
+        gender: viewerGender,
+        isTeacher: false,
+        kelompok: assignedGrp,
+        arenaWx: existingPlayer ? existingPlayer.arenaWx : coords.wx,
+        arenaWy: existingPlayer ? existingPlayer.arenaWy : coords.wy,
+        rumah_dipilih: currentHouse,
+        lastSeen: now,
+      };
+    }
+  }
+
   const data = buildSanitizedMysteryArenaPayload({
     viewerId,
     isVerifiedTeacher,
-    viewerGroup,
+    viewerGroup: viewerGroupRaw,
   });
 
   return res.json({
@@ -2797,30 +2960,50 @@ app.post('/api/mystery-arena/student-action', (req, res) => {
   const player = mysteryArenaStore.arenaPlayers[sid];
 
   if (actionType === 'join_group') {
-    const grp = Math.max(1, Math.min(8, Number(kelompok) || 1)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-    mysteryArenaStore.studentGroupMap[sid] = grp;
-    for (let g = 1; g <= 8; g++) {
-      mysteryArenaStore.groupMembers[g] = (mysteryArenaStore.groupMembers[g] || []).filter(
-        (m) => m.studentId !== sid
-      );
-    }
-    mysteryArenaStore.groupMembers[grp].push({
-      studentId: sid,
-      studentName: sName,
-      className: sClass,
-      gender: sGender,
-    });
+    if (verifiedTeacher) {
+      // Teacher stays at front podium, never placed inside student groups 1-8
+      delete mysteryArenaStore.studentGroupMap[sid];
+      for (let g = 1; g <= 8; g++) {
+        mysteryArenaStore.groupMembers[g] = (mysteryArenaStore.groupMembers[g] || []).filter(
+          (m) => m.studentId !== sid
+        );
+      }
+      player.kelompok = null;
+      player.rumah_dipilih = null;
+      player.arenaWx = 0;
+      player.arenaWy = 3.65;
+    } else {
+      const grp = Math.max(1, Math.min(8, Number(kelompok) || 1)) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+      mysteryArenaStore.studentGroupMap[sid] = grp;
+      for (let g = 1; g <= 8; g++) {
+        mysteryArenaStore.groupMembers[g] = (mysteryArenaStore.groupMembers[g] || []).filter(
+          (m) => m.studentId !== sid
+        );
+      }
+      mysteryArenaStore.groupMembers[grp].push({
+        studentId: sid,
+        studentName: sName,
+        className: sClass,
+        gender: sGender,
+      });
 
-    player.kelompok = grp;
-    const currentGroupHouse = mysteryArenaStore.choices[grp]?.rumah_dipilih || null;
-    player.rumah_dipilih = currentGroupHouse;
-    const memberIdx = mysteryArenaStore.groupMembers[grp].length - 1;
-    const targetCoords = currentGroupHouse
-      ? getMysteryHouseCoords(currentGroupHouse, memberIdx)
-      : getGroupGatheringCoords(grp, memberIdx);
-    player.arenaWx = targetCoords.wx;
-    player.arenaWy = targetCoords.wy;
-    saveMysteryArenaToFile();
+      player.kelompok = grp;
+      const currentGroupHouse = mysteryArenaStore.choices[grp]?.rumah_dipilih || null;
+      player.rumah_dipilih = currentGroupHouse;
+      const memberIdx = mysteryArenaStore.groupMembers[grp].length - 1;
+      const targetCoords = currentGroupHouse
+        ? getMysteryHouseCoords(currentGroupHouse, memberIdx)
+        : getGroupGatheringCoords(grp, memberIdx);
+      player.arenaWx = targetCoords.wx;
+      player.arenaWy = targetCoords.wy;
+    }
+    saveMysteryArenaToFile(true);
+    broadcastPresence({
+      type: 'mystery_arena_tick',
+      roundId: mysteryArenaStore.currentRound.id_ronde,
+      status: mysteryArenaStore.currentRound.status,
+      timestamp: now,
+    });
   } else if (actionType === 'select_house') {
     const grp = player.kelompok || mysteryArenaStore.studentGroupMap[sid];
     if (!grp) {
@@ -2909,6 +3092,12 @@ app.post('/api/mystery-arena/student-action', (req, res) => {
       mysteryArenaStore.groupChats = mysteryArenaStore.groupChats.slice(-200);
     }
     saveMysteryArenaToFile();
+    broadcastPresence({
+      type: 'mystery_arena_tick',
+      roundId: mysteryArenaStore.currentRound.id_ronde,
+      status: mysteryArenaStore.currentRound.status,
+      timestamp: now,
+    });
   }
 
   return res.json({

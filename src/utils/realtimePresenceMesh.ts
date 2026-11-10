@@ -148,9 +148,16 @@ function parseIncomingPackets(buffer: Uint8Array): string[] {
 }
 
 export interface PresenceMeshMessage {
-  type: 'presence_update' | 'presence_leave' | 'request_sync' | 'creator_state_update';
+  type:
+    | 'presence_update'
+    | 'presence_leave'
+    | 'request_sync'
+    | 'creator_state_update'
+    | 'mystery_arena_event'
+    | 'mystery_arena_request';
   player?: any;
   creatorState?: any;
+  arenaPayload?: any;
   id?: string;
   senderId?: string;
   ts?: number;
