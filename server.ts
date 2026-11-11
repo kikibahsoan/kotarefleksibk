@@ -1166,13 +1166,36 @@ setInterval(() => {
 
 const CREATOR_CITY_STATE_FILE_PATH = path.join(__dirname, 'server_creator_city_state.json');
 
+function migrateMenaraAsesmenInCreatorState(state: any): any {
+  if (!state || typeof state !== 'object') return state;
+  if (Array.isArray(state.customBuildings)) {
+    state.customBuildings = state.customBuildings.map((b: any) => {
+      if (
+        b &&
+        (b.id === 'cbuild-mw7csayu-ahr' ||
+          b.name === 'Menara Inovasi Digital' ||
+          (b.modelType === 'modern_tower' && Math.abs(Number(b.wx) - 9.5) < 0.8 && Math.abs(Number(b.wy) - -3.5) < 0.8))
+      ) {
+        return {
+          ...b,
+          name: 'Menara Asesmen Individu',
+          tagline: 'Asesmen Sumatif Mandiri Berbasis Lobi (TKA Individu)',
+          icon: '📝',
+        };
+      }
+      return b;
+    });
+  }
+  return state;
+}
+
 function loadCreatorCityStateFromFile(): any | null {
   try {
     if (fs.existsSync(CREATOR_CITY_STATE_FILE_PATH)) {
       const raw = fs.readFileSync(CREATOR_CITY_STATE_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && typeof parsed.version === 'number') {
-        return parsed;
+        return migrateMenaraAsesmenInCreatorState(parsed);
       }
     }
   } catch (err) {
@@ -1218,7 +1241,7 @@ app.post('/api/creator-city-state', (req, res) => {
   }
 
   if (!serverCreatorCityState || incoming.version >= (serverCreatorCityState.version || 0)) {
-    serverCreatorCityState = incoming;
+    serverCreatorCityState = migrateMenaraAsesmenInCreatorState(incoming);
     saveCreatorCityStateToFile();
 
     // Broadcast immediately via SSE to all connected citizens in real-time
@@ -4261,6 +4284,1845 @@ app.post('/api/escape-tower/student-action', (req, res) => {
       viewerId: sid,
       isVerifiedTeacher: verifiedTeacher,
       viewerGroup: player.kelompok,
+    }),
+  });
+});
+
+// ============================================================================
+// MENARA ASESMEN INDIVIDU (TKA / CBT SUMATIF MANDIRI BERBASIS LOBI • REFLEKSIA TIMUR)
+//Lokasi: Gedung Biru Modern Tower di Refleksia Timur (wx: 9.5, wy: -3.5)
+//Sheet Baru: Asesmen_Sesi, Asesmen_BankSoal, Asesmen_Stimulus, Asesmen_PaketSiswa, Asesmen_Jawaban, Asesmen_Hasil
+// ============================================================================
+const MENARA_ASESMEN_FILE_PATH = path.join(__dirname, 'server_menara_asesmen.json');
+
+interface ServerAsesmenKategoriStatement {
+  id_pernyataan: string;
+  teks: string;
+  label_opsi?: [string, string];
+  kunci: 'A' | 'B'; // 'A' = Benar/Sesuai, 'B' = Salah/Tidak Sesuai
+}
+
+interface ServerAsesmenStimulus {
+  id_stimulus: string;
+  jenis: 'teks' | 'tabel' | 'grafik';
+  judul?: string;
+  isi: string;
+}
+
+interface ServerAsesmenSoal {
+  id_soal: string;
+  id_sesi: string;
+  tp: string;
+  tp_label?: string;
+  jenis: 'pg_tunggal' | 'pg_mcma' | 'pg_kategori';
+  tipe_penyajian: 'tunggal' | 'grup';
+  id_stimulus: string;
+  teks_soal: string;
+  opsi: string[];
+  pernyataan_kategori?: ServerAsesmenKategoriStatement[];
+  label_kategori?: [string, string];
+  poin_soal?: number;
+  kunci_jawaban: string;
+  pembahasan: string;
+}
+
+interface ServerAsesmenSesi {
+  id_sesi: string;
+  judul_asesmen: string;
+  tp_terpilih: string[];
+  tp_detail: Array<{
+    id_tp: string;
+    mata_pelajaran: string;
+    kelas: string;
+    tujuan_pembelajaran: string;
+    isi_materi: string;
+  }>;
+  durasi: number; // menit
+  status: 'draf' | 'lobi' | 'berjalan' | 'jeda' | 'selesai';
+  waktu_mulai: string;
+  waktu_mulai_ms: number | null;
+  waktu_jeda_ms: number | null;
+  total_durasi_jeda_ms: number;
+  tambahan_waktu_menit: number;
+  jumlah_soal: number;
+  komposisi_jenis: {
+    pg_tunggal: number;
+    pg_mcma: number;
+    pg_kategori: number;
+  };
+  komposisi_penyajian: {
+    tunggal: number;
+    grup: number;
+  };
+  poin_per_jenis: {
+    pg_tunggal: number;
+    pg_mcma: number;
+    pg_kategori_per_pernyataan: number;
+  };
+  mcma_kredit_parsial: boolean;
+  acak_soal: boolean;
+  acak_opsi: boolean;
+  izinkan_menyusul: boolean;
+  tampilkan_pembahasan: boolean;
+  xp_bonus_selesai: number;
+  guru_pembuat?: string;
+}
+
+interface ServerAsesmenPaketSiswa {
+  id_sesi: string;
+  siswa: string;
+  nama_siswa: string;
+  kelas: string;
+  urutan_soal: string[];
+  urutan_opsi_map: Record<string, number[]>;
+  waktu_paket_dibuat: string;
+  session_token: string;
+}
+
+interface ServerAsesmenJawaban {
+  id_sesi: string;
+  siswa: string;
+  nama_siswa: string;
+  id_soal: string;
+  jawaban: string;
+  ragu: boolean;
+  waktu: string;
+}
+
+interface ServerAsesmenHasil {
+  id_sesi: string;
+  siswa: string;
+  nama_siswa: string;
+  kelas: string;
+  nilai: number;
+  poin_diperoleh: number;
+  poin_maksimal: number;
+  jumlah_benar: number;
+  jumlah_soal: number;
+  durasi: number;
+  keluar_tab: number;
+  waktu_selesai: string;
+  rincian_per_tp: Record<string, { benar: number; total: number; persentase: number }>;
+}
+
+interface ServerAsesmenStudentLive {
+  studentId: string;
+  studentName: string;
+  className: string;
+  gender: 'L' | 'P';
+  status_peserta: 'di_lobi' | 'mengerjakan' | 'selesai';
+  soal_terjawab: number;
+  soal_ragu: number;
+  total_soal: number;
+  nomor_soal_aktif: number;
+  keluar_tab: number;
+  log_keluar_tab: string[];
+  waktu_gabung: string;
+  waktu_mulai_kerja_ms: number | null;
+  waktu_selesai: string | null;
+  nilai_akhir: number | null;
+  lastSeen: number;
+  activeSessionToken: string;
+}
+
+interface ServerMenaraAsesmenStore {
+  sesi: ServerAsesmenSesi;
+  stimulusList: ServerAsesmenStimulus[];
+  bankSoal: ServerAsesmenSoal[];
+  paketByStudent: Record<string, ServerAsesmenPaketSiswa>;
+  jawabanByStudent: Record<string, Record<string, ServerAsesmenJawaban>>;
+  hasilByStudent: Record<string, ServerAsesmenHasil>;
+  pesertaLive: Record<string, ServerAsesmenStudentLive>;
+}
+
+function createDefaultAsesmenStimulusAndQuestions(idSesi: string): {
+  stimulusList: ServerAsesmenStimulus[];
+  bankSoal: ServerAsesmenSoal[];
+} {
+  const stimulusList: ServerAsesmenStimulus[] = [
+    {
+      id_stimulus: 'STIM-TABEL-01',
+      jenis: 'tabel',
+      judul: 'Tabel Spesifikasi Teknis Produksi Karya Desain Publikasi (Cetak vs Digital)',
+      isi: JSON.stringify({
+        headers: ['Parameter Teknis', 'Media Cetak (Poster A3)', 'Media Digital (Feed Instagram)'],
+        rows: [
+          ['Mode Warna Utama', 'CMYK (Cyan, Magenta, Yellow, Key)', 'RGB (Red, Green, Blue)'],
+          ['Resolusi Standar', '300 DPI / PPI', '72 - 144 PPI (1080 x 1350 px)'],
+          ['Margin Aman & Bleed', 'Bleed 3 mm + Margin Dalam 15 mm', 'Safe Zone 120 px dari tepi kanvas'],
+          ['Format File Akhir', 'PDF Print-Ready / TIFF', 'PNG-24 / JPEG Kualitas Tinggi / WebP'],
+        ],
+      }),
+    },
+    {
+      id_stimulus: 'STIM-GRAFIK-02',
+      jenis: 'grafik',
+      judul: 'Grafik Hasil Uji Keterbacaan Poster (Tes 3 Detik) pada 100 Audiens Warga Kota',
+      isi: JSON.stringify({
+        title: 'Persentase Audiens yang Langsung Menangkap Pesan Utama Poster dalam 3 Detik',
+        unit: '% Audiens',
+        bars: [
+          { label: 'Desain A (Hierarki + White Space 35%)', value: 92, color: '#10b981' },
+          { label: 'Desain B (Kontras Tinggi Tanpa Grid)', value: 64, color: '#38bdf8' },
+          { label: 'Desain C (5 Jenis Font Dekoratif)', value: 31, color: '#f59e0b' },
+          { label: 'Desain D (Teks Penuh Tanpa Ruang Kosong)', value: 18, color: '#ef4444' },
+        ],
+      }),
+    },
+  ];
+
+  const bankSoal: ServerAsesmenSoal[] = [
+    {
+      id_soal: 'SOAL-01',
+      id_sesi: idSesi,
+      tp: 'tp-bm-001',
+      tp_label:
+        'Menerapkan prinsip keseimbangan, kontras, penekanan (emphasis), dan hierarki tipografi dalam merancang poster publikasi digital yang komunikatif.',
+      jenis: 'pg_tunggal',
+      tipe_penyajian: 'tunggal',
+      id_stimulus: '',
+      teks_soal:
+        'Seorang desainer komunikasi visual ingin memastikan informasi waktu dan tempat acara pada poster kegiatan sekolah langsung terbaca jelas setelah judul utama. Langkah pengaturan hierarki visual manakah yang paling tepat?',
+      opsi: [
+        'Menempatkan informasi waktu dan tempat dengan ukuran subjudul yang kontras di bawah Headline serta memberi ruang kosong (white space) di sekelilingnya',
+        'Menyamakan ukuran seluruh huruf dari judul hingga catatan kaki agar terlihat seragam',
+        'Menggunakan huruf sambung dekoratif berukuran sangat kecil dengan warna yang mirip latar belakang',
+        'Memenuhi seluruh sudut kanvas dengan ilustrasi ramai tanpa menyisakan margin tepi',
+      ],
+      kunci_jawaban: '0',
+      pembahasan:
+        'Hierarki visual bekerja dengan membedakan ukuran dan kontras antara Headline, Subjudul (waktu/tempat), dan Body Text, didukung white space agar mata audiens mudah memindai informasi.',
+    },
+    {
+      id_soal: 'SOAL-02',
+      id_sesi: idSesi,
+      tp: 'tp-bm-001',
+      tp_label:
+        'Menerapkan prinsip keseimbangan, kontras, penekanan (emphasis), dan hierarki tipografi dalam merancang poster publikasi digital yang komunikatif.',
+      jenis: 'pg_mcma',
+      tipe_penyajian: 'tunggal',
+      id_stimulus: '',
+      teks_soal:
+        'Pilihlah SEMUA tindakan yang TEPAT ketika menerapkan sistem Grid dan White Space pada perancangan poster publikasi digital! (Jawaban benar lebih dari satu)',
+      opsi: [
+        'Menjaga konsistensi batas margin kiri dan kanan agar susunan teks tampak rapi dan terstruktur',
+        'Menyisakan ruang negatif (white space) di sekitar elemen utama untuk meningkatkan fokus baca audiens',
+        'Menghapus seluruh jarak antarbaris (leading) sehingga baris teks saling bertumpukan',
+        'Mengelompokkan informasi yang saling berkaitan (prinsip proximity) ke dalam modul grid yang jelas',
+      ],
+      kunci_jawaban: JSON.stringify([0, 1, 3]),
+      pembahasan:
+        'Penerapan Grid System yang baik mencakup konsistensi margin (opsi A), pemanfaatan white space untuk fokus visual (opsi B), dan pengelompokan elemen terkait/proximity (opsi D). Menghapus leading justru merusak keterbacaan.',
+    },
+    {
+      id_soal: 'SOAL-03',
+      id_sesi: idSesi,
+      tp: 'obj-1',
+      tp_label:
+        'Memahami alur kerja Input-Process-Output (IPO) dan struktur file/folder terstandar pada produksi karya DKV.',
+      jenis: 'pg_kategori',
+      tipe_penyajian: 'tunggal',
+      id_stimulus: '',
+      teks_soal:
+        'Tentukan apakah setiap pernyataan mengenai manajemen alur kerja produksi desain (Input - Process - Output) berikut BENAR atau SALAH!',
+      opsi: [],
+      label_kategori: ['Benar', 'Salah'],
+      pernyataan_kategori: [
+        {
+          id_pernyataan: 'p1',
+          teks: 'Brief klien, aset logo mentah, dan referensi palet warna termasuk dalam tahapan Input pada produksi desain.',
+          label_opsi: ['Benar', 'Salah'],
+          kunci: 'A',
+        },
+        {
+          id_pernyataan: 'p2',
+          teks: 'Menyimpan seluruh file proyek di satu folder acak bernama "Campuran_Baru_Fix_Banget" merupakan standar penamaan file industri DKV.',
+          label_opsi: ['Benar', 'Salah'],
+          kunci: 'B',
+        },
+        {
+          id_pernyataan: 'p3',
+          teks: 'Tahap ekspor karya ke format cetak (PDF/CMYK) atau layar (PNG/RGB) merupakan bagian dari tahapan Output.',
+          label_opsi: ['Benar', 'Salah'],
+          kunci: 'A',
+        },
+      ],
+      kunci_jawaban: JSON.stringify({ p1: 'A', p2: 'B', p3: 'A' }),
+      pembahasan:
+        'Pernyataan 1 Benar (brief & aset mentah adalah Input). Pernyataan 2 Salah (penamaan file harus terstruktur per tanggal/versi). Pernyataan 3 Benar (ekspor akhir adalah Output).',
+    },
+    {
+      id_soal: 'SOAL-04',
+      id_sesi: idSesi,
+      tp: 'tp-bm-001',
+      tp_label:
+        'Menerapkan prinsip keseimbangan, kontras, penekanan (emphasis), dan hierarki tipografi dalam merancang poster publikasi digital yang komunikatif.',
+      jenis: 'pg_tunggal',
+      tipe_penyajian: 'grup',
+      id_stimulus: 'STIM-TABEL-01',
+      teks_soal:
+        'Berdasarkan Tabel Spesifikasi Teknis Produksi Karya di samping, kombinasi pengaturan manakah yang WAJIB digunakan jika siswa DKV ingin mencetak poster ukuran A3 di mesin percetakan offset?',
+      opsi: [
+        'Mode warna CMYK, resolusi 300 DPI, dilengkapi Bleed 3 mm dalam format PDF Print-Ready',
+        'Mode warna RGB, resolusi 72 PPI, tanpa area bleed dalam format WebP',
+        'Mode warna CMYK dengan resolusi 72 PPI dan ukuran 1080 x 1350 piksel',
+        'Mode warna RGB dengan bleed 3 mm dan kompresi JPEG ukuran rendah',
+      ],
+      kunci_jawaban: '0',
+      pembahasan:
+        'Sesuai tabel spesifikasi, produksi cetak Poster A3 memerlukan mode warna tinta CMYK, resolusi tajam 300 DPI, serta area potong Bleed 3 mm dalam format PDF Print-Ready.',
+    },
+    {
+      id_soal: 'SOAL-05',
+      id_sesi: idSesi,
+      tp: 'tp-bm-001',
+      tp_label:
+        'Menerapkan prinsip keseimbangan, kontras, penekanan (emphasis), dan hierarki tipografi dalam merancang poster publikasi digital yang komunikatif.',
+      jenis: 'pg_kategori',
+      tipe_penyajian: 'grup',
+      id_stimulus: 'STIM-TABEL-01',
+      teks_soal:
+        'Berdasarkan Tabel Spesifikasi Teknis Produksi Karya tersebut, tentukan apakah keputusan produksi berikut SESUAI atau TIDAK SESUAI!',
+      opsi: [],
+      label_kategori: ['Sesuai', 'Tidak Sesuai'],
+      pernyataan_kategori: [
+        {
+          id_pernyataan: 'p1',
+          teks: 'Menggunakan mode warna RGB dan format PNG-24 untuk konten publikasi di Feed Instagram agar warna tampil cerah di layar HP.',
+          label_opsi: ['Sesuai', 'Tidak Sesuai'],
+          kunci: 'A',
+        },
+        {
+          id_pernyataan: 'p2',
+          teks: 'Meletakkan teks judul penting tepat di tepi luar kanvas cetak tanpa menyisakan Margin Dalam 15 mm.',
+          label_opsi: ['Sesuai', 'Tidak Sesuai'],
+          kunci: 'B',
+        },
+        {
+          id_pernyataan: 'p3',
+          teks: 'Menyiapkan area Bleed 3 mm pada desain poster cetak untuk mencegah munculnya garis putih saat kertas dipotong mesin.',
+          label_opsi: ['Sesuai', 'Tidak Sesuai'],
+          kunci: 'A',
+        },
+      ],
+      kunci_jawaban: JSON.stringify({ p1: 'A', p2: 'B', p3: 'A' }),
+      pembahasan:
+        'Pernyataan 1 Sesuai (layar digital menggunakan RGB & PNG-24). Pernyataan 2 Tidak Sesuai (teks penting wajib berada di dalam margin aman 15 mm agar tidak terpotong). Pernyataan 3 Sesuai (fungsi bleed 3 mm).',
+    },
+    {
+      id_soal: 'SOAL-06',
+      id_sesi: idSesi,
+      tp: 'tp-bm-001',
+      tp_label:
+        'Menerapkan prinsip keseimbangan, kontras, penekanan (emphasis), dan hierarki tipografi dalam merancang poster publikasi digital yang komunikatif.',
+      jenis: 'pg_mcma',
+      tipe_penyajian: 'grup',
+      id_stimulus: 'STIM-GRAFIK-02',
+      teks_soal:
+        'Perhatikan Grafik Hasil Uji Keterbacaan Poster (Tes 3 Detik)! Kesimpulan analitis manakah yang TEPAT berdasarkan data grafik tersebut? (Pilih semua jawaban yang benar)',
+      opsi: [
+        'Desain A mencapai tingkat keterbacaan tertinggi (92%) karena memadukan hierarki visual yang jelas dengan ruang kosong (white space) 35%',
+        'Penggunaan terlalu banyak jenis font dekoratif (Desain C) menurunkan keterbacaan pesan hingga tersisa 31%',
+        'Memenuhi seluruh kanvas dengan teks tanpa ruang kosong (Desain D) justru menghasilkan efektivitas komunikasi tertinggi',
+        'Selisih keberhasilan tangkap pesan antara Desain A dan Desain D mencapai 74 poin persentase',
+      ],
+      kunci_jawaban: JSON.stringify([0, 1, 3]),
+      pembahasan:
+        'Data grafik menunjukkan Desain A tertinggi (92%), Desain C turun menjadi 31% akibat 5 font dekoratif, dan selisih Desain A (92%) dengan Desain D (18%) adalah 92 - 18 = 74%. Opsi C salah karena Desain D justru terendah (18%).',
+    },
+  ];
+
+  return { stimulusList, bankSoal };
+}
+
+function createInitialMenaraAsesmenStore(): ServerMenaraAsesmenStore {
+  const defaultSesiId = 'ASESMEN-TKA-01';
+  const { stimulusList, bankSoal } = createDefaultAsesmenStimulusAndQuestions(defaultSesiId);
+  return {
+    sesi: {
+      id_sesi: defaultSesiId,
+      judul_asesmen: 'Asesmen Sumatif Mandiri (TKA) — Dasar DKV & Berpikir Komputasional',
+      tp_terpilih: ['tp-bm-001', 'obj-1'],
+      tp_detail: [
+        {
+          id_tp: 'tp-bm-001',
+          mata_pelajaran: 'Komputer Grafis & Publikasi',
+          kelas: 'X DKV 2 & X DKV 3',
+          tujuan_pembelajaran:
+            'Peserta didik mampu menerapkan prinsip keseimbangan, kontras, penekanan (emphasis), dan hierarki tipografi dalam merancang poster publikasi digital yang komunikatif.',
+          isi_materi:
+            'Hierarki Visual mengatur urutan mata audiens membaca informasi. Kontras warna dan ukuran huruf menonjolkan pesan kunci. White space menjaga desain tetap lega dan mudah dipindai. Grid system menyatukan tata letak elemen.',
+        },
+        {
+          id_tp: 'obj-1',
+          mata_pelajaran: 'Informatika & Berpikir Komputasional DKV',
+          kelas: 'X DKV 1, 2 & 3',
+          tujuan_pembelajaran:
+            'Memahami alur kerja Input-Process-Output (IPO) dan struktur file/folder terstandar pada produksi karya DKV.',
+          isi_materi:
+            'Alur IPO dalam produksi desain meliputi Input (brief klien, aset mentah, riset), Process (sketsa, layouting, olah vektor/raster), dan Output (ekspor PDF CMYK 300 DPI untuk cetak atau PNG/WebP RGB untuk media digital).',
+        },
+      ],
+      durasi: 30,
+      status: 'draf',
+      waktu_mulai: '-',
+      waktu_mulai_ms: null,
+      waktu_jeda_ms: null,
+      total_durasi_jeda_ms: 0,
+      tambahan_waktu_menit: 0,
+      jumlah_soal: 6,
+      komposisi_jenis: {
+        pg_tunggal: 2,
+        pg_mcma: 2,
+        pg_kategori: 2,
+      },
+      komposisi_penyajian: {
+        tunggal: 3,
+        grup: 3,
+      },
+      poin_per_jenis: {
+        pg_tunggal: 10,
+        pg_mcma: 15,
+        pg_kategori_per_pernyataan: 5,
+      },
+      mcma_kredit_parsial: true,
+      acak_soal: true,
+      acak_opsi: true,
+      izinkan_menyusul: true,
+      tampilkan_pembahasan: false,
+      xp_bonus_selesai: 50,
+      guru_pembuat: 'Mohamad Rizki Bahsoan, S.Kom',
+    },
+    stimulusList,
+    bankSoal,
+    paketByStudent: {},
+    jawabanByStudent: {},
+    hasilByStudent: {},
+    pesertaLive: {},
+  };
+}
+
+function loadMenaraAsesmenFromFile(): ServerMenaraAsesmenStore {
+  try {
+    if (fs.existsSync(MENARA_ASESMEN_FILE_PATH)) {
+      const raw = fs.readFileSync(MENARA_ASESMEN_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.sesi && Array.isArray(parsed.bankSoal)) {
+        return {
+          ...createInitialMenaraAsesmenStore(),
+          ...parsed,
+          sesi: {
+            ...createInitialMenaraAsesmenStore().sesi,
+            ...parsed.sesi,
+          },
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[server.ts] Failed reading server_menara_asesmen.json:', err);
+  }
+  return createInitialMenaraAsesmenStore();
+}
+
+let menaraAsesmenStore: ServerMenaraAsesmenStore = loadMenaraAsesmenFromFile();
+let lastAsesmenSaveMs = 0;
+
+function saveMenaraAsesmenToFile(force = false) {
+  const now = Date.now();
+  if (!force && now - lastAsesmenSaveMs < 800) return;
+  lastAsesmenSaveMs = now;
+  try {
+    fs.writeFileSync(MENARA_ASESMEN_FILE_PATH, JSON.stringify(menaraAsesmenStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[server.ts] Failed writing server_menara_asesmen.json:', err);
+  }
+}
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = tmp;
+  }
+  return copy;
+}
+
+/**
+ * Membangun Paket Soal Siswa (Asesmen_PaketSiswa):
+ * - Jika acak_soal aktif, urutan diacak TETAPI soal-soal grup yang berbagi id_stimulus yang sama
+ *   tetap dikelompokkan berurutan agar siswa membaca stimulus secara utuh!
+ * - Jika acak_opsi aktif, indeks opsi PG Tunggal & MCMA diacak per siswa.
+ */
+function buildStudentPackageForAsesmen(params: {
+  studentId: string;
+  studentName: string;
+  className: string;
+  sessionToken?: string;
+}): ServerAsesmenPaketSiswa {
+  const { studentId, studentName, className, sessionToken } = params;
+  const sesi = menaraAsesmenStore.sesi;
+  const allQuestions = menaraAsesmenStore.bankSoal;
+
+  // Kelompokkan berdasarkan stimulus untuk soal grup, dan mandiri untuk soal tunggal
+  const blocks: ServerAsesmenSoal[][] = [];
+  const stimulusGroups = new Map<string, ServerAsesmenSoal[]>();
+
+  allQuestions.forEach((q) => {
+    if (q.tipe_penyajian === 'grup' && q.id_stimulus) {
+      const existing = stimulusGroups.get(q.id_stimulus) || [];
+      existing.push(q);
+      stimulusGroups.set(q.id_stimulus, existing);
+    } else {
+      blocks.push([q]);
+    }
+  });
+
+  stimulusGroups.forEach((groupQuestions) => {
+    blocks.push(groupQuestions);
+  });
+
+  const orderedBlocks = sesi.acak_soal ? shuffleArray(blocks) : blocks;
+  const urutanSoal: string[] = [];
+  const urutanOpsiMap: Record<string, number[]> = {};
+
+  orderedBlocks.forEach((block) => {
+    const innerQuestions = sesi.acak_soal && block.length > 1 ? shuffleArray(block) : block;
+    innerQuestions.forEach((q) => {
+      urutanSoal.push(q.id_soal);
+      if (
+        (q.jenis === 'pg_tunggal' || q.jenis === 'pg_mcma') &&
+        Array.isArray(q.opsi) &&
+        q.opsi.length > 0
+      ) {
+        const indices = q.opsi.map((_, idx) => idx);
+        urutanOpsiMap[q.id_soal] = sesi.acak_opsi ? shuffleArray(indices) : indices;
+      }
+    });
+  });
+
+  const existingPkg = menaraAsesmenStore.paketByStudent[studentId];
+  return {
+    id_sesi: sesi.id_sesi,
+    siswa: studentId,
+    nama_siswa: studentName,
+    kelas: className || 'X DKV',
+    urutan_soal: urutanSoal,
+    urutan_opsi_map: urutanOpsiMap,
+    waktu_paket_dibuat: existingPkg?.waktu_paket_dibuat || new Date().toLocaleString('id-ID'),
+    session_token:
+      sessionToken ||
+      existingPkg?.session_token ||
+      `astok-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  };
+}
+
+/**
+ * Penilaian 1 Butir Soal di Sisi Server (Anti-Manipulasi Sisi Klien)
+ */
+function gradeSingleAsesmenQuestionServerSide(
+  soal: ServerAsesmenSoal,
+  jawabanRaw: string | undefined,
+  sesi: ServerAsesmenSesi
+): {
+  poinDiperoleh: number;
+  poinMaksimal: number;
+  isFullyCorrect: boolean;
+} {
+  const jwb = String(jawabanRaw ?? '').trim();
+
+  if (soal.jenis === 'pg_tunggal') {
+    const maxPoin = Number(soal.poin_soal) || Number(sesi.poin_per_jenis.pg_tunggal) || 10;
+    const kunci = String(soal.kunci_jawaban ?? '0').trim();
+    const isCorrect = jwb !== '' && jwb === kunci;
+    return {
+      poinDiperoleh: isCorrect ? maxPoin : 0,
+      poinMaksimal: maxPoin,
+      isFullyCorrect: isCorrect,
+    };
+  }
+
+  if (soal.jenis === 'pg_mcma') {
+    const maxPoin = Number(soal.poin_soal) || Number(sesi.poin_per_jenis.pg_mcma) || 15;
+    let kunciArr: number[] = [];
+    let siswaArr: number[] = [];
+    try {
+      const parsedK = JSON.parse(soal.kunci_jawaban || '[]');
+      if (Array.isArray(parsedK)) kunciArr = parsedK.map(Number);
+    } catch {}
+    try {
+      const parsedS = JSON.parse(jwb || '[]');
+      if (Array.isArray(parsedS)) siswaArr = parsedS.map(Number);
+    } catch {}
+
+    const kunciSet = new Set(kunciArr);
+    const siswaSet = new Set(siswaArr);
+    if (kunciSet.size === 0) {
+      return { poinDiperoleh: 0, poinMaksimal: maxPoin, isFullyCorrect: false };
+    }
+
+    let correctPicked = 0;
+    let wrongPicked = 0;
+    siswaSet.forEach((idx) => {
+      if (kunciSet.has(idx)) correctPicked++;
+      else wrongPicked++;
+    });
+
+    const isExactMatch = correctPicked === kunciSet.size && wrongPicked === 0;
+    if (isExactMatch) {
+      return { poinDiperoleh: maxPoin, poinMaksimal: maxPoin, isFullyCorrect: true };
+    }
+
+    if (sesi.mcma_kredit_parsial && correctPicked > 0) {
+      const netCorrect = Math.max(0, correctPicked - wrongPicked);
+      const partialPoints = Math.round((netCorrect / kunciSet.size) * maxPoin * 10) / 10;
+      return {
+        poinDiperoleh: partialPoints,
+        poinMaksimal: maxPoin,
+        isFullyCorrect: false,
+      };
+    }
+
+    return { poinDiperoleh: 0, poinMaksimal: maxPoin, isFullyCorrect: false };
+  }
+
+  // pg_kategori: nilai dihitung per pernyataan!
+  const statements = Array.isArray(soal.pernyataan_kategori) ? soal.pernyataan_kategori : [];
+  const poinPerStmt = Number(sesi.poin_per_jenis.pg_kategori_per_pernyataan) || 5;
+  const maxPoin = statements.length * poinPerStmt;
+
+  let kunciMap: Record<string, string> = {};
+  try {
+    const parsedK = JSON.parse(soal.kunci_jawaban || '{}');
+    if (parsedK && typeof parsedK === 'object') kunciMap = parsedK;
+  } catch {}
+  statements.forEach((st) => {
+    if (st.kunci && !kunciMap[st.id_pernyataan]) {
+      kunciMap[st.id_pernyataan] = st.kunci;
+    }
+  });
+
+  let siswaMap: Record<string, string> = {};
+  try {
+    const parsedS = JSON.parse(jwb || '{}');
+    if (parsedS && typeof parsedS === 'object') siswaMap = parsedS;
+  } catch {}
+
+  let correctStmts = 0;
+  statements.forEach((st) => {
+    const expected = String(kunciMap[st.id_pernyataan] || 'A').toUpperCase();
+    const actual = String(siswaMap[st.id_pernyataan] || '').toUpperCase();
+    if (actual && actual === expected) {
+      correctStmts++;
+    }
+  });
+
+  const earned = correctStmts * poinPerStmt;
+  const isAllCorrect = statements.length > 0 && correctStmts === statements.length;
+  return {
+    poinDiperoleh: earned,
+    poinMaksimal: maxPoin || 10,
+    isFullyCorrect: isAllCorrect,
+  };
+}
+
+/**
+ * Menghitung & menyimpan Asesmen_Hasil untuk seorang siswa di sisi server
+ */
+function finalizeAndGradeStudentAsesmen(studentId: string): ServerAsesmenHasil | null {
+  const sesi = menaraAsesmenStore.sesi;
+  const live = menaraAsesmenStore.pesertaLive[studentId];
+  const pkg = menaraAsesmenStore.paketByStudent[studentId];
+  if (!live && !pkg) return null;
+
+  const studentName = live?.studentName || pkg?.nama_siswa || 'Siswa DKV';
+  const className = live?.className || pkg?.kelas || 'X DKV';
+  const ansMap = menaraAsesmenStore.jawabanByStudent[studentId] || {};
+
+  let totalEarned = 0;
+  let totalMax = 0;
+  let totalFullyCorrect = 0;
+  const tpStats: Record<string, { benar: number; total: number; persentase: number }> = {};
+
+  menaraAsesmenStore.bankSoal.forEach((soal) => {
+    const ansObj = ansMap[soal.id_soal];
+    const graded = gradeSingleAsesmenQuestionServerSide(soal, ansObj?.jawaban, sesi);
+    totalEarned += graded.poinDiperoleh;
+    totalMax += graded.poinMaksimal;
+    if (graded.isFullyCorrect) {
+      totalFullyCorrect += 1;
+    }
+
+    const tpKey = soal.tp || 'TP-Umum';
+    if (!tpStats[tpKey]) {
+      tpStats[tpKey] = { benar: 0, total: 0, persentase: 0 };
+    }
+    tpStats[tpKey].total += 1;
+    if (graded.isFullyCorrect) {
+      tpStats[tpKey].benar += 1;
+    }
+  });
+
+  Object.keys(tpStats).forEach((k) => {
+    const item = tpStats[k];
+    item.persentase = item.total > 0 ? Math.round((item.benar / item.total) * 100) : 0;
+  });
+
+  const nilaiAkhir = totalMax > 0 ? Math.round((totalEarned / totalMax) * 100) : 0;
+  const now = Date.now();
+  const startWorkMs = live?.waktu_mulai_kerja_ms || sesi.waktu_mulai_ms || now - 60000;
+  const durasiDetik = Math.max(
+    5,
+    Math.round((now - startWorkMs - (sesi.total_durasi_jeda_ms || 0)) / 1000)
+  );
+  const nowStr = new Date().toLocaleString('id-ID');
+
+  const hasil: ServerAsesmenHasil = {
+    id_sesi: sesi.id_sesi,
+    siswa: studentId,
+    nama_siswa: studentName,
+    kelas: className,
+    nilai: nilaiAkhir,
+    poin_diperoleh: Math.round(totalEarned * 10) / 10,
+    poin_maksimal: totalMax,
+    jumlah_benar: totalFullyCorrect,
+    jumlah_soal: menaraAsesmenStore.bankSoal.length,
+    durasi: durasiDetik,
+    keluar_tab: live?.keluar_tab || 0,
+    waktu_selesai: nowStr,
+    rincian_per_tp: tpStats,
+  };
+
+  menaraAsesmenStore.hasilByStudent[studentId] = hasil;
+  if (live) {
+    live.status_peserta = 'selesai';
+    live.waktu_selesai = nowStr;
+    live.nilai_akhir = nilaiAkhir;
+  }
+
+  return hasil;
+}
+
+function checkAndAdvanceMenaraAsesmenTimer() {
+  const sesi = menaraAsesmenStore.sesi;
+  if (sesi.status !== 'berjalan' || !sesi.waktu_mulai_ms) return;
+
+  const now = Date.now();
+  const totalAllowedMs =
+    (Number(sesi.durasi || 30) + Number(sesi.tambahan_waktu_menit || 0)) * 60 * 1000;
+  const elapsedMs = now - sesi.waktu_mulai_ms - (sesi.total_durasi_jeda_ms || 0);
+
+  if (elapsedMs >= totalAllowedMs) {
+    // Waktu habis! Otomatis kumpulkan & nilai seluruh siswa yang sedang mengerjakan
+    sesi.status = 'selesai';
+    Object.keys(menaraAsesmenStore.pesertaLive).forEach((sid) => {
+      const p = menaraAsesmenStore.pesertaLive[sid];
+      if (p && p.status_peserta !== 'selesai') {
+        finalizeAndGradeStudentAsesmen(sid);
+      }
+    });
+    saveMenaraAsesmenToFile(true);
+    broadcastPresence({
+      type: 'asesmen_tower_tick',
+      sesiId: sesi.id_sesi,
+      status: 'selesai',
+      timestamp: now,
+    });
+  }
+}
+
+function buildSanitizedMenaraAsesmenPayload(params: {
+  viewerId?: string;
+  isVerifiedTeacher: boolean;
+}) {
+  checkAndAdvanceMenaraAsesmenTimer();
+  const { viewerId, isVerifiedTeacher } = params;
+  const sesi = menaraAsesmenStore.sesi;
+  const myHasil = viewerId ? menaraAsesmenStore.hasilByStudent[viewerId] || null : null;
+  const myPaket = viewerId ? menaraAsesmenStore.paketByStudent[viewerId] || null : null;
+  const myJawaban = viewerId ? menaraAsesmenStore.jawabanByStudent[viewerId] || {} : {};
+
+  // KEAMANAN: Kunci jawaban & pembahasan HANYA dikirim ke Guru,
+  // ATAU ke siswa yang sudah selesai JIKA guru mengaktifkan tampilkan_pembahasan!
+  const canRevealKeys =
+    isVerifiedTeacher || (Boolean(myHasil) && Boolean(sesi.tampilkan_pembahasan));
+
+  const sanitizedBankSoal = menaraAsesmenStore.bankSoal.map((q) => ({
+    ...q,
+    pernyataan_kategori: Array.isArray(q.pernyataan_kategori)
+      ? q.pernyataan_kategori.map((st) => ({
+          id_pernyataan: st.id_pernyataan,
+          teks: st.teks,
+          label_opsi: st.label_opsi,
+          kunci: canRevealKeys ? st.kunci : undefined,
+        }))
+      : undefined,
+    kunci_jawaban: canRevealKeys ? q.kunci_jawaban : null,
+    pembahasan: canRevealKeys ? q.pembahasan : null,
+  }));
+
+  const semuaHasilList = Object.values(menaraAsesmenStore.hasilByStudent).sort(
+    (a, b) => b.nilai - a.nilai
+  );
+
+  const rataRataKelas =
+    semuaHasilList.length > 0
+      ? Math.round(
+          (semuaHasilList.reduce((acc, r) => acc + r.nilai, 0) / semuaHasilList.length) * 10
+        ) / 10
+      : 0;
+
+  // Hitung Analisis Per Butir Soal & Analisis Per TP untuk Guru
+  let analisisButir: any[] = [];
+  let analisisTp: any[] = [];
+
+  if (isVerifiedTeacher) {
+    const allStudentIdsWithAnswers = Object.keys(menaraAsesmenStore.jawabanByStudent);
+    analisisButir = menaraAsesmenStore.bankSoal.map((soal, idx) => {
+      let answeredCount = 0;
+      let correctCount = 0;
+      allStudentIdsWithAnswers.forEach((sid) => {
+        const ans = menaraAsesmenStore.jawabanByStudent[sid]?.[soal.id_soal];
+        if (ans && String(ans.jawaban || '').trim() !== '') {
+          answeredCount++;
+          const graded = gradeSingleAsesmenQuestionServerSide(soal, ans.jawaban, sesi);
+          if (graded.isFullyCorrect) correctCount++;
+        }
+      });
+      return {
+        id_soal: soal.id_soal,
+        nomor_urut: idx + 1,
+        tp: soal.tp,
+        jenis: soal.jenis,
+        teks_soal: soal.teks_soal,
+        jumlah_menjawab: answeredCount,
+        jumlah_benar: correctCount,
+        persentase_benar:
+          answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0,
+      };
+    });
+
+    const tpGroupMap = new Map<
+      string,
+      { tp: string; tp_label: string; countSoal: number; sumPct: number }
+    >();
+    analisisButir.forEach((ab) => {
+      const soalObj = menaraAsesmenStore.bankSoal.find((s) => s.id_soal === ab.id_soal);
+      const tpKey = ab.tp || 'TP-Umum';
+      const existing = tpGroupMap.get(tpKey) || {
+        tp: tpKey,
+        tp_label: soalObj?.tp_label || tpKey,
+        countSoal: 0,
+        sumPct: 0,
+      };
+      existing.countSoal += 1;
+      existing.sumPct += ab.persentase_benar;
+      tpGroupMap.set(tpKey, existing);
+    });
+
+    analisisTp = Array.from(tpGroupMap.values()).map((item) => ({
+      tp: item.tp,
+      tp_label: item.tp_label,
+      jumlah_soal: item.countSoal,
+      rata_rata_penguasaan:
+        item.countSoal > 0 ? Math.round(item.sumPct / item.countSoal) : 0,
+    }));
+  }
+
+  return {
+    sesi,
+    stimulusList: menaraAsesmenStore.stimulusList,
+    bankSoal: sanitizedBankSoal,
+    paketSaya: myPaket,
+    jawabanSaya: myJawaban,
+    hasilSaya: myHasil,
+    pesertaLive: Object.values(menaraAsesmenStore.pesertaLive).sort(
+      (a, b) => b.lastSeen - a.lastSeen
+    ),
+    semuaHasil: isVerifiedTeacher ? semuaHasilList : myHasil ? [myHasil] : [],
+    analisisButir: isVerifiedTeacher ? analisisButir : undefined,
+    analisisTp: isVerifiedTeacher ? analisisTp : undefined,
+    rataRataKelas,
+    serverTime: Date.now(),
+  };
+}
+
+// GET /api/menara-asesmen/state (Polled every 3-5s by Lobby & Exam clients)
+app.get('/api/menara-asesmen/state', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-store');
+
+  const viewerId = req.query.studentId ? String(req.query.studentId).trim() : undefined;
+  const viewerName = req.query.studentName ? String(req.query.studentName).trim() : undefined;
+  const viewerClass = req.query.className ? String(req.query.className).trim() : 'X DKV';
+  const viewerGender: 'L' | 'P' = req.query.gender === 'P' ? 'P' : 'L';
+  const isTeacherParam = req.query.isTeacher === 'true' || req.query.isTeacher === '1';
+  const studentNumber = req.query.studentNumber ? String(req.query.studentNumber) : undefined;
+  const teacherPin = req.query.teacherPin ? String(req.query.teacherPin) : undefined;
+
+  const isVerifiedTeacher = verifyTeacherAccountServerSide({
+    teacherId: viewerId,
+    teacherName: viewerName,
+    isTeacher: isTeacherParam,
+    studentNumber,
+    teacherPin,
+  });
+
+  // Update student lastSeen if already registered in pesertaLive
+  if (viewerId && !isVerifiedTeacher && menaraAsesmenStore.pesertaLive[viewerId]) {
+    menaraAsesmenStore.pesertaLive[viewerId].lastSeen = Date.now();
+    menaraAsesmenStore.pesertaLive[viewerId].studentName =
+      viewerName || menaraAsesmenStore.pesertaLive[viewerId].studentName;
+    menaraAsesmenStore.pesertaLive[viewerId].className =
+      viewerClass || menaraAsesmenStore.pesertaLive[viewerId].className;
+    menaraAsesmenStore.pesertaLive[viewerId].gender = viewerGender;
+  }
+
+  return res.json({
+    success: true,
+    isVerifiedTeacher,
+    data: buildSanitizedMenaraAsesmenPayload({
+      viewerId,
+      isVerifiedTeacher,
+    }),
+  });
+});
+
+// POST /api/menara-asesmen/generate-soal (Uses Gemini API @google/genai to generate TKA questions from Bank Materi TPs)
+app.post('/api/menara-asesmen/generate-soal', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const {
+    teacherId,
+    teacherName,
+    isTeacher,
+    studentNumber,
+    teacherPin,
+    tpDetailList,
+    jumlahSoal = 6,
+    komposisiJenis = { pg_tunggal: 2, pg_mcma: 2, pg_kategori: 2 },
+    komposisiPenyajian = { tunggal: 3, grup: 3 },
+  } = req.body || {};
+
+  const verified = verifyTeacherAccountServerSide({
+    teacherId,
+    teacherName,
+    isTeacher,
+    studentNumber,
+    teacherPin,
+  });
+
+  if (!verified) {
+    return res.status(403).json({
+      success: false,
+      error: 'Akses Ditolak (Server Auth): Hanya akun Guru resmi yang dapat men-generate soal asesmen.',
+    });
+  }
+
+  const validTpList: Array<{
+    id_tp: string;
+    mata_pelajaran: string;
+    kelas: string;
+    tujuan_pembelajaran: string;
+    isi_materi: string;
+  }> = Array.isArray(tpDetailList) && tpDetailList.length > 0
+    ? tpDetailList.slice(0, 5)
+    : menaraAsesmenStore.sesi.tp_detail;
+
+  const totalCount = Math.max(
+    3,
+    Math.min(
+      25,
+      Number(komposisiJenis.pg_tunggal || 0) +
+        Number(komposisiJenis.pg_mcma || 0) +
+        Number(komposisiJenis.pg_kategori || 0) || Number(jumlahSoal) || 6
+    )
+  );
+  const countTunggal = Math.max(0, Number(komposisiJenis.pg_tunggal ?? 2));
+  const countMcma = Math.max(0, Number(komposisiJenis.pg_mcma ?? 2));
+  const countKategori = Math.max(0, Number(komposisiJenis.pg_kategori ?? 2));
+  const countGrup = Math.max(0, Math.min(totalCount, Number(komposisiPenyajian.grup ?? 3)));
+  const countStandalone = Math.max(0, totalCount - countGrup);
+
+  const sesiId = menaraAsesmenStore.sesi.id_sesi;
+
+  // Deterministic adaptive builder from selected TPs if Gemini API is unavailable or fails
+  const buildAdaptiveQuestionsFromTps = (): {
+    stimulusList: ServerAsesmenStimulus[];
+    bankSoal: ServerAsesmenSoal[];
+  } => {
+    const stims: ServerAsesmenStimulus[] = [];
+    const questions: ServerAsesmenSoal[] = [];
+
+    if (countGrup > 0) {
+      const primaryTp = validTpList[0] || {
+        id_tp: 'tp-bm-001',
+        mata_pelajaran: 'Dasar-Dasar DKV',
+        kelas: 'X DKV',
+        tujuan_pembelajaran: 'Menerapkan prinsip desain dan alur kerja kreatif DKV',
+        isi_materi: 'Materi desain komunikasi visual dan berpikir komputasional.',
+      };
+      stims.push({
+        id_stimulus: `STIM-TEKS-${Date.now().toString(36).slice(-4).toUpperCase()}`,
+        jenis: 'teks',
+        judul: `Studi Kasus Produksi: ${primaryTp.mata_pelajaran} (${primaryTp.kelas})`,
+        isi: `Tim kreatif siswa ${primaryTp.kelas} sedang mengerjakan proyek berbasis Tujuan Pembelajaran: "${primaryTp.tujuan_pembelajaran}".\n\nRingkasan Materi Acuan:\n${primaryTp.isi_materi || primaryTp.tujuan_pembelajaran}\n\nDalam tahap evaluasi kualitas (Quality Control), guru meminta setiap desainer memeriksa ketepatan konsep, efisiensi langkah kerja, serta kejelasan pesan visual sebelum karya dipublikasikan kepada warga Kota Refleksia.`,
+      });
+      stims.push({
+        id_stimulus: `STIM-TABEL-${Date.now().toString(36).slice(-4).toUpperCase()}`,
+        jenis: 'tabel',
+        judul: `Tabel Evaluasi Indikator Capaian — ${primaryTp.mata_pelajaran}`,
+        isi: JSON.stringify({
+          headers: ['Aspek Penilaian', 'Standar Kualitas Minimal', 'Target Unggul (TKA)'],
+          rows: [
+            ['Ketepatan Konsep TP', 'Memenuhi 1 indikator dasar', 'Selaras penuh dengan Tujuan Pembelajaran'],
+            ['Struktur & Keterbacaan', 'Cukup terbaca di layar standar', 'Hierarki jelas, kontras tinggi & responsif'],
+            ['Efisiensi Alur Kerja', 'Urutan langkah terdokumentasi', 'Terstruktur (Input-Process-Output) & bebas revisi mayor'],
+          ],
+        }),
+      });
+      stims.push({
+        id_stimulus: `STIM-GRAFIK-${Date.now().toString(36).slice(-4).toUpperCase()}`,
+        jenis: 'grafik',
+        judul: `Grafik Penguasaan Kompetensi Kelas pada ${primaryTp.mata_pelajaran}`,
+        isi: JSON.stringify({
+          title: 'Persentase Ketercapaian Indikator Karya Siswa (%)',
+          unit: '%',
+          bars: [
+            { label: 'Perencanaan & Analisis Brief', value: 88, color: '#10b981' },
+            { label: 'Eksekusi Visual & Komposisi', value: 82, color: '#38bdf8' },
+            { label: 'Ketepatan Spesifikasi Output', value: 76, color: '#a855f7' },
+            { label: 'Dokumentasi & Evaluasi Mandiri', value: 69, color: '#f59e0b' },
+          ],
+        }),
+      });
+    }
+
+    const typeQueue: Array<'pg_tunggal' | 'pg_mcma' | 'pg_kategori'> = [];
+    for (let i = 0; i < countTunggal; i++) typeQueue.push('pg_tunggal');
+    for (let i = 0; i < countMcma; i++) typeQueue.push('pg_mcma');
+    for (let i = 0; i < countKategori; i++) typeQueue.push('pg_kategori');
+    while (typeQueue.length < totalCount) typeQueue.push('pg_tunggal');
+
+    for (let idx = 0; idx < totalCount; idx++) {
+      const qType = typeQueue[idx] || 'pg_tunggal';
+      const tpItem = validTpList[idx % validTpList.length];
+      const isGrupQuestion = idx >= countStandalone && stims.length > 0;
+      const chosenStim = isGrupQuestion ? stims[(idx - countStandalone) % stims.length] : null;
+      const qNum = idx + 1;
+      const idSoal = `SOAL-${String(qNum).padStart(2, '0')}`;
+
+      if (qType === 'pg_tunggal') {
+        questions.push({
+          id_soal: idSoal,
+          id_sesi: sesiId,
+          tp: tpItem.id_tp,
+          tp_label: tpItem.tujuan_pembelajaran,
+          jenis: 'pg_tunggal',
+          tipe_penyajian: isGrupQuestion ? 'grup' : 'tunggal',
+          id_stimulus: chosenStim ? chosenStim.id_stimulus : '',
+          teks_soal: isGrupQuestion
+            ? `Berdasarkan stimulus "${chosenStim?.judul}" di samping serta mengacu pada TP "${tpItem.tujuan_pembelajaran}", keputusan paling tepat yang harus diambil siswa adalah...`
+            : `Dalam mempelajari materi "${tpItem.mata_pelajaran}" dengan tujuan pembelajaran "${tpItem.tujuan_pembelajaran}", langkah penerapan manakah yang paling tepat dilakukan oleh siswa?`,
+          opsi: [
+            `Menerapkan konsep inti "${tpItem.tujuan_pembelajaran.slice(0, 95)}" secara sistematis sesuai standar kualitas desain dan komputasi`,
+            'Melewati tahapan perencanaan konsep dan langsung mengekspor file tanpa pemeriksaan kualitas',
+            'Mengabaikan keterbacaan visual serta struktur data agar waktu pengerjaan lebih singkat',
+            'Menggunakan pengaturan acak yang bertentangan dengan spesifikasi materi pembelajaran',
+          ],
+          kunci_jawaban: '0',
+          pembahasan: `Jawaban A tepat karena selaras langsung dengan tuntutan Tujuan Pembelajaran (${tpItem.tujuan_pembelajaran}) dan materi esensial.`,
+        });
+      } else if (qType === 'pg_mcma') {
+        questions.push({
+          id_soal: idSoal,
+          id_sesi: sesiId,
+          tp: tpItem.id_tp,
+          tp_label: tpItem.tujuan_pembelajaran,
+          jenis: 'pg_mcma',
+          tipe_penyajian: isGrupQuestion ? 'grup' : 'tunggal',
+          id_stimulus: chosenStim ? chosenStim.id_stimulus : '',
+          teks_soal: isGrupQuestion
+            ? `Perhatikan stimulus "${chosenStim?.judul}"! Pilihlah SEMUA pernyataan evaluasi yang TEPAT sesuai kompetensi "${tpItem.tujuan_pembelajaran}"! (Jawaban benar lebih dari satu)`
+            : `Manakah dari langkah-langkah berikut yang merupakan praktik TEPAT dalam mencapai tujuan pembelajaran: "${tpItem.tujuan_pembelajaran}"? (Pilih semua yang benar)`,
+          opsi: [
+            `Menganalisis kebutuhan proyek berdasarkan materi "${tpItem.mata_pelajaran}" sebelum mengeksekusi karya`,
+            'Memastikan hasil kerja memenuhi indikator ketepatan konsep, keterbacaan, dan kerapian struktur',
+            'Menghapus seluruh dokumentasi proses dan mengabaikan instruksi pada tujuan pembelajaran',
+            'Melakukan evaluasi mandiri terhadap kesesuaian output akhir dengan standar yang ditetapkan',
+          ],
+          kunci_jawaban: JSON.stringify([0, 1, 3]),
+          pembahasan:
+            'Pernyataan 1, 2, dan 4 merupakan tahapan analisis, eksekusi terstandar, dan evaluasi yang mendukung ketercapaian Tujuan Pembelajaran secara utuh.',
+        });
+      } else {
+        questions.push({
+          id_soal: idSoal,
+          id_sesi: sesiId,
+          tp: tpItem.id_tp,
+          tp_label: tpItem.tujuan_pembelajaran,
+          jenis: 'pg_kategori',
+          tipe_penyajian: isGrupQuestion ? 'grup' : 'tunggal',
+          id_stimulus: chosenStim ? chosenStim.id_stimulus : '',
+          teks_soal: isGrupQuestion
+            ? `Berdasarkan data pada stimulus "${chosenStim?.judul}", tentukan apakah setiap pernyataan berikut SESUAI atau TIDAK SESUAI dengan konsep "${tpItem.tujuan_pembelajaran}"!`
+            : `Tentukan apakah setiap pernyataan berikut BENAR atau SALAH terkait penguasaan kompetensi "${tpItem.tujuan_pembelajaran}"!`,
+          opsi: [],
+          label_kategori: isGrupQuestion ? ['Sesuai', 'Tidak Sesuai'] : ['Benar', 'Salah'],
+          pernyataan_kategori: [
+            {
+              id_pernyataan: 'p1',
+              teks: `Penerapan konsep pada materi "${tpItem.mata_pelajaran}" wajib mengacu pada indikator: ${tpItem.tujuan_pembelajaran.slice(0, 110)}.`,
+              label_opsi: isGrupQuestion ? ['Sesuai', 'Tidak Sesuai'] : ['Benar', 'Salah'],
+              kunci: 'A',
+            },
+            {
+              id_pernyataan: 'p2',
+              teks: 'Kualitas karya akhir tetap dianggap unggul meskipun seluruh prinsip dasar pada materi diabaikan sepenuhnya.',
+              label_opsi: isGrupQuestion ? ['Sesuai', 'Tidak Sesuai'] : ['Benar', 'Salah'],
+              kunci: 'B',
+            },
+            {
+              id_pernyataan: 'p3',
+              teks: 'Evaluasi bertahap dari perencanaan hingga output membantu mencegah kesalahan teknis produksi.',
+              label_opsi: isGrupQuestion ? ['Sesuai', 'Tidak Sesuai'] : ['Benar', 'Salah'],
+              kunci: 'A',
+            },
+          ],
+          kunci_jawaban: JSON.stringify({ p1: 'A', p2: 'B', p3: 'A' }),
+          pembahasan:
+            'Pernyataan 1 Benar/Sesuai, Pernyataan 2 Salah/Tidak Sesuai karena mengabaikan prinsip dasar menurunkan mutu karya, dan Pernyataan 3 Benar/Sesuai.',
+        });
+      }
+    }
+
+    return { stimulusList: stims, bankSoal: questions };
+  };
+
+  if (ai && apiKey) {
+    try {
+      const tpPromptText = validTpList
+        .map(
+          (t, i) =>
+            `${i + 1}. [ID_TP: ${t.id_tp}] Mapel: ${t.mata_pelajaran} (${t.kelas})\n   Tujuan Pembelajaran: ${t.tujuan_pembelajaran}\n   Materi Esensial: ${t.isi_materi}`
+        )
+        .join('\n\n');
+
+      const prompt = `Buat paket soal Asesmen Sumatif Mandiri setara TKA (Tes Kemampuan Akademik) untuk siswa SMK Desain Komunikasi Visual (DKV) berdasarkan Tujuan Pembelajaran (TP) dari Bank Materi berikut:
+
+${tpPromptText}
+
+Spesifikasi Wajib:
+- Total Soal: ${totalCount} butir
+- Komposisi Jenis Soal:
+  * pg_tunggal (Pilihan Ganda Sederhana 4 opsi, 1 jawaban benar): ${countTunggal} soal
+  * pg_mcma (Pilihan Ganda Kompleks MCMA 4 opsi, 2 atau 3 jawaban benar): ${countMcma} soal
+  * pg_kategori (Pilihan Ganda Kompleks Kategori berisi 3 pernyataan Benar/Salah atau Sesuai/Tidak Sesuai): ${countKategori} soal
+- Komposisi Penyajian:
+  * Soal Tunggal (tipe_penyajian = "tunggal", id_stimulus = ""): ${countStandalone} soal
+  * Soal Grup Berstimulus (tipe_penyajian = "grup", berbagi id_stimulus dari daftar stimulusList): ${countGrup} soal
+- Untuk stimulusList, buat minimal 2 stimulus berkualitas tinggi (kombinasikan jenis "teks", "tabel" dalam format JSON {headers, rows}, atau "grafik" dalam format JSON {title, unit, bars:[{label, value, color}]}).
+- Setiap soal WAJIB memiliki kunci_jawaban dan pembahasan yang jelas dalam Bahasa Indonesia.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          systemInstruction:
+            'Kamu adalah penyusun soal Asesmen Nasional / TKA (Tes Kemampuan Akademik) tingkat SMK Kejuruan DKV & Informatika. Kembalikan HANYA JSON valid sesuai schema.',
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              stimulusList: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id_stimulus: { type: Type.STRING },
+                    jenis: { type: Type.STRING, description: 'teks, tabel, atau grafik' },
+                    judul: { type: Type.STRING },
+                    isi: {
+                      type: Type.STRING,
+                      description:
+                        'Untuk teks: paragraf wacana. Untuk tabel: JSON string {"headers":[...],"rows":[[...]]}. Untuk grafik: JSON string {"title":"...","unit":"%","bars":[{"label":"...","value":80,"color":"#38bdf8"}]}',
+                    },
+                  },
+                  required: ['id_stimulus', 'jenis', 'judul', 'isi'],
+                },
+              },
+              bankSoal: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id_soal: { type: Type.STRING },
+                    tp: { type: Type.STRING, description: 'ID_TP yang dirujuk' },
+                    tp_label: { type: Type.STRING },
+                    jenis: {
+                      type: Type.STRING,
+                      description: 'pg_tunggal, pg_mcma, atau pg_kategori',
+                    },
+                    tipe_penyajian: {
+                      type: Type.STRING,
+                      description: 'tunggal atau grup',
+                    },
+                    id_stimulus: { type: Type.STRING },
+                    teks_soal: { type: Type.STRING },
+                    opsi: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                    },
+                    pernyataan_kategori: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          id_pernyataan: { type: Type.STRING },
+                          teks: { type: Type.STRING },
+                          kunci: { type: Type.STRING, description: 'A untuk Benar/Sesuai, B untuk Salah/Tidak Sesuai' },
+                        },
+                        required: ['id_pernyataan', 'teks', 'kunci'],
+                      },
+                    },
+                    kunci_jawaban: {
+                      type: Type.STRING,
+                      description:
+                        'Untuk pg_tunggal: indeks "0".."3". Untuk pg_mcma: JSON array "[0,2]". Untuk pg_kategori: JSON object {"p1":"A","p2":"B","p3":"A"}',
+                    },
+                    pembahasan: { type: Type.STRING },
+                  },
+                  required: [
+                    'id_soal',
+                    'tp',
+                    'jenis',
+                    'tipe_penyajian',
+                    'id_stimulus',
+                    'teks_soal',
+                    'opsi',
+                    'kunci_jawaban',
+                    'pembahasan',
+                  ],
+                },
+              },
+            },
+            required: ['stimulusList', 'bankSoal'],
+          },
+        },
+      });
+
+      const parsed = JSON.parse(response.text || '{}');
+      if (Array.isArray(parsed.bankSoal) && parsed.bankSoal.length > 0) {
+        const cleanStims: ServerAsesmenStimulus[] = Array.isArray(parsed.stimulusList)
+          ? parsed.stimulusList.map((st: any, idx: number) => ({
+              id_stimulus: String(st.id_stimulus || `STIM-${idx + 1}`),
+              jenis:
+                st.jenis === 'tabel' || st.jenis === 'grafik' ? st.jenis : 'teks',
+              judul: String(st.judul || `Stimulus #${idx + 1}`),
+              isi: String(st.isi || ''),
+            }))
+          : [];
+
+        const cleanQuestions: ServerAsesmenSoal[] = parsed.bankSoal.map(
+          (q: any, idx: number) => {
+            const jenisClean: 'pg_tunggal' | 'pg_mcma' | 'pg_kategori' =
+              q.jenis === 'pg_mcma' || q.jenis === 'pg_kategori'
+                ? q.jenis
+                : 'pg_tunggal';
+            const penyajianClean: 'tunggal' | 'grup' =
+              q.tipe_penyajian === 'grup' && q.id_stimulus ? 'grup' : 'tunggal';
+            const stmts: ServerAsesmenKategoriStatement[] | undefined =
+              jenisClean === 'pg_kategori'
+                ? (Array.isArray(q.pernyataan_kategori) && q.pernyataan_kategori.length > 0
+                    ? q.pernyataan_kategori
+                    : [
+                        { id_pernyataan: 'p1', teks: 'Pernyataan 1 sesuai materi TP', kunci: 'A' },
+                        { id_pernyataan: 'p2', teks: 'Pernyataan 2 bertentangan dengan materi TP', kunci: 'B' },
+                        { id_pernyataan: 'p3', teks: 'Pernyataan 3 mendukung kualitas karya', kunci: 'A' },
+                      ]
+                  ).map((st: any, sIdx: number) => ({
+                    id_pernyataan: String(st.id_pernyataan || `p${sIdx + 1}`),
+                    teks: String(st.teks || ''),
+                    label_opsi: ['Benar', 'Salah'],
+                    kunci: String(st.kunci || 'A').toUpperCase() === 'B' ? 'B' : 'A',
+                  }))
+                : undefined;
+
+            return {
+              id_soal: `SOAL-${String(idx + 1).padStart(2, '0')}`,
+              id_sesi: sesiId,
+              tp: String(q.tp || validTpList[0]?.id_tp || 'tp-bm-001'),
+              tp_label: String(
+                q.tp_label ||
+                  validTpList.find((t) => t.id_tp === q.tp)?.tujuan_pembelajaran ||
+                  validTpList[0]?.tujuan_pembelajaran ||
+                  ''
+              ),
+              jenis: jenisClean,
+              tipe_penyajian: penyajianClean,
+              id_stimulus: penyajianClean === 'grup' ? String(q.id_stimulus || '') : '',
+              teks_soal: String(q.teks_soal || `Pertanyaan #${idx + 1}`),
+              opsi:
+                Array.isArray(q.opsi) && q.opsi.length >= 2
+                  ? q.opsi.map(String)
+                  : ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'],
+              pernyataan_kategori: stmts,
+              label_kategori: ['Benar', 'Salah'],
+              kunci_jawaban: String(q.kunci_jawaban || '0'),
+              pembahasan: String(q.pembahasan || 'Pembahasan sesuai Tujuan Pembelajaran.'),
+            };
+          }
+        );
+
+        menaraAsesmenStore.stimulusList = cleanStims;
+        menaraAsesmenStore.bankSoal = cleanQuestions;
+        menaraAsesmenStore.sesi.tp_terpilih = validTpList.map((t) => t.id_tp);
+        menaraAsesmenStore.sesi.tp_detail = validTpList;
+        menaraAsesmenStore.sesi.jumlah_soal = cleanQuestions.length;
+        saveMenaraAsesmenToFile(true);
+
+        return res.json({
+          success: true,
+          source: 'gemini-ai',
+          message: `✨ Berhasil men-generate ${cleanQuestions.length} soal TKA & ${cleanStims.length} stimulus dari Gemini AI! Silakan tinjau dan edit sebelum dipublikasikan.`,
+          data: buildSanitizedMenaraAsesmenPayload({
+            viewerId: teacherId,
+            isVerifiedTeacher: true,
+          }),
+        });
+      }
+    } catch (err) {
+      console.warn('[MenaraAsesmen] Gemini generate-soal fallback triggered:', err);
+    }
+  }
+
+  // Fallback adaptif berbasis TP terpilih
+  const generated = buildAdaptiveQuestionsFromTps();
+  menaraAsesmenStore.stimulusList = generated.stimulusList;
+  menaraAsesmenStore.bankSoal = generated.bankSoal;
+  menaraAsesmenStore.sesi.tp_terpilih = validTpList.map((t) => t.id_tp);
+  menaraAsesmenStore.sesi.tp_detail = validTpList;
+  menaraAsesmenStore.sesi.jumlah_soal = generated.bankSoal.length;
+  saveMenaraAsesmenToFile(true);
+
+  return res.json({
+    success: true,
+    source: 'bank-materi-engine',
+    message: `✅ Berhasil menyusun ${generated.bankSoal.length} soal TKA & ${generated.stimulusList.length} stimulus dari ${validTpList.length} Tujuan Pembelajaran Bank Materi!`,
+    data: buildSanitizedMenaraAsesmenPayload({
+      viewerId: teacherId,
+      isVerifiedTeacher: true,
+    }),
+  });
+});
+
+// POST /api/menara-asesmen/teacher-action (Server-verified Teacher Controls)
+app.post('/api/menara-asesmen/teacher-action', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const {
+    actionType,
+    teacherId,
+    teacherName,
+    isTeacher,
+    studentNumber,
+    teacherPin,
+    sesiConfig,
+    questionItem,
+    questionId,
+    stimulusItem,
+    stimulusId,
+    extraMinutes,
+  } = req.body || {};
+
+  const verified = verifyTeacherAccountServerSide({
+    teacherId,
+    teacherName,
+    isTeacher,
+    studentNumber,
+    teacherPin,
+  });
+
+  if (!verified) {
+    return res.status(403).json({
+      success: false,
+      error:
+        'Akses Ditolak (Server Role Check): Hanya akun Guru resmi yang diizinkan mengelola Panel Guru Menara Asesmen Individu.',
+    });
+  }
+
+  const now = Date.now();
+  const nowStr = new Date().toLocaleString('id-ID');
+  const sesi = menaraAsesmenStore.sesi;
+
+  if (actionType === 'save_config' && sesiConfig && typeof sesiConfig === 'object') {
+    sesi.judul_asesmen = String(sesiConfig.judul_asesmen || sesi.judul_asesmen).trim();
+    if (Array.isArray(sesiConfig.tp_terpilih) && sesiConfig.tp_terpilih.length > 0) {
+      sesi.tp_terpilih = sesiConfig.tp_terpilih.slice(0, 5);
+    }
+    if (Array.isArray(sesiConfig.tp_detail) && sesiConfig.tp_detail.length > 0) {
+      sesi.tp_detail = sesiConfig.tp_detail.slice(0, 5);
+    }
+    if (typeof sesiConfig.durasi === 'number') {
+      sesi.durasi = Math.max(5, Math.min(180, sesiConfig.durasi));
+    }
+    if (sesiConfig.komposisi_jenis) {
+      sesi.komposisi_jenis = {
+        pg_tunggal: Math.max(0, Number(sesiConfig.komposisi_jenis.pg_tunggal ?? 2)),
+        pg_mcma: Math.max(0, Number(sesiConfig.komposisi_jenis.pg_mcma ?? 2)),
+        pg_kategori: Math.max(0, Number(sesiConfig.komposisi_jenis.pg_kategori ?? 2)),
+      };
+      sesi.jumlah_soal =
+        sesi.komposisi_jenis.pg_tunggal +
+        sesi.komposisi_jenis.pg_mcma +
+        sesi.komposisi_jenis.pg_kategori;
+    }
+    if (sesiConfig.komposisi_penyajian) {
+      sesi.komposisi_penyajian = {
+        tunggal: Math.max(0, Number(sesiConfig.komposisi_penyajian.tunggal ?? 3)),
+        grup: Math.max(0, Number(sesiConfig.komposisi_penyajian.grup ?? 3)),
+      };
+    }
+    if (sesiConfig.poin_per_jenis) {
+      sesi.poin_per_jenis = {
+        pg_tunggal: Math.max(1, Number(sesiConfig.poin_per_jenis.pg_tunggal ?? 10)),
+        pg_mcma: Math.max(1, Number(sesiConfig.poin_per_jenis.pg_mcma ?? 15)),
+        pg_kategori_per_pernyataan: Math.max(
+          1,
+          Number(sesiConfig.poin_per_jenis.pg_kategori_per_pernyataan ?? 5)
+        ),
+      };
+    }
+    if (typeof sesiConfig.mcma_kredit_parsial === 'boolean') {
+      sesi.mcma_kredit_parsial = sesiConfig.mcma_kredit_parsial;
+    }
+    if (typeof sesiConfig.acak_soal === 'boolean') {
+      sesi.acak_soal = sesiConfig.acak_soal;
+    }
+    if (typeof sesiConfig.acak_opsi === 'boolean') {
+      sesi.acak_opsi = sesiConfig.acak_opsi;
+    }
+    if (typeof sesiConfig.izinkan_menyusul === 'boolean') {
+      sesi.izinkan_menyusul = sesiConfig.izinkan_menyusul;
+    }
+    if (typeof sesiConfig.tampilkan_pembahasan === 'boolean') {
+      sesi.tampilkan_pembahasan = sesiConfig.tampilkan_pembahasan;
+    }
+    if (typeof sesiConfig.xp_bonus_selesai === 'number') {
+      sesi.xp_bonus_selesai = Math.max(10, Math.min(200, sesiConfig.xp_bonus_selesai));
+    }
+    sesi.guru_pembuat = teacherName || sesi.guru_pembuat;
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'save_question' && questionItem && typeof questionItem === 'object') {
+    const idSoal = String(
+      questionItem.id_soal || `SOAL-${String(menaraAsesmenStore.bankSoal.length + 1).padStart(2, '0')}`
+    );
+    const cleanedQuestion: ServerAsesmenSoal = {
+      id_soal: idSoal,
+      id_sesi: sesi.id_sesi,
+      tp: String(questionItem.tp || sesi.tp_terpilih[0] || 'tp-bm-001'),
+      tp_label: String(questionItem.tp_label || ''),
+      jenis:
+        questionItem.jenis === 'pg_mcma' || questionItem.jenis === 'pg_kategori'
+          ? questionItem.jenis
+          : 'pg_tunggal',
+      tipe_penyajian:
+        questionItem.tipe_penyajian === 'grup' && questionItem.id_stimulus ? 'grup' : 'tunggal',
+      id_stimulus:
+        questionItem.tipe_penyajian === 'grup' ? String(questionItem.id_stimulus || '') : '',
+      teks_soal: String(questionItem.teks_soal || '').trim(),
+      opsi: Array.isArray(questionItem.opsi) ? questionItem.opsi.map(String) : [],
+      pernyataan_kategori: Array.isArray(questionItem.pernyataan_kategori)
+        ? questionItem.pernyataan_kategori.map((st: any, idx: number) => ({
+            id_pernyataan: String(st.id_pernyataan || `p${idx + 1}`),
+            teks: String(st.teks || ''),
+            label_opsi: Array.isArray(st.label_opsi) ? st.label_opsi : ['Benar', 'Salah'],
+            kunci: String(st.kunci || 'A').toUpperCase() === 'B' ? 'B' : 'A',
+          }))
+        : undefined,
+      label_kategori: Array.isArray(questionItem.label_kategori)
+        ? questionItem.label_kategori
+        : ['Benar', 'Salah'],
+      kunci_jawaban: String(questionItem.kunci_jawaban ?? '0'),
+      pembahasan: String(questionItem.pembahasan || ''),
+    };
+
+    const existingIdx = menaraAsesmenStore.bankSoal.findIndex((q) => q.id_soal === idSoal);
+    if (existingIdx >= 0) {
+      menaraAsesmenStore.bankSoal[existingIdx] = cleanedQuestion;
+    } else {
+      menaraAsesmenStore.bankSoal.push(cleanedQuestion);
+    }
+    sesi.jumlah_soal = menaraAsesmenStore.bankSoal.length;
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'delete_question' && questionId) {
+    menaraAsesmenStore.bankSoal = menaraAsesmenStore.bankSoal.filter(
+      (q) => q.id_soal !== String(questionId)
+    );
+    sesi.jumlah_soal = menaraAsesmenStore.bankSoal.length;
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'save_stimulus' && stimulusItem && typeof stimulusItem === 'object') {
+    const idStim = String(
+      stimulusItem.id_stimulus || `STIM-${Date.now().toString(36).slice(-4).toUpperCase()}`
+    );
+    const cleanedStim: ServerAsesmenStimulus = {
+      id_stimulus: idStim,
+      jenis:
+        stimulusItem.jenis === 'tabel' || stimulusItem.jenis === 'grafik'
+          ? stimulusItem.jenis
+          : 'teks',
+      judul: String(stimulusItem.judul || `Stimulus ${idStim}`),
+      isi: String(stimulusItem.isi || ''),
+    };
+    const existingIdx = menaraAsesmenStore.stimulusList.findIndex(
+      (s) => s.id_stimulus === idStim
+    );
+    if (existingIdx >= 0) {
+      menaraAsesmenStore.stimulusList[existingIdx] = cleanedStim;
+    } else {
+      menaraAsesmenStore.stimulusList.push(cleanedStim);
+    }
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'delete_stimulus' && stimulusId) {
+    menaraAsesmenStore.stimulusList = menaraAsesmenStore.stimulusList.filter(
+      (s) => s.id_stimulus !== String(stimulusId)
+    );
+    menaraAsesmenStore.bankSoal.forEach((q) => {
+      if (q.id_stimulus === String(stimulusId)) {
+        q.id_stimulus = '';
+        q.tipe_penyajian = 'tunggal';
+      }
+    });
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'buka_lobi') {
+    if (menaraAsesmenStore.bankSoal.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bank Soal sesi masih kosong. Silakan Generate Soal atau tambah soal terlebih dahulu.',
+      });
+    }
+    sesi.status = 'lobi';
+    sesi.waktu_mulai = '-';
+    sesi.waktu_mulai_ms = null;
+    sesi.waktu_jeda_ms = null;
+    sesi.total_durasi_jeda_ms = 0;
+    sesi.tambahan_waktu_menit = 0;
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'mulai_asesmen') {
+    if (menaraAsesmenStore.bankSoal.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bank Soal sesi masih kosong.',
+      });
+    }
+    sesi.status = 'berjalan';
+    sesi.waktu_mulai = nowStr;
+    sesi.waktu_mulai_ms = now;
+    sesi.waktu_jeda_ms = null;
+    sesi.total_durasi_jeda_ms = 0;
+
+    // Buat paket soal teracak untuk seluruh siswa yang sudah menunggu di lobi
+    Object.values(menaraAsesmenStore.pesertaLive).forEach((peserta) => {
+      const pkg = buildStudentPackageForAsesmen({
+        studentId: peserta.studentId,
+        studentName: peserta.studentName,
+        className: peserta.className,
+        sessionToken: peserta.activeSessionToken,
+      });
+      menaraAsesmenStore.paketByStudent[peserta.studentId] = pkg;
+      if (peserta.status_peserta === 'di_lobi') {
+        peserta.status_peserta = 'mengerjakan';
+        peserta.waktu_mulai_kerja_ms = now;
+        peserta.total_soal = pkg.urutan_soal.length;
+      }
+    });
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'tambah_waktu') {
+    const addMin = Math.max(1, Math.min(60, Number(extraMinutes) || 5));
+    sesi.tambahan_waktu_menit = (sesi.tambahan_waktu_menit || 0) + addMin;
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'jeda') {
+    if (sesi.status === 'berjalan') {
+      sesi.status = 'jeda';
+      sesi.waktu_jeda_ms = now;
+      saveMenaraAsesmenToFile(true);
+    }
+  } else if (actionType === 'lanjut') {
+    if (sesi.status === 'jeda') {
+      if (sesi.waktu_jeda_ms) {
+        sesi.total_durasi_jeda_ms += Math.max(0, now - sesi.waktu_jeda_ms);
+      }
+      sesi.waktu_jeda_ms = null;
+      sesi.status = 'berjalan';
+      saveMenaraAsesmenToFile(true);
+    }
+  } else if (actionType === 'akhiri_paksa') {
+    sesi.status = 'selesai';
+    Object.keys(menaraAsesmenStore.pesertaLive).forEach((sid) => {
+      const p = menaraAsesmenStore.pesertaLive[sid];
+      if (p && p.status_peserta !== 'selesai') {
+        finalizeAndGradeStudentAsesmen(sid);
+      }
+    });
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'reset_sesi') {
+    const nextSesiNum =
+      Number(String(sesi.id_sesi).replace(/[^0-9]/g, '') || '1') + 1;
+    const nextSesiId = `ASESMEN-TKA-${String(nextSesiNum).padStart(2, '0')}`;
+    sesi.id_sesi = nextSesiId;
+    sesi.status = 'draf';
+    sesi.waktu_mulai = '-';
+    sesi.waktu_mulai_ms = null;
+    sesi.waktu_jeda_ms = null;
+    sesi.total_durasi_jeda_ms = 0;
+    sesi.tambahan_waktu_menit = 0;
+    menaraAsesmenStore.bankSoal.forEach((q) => {
+      q.id_sesi = nextSesiId;
+    });
+    menaraAsesmenStore.paketByStudent = {};
+    menaraAsesmenStore.jawabanByStudent = {};
+    menaraAsesmenStore.hasilByStudent = {};
+    menaraAsesmenStore.pesertaLive = {};
+    saveMenaraAsesmenToFile(true);
+  }
+
+  broadcastPresence({
+    type: 'asesmen_tower_tick',
+    sesiId: sesi.id_sesi,
+    status: sesi.status,
+    timestamp: now,
+  });
+
+  return res.json({
+    success: true,
+    data: buildSanitizedMenaraAsesmenPayload({
+      viewerId: teacherId,
+      isVerifiedTeacher: true,
+    }),
+  });
+});
+
+// POST /api/menara-asesmen/student-action (Lobby join, Batch auto-save answers, Tab exit warning, Submit exam)
+app.post('/api/menara-asesmen/student-action', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const {
+    actionType,
+    studentId,
+    studentName,
+    className,
+    gender,
+    sessionToken,
+    answersBatch,
+    activeQuestionNumber,
+    tabExitReason,
+  } = req.body || {};
+
+  if (!studentId || !studentName) {
+    return res.status(400).json({
+      success: false,
+      error: 'Identitas siswa diperlukan.',
+    });
+  }
+
+  checkAndAdvanceMenaraAsesmenTimer();
+  const sid = String(studentId).trim();
+  const sName = String(studentName).trim();
+  const sClass = String(className || 'X DKV').trim();
+  const sGender: 'L' | 'P' = gender === 'P' ? 'P' : 'L';
+  const now = Date.now();
+  const nowStr = new Date().toLocaleString('id-ID');
+  const sesi = menaraAsesmenStore.sesi;
+
+  let live = menaraAsesmenStore.pesertaLive[sid];
+
+  if (actionType === 'join_lobby') {
+    if (sesi.status === 'draf') {
+      return res.status(400).json({
+        success: false,
+        error: 'Lobi belum dibuka oleh Guru. Tunggu Guru menekan tombol "Buka Lobi".',
+      });
+    }
+
+    // Jika asesmen sudah berjalan dan siswa belum pernah gabung lobi, cek opsi izinkan_menyusul
+    if (sesi.status === 'berjalan' && !live && !sesi.izinkan_menyusul) {
+      return res.status(403).json({
+        success: false,
+        error:
+          'Asesmen sudah dimulai dan opsi "Siswa Menyusul" dikunci oleh Guru. Silakan hubungi Guru Pengampu.',
+      });
+    }
+
+    const tok =
+      String(sessionToken || '').trim() ||
+      live?.activeSessionToken ||
+      `astok-${now}-${Math.random().toString(36).slice(2, 7)}`;
+
+    if (!live) {
+      live = {
+        studentId: sid,
+        studentName: sName,
+        className: sClass,
+        gender: sGender,
+        status_peserta:
+          sesi.status === 'berjalan' || sesi.status === 'jeda' ? 'mengerjakan' : 'di_lobi',
+        soal_terjawab: 0,
+        soal_ragu: 0,
+        total_soal: menaraAsesmenStore.bankSoal.length,
+        nomor_soal_aktif: 1,
+        keluar_tab: 0,
+        log_keluar_tab: [],
+        waktu_gabung: nowStr,
+        waktu_mulai_kerja_ms:
+          sesi.status === 'berjalan' || sesi.status === 'jeda' ? now : null,
+        waktu_selesai: null,
+        nilai_akhir: null,
+        lastSeen: now,
+        activeSessionToken: tok,
+      };
+      menaraAsesmenStore.pesertaLive[sid] = live;
+    } else {
+      live.lastSeen = now;
+      live.studentName = sName;
+      live.className = sClass;
+      live.activeSessionToken = tok;
+      if (
+        (sesi.status === 'berjalan' || sesi.status === 'jeda') &&
+        live.status_peserta === 'di_lobi'
+      ) {
+        live.status_peserta = 'mengerjakan';
+        live.waktu_mulai_kerja_ms = live.waktu_mulai_kerja_ms || now;
+      }
+    }
+
+    // Pastikan paket siswa dibuat jika asesmen sudah berjalan atau saat di lobi
+    if (!menaraAsesmenStore.paketByStudent[sid]) {
+      menaraAsesmenStore.paketByStudent[sid] = buildStudentPackageForAsesmen({
+        studentId: sid,
+        studentName: sName,
+        className: sClass,
+        sessionToken: tok,
+      });
+    }
+
+    saveMenaraAsesmenToFile(true);
+  } else if (actionType === 'save_answers_batch') {
+    if (!live) {
+      return res.status(400).json({
+        success: false,
+        error: 'Silakan bergabung ke lobi asesmen terlebih dahulu.',
+      });
+    }
+    if (live.status_peserta === 'selesai') {
+      return res.status(400).json({
+        success: false,
+        error: 'Asesmen Anda sudah dikumpulkan dan dikunci.',
+      });
+    }
+
+    if (!menaraAsesmenStore.jawabanByStudent[sid]) {
+      menaraAsesmenStore.jawabanByStudent[sid] = {};
+    }
+
+    if (Array.isArray(answersBatch)) {
+      answersBatch.forEach((item: any) => {
+        if (!item || !item.id_soal) return;
+        menaraAsesmenStore.jawabanByStudent[sid][String(item.id_soal)] = {
+          id_sesi: sesi.id_sesi,
+          siswa: sid,
+          nama_siswa: sName,
+          id_soal: String(item.id_soal),
+          jawaban: String(item.jawaban ?? ''),
+          ragu: Boolean(item.ragu),
+          waktu: String(item.waktu || nowStr),
+        };
+      });
+    }
+
+    const allAns = Object.values(menaraAsesmenStore.jawabanByStudent[sid]);
+    live.soal_terjawab = allAns.filter((a) => {
+      const v = String(a.jawaban || '').trim();
+      return v !== '' && v !== '[]' && v !== '{}';
+    }).length;
+    live.soal_ragu = allAns.filter((a) => Boolean(a.ragu)).length;
+    if (typeof activeQuestionNumber === 'number') {
+      live.nomor_soal_aktif = activeQuestionNumber;
+    }
+    live.lastSeen = now;
+    saveMenaraAsesmenToFile();
+  } else if (actionType === 'log_tab_exit') {
+    if (live && live.status_peserta === 'mengerjakan' && sesi.status === 'berjalan') {
+      live.keluar_tab = (live.keluar_tab || 0) + 1;
+      const d = new Date();
+      const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(
+        d.getMinutes()
+      ).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+      live.log_keluar_tab = [
+        `${timeStr} (${String(tabExitReason || 'Pindah Tab/Aplikasi')})`,
+        ...(live.log_keluar_tab || []),
+      ].slice(0, 20);
+      live.lastSeen = now;
+      saveMenaraAsesmenToFile();
+    }
+  } else if (actionType === 'submit_exam') {
+    // Simpan batch jawaban terakhir jika disertakan bersama tombol Kumpulkan
+    if (Array.isArray(answersBatch)) {
+      if (!menaraAsesmenStore.jawabanByStudent[sid]) {
+        menaraAsesmenStore.jawabanByStudent[sid] = {};
+      }
+      answersBatch.forEach((item: any) => {
+        if (!item || !item.id_soal) return;
+        menaraAsesmenStore.jawabanByStudent[sid][String(item.id_soal)] = {
+          id_sesi: sesi.id_sesi,
+          siswa: sid,
+          nama_siswa: sName,
+          id_soal: String(item.id_soal),
+          jawaban: String(item.jawaban ?? ''),
+          ragu: Boolean(item.ragu),
+          waktu: String(item.waktu || nowStr),
+        };
+      });
+    }
+
+    if (live) {
+      const allAns = Object.values(menaraAsesmenStore.jawabanByStudent[sid] || {});
+      live.soal_terjawab = allAns.filter((a) => {
+        const v = String(a.jawaban || '').trim();
+        return v !== '' && v !== '[]' && v !== '{}';
+      }).length;
+      live.soal_ragu = 0;
+    }
+
+    const hasil = finalizeAndGradeStudentAsesmen(sid);
+    saveMenaraAsesmenToFile(true);
+
+    broadcastPresence({
+      type: 'asesmen_tower_tick',
+      sesiId: sesi.id_sesi,
+      status: sesi.status,
+      timestamp: now,
+    });
+
+    return res.json({
+      success: true,
+      hasil,
+      data: buildSanitizedMenaraAsesmenPayload({
+        viewerId: sid,
+        isVerifiedTeacher: false,
+      }),
+    });
+  }
+
+  broadcastPresence({
+    type: 'asesmen_tower_tick',
+    sesiId: sesi.id_sesi,
+    status: sesi.status,
+    timestamp: now,
+  });
+
+  return res.json({
+    success: true,
+    data: buildSanitizedMenaraAsesmenPayload({
+      viewerId: sid,
+      isVerifiedTeacher: false,
     }),
   });
 });

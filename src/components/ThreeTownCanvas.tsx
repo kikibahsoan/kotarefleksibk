@@ -118,6 +118,7 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'pencakar_langit', name: 'Gedung Pencakar Langit (Escape Room Menara)', tagline: 'Refleksia Timur • Escape Room Menara (Lantai 1–5) & Tantangan Karier', position: [14.0, 0, -10.5], color: 0x0284c7, icon: '🏙️' },
   { id: 'bandara', name: 'Bandara Refleksia Timur', tagline: 'Gerbang Udara • Landasan Pacu, Pesawat Terbang & Target Masa Depan', position: [10.8, 0, -11.8], color: 0x38bdf8, icon: '✈️' },
   { id: 'arena_rumah_misteri', name: 'Arena Rumah Misteri', tagline: 'Refleksia Timur Depan • Game Kelompok Langsung (Rumah 1–5)', position: [13.5, 0, 3.6], color: 0xf43f5e, icon: '🏠' },
+  { id: 'menara_asesmen', name: 'Menara Asesmen Individu', tagline: 'Refleksia Timur • Asesmen Sumatif Mandiri Berbasis Lobi (TKA Individu)', position: [9.5, 0, -3.5], color: 0x38bdf8, icon: '📝' },
 ];
 
 export const DEFAULT_BUILDINGS_SNAPSHOT = BUILDINGS_INFO.map((b) => ({
@@ -4233,8 +4234,20 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           pendingSeatRef.current = null;
           const standWx = cb.wx;
           const standWy = cb.wy + 0.65 * sc;
-          if (Math.hypot(player.wx - cb.wx, player.wy - cb.wy) < 1.85 || isRun) {
-            setActiveCreatorBuildingModal(cb);
+          const isMenaraAsesmenCb =
+            cb.id === 'cbuild-mw7csayu-ahr' ||
+            cb.modelType === 'modern_tower' ||
+            cb.name === 'Menara Asesmen Individu' ||
+            cb.name === 'Menara Inovasi Digital';
+
+          if (isMenaraAsesmenCb && !isCreatorStudioOpenRef.current) {
+            onSelectBuildingRef.current('menara_asesmen');
+          } else if (Math.hypot(player.wx - cb.wx, player.wy - cb.wy) < 1.85 || isRun) {
+            if (isMenaraAsesmenCb) {
+              onSelectBuildingRef.current('menara_asesmen');
+            } else {
+              setActiveCreatorBuildingModal(cb);
+            }
           }
           player.targetWx = standWx;
           player.targetWy = standWy;
@@ -4727,6 +4740,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           const isScreenHit = Math.abs(sx - bPt.x) < 88 * z && sy >= bPt.y - 95 * z && sy <= bPt.y + 42 * z;
           const isWorldHit = wx >= 11.2 && wx <= 15.8 && wy >= 1.6 && wy <= 5.0;
           isDirectHit = isDirectHit || isScreenHit || isWorldHit;
+        } else if (b.id === 'menara_asesmen') {
+          const bPt = toScreen(bx, by, 0, camera.x, camera.y);
+          const isScreenHit = Math.abs(sx - bPt.x) < 48 * z && sy >= bPt.y - 95 * z && sy <= bPt.y + 28 * z;
+          isDirectHit = isDirectHit || isScreenHit;
         }
         if (isDirectHit) {
           sounds.playClick();
@@ -4735,6 +4752,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             setSittingSeat(null);
           }
           pendingSeatRef.current = null;
+          if (b.id === 'menara_asesmen' && !isCreatorStudioOpenRef.current) {
+            onSelectBuildingRef.current('menara_asesmen');
+          }
           // Walk to doorstep so proximity check triggers pendingConfirmation pop-up
           if (b.id === 'balai_kota') {
             player.targetWx = 0;
@@ -4763,6 +4783,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           } else if (b.id === 'arena_rumah_misteri') {
             player.targetWx = 13.5;
             player.targetWy = 4.4;
+          } else if (b.id === 'menara_asesmen') {
+            player.targetWx = 9.5;
+            player.targetWy = -2.85;
           } else {
             player.targetWx = bx * 0.68;
             player.targetWy = by * 0.68;
@@ -5869,15 +5892,22 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             });
           }
         } else if (touchedCreatorBuilding) {
+          const isMenaraAsesmenTouched =
+            touchedCreatorBuilding.id === 'cbuild-mw7csayu-ahr' ||
+            touchedCreatorBuilding.modelType === 'modern_tower' ||
+            touchedCreatorBuilding.name === 'Menara Asesmen Individu' ||
+            touchedCreatorBuilding.name === 'Menara Inovasi Digital';
           if (lastTouchedIdRef.current !== touchedCreatorBuilding.id) {
             lastTouchedIdRef.current = touchedCreatorBuilding.id;
             sounds.playClick();
             setPendingConfirmation({
-              type: 'creator_building',
-              id: touchedCreatorBuilding.id,
-              name: touchedCreatorBuilding.name,
-              tagline: touchedCreatorBuilding.tagline,
-              icon: touchedCreatorBuilding.icon,
+              type: isMenaraAsesmenTouched ? 'building' : 'creator_building',
+              id: isMenaraAsesmenTouched ? 'menara_asesmen' : touchedCreatorBuilding.id,
+              name: isMenaraAsesmenTouched ? 'Menara Asesmen Individu' : touchedCreatorBuilding.name,
+              tagline: isMenaraAsesmenTouched
+                ? 'Refleksia Timur • Asesmen Sumatif Mandiri Berbasis Lobi (TKA Individu)'
+                : touchedCreatorBuilding.tagline,
+              icon: isMenaraAsesmenTouched ? '📝' : touchedCreatorBuilding.icon,
             });
           }
         } else if (touchedBuilding) {
@@ -9982,6 +10012,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       BUILDINGS_INFO.forEach((b) => {
         if (b.id === 'monumen_warga') return; // drawn as fountain
+        if (
+          b.id === 'menara_asesmen' &&
+          (creatorStateRef.current.customBuildings || []).some(
+            (cb) =>
+              cb.id === 'cbuild-mw7csayu-ahr' ||
+              cb.modelType === 'modern_tower' ||
+              cb.name === 'Menara Asesmen Individu'
+          )
+        ) {
+          return; // drawn by custom_creator_building (modern_tower) at [9.5, -3.5] so exact building shape is preserved
+        }
         if (creatorStateRef.current.existingOverrides?.[b.id]?.isHidden) return;
         drawItems.push({ type: 'building', info: b, depth: b.position[0] + b.position[2] });
       });
@@ -23963,7 +24004,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                         const foundCb = (creatorStateRef.current.customBuildings || []).find(
                           (c) => c.id === target.id
                         );
-                        if (foundCb) {
+                        if (
+                          foundCb &&
+                          (foundCb.id === 'cbuild-mw7csayu-ahr' ||
+                            foundCb.modelType === 'modern_tower' ||
+                            foundCb.name === 'Menara Asesmen Individu' ||
+                            foundCb.name === 'Menara Inovasi Digital')
+                        ) {
+                          onSelectBuildingRef.current('menara_asesmen');
+                        } else if (foundCb) {
                           setActiveCreatorBuildingModal(foundCb);
                         }
                       } else {
@@ -26559,7 +26608,18 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             wx: playerRef.current?.wx ?? 0,
             wy: playerRef.current?.wy ?? 0,
           }}
-          onPreviewCustomBuildingModal={(b: CreatorBuildingItem) => setActiveCreatorBuildingModal(b)}
+          onPreviewCustomBuildingModal={(b: CreatorBuildingItem) => {
+            if (
+              b.id === 'cbuild-mw7csayu-ahr' ||
+              b.modelType === 'modern_tower' ||
+              b.name === 'Menara Asesmen Individu' ||
+              b.name === 'Menara Inovasi Digital'
+            ) {
+              onSelectBuildingRef.current('menara_asesmen');
+            } else {
+              setActiveCreatorBuildingModal(b);
+            }
+          }}
           onTeleportCameraOrAvatar={(wx: number, wy: number) => {
             if (playerRef.current) {
               playerRef.current.wx = wx;
@@ -26575,8 +26635,12 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       )}
 
       {/* CITIZEN INTERACTIVE MODAL FOR CUSTOM CREATOR BUILDINGS */}
-      {activeCreatorBuildingModal && (
-        <CreatorBuildingCitizenModal
+      {activeCreatorBuildingModal &&
+        activeCreatorBuildingModal.id !== 'cbuild-mw7csayu-ahr' &&
+        activeCreatorBuildingModal.modelType !== 'modern_tower' &&
+        activeCreatorBuildingModal.name !== 'Menara Asesmen Individu' &&
+        activeCreatorBuildingModal.name !== 'Menara Inovasi Digital' && (
+          <CreatorBuildingCitizenModal
           building={
             creatorState.customBuildings.find((b) => b.id === activeCreatorBuildingModal.id) ||
             activeCreatorBuildingModal

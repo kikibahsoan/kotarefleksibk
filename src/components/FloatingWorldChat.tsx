@@ -35,8 +35,8 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
   onReportMessage,
   studentHandle,
 }) => {
-  // Open by default on all screen sizes so chat and typing board are immediately visible
-  const [isOpen, setIsOpen] = useState(true);
+  // Selalu tertutup secara default, terbuka saat menekan icon Chat
+  const [isOpen, setIsOpen] = useState(false);
   const [inputText, setInputText] = useState('');
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +53,7 @@ export const FloatingWorldChat: React.FC<FloatingWorldChatProps> = ({
     if (!trimmed) return;
     onSendMessage(trimmed);
     setInputText('');
+    setIsOpen(true);
   };
 
   return (

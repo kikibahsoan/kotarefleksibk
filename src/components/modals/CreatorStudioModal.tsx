@@ -76,13 +76,13 @@ export const CREATOR_STOCK_MODELS: StockModelDefinition[] = [
   {
     modelType: 'modern_tower',
     category: 'gedung_kantor',
-    defaultName: 'Menara Inovasi Digital',
-    defaultTagline: 'Pusat Riset & Kolaborasi Masa Depan',
-    icon: '🏙️',
+    defaultName: 'Menara Asesmen Individu',
+    defaultTagline: 'Asesmen Sumatif Mandiri Berbasis Lobi (TKA Individu)',
+    icon: '📝',
     accentColor: '#38bdf8',
     roofColor: '#0284c7',
     defaultTemplate: 'facility_info',
-    description: 'Gedung kaca bertingkat bergaya futuristik dengan helipad dan fasad neon.',
+    description: 'Gedung biru bertingkat di Refleksia Timur untuk Asesmen Sumatif Mandiri berbasis lobi setara TKA.',
   },
   {
     modelType: 'innovation_lab',

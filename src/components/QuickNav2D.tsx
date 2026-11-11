@@ -28,6 +28,7 @@ const BUILDING_ICONS: Partial<Record<BuildingId, string>> = {
   mall_kota: '🛍️',
   bandara: '✈️',
   arena_rumah_misteri: '🏠',
+  menara_asesmen: '📝',
 };
 
 const BUILDING_DESCRIPTIONS: Partial<Record<BuildingId, string>> = {
@@ -48,6 +49,7 @@ const BUILDING_DESCRIPTIONS: Partial<Record<BuildingId, string>> = {
   mall_kota: 'Pusat Kota (Setelah Sungai) • Etalase belanja atribut warga dan literasi finansial bijak.',
   bandara: 'Pusat Kota (Setelah Sungai) • Terminal perjalanan belajar dan target jangka panjang.',
   arena_rumah_misteri: 'Refleksia Timur Depan • Game Kelompok Langsung: Diskusi soal, pilih Rumah 1–5 & bertahan dari ledakan 4 rumah salah!',
+  menara_asesmen: 'Refleksia Timur • Asesmen Sumatif Mandiri berbasis lobi (mirip TKA/CBT): Pilihan Ganda Tunggal, MCMA & Kategori dari Bank Materi.',
 };
 
 export const QuickNav2D: React.FC<QuickNav2DProps> = ({

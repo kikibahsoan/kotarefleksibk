@@ -116,6 +116,21 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
+  // 2d. Aksi Khusus Menara Asesmen Individu (Polling 3-5 Detik + Anti-Peek Kunci Jawaban & Pembahasan)
+  if (action === "get_menara_asesmen") {
+    var roleAsesmen = (e && e.parameter && e.parameter.role) ? String(e.parameter.role) : "siswa";
+    var pinAsesmen = (e && e.parameter && e.parameter.teacherPin) ? String(e.parameter.teacherPin) : "";
+    var siswaAsesmen = (e && e.parameter && e.parameter.siswa) ? String(e.parameter.siswa) : "";
+    var isGuruAsesmen = (roleAsesmen === "guru" && isValidTeacherPin(ss, pinAsesmen));
+    var asesmenData = getMenaraAsesmenStateGAS(ss, isGuruAsesmen, siswaAsesmen);
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      isTeacherVerified: isGuruAsesmen,
+      asesmen: asesmenData,
+      timestamp: new Date().toISOString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   // 3. Aksi Lengkap Semua Data v3.0 (Refleksi, Feedback, Pesan Kantor Pos, Obrolan Warga, Jurnal Pohon Beringin, Podcast, Hasil Tes Lab DKV, Leaderboard Mingguan 7 Hari, Pasar Prestasi, Bank Materi Guru AI & Kotak Saran Wisma)
   var reflections = getReflections(ss);
   var feedbacks = getFeedbacks(ss);
@@ -263,6 +278,26 @@ function doPost(e) {
         success: true,
         hasil: checkResult ? "benar" : "salah"
       })).setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_asesmen_sesi_dan_soal") {
+      if (!isValidTeacherAccountOrPin(ss, data.teacherId, data.teacherName, data.teacherPin)) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Akses ditolak: Hanya akun Guru resmi yang dapat mengatur Menara Asesmen Individu." }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      saveAsesmenSesiDanSoalGAS(ss, data.sesi, data.bankSoal, data.stimulusList);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_asesmen_paket_batch") {
+      saveAsesmenPaketBatchGAS(ss, data.paketList);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_asesmen_jawaban_batch") {
+      saveAsesmenJawabanBatchGAS(ss, data.jawabanList);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "save_asesmen_hasil_batch") {
+      saveAsesmenHasilBatchGAS(ss, data.hasilList);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, action: action }))
+        .setMimeType(ContentService.MimeType.JSON);
     }
 
     return ContentService.createTextOutput(JSON.stringify({ success: true, message: "Aksi berhasil diproses" }))
@@ -1709,6 +1744,308 @@ function getEscapeTowerState(ss, isTeacherVerified, kelompokViewer) {
     konfigurasi: konfigList,
     progres: progresList,
     skor: skorList
+  };
+}
+
+// -------------------------------------------------------------
+// MENARA ASESMEN INDIVIDU (6 SHEET BARU TERPISAH TANPA MENGUBAH SHEET LAMA)
+// 1. "Asesmen_Sesi": id_sesi, tp_terpilih, durasi, status, waktu_mulai
+// 2. "Asesmen_BankSoal": id_soal, id_sesi, tp, jenis, tipe_penyajian, id_stimulus, teks_soal, opsi, kunci_jawaban, pembahasan
+// 3. "Asesmen_Stimulus": id_stimulus, jenis, isi
+// 4. "Asesmen_PaketSiswa": id_sesi, siswa, urutan_soal
+// 5. "Asesmen_Jawaban": id_sesi, siswa, id_soal, jawaban, ragu, waktu
+// 6. "Asesmen_Hasil": id_sesi, siswa, nilai, jumlah_benar, durasi, keluar_tab
+// KEAMANAN: Kunci jawaban & pembahasan TIDAK PERNAH dikirim ke siswa saat asesmen berlangsung!
+// -------------------------------------------------------------
+function getOrCreateAsesmenSesiSheet(ss) {
+  var sheet = ss.getSheetByName("Asesmen_Sesi");
+  if (!sheet) {
+    sheet = ss.insertSheet("Asesmen_Sesi");
+    sheet.appendRow(["id_sesi", "tp_terpilih", "durasi", "status", "waktu_mulai"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateAsesmenBankSoalSheet(ss) {
+  var sheet = ss.getSheetByName("Asesmen_BankSoal");
+  if (!sheet) {
+    sheet = ss.insertSheet("Asesmen_BankSoal");
+    sheet.appendRow(["id_soal", "id_sesi", "tp", "jenis", "tipe_penyajian", "id_stimulus", "teks_soal", "opsi", "kunci_jawaban", "pembahasan"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateAsesmenStimulusSheet(ss) {
+  var sheet = ss.getSheetByName("Asesmen_Stimulus");
+  if (!sheet) {
+    sheet = ss.insertSheet("Asesmen_Stimulus");
+    sheet.appendRow(["id_stimulus", "jenis", "isi"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateAsesmenPaketSiswaSheet(ss) {
+  var sheet = ss.getSheetByName("Asesmen_PaketSiswa");
+  if (!sheet) {
+    sheet = ss.insertSheet("Asesmen_PaketSiswa");
+    sheet.appendRow(["id_sesi", "siswa", "urutan_soal"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateAsesmenJawabanSheet(ss) {
+  var sheet = ss.getSheetByName("Asesmen_Jawaban");
+  if (!sheet) {
+    sheet = ss.insertSheet("Asesmen_Jawaban");
+    sheet.appendRow(["id_sesi", "siswa", "id_soal", "jawaban", "ragu", "waktu"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getOrCreateAsesmenHasilSheet(ss) {
+  var sheet = ss.getSheetByName("Asesmen_Hasil");
+  if (!sheet) {
+    sheet = ss.insertSheet("Asesmen_Hasil");
+    sheet.appendRow(["id_sesi", "siswa", "nilai", "jumlah_benar", "durasi", "keluar_tab"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function saveAsesmenSesiDanSoalGAS(ss, sesi, bankSoal, stimulusList) {
+  if (sesi && sesi.id_sesi) {
+    var sSheet = getOrCreateAsesmenSesiSheet(ss);
+    var sRows = sSheet.getDataRange().getValues();
+    var foundS = -1;
+    for (var i = 1; i < sRows.length; i++) {
+      if (String(sRows[i][0]) === String(sesi.id_sesi)) {
+        foundS = i + 1;
+        break;
+      }
+    }
+    var sRowVal = [
+      String(sesi.id_sesi),
+      JSON.stringify(sesi.tp_terpilih || []),
+      Number(sesi.durasi) || 30,
+      String(sesi.status || "draf"),
+      String(sesi.waktu_mulai || "")
+    ];
+    if (foundS > 0) {
+      sSheet.getRange(foundS, 1, 1, sRowVal.length).setValues([sRowVal]);
+    } else {
+      sSheet.appendRow(sRowVal);
+    }
+  }
+
+  if (Array.isArray(stimulusList)) {
+    var stSheet = getOrCreateAsesmenStimulusSheet(ss);
+    if (stSheet.getLastRow() > 1) {
+      stSheet.deleteRows(2, stSheet.getLastRow() - 1);
+    }
+    for (var st = 0; st < stimulusList.length; st++) {
+      var itemSt = stimulusList[st] || {};
+      stSheet.appendRow([
+        String(itemSt.id_stimulus || ""),
+        String(itemSt.jenis || "teks"),
+        String(itemSt.isi || "")
+      ]);
+    }
+  }
+
+  if (Array.isArray(bankSoal)) {
+    var bSheet = getOrCreateAsesmenBankSoalSheet(ss);
+    if (bSheet.getLastRow() > 1) {
+      bSheet.deleteRows(2, bSheet.getLastRow() - 1);
+    }
+    for (var b = 0; b < bankSoal.length; b++) {
+      var q = bankSoal[b] || {};
+      var opsiPayload = q.jenis === "pg_kategori" ? JSON.stringify(q.pernyataan_kategori || q.opsi || []) : JSON.stringify(q.opsi || []);
+      bSheet.appendRow([
+        String(q.id_soal || ""),
+        String(q.id_sesi || (sesi && sesi.id_sesi) || ""),
+        String(q.tp || ""),
+        String(q.jenis || "pg_tunggal"),
+        String(q.tipe_penyajian || "tunggal"),
+        String(q.id_stimulus || ""),
+        String(q.teks_soal || ""),
+        opsiPayload,
+        String(q.kunci_jawaban || ""),
+        String(q.pembahasan || "")
+      ]);
+    }
+  }
+}
+
+function saveAsesmenPaketBatchGAS(ss, paketList) {
+  if (!Array.isArray(paketList) || paketList.length === 0) return;
+  var pSheet = getOrCreateAsesmenPaketSiswaSheet(ss);
+  var pRows = pSheet.getDataRange().getValues();
+  for (var i = 0; i < paketList.length; i++) {
+    var pk = paketList[i] || {};
+    if (!pk.id_sesi || !pk.siswa) continue;
+    var foundIdx = -1;
+    for (var r = 1; r < pRows.length; r++) {
+      if (String(pRows[r][0]) === String(pk.id_sesi) && String(pRows[r][1]) === String(pk.siswa)) {
+        foundIdx = r + 1;
+        break;
+      }
+    }
+    var rowVal = [
+      String(pk.id_sesi),
+      String(pk.nama_siswa || pk.siswa),
+      JSON.stringify(pk.urutan_soal || [])
+    ];
+    if (foundIdx > 0) {
+      pSheet.getRange(foundIdx, 1, 1, rowVal.length).setValues([rowVal]);
+    } else {
+      pSheet.appendRow(rowVal);
+    }
+  }
+}
+
+function saveAsesmenJawabanBatchGAS(ss, jawabanList) {
+  if (!Array.isArray(jawabanList) || jawabanList.length === 0) return;
+  var jSheet = getOrCreateAsesmenJawabanSheet(ss);
+  var jRows = jSheet.getDataRange().getValues();
+  for (var i = 0; i < jawabanList.length; i++) {
+    var jw = jawabanList[i] || {};
+    if (!jw.id_sesi || !jw.siswa || !jw.id_soal) continue;
+    var siswaLabel = String(jw.nama_siswa || jw.siswa);
+    var foundRow = -1;
+    for (var r = 1; r < jRows.length; r++) {
+      if (String(jRows[r][0]) === String(jw.id_sesi) && String(jRows[r][1]) === siswaLabel && String(jRows[r][2]) === String(jw.id_soal)) {
+        foundRow = r + 1;
+        break;
+      }
+    }
+    var rowVal = [
+      String(jw.id_sesi),
+      siswaLabel,
+      String(jw.id_soal),
+      String(jw.jawaban || ""),
+      Boolean(jw.ragu),
+      String(jw.waktu || new Date().toLocaleString("id-ID"))
+    ];
+    if (foundRow > 0) {
+      jSheet.getRange(foundRow, 1, 1, rowVal.length).setValues([rowVal]);
+    } else {
+      jSheet.appendRow(rowVal);
+    }
+  }
+}
+
+function saveAsesmenHasilBatchGAS(ss, hasilList) {
+  if (!Array.isArray(hasilList) || hasilList.length === 0) return;
+  var hSheet = getOrCreateAsesmenHasilSheet(ss);
+  var hRows = hSheet.getDataRange().getValues();
+  for (var i = 0; i < hasilList.length; i++) {
+    var hs = hasilList[i] || {};
+    if (!hs.id_sesi || !hs.siswa) continue;
+    var siswaName = String(hs.nama_siswa || hs.siswa);
+    var foundRow = -1;
+    for (var r = 1; r < hRows.length; r++) {
+      if (String(hRows[r][0]) === String(hs.id_sesi) && String(hRows[r][1]) === siswaName) {
+        foundRow = r + 1;
+        break;
+      }
+    }
+    var rowVal = [
+      String(hs.id_sesi),
+      siswaName,
+      Number(hs.nilai) || 0,
+      Number(hs.jumlah_benar) || 0,
+      Number(hs.durasi) || 0,
+      Number(hs.keluar_tab) || 0
+    ];
+    if (foundRow > 0) {
+      hSheet.getRange(foundRow, 1, 1, rowVal.length).setValues([rowVal]);
+    } else {
+      hSheet.appendRow(rowVal);
+    }
+  }
+}
+
+function getMenaraAsesmenStateGAS(ss, isTeacherVerified, siswaViewer) {
+  var sSheet = getOrCreateAsesmenSesiSheet(ss);
+  var bSheet = getOrCreateAsesmenBankSoalSheet(ss);
+  var stSheet = getOrCreateAsesmenStimulusSheet(ss);
+  var pSheet = getOrCreateAsesmenPaketSiswaSheet(ss);
+  var hSheet = getOrCreateAsesmenHasilSheet(ss);
+
+  var sRows = sSheet.getDataRange().getValues();
+  var latestSesi = null;
+  if (sRows.length > 1) {
+    var ls = sRows[sRows.length - 1];
+    var tpArr = [];
+    try { tpArr = JSON.parse(String(ls[1] || "[]")); } catch (e) {}
+    latestSesi = {
+      id_sesi: String(ls[0] || "ASESMEN-1"),
+      tp_terpilih: tpArr,
+      durasi: Number(ls[2]) || 30,
+      status: String(ls[3] || "draf"),
+      waktu_mulai: String(ls[4] || "")
+    };
+  }
+
+  var stRows = stSheet.getDataRange().getValues();
+  var stimulusList = [];
+  for (var st = 1; st < stRows.length; st++) {
+    if (!stRows[st][0]) continue;
+    stimulusList.push({
+      id_stimulus: String(stRows[st][0]),
+      jenis: String(stRows[st][1] || "teks"),
+      isi: String(stRows[st][2] || "")
+    });
+  }
+
+  var bRows = bSheet.getDataRange().getValues();
+  var bankSoal = [];
+  for (var b = 1; b < bRows.length; b++) {
+    var br = bRows[b];
+    if (!br[0]) continue;
+    var parsedOpsi = [];
+    try { parsedOpsi = JSON.parse(String(br[7] || "[]")); } catch (e) {}
+    bankSoal.push({
+      id_soal: String(br[0]),
+      id_sesi: String(br[1] || ""),
+      tp: String(br[2] || ""),
+      jenis: String(br[3] || "pg_tunggal"),
+      tipe_penyajian: String(br[4] || "tunggal"),
+      id_stimulus: String(br[5] || ""),
+      teks_soal: String(br[6] || ""),
+      opsi: parsedOpsi,
+      // KEAMANAN: Kunci jawaban & pembahasan TIDAK PERNAH dikirim ke siswa!
+      kunci_jawaban: isTeacherVerified ? String(br[8] || "") : null,
+      pembahasan: isTeacherVerified ? String(br[9] || "") : null
+    });
+  }
+
+  var hRows = hSheet.getDataRange().getValues();
+  var hasilList = [];
+  for (var h = 1; h < hRows.length; h++) {
+    var hr = hRows[h];
+    if (!hr[0]) continue;
+    if (!isTeacherVerified && siswaViewer && String(hr[1]) !== siswaViewer) continue;
+    hasilList.push({
+      id_sesi: String(hr[0]),
+      siswa: String(hr[1]),
+      nilai: Number(hr[2]) || 0,
+      jumlah_benar: Number(hr[3]) || 0,
+      durasi: Number(hr[4]) || 0,
+      keluar_tab: Number(hr[5]) || 0
+    });
+  }
+
+  return {
+    sesi: latestSesi,
+    stimulusList: stimulusList,
+    bankSoal: bankSoal,
+    hasilList: hasilList
   };
 }`;
 

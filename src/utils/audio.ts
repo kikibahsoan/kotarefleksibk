@@ -282,7 +282,16 @@ class SoundManager {
       // ignore
     }
   }
+
+  playSuccess() {
+    this.playRewardXp();
+  }
+
+  playError() {
+    this.playBounceKnockback();
+  }
 }
 
 export const sounds = new SoundManager();
+
 

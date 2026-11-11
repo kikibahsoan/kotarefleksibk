@@ -43,6 +43,7 @@ import { BankMateriModal } from './components/modals/BankMateriModal.tsx';
 import { PusatKotaBuildingModal } from './components/modals/PusatKotaBuildingModal.tsx';
 import { ArenaRumahMisteriModal } from './components/modals/ArenaRumahMisteriModal.tsx';
 import { EscapeRoomMenaraModal } from './components/modals/EscapeRoomMenaraModal.tsx';
+import { MenaraAsesmenIndividuModal } from './components/modals/MenaraAsesmenIndividuModal.tsx';
 import { isPusatKotaBuilding } from './utils/aturanBakuKota.ts';
 import { FloatingWorldChat } from './components/FloatingWorldChat.tsx';
 import { LofiAudioControl } from './components/LofiAudioControl.tsx';
@@ -1472,6 +1473,14 @@ export default function App() {
         />
       )}
 
+      {activeBuilding === 'menara_asesmen' && (
+        <MenaraAsesmenIndividuModal
+          onClose={() => setActiveBuilding(null)}
+          currentStudent={student}
+          onAddXp={handleAddPoints}
+        />
+      )}
+
       {activeBuilding === 'bank_materi' && student.isTeacher && (
         <BankMateriModal
           onClose={() => setActiveBuilding(null)}
@@ -1499,6 +1508,7 @@ export default function App() {
       )}
 
       {activeBuilding &&
+        activeBuilding !== 'menara_asesmen' &&
         isPusatKotaBuilding(activeBuilding) &&
         (activeBuilding !== 'pencakar_langit' || showCareerModalInSkyscraper) && (
           <PusatKotaBuildingModal

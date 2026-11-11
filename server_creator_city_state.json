@@ -1,0 +1,1833 @@
+{
+  "version": 1794319999999,
+  "updatedAt": "10 Nov 2026, 21.30",
+  "updatedBy": "kikybahsoan",
+  "customBuildings": [
+    {
+      "id": "cbuild-mw7csayu-ahr",
+      "name": "Menara Asesmen Individu",
+      "tagline": "Asesmen Sumatif Mandiri Berbasis Lobi (TKA Individu)",
+      "icon": "📝",
+      "category": "gedung_kantor",
+      "modelType": "modern_tower",
+      "wx": 9.5,
+      "wy": -3.5,
+      "scale": 1,
+      "accentColor": "#38bdf8",
+      "roofColor": "#0284c7",
+      "hasCollision": false,
+      "templateType": "facility_info",
+      "templateData": {
+        "welcomeText": "Selamat datang di Menara Asesmen Individu! Fasilitas evaluasi sumatif mandiri berbasis lobi dengan standar TKA (Pilihan Ganda Tunggal, Kompleks MCMA, dan Kategori Berstimulus).",
+        "xpReward": 25,
+        "gameTitle": "Asesmen Sumatif Mandiri (TKA) Kota Refleksia",
+        "quizItems": [
+          {
+            "id": "q1",
+            "question": "Prinsip desain yang membantu mata audiens fokus pada elemen utama terlebih dahulu disebut?",
+            "options": [
+              "Hierarki Visual",
+              "Distorsi Pixel",
+              "Saturasi Bebas",
+              "Kompresi File"
+            ],
+            "correctIndex": 0,
+            "explanation": "Hierarki visual mengatur urutan prioritas elemen agar pesan utama langsung tertangkap."
+          },
+          {
+            "id": "q2",
+            "question": "Mengapa ruang kosong (white space) sangat penting dalam tata letak poster atau antarmuka?",
+            "options": [
+              "Agar ukuran file menjadi lebih besar",
+              "Memberi napas bagi mata pembaca dan memperjelas struktur informasi",
+              "Mengurangi jumlah warna yang dipakai",
+              "Menghilangkan kebutuhan tipografi"
+            ],
+            "correctIndex": 1,
+            "explanation": "White space menjaga desain tetap rapi, lega, dan meningkatkan keterbacaan."
+          }
+        ],
+        "highScores": [],
+        "ideaPrompt": "Tuliskan refleksi atau kesanmu setelah mengikuti sesi ujian di Menara Asesmen Individu!",
+        "ideas": [],
+        "infoContent": "Menara Asesmen Individu adalah pusat asesmen sumatif mandiri berbasis lobi (mirip TKA/CBT) di Kota Refleksia.\n\n• Siswa masuk ke lobi asesmen dan mengerjakan paket soal teracak secara mandiri.\n• Soal disusun otomatis dari Tujuan Pembelajaran (TP) pada Bank Materi Kota Refleksia.",
+        "externalUrl": "",
+        "mediaCaption": "Fasilitas Asesmen Sumatif Mandiri Kota Refleksia",
+        "missionChecklist": [
+          "Bergabung ke lobi Menara Asesmen Individu tepat waktu",
+          "Mengerjakan seluruh butir soal secara jujur dan mandiri tanpa keluar tab"
+        ],
+        "submissions": []
+      },
+      "createdBy": "kikybahsoan",
+      "updatedAt": "10/11/2026, 21.30.00"
+    },
+    {
+      "id": "cbuild-mw7csmb1-w0y",
+      "name": "Laboratorium Sains & AI",
+      "tagline": "Eksperimen Teknologi & Desain Masa Kini",
+      "icon": "🔬",
+      "category": "gedung_kantor",
+      "modelType": "innovation_lab",
+      "wx": 11,
+      "wy": -3.5,
+      "scale": 1,
+      "accentColor": "#a855f7",
+      "roofColor": "#7e22ce",
+      "hasCollision": false,
+      "templateType": "games",
+      "templateData": {
+        "welcomeText": "Selamat datang di Laboratorium Sains & AI! Mari berpartisipasi dalam aktivitas warga di fasilitas ini.",
+        "xpReward": 15,
+        "gameTitle": "Tantangan Kuis Laboratorium Sains & AI",
+        "quizItems": [
+          {
+            "id": "q1",
+            "question": "Prinsip desain yang membantu mata audiens fokus pada elemen utama terlebih dahulu disebut?",
+            "options": [
+              "Hierarki Visual",
+              "Distorsi Pixel",
+              " Saturasi Bebas",
+              "kompresi File"
+            ],
+            "correctIndex": 0,
+            "explanation": "Hierarki visual mengatur urutan prioritas elemen agar pesan utama langsung tertangkap."
+          },
+          {
+            "id": "q2",
+            "question": "Mengapa ruang kosong (white space) sangat penting dalam tata letak poster atau antarmuka?",
+            "options": [
+              "Agar ukuran file menjadi lebih besar",
+              "Memberi napas bagi mata pembaca dan memperjelas struktur informasi",
+              "Mengurangi jumlah warna yang dipakai",
+              "Menghilangkan kebutuhan tipografi"
+            ],
+            "correctIndex": 1,
+            "explanation": "White space menjaga desain tetap rapi, lega, dan meningkatkan keterbacaan."
+          }
+        ],
+        "highScores": [
+          {
+            "studentId": "teacher-kikybahsoan",
+            "studentName": "kikybahsoan",
+            "score": 0,
+            "date": "08/11/26, 13.01"
+          }
+        ],
+        "ideaPrompt": "Tuliskan ide, terobosan kreatif, atau saran terbaikmu di Laboratorium Sains & AI!",
+        "ideas": [],
+        "infoContent": "Laboratorium Sains & AI hadir sebagai fasilitas kolaborasi dan eksplorasi warga Kota Refleksia.\n\n• Manfaatkan ruang ini untuk berdiskusi dan memetik inspirasi baru.\n• Setiap warga yang berkunjung berhak mengklaim apresiasi XP Kunjungan.",
+        "externalUrl": "",
+        "mediaCaption": "Fasilitas Resmi Kreasi Master Kota Refleksia",
+        "missionChecklist": [
+          "Mengamati arsitektur dan informasi utama di fasilitas ini",
+          "Berdiskusi atau berbagi kesan positif bersama warga kota lainnya"
+        ],
+        "submissions": []
+      },
+      "createdBy": "kikybahsoan",
+      "updatedAt": "8/11/2026, 12.49.58"
+    }
+  ],
+  "existingOverrides": {
+    "balai_kota": {
+      "id": "balai_kota",
+      "objectCategory": "building",
+      "wx": -0.5,
+      "wy": -4.5,
+      "customName": "Balai Kota",
+      "customTagline": "Kubah Emas & Misi",
+      "customIcon": "🏛️"
+    },
+    "perpustakaan": {
+      "id": "perpustakaan",
+      "objectCategory": "building",
+      "wx": -4.5,
+      "wy": -0.5,
+      "customName": "Perpustakaan Kampus",
+      "customTagline": "Gedung Biru & Materi",
+      "customIcon": "📚"
+    },
+    "pasar_prestasi": {
+      "id": "pasar_prestasi",
+      "objectCategory": "building",
+      "wx": -3.5,
+      "wy": 2.5,
+      "customName": "Pasar Prestasi",
+      "customTagline": "Leaderboard & Dewan Guru",
+      "customIcon": "🏆"
+    },
+    "menara_mentor": {
+      "id": "menara_mentor",
+      "objectCategory": "building",
+      "wx": 3.5,
+      "wy": -0.5,
+      "customName": "Studio ON AIR",
+      "customTagline": "Studio Podcast, ON AIR & AI",
+      "customIcon": "🎙️"
+    },
+    "bank_materi": {
+      "id": "bank_materi",
+      "objectCategory": "building",
+      "wx": -5.5,
+      "wy": -5.5,
+      "customName": "Bank Materi Guru",
+      "customTagline": "Khusus Guru • Input TP, Materi Esensial & Generate AI",
+      "customIcon": "🏦"
+    },
+    "pencakar_langit": {
+      "id": "pencakar_langit",
+      "objectCategory": "building",
+      "wx": 13.5,
+      "wy": -9,
+      "customName": "Gedung Pencakar Langit",
+      "customTagline": "Refleksia Timur • Tantangan Karier & Cita-cita Masa Depan",
+      "customIcon": "🏙️"
+    },
+    "bandara": {
+      "id": "bandara",
+      "objectCategory": "building",
+      "wx": 10.5,
+      "wy": -12.5,
+      "customName": "Bandara Refleksia Timur",
+      "customTagline": "Gerbang Udara • Landasan Pacu, Pesawat Terbang & Target Masa Depan",
+      "customIcon": "✈️"
+    },
+    "taman_refleksi": {
+      "id": "taman_refleksi",
+      "objectCategory": "building",
+      "wx": -3,
+      "wy": -3,
+      "customName": "Pusat Refleksi",
+      "customTagline": "Tulis Jurnal Refleksi (+3 Poin)",
+      "customIcon": "🌍"
+    },
+    "announcement_board": {
+      "id": "announcement_board",
+      "objectCategory": "facility",
+      "wx": 1,
+      "wy": -4,
+      "customName": "Papan Pengumuman",
+      "customTagline": "Informasi Resmi Dewan Guru",
+      "customIcon": "📋"
+    },
+    "swing_struct_1": {
+      "id": "swing_struct_1",
+      "objectCategory": "swing",
+      "wx": -2,
+      "wy": -4,
+      "customName": "Ayunan 1 • Taman Refleksi",
+      "customTagline": "2 Kursi Ayunan Taman Barat",
+      "customIcon": "🎠"
+    },
+    "beringin": {
+      "id": "beringin",
+      "objectCategory": "facility",
+      "wx": -3,
+      "wy": -6,
+      "customName": "Pohon Beringin Refleksi",
+      "customTagline": "Gantungkan Daun Jurnal 4F",
+      "customIcon": "🌳"
+    },
+    "swing_struct_2": {
+      "id": "swing_struct_2",
+      "objectCategory": "swing",
+      "wx": 3,
+      "wy": 5,
+      "customName": "Ayunan 2 • Taman Timur",
+      "customTagline": "2 Kursi Ayunan Taman Timur",
+      "customIcon": "🎠",
+      "isHidden": false
+    },
+    "kantor_pos": {
+      "id": "kantor_pos",
+      "objectCategory": "building",
+      "wx": 2.5,
+      "wy": -4,
+      "customName": "Kantor Pos Kilat",
+      "customTagline": "Kirim Pesan ke Guru",
+      "customIcon": "📮"
+    },
+    "campfire": {
+      "id": "campfire",
+      "objectCategory": "campfire",
+      "wx": -5,
+      "wy": 5,
+      "customName": "Api Unggun Taman Barat Daya",
+      "customTagline": "Titik Penghangat & Kumpul Malam Warga",
+      "customIcon": "🔥"
+    },
+    "campfire_1": {
+      "id": "campfire_1",
+      "objectCategory": "bench",
+      "wx": -5,
+      "wy": 4,
+      "customName": "Bangku Api Unggun Kiri",
+      "customTagline": "Bangku Kayu Hangat 2 Warga",
+      "customIcon": "🪵"
+    },
+    "campfire_2": {
+      "id": "campfire_2",
+      "objectCategory": "bench",
+      "wx": -4,
+      "wy": 5,
+      "customName": "Bangku Api Unggun Kanan",
+      "customTagline": "Bangku Kayu Hangat 2 Warga",
+      "customIcon": "🪵"
+    },
+    "tree_55": {
+      "id": "tree_55",
+      "objectCategory": "tree",
+      "wx": 17.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #56",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🍁"
+    },
+    "tree_54": {
+      "id": "tree_54",
+      "objectCategory": "tree",
+      "wx": 16.5,
+      "wy": 7.5,
+      "customName": "Pohon Kota #55",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🌳"
+    },
+    "tree_57": {
+      "id": "tree_57",
+      "objectCategory": "tree",
+      "wx": 14.5,
+      "wy": 7.5,
+      "customName": "Pohon Kota #58",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🌳"
+    },
+    "tree_56": {
+      "id": "tree_56",
+      "objectCategory": "tree",
+      "wx": 12.5,
+      "wy": 7.5,
+      "customName": "Pohon Kota #57",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🌳",
+      "isHidden": false
+    },
+    "tree_53": {
+      "id": "tree_53",
+      "objectCategory": "tree",
+      "wx": 17.5,
+      "wy": 4.5,
+      "customName": "Pohon Kota #54",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🌳",
+      "isHidden": false
+    },
+    "tree_52": {
+      "id": "tree_52",
+      "objectCategory": "tree",
+      "wx": 17.5,
+      "wy": 4.5,
+      "customName": "Pohon Kota #53",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🍁",
+      "isHidden": false
+    },
+    "tree_51": {
+      "id": "tree_51",
+      "objectCategory": "tree",
+      "wx": 17.5,
+      "wy": 4.5,
+      "customName": "Pohon Kota #52",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🌳",
+      "isHidden": false
+    },
+    "tree_50": {
+      "id": "tree_50",
+      "objectCategory": "tree",
+      "wx": 17.5,
+      "wy": 2.5,
+      "customName": "Pohon Kota #51",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🌳"
+    },
+    "tree_49": {
+      "id": "tree_49",
+      "objectCategory": "tree",
+      "wx": 17.5,
+      "wy": 0.5,
+      "customName": "Pohon Kota #50",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🍁"
+    },
+    "tree_48": {
+      "id": "tree_48",
+      "objectCategory": "tree",
+      "wx": 10.5,
+      "wy": 7.5,
+      "customName": "Pohon Kota #49",
+      "customTagline": "Pohon Refleksia Timur",
+      "customIcon": "🌳",
+      "isHidden": false
+    },
+    "tree_16": {
+      "id": "tree_16",
+      "objectCategory": "tree",
+      "wx": -6.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #17",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🍁"
+    },
+    "tree_21": {
+      "id": "tree_21",
+      "objectCategory": "tree",
+      "wx": -5.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #22",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_23": {
+      "id": "tree_23",
+      "objectCategory": "tree",
+      "wx": -4.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #24",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_19": {
+      "id": "tree_19",
+      "objectCategory": "tree",
+      "wx": -3.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #20",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🍁"
+    },
+    "tree_25": {
+      "id": "tree_25",
+      "objectCategory": "tree",
+      "wx": -2.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #26",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🍁"
+    },
+    "tree_17": {
+      "id": "tree_17",
+      "objectCategory": "tree",
+      "wx": -1.5,
+      "wy": 7,
+      "customName": "Pohon Kota #18",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_18": {
+      "id": "tree_18",
+      "objectCategory": "tree",
+      "wx": 1.5,
+      "wy": 7,
+      "customName": "Pohon Kota #19",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "rules_board": {
+      "id": "rules_board",
+      "objectCategory": "facility",
+      "wx": -1.5,
+      "wy": 7.5,
+      "customName": "Papan Peraturan Kota",
+      "customTagline": "Tata Tertib & Panduan Warga",
+      "customIcon": "📜"
+    },
+    "tree_24": {
+      "id": "tree_24",
+      "objectCategory": "tree",
+      "wx": 3.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #25",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_26": {
+      "id": "tree_26",
+      "objectCategory": "tree",
+      "wx": 2.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #27",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳",
+      "isHidden": false
+    },
+    "tree_22": {
+      "id": "tree_22",
+      "objectCategory": "tree",
+      "wx": 4.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #23",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🍁",
+      "isHidden": false
+    },
+    "tree_27": {
+      "id": "tree_27",
+      "objectCategory": "tree",
+      "wx": 5.5,
+      "wy": 6.5,
+      "customName": "Pohon Kota #28",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_35": {
+      "id": "tree_35",
+      "objectCategory": "tree",
+      "wx": 8.5,
+      "wy": 7.5,
+      "customName": "Pohon Kota #36",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_37": {
+      "id": "tree_37",
+      "objectCategory": "tree",
+      "wx": 6.5,
+      "wy": 0.5,
+      "customName": "Pohon Kota #38",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🍁"
+    },
+    "tree_29": {
+      "id": "tree_29",
+      "objectCategory": "tree",
+      "wx": 6.5,
+      "wy": 1.5,
+      "customName": "Pohon Kota #30",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_34": {
+      "id": "tree_34",
+      "objectCategory": "tree",
+      "wx": 6.5,
+      "wy": 2.5,
+      "customName": "Pohon Kota #35",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🍁"
+    },
+    "tree_30": {
+      "id": "tree_30",
+      "objectCategory": "tree",
+      "wx": 6.5,
+      "wy": 3.5,
+      "customName": "Pohon Kota #31",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_28": {
+      "id": "tree_28",
+      "objectCategory": "tree",
+      "wx": 6.5,
+      "wy": -0.5,
+      "customName": "Pohon Kota #29",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🍁"
+    },
+    "tree_32": {
+      "id": "tree_32",
+      "objectCategory": "tree",
+      "wx": 6.5,
+      "wy": -3.5,
+      "customName": "Pohon Kota #33",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_20": {
+      "id": "tree_20",
+      "objectCategory": "tree",
+      "wx": 6.5,
+      "wy": 4.5,
+      "customName": "Pohon Kota #21",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🌳"
+    },
+    "tree_43": {
+      "id": "tree_43",
+      "objectCategory": "tree",
+      "wx": 6.5,
+      "wy": 5.5,
+      "customName": "Pohon Kota #44",
+      "customTagline": "Pohon Rindang Kota Refleksia",
+      "customIcon": "🍁"
+    }
+  },
+  "npcConfigs": {
+    "surya": {
+      "id": "surya",
+      "isCustom": false,
+      "name": "Surya",
+      "role": "Satpam Kota",
+      "gender": "L",
+      "wx": 3.5,
+      "wy": 1.5,
+      "homeWx": 3.5,
+      "homeWy": 1.5,
+      "movementMode": "patrol",
+      "wanderRadius": 2.2,
+      "speed": 1.05,
+      "patrolWaypoints": [
+        {
+          "wx": 0,
+          "wy": 7
+        },
+        {
+          "wx": -4,
+          "wy": 7.5
+        },
+        {
+          "wx": -6,
+          "wy": 4.5
+        },
+        {
+          "wx": -5.5,
+          "wy": 1.5
+        },
+        {
+          "wx": -5.5,
+          "wy": -3
+        },
+        {
+          "wx": -3.5,
+          "wy": -5
+        },
+        {
+          "wx": 0,
+          "wy": -6
+        },
+        {
+          "wx": 3,
+          "wy": -5
+        },
+        {
+          "wx": 5,
+          "wy": -0.5
+        },
+        {
+          "wx": 4.5,
+          "wy": 3
+        },
+        {
+          "wx": 2,
+          "wy": 5
+        },
+        {
+          "wx": 0.5,
+          "wy": 4.5
+        }
+      ],
+      "shirtColor": "#d6c7b2",
+      "pantsColor": "#451a03",
+      "hairColor": "#0f172a",
+      "hatColor": "#1e293b",
+      "speeches": [
+        "👮‍♂️ Keamanan Kota Refleksia terkendali dan tertib!",
+        "🏛️ Cek misi terbaru di Balai Kota ya!",
+        "🛡️ Tetap santun saat berdiskusi bersama warga ya!"
+      ]
+    },
+    "malik": {
+      "id": "malik",
+      "isCustom": false,
+      "name": "Malik",
+      "role": "Kutu Buku Lab",
+      "gender": "L",
+      "wx": 1.5,
+      "wy": 2,
+      "homeWx": 1.5,
+      "homeWy": 2,
+      "movementMode": "wander",
+      "wanderRadius": 1.4,
+      "speed": 0.78,
+      "shirtColor": "#1e3a8a",
+      "pantsColor": "#334155",
+      "hairColor": "#0f172a",
+      "hatColor": "#ffffff",
+      "speeches": [
+        "📚 Sudah coba latihan soal 5 jenjang di Lab DKV?",
+        "✨ Ilmu desain grafis makin seru kalau dipraktikkan!",
+        "🤝 Jangan lupa baca modul di Perpustakaan juga ya!"
+      ]
+    },
+    "nawa": {
+      "id": "nawa",
+      "isCustom": false,
+      "name": "Nawa",
+      "role": "Penjaga Gerbang Utama",
+      "gender": "L",
+      "wx": -1,
+      "wy": 6.5,
+      "homeWx": -1,
+      "homeWy": 6.5,
+      "movementMode": "static",
+      "wanderRadius": 0.5,
+      "speed": 0.5,
+      "shirtColor": "#c2b280",
+      "pantsColor": "#3e1e04",
+      "hairColor": "#1e293b",
+      "hatColor": "#78350f",
+      "speeches": [
+        "🦅 Siap komando! Saya Nawa, Penjaga Gerbang Selamat Datang Kota Refleksia.",
+        "🦅 Pastikan kamu membaca Papan Peraturan & Panduan Kota di sebelah kanan gerbang sebelum menjelajah!",
+        "🦅 Klik saya kapan saja untuk melihat Buku Tamu Gerbang hari ini!"
+      ]
+    }
+  },
+  "customProps": [
+    {
+      "id": "cprop-mw7dfhhm-n7p",
+      "propCategory": "tree",
+      "propModel": "tree_banyan_shady",
+      "name": "Pohon Beringin Teduh",
+      "wx": 7.5,
+      "wy": -13.5,
+      "facing": "down-right",
+      "scale": 1
+    },
+    {
+      "id": "cprop-mw7dfjbd-qij",
+      "propCategory": "tree",
+      "propModel": "tree_banyan_shady",
+      "name": "Pohon Beringin Teduh",
+      "wx": 8,
+      "wy": -13.5,
+      "facing": "down-right",
+      "scale": 1
+    },
+    {
+      "id": "cprop-mw7dgkmv-akd",
+      "propCategory": "tree",
+      "propModel": "tree_banyan_shady",
+      "name": "Pohon Beringin Teduh",
+      "wx": 8,
+      "wy": -11.5,
+      "facing": "down-right",
+      "scale": 1
+    },
+    {
+      "id": "cprop-mw7dgmvb-ct5",
+      "propCategory": "tree",
+      "propModel": "tree_banyan_shady",
+      "name": "Pohon Beringin Teduh",
+      "wx": 8,
+      "wy": -12.5,
+      "facing": "down-right",
+      "scale": 1
+    },
+    {
+      "id": "cprop-mw7dgohz-1vr",
+      "propCategory": "tree",
+      "propModel": "tree_banyan_shady",
+      "name": "Pohon Beringin Teduh",
+      "wx": 8,
+      "wy": -12,
+      "facing": "down-right",
+      "scale": 1
+    },
+    {
+      "id": "cprop-mw7dgres-hjp",
+      "propCategory": "tree",
+      "propModel": "tree_banyan_shady",
+      "name": "Pohon Beringin Teduh",
+      "wx": 8,
+      "wy": -13,
+      "facing": "down-right",
+      "scale": 1
+    },
+    {
+      "id": "cprop-mw7dhgy7-taz",
+      "propCategory": "tree",
+      "propModel": "tree_banyan_shady",
+      "name": "Pohon Beringin Teduh",
+      "wx": 18,
+      "wy": -10,
+      "facing": "down-right",
+      "scale": 1
+    },
+    {
+      "id": "cprop-mw7dozsw-y30",
+      "propCategory": "shrub_plant",
+      "propModel": "shrub_flowering_azalea",
+      "name": "Semak Bunga Azalea Rimbun",
+      "wx": 17.5,
+      "wy": 2.5,
+      "facing": "down-right",
+      "scale": 1
+    },
+    {
+      "id": "cprop-mwamzm5s-p1a",
+      "propCategory": "water_feature",
+      "propModel": "water_fountain_tiered",
+      "name": "Air Mancur Taman 3 Tingkat",
+      "wx": 16,
+      "wy": -6,
+      "facing": "down-right",
+      "scale": 1
+    }
+  ],
+  "customAnimals": [],
+  "terrainTiles": {
+    "0,7": {
+      "gx": 0,
+      "gy": 7,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "0,5": {
+      "gx": 0,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "0,6": {
+      "gx": 0,
+      "gy": 6,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "1,6": {
+      "gx": 1,
+      "gy": 6,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-1,6": {
+      "gx": -1,
+      "gy": 6,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-1,5": {
+      "gx": -1,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-2,5": {
+      "gx": -2,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-3,5": {
+      "gx": -3,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-3,4": {
+      "gx": -3,
+      "gy": 4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "1,5": {
+      "gx": 1,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "2,5": {
+      "gx": 2,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "3,5": {
+      "gx": 3,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "3,4": {
+      "gx": 3,
+      "gy": 4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "3,3": {
+      "gx": 3,
+      "gy": 3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-3,3": {
+      "gx": -3,
+      "gy": 3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-4,3": {
+      "gx": -4,
+      "gy": 3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,3": {
+      "gx": -5,
+      "gy": 3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,2": {
+      "gx": -5,
+      "gy": 2,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,1": {
+      "gx": -5,
+      "gy": 1,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,0": {
+      "gx": -5,
+      "gy": 0,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "4,3": {
+      "gx": 4,
+      "gy": 3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "5,3": {
+      "gx": 5,
+      "gy": 3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "5,2": {
+      "gx": 5,
+      "gy": 2,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "5,1": {
+      "gx": 5,
+      "gy": 1,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "5,0": {
+      "gx": 5,
+      "gy": 0,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "4,0": {
+      "gx": 4,
+      "gy": 0,
+      "terrainType": "road_cobble"
+    },
+    "-4,0": {
+      "gx": -4,
+      "gy": 0,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "0,-4": {
+      "gx": 0,
+      "gy": -4,
+      "terrainType": "road_cobble"
+    },
+    "5,-1": {
+      "gx": 5,
+      "gy": -1,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "5,-2": {
+      "gx": 5,
+      "gy": -2,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "5,-3": {
+      "gx": 5,
+      "gy": -3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "5,-4": {
+      "gx": 5,
+      "gy": -4,
+      "terrainType": "road_cobble"
+    },
+    "6,-4": {
+      "gx": 6,
+      "gy": -4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,-1": {
+      "gx": -5,
+      "gy": -1,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,-2": {
+      "gx": -5,
+      "gy": -2,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,-3": {
+      "gx": -5,
+      "gy": -3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,-5": {
+      "gx": -5,
+      "gy": -5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-6,-5": {
+      "gx": -6,
+      "gy": -5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,-6": {
+      "gx": -5,
+      "gy": -6,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-6,-6": {
+      "gx": -6,
+      "gy": -6,
+      "terrainType": "road_cobble"
+    },
+    "6,-5": {
+      "gx": 6,
+      "gy": -5,
+      "terrainType": "road_cobble"
+    },
+    "5,-5": {
+      "gx": 5,
+      "gy": -5,
+      "terrainType": "road_cobble"
+    },
+    "5,-6": {
+      "gx": 5,
+      "gy": -6,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "6,-6": {
+      "gx": 6,
+      "gy": -6,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "0,-6": {
+      "gx": 0,
+      "gy": -6,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,-4": {
+      "gx": -5,
+      "gy": -4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "4,-5": {
+      "gx": 4,
+      "gy": -5,
+      "terrainType": "grass_open_meadow"
+    },
+    "3,-3": {
+      "gx": 3,
+      "gy": -3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "3,-5": {
+      "gx": 3,
+      "gy": -5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "2,-5": {
+      "gx": 2,
+      "gy": -5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "1,-5": {
+      "gx": 1,
+      "gy": -5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "0,-5": {
+      "gx": 0,
+      "gy": -5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-1,-5": {
+      "gx": -1,
+      "gy": -5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-2,-5": {
+      "gx": -2,
+      "gy": -5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-3,-4": {
+      "gx": -3,
+      "gy": -4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-3,-3": {
+      "gx": -3,
+      "gy": -3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-4,-3": {
+      "gx": -4,
+      "gy": -3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "3,-4": {
+      "gx": 3,
+      "gy": -4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "2,-3": {
+      "gx": 2,
+      "gy": -3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "2,-4": {
+      "gx": 2,
+      "gy": -4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "4,-3": {
+      "gx": 4,
+      "gy": -3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-2,-3": {
+      "gx": -2,
+      "gy": -3,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-2,-4": {
+      "gx": -2,
+      "gy": -4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-3,-5": {
+      "gx": -3,
+      "gy": -5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "6,0": {
+      "gx": 6,
+      "gy": 0,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "6,-3": {
+      "gx": 6,
+      "gy": -3,
+      "terrainType": "flower_garden"
+    },
+    "-4,5": {
+      "gx": -4,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,4": {
+      "gx": -5,
+      "gy": 4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "-5,5": {
+      "gx": -5,
+      "gy": 5,
+      "terrainType": "road_dirt"
+    },
+    "9,0": {
+      "gx": 9,
+      "gy": 0,
+      "terrainType": "road_asphalt"
+    },
+    "10,0": {
+      "gx": 10,
+      "gy": 0,
+      "terrainType": "road_asphalt"
+    },
+    "11,0": {
+      "gx": 11,
+      "gy": 0,
+      "terrainType": "road_asphalt"
+    },
+    "12,0": {
+      "gx": 12,
+      "gy": 0,
+      "terrainType": "road_asphalt"
+    },
+    "13,0": {
+      "gx": 13,
+      "gy": 0,
+      "terrainType": "road_asphalt_t_west"
+    },
+    "13,-1": {
+      "gx": 13,
+      "gy": -1,
+      "terrainType": "road_asphalt"
+    },
+    "13,-2": {
+      "gx": 13,
+      "gy": -2,
+      "terrainType": "road_asphalt"
+    },
+    "13,-4": {
+      "gx": 13,
+      "gy": -4,
+      "terrainType": "road_asphalt"
+    },
+    "13,-3": {
+      "gx": 13,
+      "gy": -3,
+      "terrainType": "road_asphalt"
+    },
+    "13,-5": {
+      "gx": 13,
+      "gy": -5,
+      "terrainType": "road_asphalt"
+    },
+    "13,-6": {
+      "gx": 13,
+      "gy": -6,
+      "terrainType": "road_asphalt"
+    },
+    "13,-7": {
+      "gx": 13,
+      "gy": -7,
+      "terrainType": "road_asphalt"
+    },
+    "12,-5": {
+      "gx": 12,
+      "gy": -5,
+      "terrainType": "road_asphalt"
+    },
+    "11,-5": {
+      "gx": 11,
+      "gy": -5,
+      "terrainType": "road_asphalt"
+    },
+    "10,-5": {
+      "gx": 10,
+      "gy": -5,
+      "terrainType": "road_asphalt"
+    },
+    "9,-5": {
+      "gx": 9,
+      "gy": -5,
+      "terrainType": "road_asphalt"
+    },
+    "9,-6": {
+      "gx": 9,
+      "gy": -6,
+      "terrainType": "road_asphalt"
+    },
+    "9,-7": {
+      "gx": 9,
+      "gy": -7,
+      "terrainType": "road_asphalt"
+    },
+    "9,-8": {
+      "gx": 9,
+      "gy": -8,
+      "terrainType": "road_asphalt"
+    },
+    "9,-9": {
+      "gx": 9,
+      "gy": -9,
+      "terrainType": "road_asphalt"
+    },
+    "9,-10": {
+      "gx": 9,
+      "gy": -10,
+      "terrainType": "road_asphalt"
+    },
+    "11,-8": {
+      "gx": 11,
+      "gy": -8,
+      "terrainType": "plaza_marble"
+    },
+    "12,-8": {
+      "gx": 12,
+      "gy": -8,
+      "terrainType": "plaza_marble"
+    },
+    "13,-8": {
+      "gx": 13,
+      "gy": -8,
+      "terrainType": "plaza_marble"
+    },
+    "15,-8": {
+      "gx": 15,
+      "gy": -8,
+      "terrainType": "plaza_marble"
+    },
+    "14,-8": {
+      "gx": 14,
+      "gy": -8,
+      "terrainType": "plaza_marble"
+    },
+    "16,-8": {
+      "gx": 16,
+      "gy": -8,
+      "terrainType": "plaza_marble"
+    },
+    "17,-8": {
+      "gx": 17,
+      "gy": -8,
+      "terrainType": "plaza_marble"
+    },
+    "11,-9": {
+      "gx": 11,
+      "gy": -9,
+      "terrainType": "plaza_marble"
+    },
+    "17,-9": {
+      "gx": 17,
+      "gy": -9,
+      "terrainType": "plaza_marble"
+    },
+    "17,-10": {
+      "gx": 17,
+      "gy": -10,
+      "terrainType": "plaza_marble"
+    },
+    "16,-10": {
+      "gx": 16,
+      "gy": -10,
+      "terrainType": "plaza_marble"
+    },
+    "10,-8": {
+      "gx": 10,
+      "gy": -8,
+      "terrainType": "plaza_marble"
+    },
+    "10,-9": {
+      "gx": 10,
+      "gy": -9,
+      "terrainType": "plaza_marble"
+    },
+    "4,5": {
+      "gx": 4,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "5,4": {
+      "gx": 5,
+      "gy": 4,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "5,5": {
+      "gx": 5,
+      "gy": 5,
+      "terrainType": "img_paving_parquet_taupe"
+    },
+    "4,4": {
+      "gx": 4,
+      "gy": 4,
+      "terrainType": "grass_open_meadow"
+    },
+    "-4,4": {
+      "gx": -4,
+      "gy": 4,
+      "terrainType": "grass_open_meadow"
+    },
+    "-4,-5": {
+      "gx": -4,
+      "gy": -5,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,-2": {
+      "gx": -6,
+      "gy": -2,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,-4": {
+      "gx": -6,
+      "gy": -4,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,-3": {
+      "gx": -6,
+      "gy": -3,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,-1": {
+      "gx": -6,
+      "gy": -1,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,0": {
+      "gx": -6,
+      "gy": 0,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,2": {
+      "gx": -6,
+      "gy": 2,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,1": {
+      "gx": -6,
+      "gy": 1,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,3": {
+      "gx": -6,
+      "gy": 3,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,4": {
+      "gx": -6,
+      "gy": 4,
+      "terrainType": "grass_open_meadow"
+    },
+    "-6,5": {
+      "gx": -6,
+      "gy": 5,
+      "terrainType": "grass_open_meadow"
+    },
+    "-7,0": {
+      "gx": -7,
+      "gy": 0,
+      "terrainType": "grass_open_meadow"
+    },
+    "0,8": {
+      "gx": 0,
+      "gy": 8,
+      "terrainType": "grass_open_meadow"
+    },
+    "13,1": {
+      "gx": 13,
+      "gy": 1,
+      "terrainType": "road_asphalt_turn_ne"
+    },
+    "14,1": {
+      "gx": 14,
+      "gy": 1,
+      "terrainType": "road_asphalt_turn_sw"
+    },
+    "14,2": {
+      "gx": 14,
+      "gy": 2,
+      "terrainType": "road_asphalt_turn_nw"
+    },
+    "13,2": {
+      "gx": 13,
+      "gy": 2,
+      "terrainType": "road_asphalt_turn_se"
+    },
+    "9,1": {
+      "gx": 9,
+      "gy": 1,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "9,2": {
+      "gx": 9,
+      "gy": 2,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "12,1": {
+      "gx": 12,
+      "gy": 1,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "11,1": {
+      "gx": 11,
+      "gy": 1,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "10,1": {
+      "gx": 10,
+      "gy": 1,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "9,3": {
+      "gx": 9,
+      "gy": 3,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "9,5": {
+      "gx": 9,
+      "gy": 5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "9,4": {
+      "gx": 9,
+      "gy": 4,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "12,2": {
+      "gx": 12,
+      "gy": 2,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "11,3": {
+      "gx": 11,
+      "gy": 3,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "11,4": {
+      "gx": 11,
+      "gy": 4,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "11,5": {
+      "gx": 11,
+      "gy": 5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "12,5": {
+      "gx": 12,
+      "gy": 5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "13,5": {
+      "gx": 13,
+      "gy": 5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,5": {
+      "gx": 14,
+      "gy": 5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "15,5": {
+      "gx": 15,
+      "gy": 5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "15,4": {
+      "gx": 15,
+      "gy": 4,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "15,3": {
+      "gx": 15,
+      "gy": 3,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "15,1": {
+      "gx": 15,
+      "gy": 1,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "15,2": {
+      "gx": 15,
+      "gy": 2,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,0": {
+      "gx": 14,
+      "gy": 0,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "15,0": {
+      "gx": 15,
+      "gy": 0,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "16,3": {
+      "gx": 16,
+      "gy": 3,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "16,4": {
+      "gx": 16,
+      "gy": 4,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "16,5": {
+      "gx": 16,
+      "gy": 5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,-2": {
+      "gx": 14,
+      "gy": -2,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,-1": {
+      "gx": 14,
+      "gy": -1,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,-3": {
+      "gx": 14,
+      "gy": -3,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,-4": {
+      "gx": 14,
+      "gy": -4,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "9,6": {
+      "gx": 9,
+      "gy": 6,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "10,-6": {
+      "gx": 10,
+      "gy": -6,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "10,-7": {
+      "gx": 10,
+      "gy": -7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "11,-7": {
+      "gx": 11,
+      "gy": -7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "12,-7": {
+      "gx": 12,
+      "gy": -7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "11,-6": {
+      "gx": 11,
+      "gy": -6,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "12,-6": {
+      "gx": 12,
+      "gy": -6,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,-6": {
+      "gx": 14,
+      "gy": -6,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,-5": {
+      "gx": 14,
+      "gy": -5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,-7": {
+      "gx": 14,
+      "gy": -7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "15,-7": {
+      "gx": 15,
+      "gy": -7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "16,-7": {
+      "gx": 16,
+      "gy": -7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,-7": {
+      "gx": 17,
+      "gy": -7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "9,7": {
+      "gx": 9,
+      "gy": 7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "10,7": {
+      "gx": 10,
+      "gy": 7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "11,7": {
+      "gx": 11,
+      "gy": 7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "12,7": {
+      "gx": 12,
+      "gy": 7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "13,7": {
+      "gx": 13,
+      "gy": 7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "14,7": {
+      "gx": 14,
+      "gy": 7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "15,7": {
+      "gx": 15,
+      "gy": 7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "16,7": {
+      "gx": 16,
+      "gy": 7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,7": {
+      "gx": 17,
+      "gy": 7,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,1": {
+      "gx": 17,
+      "gy": 1,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,0": {
+      "gx": 17,
+      "gy": 0,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,-1": {
+      "gx": 17,
+      "gy": -1,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,-2": {
+      "gx": 17,
+      "gy": -2,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "16,-2": {
+      "gx": 16,
+      "gy": -2,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "16,-3": {
+      "gx": 16,
+      "gy": -3,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "16,-4": {
+      "gx": 16,
+      "gy": -4,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "16,-5": {
+      "gx": 16,
+      "gy": -5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,-5": {
+      "gx": 17,
+      "gy": -5,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,-4": {
+      "gx": 17,
+      "gy": -4,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,-3": {
+      "gx": 17,
+      "gy": -3,
+      "terrainType": "img_paving_basketweave_brown"
+    },
+    "17,-6": {
+      "gx": 17,
+      "gy": -6,
+      "terrainType": "img_paving_basketweave_brown"
+    }
+  },
+  "customFences": [
+    {
+      "id": "cfence-mw7cpohj-1cq",
+      "fenceModel": "fence_stone_brick",
+      "name": "Tembok Pagar Batu Bata",
+      "wx": 10,
+      "wy": 8,
+      "axis": "x",
+      "lengthTiles": 3,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7cpsdt-k8r",
+      "fenceModel": "fence_stone_brick",
+      "name": "Tembok Pagar Batu Bata",
+      "wx": 14,
+      "wy": 8,
+      "axis": "x",
+      "lengthTiles": 3,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7cpusp-xwi",
+      "fenceModel": "fence_stone_brick",
+      "name": "Tembok Pagar Batu Bata",
+      "wx": 16.6,
+      "wy": 8,
+      "axis": "x",
+      "lengthTiles": 3,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7cq41l-61g",
+      "fenceModel": "fence_stone_brick",
+      "name": "Tembok Pagar Batu Bata",
+      "wx": 12,
+      "wy": 8,
+      "axis": "x",
+      "lengthTiles": 3,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7d90mz-mz5",
+      "fenceModel": "fence_stone_brick",
+      "name": "Tembok Pagar Batu Bata",
+      "wx": 18,
+      "wy": 6,
+      "axis": "y",
+      "lengthTiles": 4,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7daj22-10g",
+      "fenceModel": "fence_stone_brick",
+      "name": "Tembok Pagar Batu Bata",
+      "wx": 18,
+      "wy": 1.5,
+      "axis": "y",
+      "lengthTiles": 5,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7db6as-8b1",
+      "fenceModel": "fence_stone_brick",
+      "name": "Tembok Pagar Batu Bata",
+      "wx": 18,
+      "wy": -4,
+      "axis": "y",
+      "lengthTiles": 6,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7dd5rs-evv",
+      "fenceModel": "fence_stone_brick",
+      "name": "Tembok Pagar Batu Bata",
+      "wx": 18,
+      "wy": -8.5,
+      "axis": "y",
+      "lengthTiles": 3,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7ds1o9-93u",
+      "fenceModel": "fence_wood_rustic",
+      "name": "Pagar Kayu Pedesaan",
+      "wx": 7,
+      "wy": 2.5,
+      "axis": "y",
+      "lengthTiles": 3,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7dtmda-anl",
+      "fenceModel": "fence_wood_rustic",
+      "name": "Pagar Kayu Pedesaan",
+      "wx": 7,
+      "wy": 6.5,
+      "axis": "y",
+      "lengthTiles": 4,
+      "hasCollision": true
+    },
+    {
+      "id": "cfence-mw7dv3i4-p71",
+      "fenceModel": "fence_wood_rustic",
+      "name": "Pagar Kayu Pedesaan",
+      "wx": 7,
+      "wy": -5,
+      "axis": "y",
+      "lengthTiles": 5,
+      "hasCollision": true
+    }
+  ]
+}

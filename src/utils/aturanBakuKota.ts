@@ -316,6 +316,23 @@ export const CITY_BUILDINGS_GOVERNANCE: Record<BuildingId, BuildingGovernanceSpe
     dailyXpCap: 25,
     defaultOpen: true,
   },
+  menara_asesmen: {
+    id: 'menara_asesmen',
+    name: 'Menara Asesmen Individu',
+    zone: 'Pusat Kota (Seberang Sungai)',
+    icon: '📝',
+    wx: 9.5,
+    wy: -3.5,
+    tileFootprint: 2,
+    category: 'Asesmen Sumatif Mandiri • TKA & CBT',
+    shortDescription: 'Menara asesmen sumatif mandiri berbasis lobi dengan soal otomatis dari Bank Materi (PG Tunggal, MCMA, Kategori & Stimulus).',
+    learningObjective: 'Mengukur ketercapaian Tujuan Pembelajaran (TP) secara mandiri, jujur, dan terukur melalui asesmen sumatif standar TKA.',
+    capacity: 60,
+    openingHours: '06.00 - 22.00 WITA',
+    xpRewardPerActivity: 10,
+    dailyXpCap: 30,
+    defaultOpen: true,
+  },
 };
 
 export const PUSAT_KOTA_BUILDING_IDS: BuildingId[] = [

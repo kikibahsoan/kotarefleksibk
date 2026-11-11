@@ -15,7 +15,8 @@ export type BuildingId =
   | 'panggung_kota'
   | 'mall_kota'
   | 'bandara'
-  | 'arena_rumah_misteri';
+  | 'arena_rumah_misteri'
+  | 'menara_asesmen';
 
 export interface PublicChatMessage {
   id: string;
@@ -960,6 +961,228 @@ export interface EscapeTowerState {
   winningGroups: MysteryGroupNumber[];
   serverTime: number;
 }
+
+// ============================================================================
+// MENARA ASESMEN INDIVIDU (TKA / CBT SUMATIF MANDIRI BERBASIS LOBI • REFLEKSIA TIMUR)
+// Sheet Baru: Asesmen_Sesi, Asesmen_BankSoal, Asesmen_Stimulus, Asesmen_PaketSiswa, Asesmen_Jawaban, Asesmen_Hasil
+// ============================================================================
+
+export type AsesmenSessionStatus = 'draf' | 'lobi' | 'berjalan' | 'jeda' | 'selesai';
+export type AsesmenQuestionType = 'pg_tunggal' | 'pg_mcma' | 'pg_kategori';
+export type AsesmenPresentationType = 'tunggal' | 'grup';
+export type AsesmenStimulusType = 'teks' | 'tabel' | 'grafik';
+
+/** Sumber Tujuan Pembelajaran (TP) yang diambil dari Bank Materi Kota Refleksia */
+export interface AsesmenTpReference {
+  id_tp: string;
+  mata_pelajaran: string;
+  kelas: string;
+  tujuan_pembelajaran: string;
+  isi_materi: string;
+}
+
+/** Representasi baris pada Sheet "Asesmen_Stimulus" */
+export interface AsesmenStimulusRow {
+  id_stimulus: string;
+  jenis: AsesmenStimulusType;
+  judul?: string;
+  /**
+   * Untuk 'teks': teks wacana / studi kasus.
+   * Untuk 'tabel': JSON string `{ headers: string[], rows: string[][] }` atau teks markdown.
+   * Untuk 'grafik': JSON string `{ title: string, unit: string, bars: Array<{ label: string, value: number, color?: string }> }`.
+   */
+  isi: string;
+}
+
+/** Pernyataan individual pada soal Pilihan Ganda Kompleks Kategori */
+export interface AsesmenKategoriStatement {
+  id_pernyataan: string;
+  teks: string;
+  /** Label kolom pilihan, mis. ['Benar', 'Salah'] atau ['Sesuai', 'Tidak Sesuai'] */
+  label_opsi?: [string, string];
+  /** Hanya dikirim ke Guru (atau setelah selesai jika pembahasan diaktifkan) */
+  kunci?: 'A' | 'B'; // 'A' = Benar/Sesuai, 'B' = Salah/Tidak Sesuai
+}
+
+/** Representasi baris pada Sheet "Asesmen_BankSoal" */
+export interface AsesmenBankSoalRow {
+  id_soal: string;
+  id_sesi: string;
+  tp: string; // ID atau teks ringkas TP
+  tp_label?: string;
+  jenis: AsesmenQuestionType;
+  tipe_penyajian: AsesmenPresentationType;
+  id_stimulus: string; // "" jika tunggal
+  teks_soal: string;
+  /**
+   * Untuk pg_tunggal & pg_mcma: daftar string opsi (mis. 4-5 opsi).
+   * Untuk pg_kategori: daftar pernyataan AsesmenKategoriStatement (disimpan sebagai JSON di sheet).
+   */
+  opsi: string[];
+  pernyataan_kategori?: AsesmenKategoriStatement[];
+  label_kategori?: [string, string]; // default ['Benar', 'Salah'] atau ['Sesuai', 'Tidak Sesuai']
+  poin_soal?: number;
+  /**
+   * PENTING KEAMANAN:
+   * kunci_jawaban dan pembahasan TIDAK PERNAH dikirim ke sisi siswa selama ujian berlangsung!
+   * - Untuk pg_tunggal: string indeks/teks opsi benar (mis. "0" / "A")
+   * - Untuk pg_mcma: JSON array indeks benar (mis. "[0,2]")
+   * - Untuk pg_kategori: JSON object map `{ "p1": "A", "p2": "B", "p3": "A" }`
+   */
+  kunci_jawaban: string | null;
+  pembahasan: string | null;
+}
+
+/** Representasi baris pada Sheet "Asesmen_Sesi" */
+export interface AsesmenSesiRow {
+  id_sesi: string;
+  judul_asesmen: string;
+  tp_terpilih: string[]; // 1 sampai 5 TP ID
+  tp_detail?: AsesmenTpReference[];
+  durasi: number; // menit
+  status: AsesmenSessionStatus;
+  waktu_mulai: string;
+  waktu_mulai_ms: number | null;
+  waktu_jeda_ms: number | null;
+  total_durasi_jeda_ms: number;
+  tambahan_waktu_menit: number;
+  // Pengaturan Komposisi & Poin
+  jumlah_soal: number;
+  komposisi_jenis: {
+    pg_tunggal: number;
+    pg_mcma: number;
+    pg_kategori: number;
+  };
+  komposisi_penyajian: {
+    tunggal: number;
+    grup: number;
+  };
+  poin_per_jenis: {
+    pg_tunggal: number;
+    pg_mcma: number;
+    pg_kategori_per_pernyataan: number;
+  };
+  mcma_kredit_parsial: boolean;
+  acak_soal: boolean;
+  acak_opsi: boolean;
+  izinkan_menyusul: boolean;
+  tampilkan_pembahasan: boolean;
+  xp_bonus_selesai: number;
+  guru_pembuat?: string;
+}
+
+/** Representasi baris pada Sheet "Asesmen_PaketSiswa" */
+export interface AsesmenPaketSiswaRow {
+  id_sesi: string;
+  siswa: string; // studentId
+  nama_siswa: string;
+  kelas: string;
+  /** Urutan ID soal yang sudah diacak khusus siswa ini (soal grup tetap berdampingan) */
+  urutan_soal: string[];
+  /** Pemetaan urutan indeks opsi per soal jika acak_opsi aktif: `{ [id_soal]: number[] }` */
+  urutan_opsi_map?: Record<string, number[]>;
+  waktu_paket_dibuat: string;
+  session_token?: string;
+}
+
+/** Representasi baris pada Sheet "Asesmen_Jawaban" */
+export interface AsesmenJawabanRow {
+  id_sesi: string;
+  siswa: string; // studentId
+  nama_siswa?: string;
+  id_soal: string;
+  /**
+   * Jawaban siswa:
+   * - pg_tunggal: string indeks asli opsi yang dipilih (mis. "1")
+   * - pg_mcma: JSON string array indeks asli opsi (mis. "[0,2]")
+   * - pg_kategori: JSON string map `{ "p1": "A", "p2": "B" }`
+   */
+  jawaban: string;
+  ragu: boolean;
+  waktu: string;
+}
+
+/** Representasi baris pada Sheet "Asesmen_Hasil" */
+export interface AsesmenHasilRow {
+  id_sesi: string;
+  siswa: string; // studentId
+  nama_siswa: string;
+  kelas: string;
+  nilai: number; // Skala 0 - 100
+  poin_diperoleh: number;
+  poin_maksimal: number;
+  jumlah_benar: number;
+  jumlah_soal: number;
+  durasi: number; // detik pengerjaan
+  keluar_tab: number;
+  waktu_selesai: string;
+  rincian_per_tp?: Record<string, { benar: number; total: number; persentase: number }>;
+}
+
+/** Status kehadiran & pantauan langsung siswa di Lobi / Ujian Menara Asesmen */
+export interface AsesmenStudentLiveStatus {
+  studentId: string;
+  studentName: string;
+  className: string;
+  gender: 'L' | 'P';
+  status_peserta: 'di_lobi' | 'mengerjakan' | 'selesai';
+  soal_terjawab: number;
+  soal_ragu: number;
+  total_soal: number;
+  nomor_soal_aktif: number;
+  keluar_tab: number;
+  log_keluar_tab: string[];
+  waktu_gabung: string;
+  waktu_mulai_kerja_ms?: number | null;
+  waktu_selesai?: string | null;
+  nilai_akhir?: number | null;
+  lastSeen: number;
+  activeSessionToken?: string;
+}
+
+/** Analisis Butir Soal & Tujuan Pembelajaran (TP) untuk Guru */
+export interface AsesmenButirAnalysis {
+  id_soal: string;
+  nomor_urut: number;
+  tp: string;
+  jenis: AsesmenQuestionType;
+  teks_soal: string;
+  jumlah_menjawab: number;
+  jumlah_benar: number;
+  persentase_benar: number;
+}
+
+export interface AsesmenTpAnalysis {
+  tp: string;
+  tp_label: string;
+  jumlah_soal: number;
+  rata_rata_penguasaan: number; // 0 - 100%
+}
+
+export interface MenaraAsesmenState {
+  sesi: AsesmenSesiRow;
+  stimulusList: AsesmenStimulusRow[];
+  /**
+   * Untuk Guru: seluruh bankSoal lengkap dengan kunci_jawaban & pembahasan.
+   * Untuk Siswa: hanya soal dalam paketnya, TANPA kunci_jawaban & pembahasan (kecuali sudah selesai & diizinkan guru).
+   */
+  bankSoal: AsesmenBankSoalRow[];
+  /** Paket soal milik siswa yang sedang login (atau semua paket jika guru) */
+  paketSaya: AsesmenPaketSiswaRow | null;
+  /** Jawaban milik siswa yang sedang login: `{ [id_soal]: AsesmenJawabanRow }` */
+  jawabanSaya: Record<string, AsesmenJawabanRow>;
+  /** Hasil milik siswa yang sedang login (jika sudah selesai) */
+  hasilSaya: AsesmenHasilRow | null;
+  /** Daftar seluruh peserta di lobi/ujian (Guru melihat detail penuh, Siswa melihat daftar lobi) */
+  pesertaLive: AsesmenStudentLiveStatus[];
+  /** Rekap hasil seluruh siswa (khusus Guru atau jika dipublikasikan) */
+  semuaHasil: AsesmenHasilRow[];
+  analisisButir?: AsesmenButirAnalysis[];
+  analisisTp?: AsesmenTpAnalysis[];
+  rataRataKelas?: number;
+  serverTime: number;
+}
+
 
 
 

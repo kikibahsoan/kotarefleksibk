@@ -156,11 +156,14 @@ export interface PresenceMeshMessage {
     | 'mystery_arena_event'
     | 'mystery_arena_request'
     | 'escape_tower_event'
-    | 'escape_tower_request';
+    | 'escape_tower_request'
+    | 'asesmen_tower_event'
+    | 'asesmen_tower_request';
   player?: any;
   creatorState?: any;
   arenaPayload?: any;
   escapePayload?: any;
+  asesmenPayload?: any;
   id?: string;
   senderId?: string;
   ts?: number;

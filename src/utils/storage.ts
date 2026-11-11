@@ -27,6 +27,13 @@ import {
   EscapeSesiRow,
   EscapeProgresRow,
   EscapeSkorRow,
+  AsesmenTpReference,
+  AsesmenSesiRow,
+  AsesmenBankSoalRow,
+  AsesmenStimulusRow,
+  AsesmenPaketSiswaRow,
+  AsesmenJawabanRow,
+  AsesmenHasilRow,
 } from '../types/index.ts';
 import {
   INITIAL_MATERI,
@@ -2860,11 +2867,36 @@ export const StorageService = {
       customFences: [],
     };
     if (!raw || typeof raw !== 'object') return defaultState;
+    const rawBuildings: CreatorBuildingItem[] = Array.isArray(raw.customBuildings)
+      ? raw.customBuildings.map((b: CreatorBuildingItem) => {
+          if (
+            b &&
+            (b.id === 'cbuild-mw7csayu-ahr' ||
+              b.name === 'Menara Inovasi Digital' ||
+              (b.modelType === 'modern_tower' && Math.abs(b.wx - 9.5) < 0.8 && Math.abs(b.wy - -3.5) < 0.8))
+          ) {
+            return {
+              ...b,
+              name: 'Menara Asesmen Individu',
+              tagline: 'Asesmen Sumatif Mandiri Berbasis Lobi (TKA Individu)',
+              icon: '📝',
+              templateData: {
+                ...(b.templateData || {}),
+                welcomeText:
+                  'Selamat datang di Menara Asesmen Individu! Fasilitas evaluasi sumatif mandiri berbasis lobi dengan standar TKA (Pilihan Ganda Tunggal, Kompleks MCMA, dan Kategori Berstimulus).',
+                infoContent:
+                  'Menara Asesmen Individu adalah pusat asesmen sumatif mandiri berbasis lobi (mirip TKA/CBT) di Kota Refleksia.\n\n• Siswa masuk ke lobi asesmen dan mengerjakan paket soal teracak secara mandiri.\n• Soal disusun otomatis dari Tujuan Pembelajaran (TP) pada Bank Materi Kota Refleksia.',
+              },
+            };
+          }
+          return b;
+        })
+      : [];
     return {
       version: typeof raw.version === 'number' ? raw.version : 0,
       updatedAt: raw.updatedAt || defaultState.updatedAt,
       updatedBy: raw.updatedBy || 'kikybahsoan',
-      customBuildings: Array.isArray(raw.customBuildings) ? raw.customBuildings : [],
+      customBuildings: rawBuildings,
       existingOverrides:
         raw.existingOverrides && typeof raw.existingOverrides === 'object'
           ? raw.existingOverrides
@@ -3395,6 +3427,171 @@ export const StorageService = {
       return true;
     } catch (e) {
       console.warn('Gagal sinkronisasi Escape_Skor ke Spreadsheet:', e);
+      return false;
+    }
+  },
+
+  // ==========================================================================
+  // MENARA ASESMEN INDIVIDU (TKA MANDIRI BERBASIS LOBI)
+  // Mengambil Tujuan Pembelajaran (TP) dari Bank Materi Kota Refleksia
+  // & Sinkronisasi 6 Sheet Baru ke Google Spreadsheet
+  // ==========================================================================
+
+  getAvailableAsesmenTpList(): AsesmenTpReference[] {
+    const bankEntries = this.getBankMateri();
+    const materis = this.getMateri();
+    const objectives = this.getObjectives();
+    const seenTpIds = new Set<string>();
+    const list: AsesmenTpReference[] = [];
+
+    // 1. Utamakan dari Bank Materi Guru AI yang sudah ada di Kota Refleksia
+    bankEntries.forEach((bm) => {
+      if (!bm || !bm.tujuanPembelajaran) return;
+      const idTp = bm.objectiveId || bm.id;
+      if (seenTpIds.has(idTp)) return;
+      seenTpIds.add(idTp);
+      list.push({
+        id_tp: idTp,
+        mata_pelajaran: bm.mataPelajaran || 'Dasar-Dasar DKV / Informatika',
+        kelas: bm.kelasTarget || 'X DKV',
+        tujuan_pembelajaran: bm.tujuanPembelajaran,
+        isi_materi: [bm.materiEsensial, bm.ringkasanAI, bm.modulPerpustakaan]
+          .filter(Boolean)
+          .join('\n\n'),
+      });
+    });
+
+    // 2. Gabungkan dengan Learning Objectives (TP) & Materi Bawaan Kota Refleksia
+    objectives.forEach((obj) => {
+      if (!obj || !obj.goalStatement) return;
+      if (seenTpIds.has(obj.id)) return;
+      const relatedMateri = materis.find((m) => m.id === obj.materiId);
+      seenTpIds.add(obj.id);
+      list.push({
+        id_tp: obj.id,
+        mata_pelajaran: relatedMateri?.subject || 'Informatika & Dasar DKV',
+        kelas: relatedMateri?.targetClass === 'ALL' ? 'X DKV 1, 2 & 3' : relatedMateri?.targetClass || 'X DKV',
+        tujuan_pembelajaran: obj.goalStatement,
+        isi_materi:
+          relatedMateri?.materiEsensial ||
+          relatedMateri?.content ||
+          obj.indicator ||
+          obj.goalStatement,
+      });
+    });
+
+    // 3. Gabungkan juga Materi yang memiliki field tujuanPembelajaran langsung
+    materis.forEach((m) => {
+      if (!m || !m.tujuanPembelajaran) return;
+      const idTp = `tp-${m.id}`;
+      if (seenTpIds.has(idTp)) return;
+      seenTpIds.add(idTp);
+      list.push({
+        id_tp: idTp,
+        mata_pelajaran: m.subject || 'Dasar-Dasar DKV',
+        kelas: m.targetClass === 'ALL' ? 'X DKV 1, 2 & 3' : m.targetClass || 'X DKV',
+        tujuan_pembelajaran: m.tujuanPembelajaran,
+        isi_materi: m.materiEsensial || m.content || m.title,
+      });
+    });
+
+    return list;
+  },
+
+  async syncAsesmenSessionAndBankToGAS(params: {
+    sesi: AsesmenSesiRow;
+    bankSoal: AsesmenBankSoalRow[];
+    stimulusList: AsesmenStimulusRow[];
+    teacherId: string;
+    teacherName: string;
+    teacherPin?: string;
+  }): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || settings.gasWebAppUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_asesmen_sesi_dan_soal',
+          teacherId: params.teacherId,
+          teacherName: params.teacherName,
+          teacherPin: params.teacherPin || settings.teacherPin || '1234',
+          sesi: params.sesi,
+          bankSoal: params.bankSoal,
+          stimulusList: params.stimulusList,
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Asesmen_Sesi & Asesmen_BankSoal ke Spreadsheet:', e);
+      return false;
+    }
+  },
+
+  async syncAsesmenPaketSiswaBatchToGAS(paketList: AsesmenPaketSiswaRow[]): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || settings.gasWebAppUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_asesmen_paket_batch',
+          paketList,
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Asesmen_PaketSiswa ke Spreadsheet:', e);
+      return false;
+    }
+  },
+
+  async syncAsesmenJawabanBatchToGAS(jawabanList: AsesmenJawabanRow[]): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || settings.gasWebAppUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    if (!Array.isArray(jawabanList) || jawabanList.length === 0) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_asesmen_jawaban_batch',
+          jawabanList,
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi batch Asesmen_Jawaban ke Spreadsheet:', e);
+      return false;
+    }
+  },
+
+  async syncAsesmenHasilToGAS(hasilList: AsesmenHasilRow[]): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || settings.gasWebAppUrl || '').trim();
+    if (!url || !url.startsWith('https://script.google.com/')) return false;
+    if (!Array.isArray(hasilList) || hasilList.length === 0) return false;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'save_asesmen_hasil_batch',
+          hasilList,
+        }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('Gagal sinkronisasi Asesmen_Hasil ke Spreadsheet:', e);
       return false;
     }
   },
