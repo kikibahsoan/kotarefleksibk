@@ -984,8 +984,10 @@ export interface AsesmenTpReference {
 /** Representasi baris pada Sheet "Asesmen_Stimulus" */
 export interface AsesmenStimulusRow {
   id_stimulus: string;
+  id_sesi?: string;
   jenis: AsesmenStimulusType;
   judul?: string;
+  sumber?: string;
   /**
    * Untuk 'teks': teks wacana / studi kasus.
    * Untuk 'tabel': JSON string `{ headers: string[], rows: string[][] }` atau teks markdown.
@@ -998,6 +1000,7 @@ export interface AsesmenStimulusRow {
 export interface AsesmenKategoriStatement {
   id_pernyataan: string;
   teks: string;
+  teks_pernyataan?: string;
   /** Label kolom pilihan, mis. ['Benar', 'Salah'] atau ['Sesuai', 'Tidak Sesuai'] */
   label_opsi?: [string, string];
   /** Hanya dikirim ke Guru (atau setelah selesai jika pembahasan diaktifkan) */
@@ -1010,9 +1013,12 @@ export interface AsesmenBankSoalRow {
   id_sesi: string;
   tp: string; // ID atau teks ringkas TP
   tp_label?: string;
+  id_tp?: string;
+  label_tp?: string;
+  nomor_urut?: number;
   jenis: AsesmenQuestionType;
   tipe_penyajian: AsesmenPresentationType;
-  id_stimulus: string; // "" jika tunggal
+  id_stimulus: string | null; // "" atau null jika tunggal
   teks_soal: string;
   /**
    * Untuk pg_tunggal & pg_mcma: daftar string opsi (mis. 4-5 opsi).
@@ -1041,11 +1047,14 @@ export interface AsesmenSesiRow {
   tp_detail?: AsesmenTpReference[];
   durasi: number; // menit
   status: AsesmenSessionStatus;
-  waktu_mulai: string;
+  waktu_buka_lobi?: string | null;
+  waktu_mulai: string | null;
   waktu_mulai_ms: number | null;
   waktu_jeda_ms: number | null;
   total_durasi_jeda_ms: number;
   tambahan_waktu_menit: number;
+  waktu_selesai?: string | null;
+  updated_at?: string;
   // Pengaturan Komposisi & Poin
   jumlah_soal: number;
   komposisi_jenis: {
@@ -1100,6 +1109,8 @@ export interface AsesmenJawabanRow {
   jawaban: string;
   ragu: boolean;
   waktu: string;
+  skor_butir?: number;
+  benar?: boolean;
 }
 
 /** Representasi baris pada Sheet "Asesmen_Hasil" */
@@ -1117,6 +1128,7 @@ export interface AsesmenHasilRow {
   keluar_tab: number;
   waktu_selesai: string;
   rincian_per_tp?: Record<string, { benar: number; total: number; persentase: number }>;
+  detail_per_tp?: Record<string, { benar: number; total: number; persentase: number }>;
 }
 
 /** Status kehadiran & pantauan langsung siswa di Lobi / Ujian Menara Asesmen */
@@ -1130,33 +1142,47 @@ export interface AsesmenStudentLiveStatus {
   soal_ragu: number;
   total_soal: number;
   nomor_soal_aktif: number;
+  soal_aktif?: number;
   keluar_tab: number;
   log_keluar_tab: string[];
   waktu_gabung: string;
+  waktu_gabung_lobi?: string;
+  waktu_mulai?: string | null;
   waktu_mulai_kerja_ms?: number | null;
   waktu_selesai?: string | null;
   nilai_akhir?: number | null;
   lastSeen: number;
   activeSessionToken?: string;
+  session_token?: string;
 }
+
+export type AsesmenLiveStudentStatus = AsesmenStudentLiveStatus;
 
 /** Analisis Butir Soal & Tujuan Pembelajaran (TP) untuk Guru */
 export interface AsesmenButirAnalysis {
   id_soal: string;
   nomor_urut: number;
   tp: string;
+  id_tp?: string;
   jenis: AsesmenQuestionType;
   teks_soal: string;
   jumlah_menjawab: number;
   jumlah_benar: number;
   persentase_benar: number;
+  total_menjawab?: number;
+  jumlah_benar_penuh?: number;
+  jumlah_salah_atau_parsial?: number;
+  persentase_ketercapaian?: number;
 }
 
 export interface AsesmenTpAnalysis {
   tp: string;
   tp_label: string;
+  id_tp?: string;
+  tujuan_pembelajaran?: string;
   jumlah_soal: number;
   rata_rata_penguasaan: number; // 0 - 100%
+  rata_rata_ketercapaian?: number;
 }
 
 export interface MenaraAsesmenState {

@@ -23480,44 +23480,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       </div>
                     )}
 
-                    {/* Exclusive Movement Mode Selector for Master kikybahsoan (Jalan Normal vs Teleportasi) */}
+                    {/* Exclusive Creator Studio Button for Master kikybahsoan (Teleport removed) */}
                     {isMasterKiky && (
-                      <div
-                        className="bg-[#0f172a]/85 backdrop-blur-md border border-cyan-400/60 rounded-full p-0.5 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-0.5"
-                        title="Mode Pergerakan Khusus Master kikybahsoan: Pilih Jalan Normal atau Teleportasi Instan"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            sounds.playClick();
-                            setMasterMoveMode('walk');
-                            showToast('🚶 Mode Pergerakan Master: Jalan Normal Aktif', 2000);
-                          }}
-                          className={`px-2 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ${
-                            masterMoveMode === 'walk'
-                              ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                              : 'text-slate-300 hover:text-white'
-                          }`}
-                        >
-                          <span>🚶</span>
-                          <span>Jalan</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            sounds.playClick();
-                            setMasterMoveMode('teleport');
-                            showToast('⚡ Mode Pergerakan Master: Teleportasi Chrono Aktif', 2000);
-                          }}
-                          className={`px-2 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ${
-                            masterMoveMode === 'teleport'
-                              ? 'bg-gradient-to-r from-cyan-400 to-amber-300 text-slate-950 shadow-sm'
-                              : 'text-cyan-200 hover:text-white'
-                          }`}
-                        >
-                          <span>⚡</span>
-                          <span>Teleport</span>
-                        </button>
+                      <div className="bg-[#0f172a]/85 backdrop-blur-md border border-cyan-400/60 rounded-full p-0.5 text-[10px] sm:text-[11px] font-bold shadow-lg flex items-center gap-0.5">
                         <button
                           type="button"
                           onClick={() => {
@@ -23537,7 +23502,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                               return next;
                             });
                           }}
-                          className={`px-2.5 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ml-0.5 ${
+                          className={`px-2.5 py-0.5 rounded-full transition flex items-center gap-1 cursor-pointer ${
                             isCreatorStudioOpen
                               ? 'bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 text-slate-950 shadow-md ring-2 ring-amber-300/60'
                               : 'bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-400/50'

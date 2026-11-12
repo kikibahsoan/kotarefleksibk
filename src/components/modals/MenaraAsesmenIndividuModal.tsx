@@ -52,6 +52,10 @@ import {
 import { StorageService } from '../../utils/storage.ts';
 import { sounds } from '../../utils/audio.ts';
 import { RealtimePresenceMesh, PresenceMeshMessage } from '../../utils/realtimePresenceMesh.ts';
+import {
+  MenaraAsesmenEngine,
+  CanonicalMenaraAsesmenStore,
+} from '../../utils/menaraAsesmenEngine.ts';
 
 interface MenaraAsesmenIndividuModalProps {
   onClose: () => void;
@@ -78,9 +82,12 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
     'konfigurasi' | 'bank_soal' | 'lobi_pantau' | 'analisis'
   >('konfigurasi');
 
-  const [asesmenState, setAsesmenState] = useState<MenaraAsesmenState | null>(null);
+  // Hydrate langsung tanpa menunggu /api agar di Vercel (https://refleksia-azure.vercel.app/) langsung tampil instan!
+  const [asesmenState, setAsesmenState] = useState<MenaraAsesmenState>(() =>
+    MenaraAsesmenEngine.getInitialHydratedState(currentStudent, isTeacherAccount)
+  );
   const [isServerVerifiedTeacher, setIsServerVerifiedTeacher] = useState<boolean>(isTeacherAccount);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [actionBusy, setActionBusy] = useState<boolean>(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -154,6 +161,7 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
   );
 
   const meshRef = useRef<RealtimePresenceMesh | null>(null);
+  const bcRef = useRef<BroadcastChannel | null>(null);
   const awardedSesiRef = useRef<string | null>(null);
   const autoSubmittedSesiRef = useRef<string | null>(null);
   const lastTabExitLogMsRef = useRef<number>(0);
@@ -165,94 +173,102 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
     }, 4200);
   }, []);
 
+  // Broadcast real-time event ke seluruh perangkat di jaringan berbeda (Global WSS Mesh) & tab lokal
+  const publishAsesmenMeshPayload = useCallback(
+    (asesmenPayload: Record<string, any>) => {
+      const msg: PresenceMeshMessage = {
+        type: 'asesmen_tower_event',
+        senderId: currentStudent?.id || 'teacher',
+        asesmenPayload,
+        ts: Date.now(),
+      };
+      try {
+        meshRef.current?.publish(msg);
+      } catch {}
+      try {
+        bcRef.current?.postMessage(msg);
+      } catch {}
+    },
+    [currentStudent?.id]
+  );
+
   // Muat daftar TP dari Bank Materi Kota Refleksia
   useEffect(() => {
     const tps = StorageService.getAvailableAsesmenTpList();
     setAvailableTpList(tps);
   }, []);
 
-  // Fungsi Fetch State dari Server (Polling 3.5 detik + SSE/Mesh trigger)
+  // Fungsi Fetch State dari Server + Fallback Engine (Polling 3.5 detik + SSE/Mesh trigger)
   const fetchMenaraAsesmenState = useCallback(async () => {
     try {
-      const params = new URLSearchParams();
-      if (currentStudent?.id) params.set('studentId', currentStudent.id);
-      if (currentStudent?.name) params.set('studentName', currentStudent.name);
-      if (currentStudent?.className) params.set('className', currentStudent.className);
-      if (currentStudent?.gender) params.set('gender', currentStudent.gender);
-      if (isTeacherAccount) params.set('isTeacher', 'true');
-      if (currentStudent?.studentNumber) params.set('studentNumber', currentStudent.studentNumber);
-      if (teacherPinInput) params.set('teacherPin', teacherPinInput);
-      params.set('_t', String(Date.now()));
-
-      const res = await fetch(`/api/menara-asesmen/state?${params.toString()}`, {
-        cache: 'no-store',
+      const result = await MenaraAsesmenEngine.fetchState({
+        currentStudent,
+        isTeacherAccount,
+        teacherPin: teacherPinInput,
       });
-      if (!res.ok) return;
-      const json = await res.json();
-      if (json?.success && json.data) {
-        const data: MenaraAsesmenState = json.data;
-        setAsesmenState(data);
-        setIsServerVerifiedTeacher(Boolean(json.isVerifiedTeacher));
-        setIsLoading(false);
 
-        if (!configInitialized && data.sesi) {
-          setJudulAsesmen(data.sesi.judul_asesmen || 'Asesmen Sumatif Mandiri (TKA)');
-          if (Array.isArray(data.sesi.tp_terpilih) && data.sesi.tp_terpilih.length > 0) {
-            setSelectedTpIds(data.sesi.tp_terpilih);
-          }
-          setDurasiMenit(data.sesi.durasi || 30);
-          if (data.sesi.komposisi_jenis) setKomposisiJenis(data.sesi.komposisi_jenis);
-          if (data.sesi.komposisi_penyajian) setKomposisiPenyajian(data.sesi.komposisi_penyajian);
-          if (data.sesi.poin_per_jenis) setPoinPerJenis(data.sesi.poin_per_jenis);
-          setMcmaKreditParsial(Boolean(data.sesi.mcma_kredit_parsial));
-          setAcakSoal(Boolean(data.sesi.acak_soal));
-          setAcakOpsi(Boolean(data.sesi.acak_opsi));
-          setIzinkanMenyusul(Boolean(data.sesi.izinkan_menyusul));
-          setTampilkanPembahasan(Boolean(data.sesi.tampilkan_pembahasan));
-          setXpBonusSelesai(Number(data.sesi.xp_bonus_selesai || 50));
-          setConfigInitialized(true);
+      const data = result.data;
+      setAsesmenState(data);
+      setIsServerVerifiedTeacher(result.isVerifiedTeacher);
+      setIsLoading(false);
+
+      if (!configInitialized && data.sesi) {
+        setJudulAsesmen(data.sesi.judul_asesmen || 'Asesmen Sumatif Mandiri (TKA)');
+        if (Array.isArray(data.sesi.tp_terpilih) && data.sesi.tp_terpilih.length > 0) {
+          setSelectedTpIds(data.sesi.tp_terpilih);
         }
+        setDurasiMenit(data.sesi.durasi || 30);
+        if (data.sesi.komposisi_jenis) setKomposisiJenis(data.sesi.komposisi_jenis);
+        if (data.sesi.komposisi_penyajian) setKomposisiPenyajian(data.sesi.komposisi_penyajian);
+        if (data.sesi.poin_per_jenis) setPoinPerJenis(data.sesi.poin_per_jenis);
+        setMcmaKreditParsial(Boolean(data.sesi.mcma_kredit_parsial));
+        setAcakSoal(Boolean(data.sesi.acak_soal));
+        setAcakOpsi(Boolean(data.sesi.acak_opsi));
+        setIzinkanMenyusul(Boolean(data.sesi.izinkan_menyusul));
+        setTampilkanPembahasan(Boolean(data.sesi.tampilkan_pembahasan));
+        setXpBonusSelesai(Number(data.sesi.xp_bonus_selesai || 50));
+        setConfigInitialized(true);
+      }
 
-        // Hydrate jawaban siswa dari server jika belum ada perubahan lokal yang belum tersimpan
-        if (data.jawabanSaya && Object.keys(data.jawabanSaya).length > 0) {
-          setLocalAnswers((prev) => {
-            const merged = { ...prev };
-            Object.entries(data.jawabanSaya).forEach(([idSoal, row]) => {
-              if (!merged[idSoal]) {
-                merged[idSoal] = {
-                  jawaban: row.jawaban,
-                  ragu: Boolean(row.ragu),
-                  waktu: row.waktu,
-                };
-              }
-            });
-            return merged;
+      // Hydrate jawaban siswa jika belum ada perubahan lokal yang belum tersimpan
+      if (data.jawabanSaya && Object.keys(data.jawabanSaya).length > 0) {
+        setLocalAnswers((prev) => {
+          const merged = { ...prev };
+          Object.entries(data.jawabanSaya).forEach(([idSoal, row]) => {
+            if (!merged[idSoal]) {
+              merged[idSoal] = {
+                jawaban: row.jawaban,
+                ragu: Boolean(row.ragu),
+                waktu: row.waktu,
+              };
+            }
           });
-        }
+          return merged;
+        });
+      }
 
-        // Berikan XP bonus jika siswa selesai mengerjakan sesi ini
-        if (
-          !json.isVerifiedTeacher &&
-          data.hasilSaya &&
-          awardedSesiRef.current !== data.sesi.id_sesi
-        ) {
-          awardedSesiRef.current = data.sesi.id_sesi;
-          const xpReward = data.sesi.xp_bonus_selesai || 50;
-          if (onAddXp) {
-            onAddXp(
-              xpReward,
-              `Menyelesaikan Asesmen Sumatif Mandiri di Menara Asesmen Individu (${data.sesi.id_sesi})`
-            );
-          }
-          sounds.playSuccess();
+      // Berikan XP bonus jika siswa selesai mengerjakan sesi ini
+      if (
+        !result.isVerifiedTeacher &&
+        data.hasilSaya &&
+        awardedSesiRef.current !== data.sesi.id_sesi
+      ) {
+        awardedSesiRef.current = data.sesi.id_sesi;
+        const xpReward = data.sesi.xp_bonus_selesai || 50;
+        if (onAddXp) {
+          onAddXp(
+            xpReward,
+            `Menyelesaikan Asesmen Sumatif Mandiri di Menara Asesmen Individu (${data.sesi.id_sesi})`
+          );
         }
+        sounds.playSuccess();
       }
     } catch {
       setIsLoading(false);
     }
   }, [currentStudent, isTeacherAccount, teacherPinInput, configInitialized, onAddXp]);
 
-  // Setup Polling (setiap 3.5 detik sesuai aturan 3-5 detik) + SSE + MQTT Mesh
+  // Setup Polling (setiap 3.5 detik sesuai aturan 3-5 detik) + SSE + MQTT Mesh + BroadcastChannel
   useEffect(() => {
     fetchMenaraAsesmenState();
     const pollInterval = window.setInterval(fetchMenaraAsesmenState, 3500);
@@ -270,23 +286,87 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
       };
     } catch {}
 
+    const handleIncomingMeshMessage = (msg: PresenceMeshMessage) => {
+      if (msg.type === 'asesmen_tower_event') {
+        const payload = msg.asesmenPayload;
+        if (payload?.eventType === 'state_sync' && payload.store) {
+          const nextView = MenaraAsesmenEngine.mergeIncomingMeshStore(
+            payload.store as CanonicalMenaraAsesmenStore,
+            currentStudent,
+            isTeacherAccount
+          );
+          if (nextView) {
+            setAsesmenState(nextView);
+          }
+        } else if (payload?.eventType === 'student_sync' && payload.studentPacket) {
+          const nextView = MenaraAsesmenEngine.mergeIncomingStudentPacket(
+            payload.studentPacket,
+            currentStudent,
+            isTeacherAccount
+          );
+          if (nextView) {
+            setAsesmenState(nextView);
+          }
+        }
+        fetchMenaraAsesmenState();
+      } else if (
+        msg.type === 'asesmen_tower_request' &&
+        isTeacherAccount &&
+        msg.senderId !== (currentStudent?.id || 'teacher')
+      ) {
+        // Jika ada siswa baru membuka Menara Asesmen di Vercel, Guru otomatis mengirim Canonical Store terbaru!
+        publishAsesmenMeshPayload({
+          eventType: 'state_sync',
+          store: MenaraAsesmenEngine.getLocalCanonicalStore(),
+        });
+      }
+    };
+
     const mesh = new RealtimePresenceMesh(
       `asesmen-${currentStudent?.id || 'guest'}`,
-      (msg: PresenceMeshMessage) => {
-        if (msg.type === 'asesmen_tower_event' || msg.type === 'asesmen_tower_request') {
-          fetchMenaraAsesmenState();
-        }
-      },
-      () => {}
+      handleIncomingMeshMessage,
+      () => {
+        // Saat terhubung ke WSS Mesh, minta state terbaru dari Guru/peer
+        mesh.publish({
+          type: 'asesmen_tower_request',
+          senderId: currentStudent?.id || 'guest',
+          ts: Date.now(),
+        });
+      }
     );
     meshRef.current = mesh;
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('kota_refleksi_menara_asesmen');
+        bcRef.current = bc;
+        bc.onmessage = (ev) => {
+          if (ev.data) {
+            handleIncomingMeshMessage(ev.data as PresenceMeshMessage);
+          }
+        };
+        bc.postMessage({
+          type: 'asesmen_tower_request',
+          senderId: currentStudent?.id || 'guest',
+          ts: Date.now(),
+        });
+      }
+    } catch {}
 
     return () => {
       clearInterval(pollInterval);
       if (es) es.close();
       mesh.dispose();
+      meshRef.current = null;
+      if (bc) {
+        try {
+          bc.close();
+        } catch {}
+      }
+      bcRef.current = null;
     };
-  }, [fetchMenaraAsesmenState, currentStudent?.id]);
+  }, [fetchMenaraAsesmenState, currentStudent, isTeacherAccount, publishAsesmenMeshPayload]);
 
   // Hitung mundur timer ujian secara akurat
   useEffect(() => {
@@ -361,7 +441,7 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
     );
   }, [activeStudentQuestion, asesmenState?.stimulusList]);
 
-  // Fungsi Batch Auto-Save Jawaban Siswa ke Server & Google Spreadsheet
+  // Fungsi Batch Auto-Save Jawaban Siswa ke Server, Mesh & Google Spreadsheet
   const flushDirtyAnswersBatch = useCallback(
     async (forceAll = false, nextQuestionNum?: number) => {
       if (!currentStudent || isServerVerifiedTeacher || !asesmenState?.sesi) return;
@@ -387,22 +467,20 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
 
       try {
         setDirtyAnswerIds(new Set());
-        await fetch('/api/menara-asesmen/student-action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            actionType: 'save_answers_batch',
-            studentId: currentStudent.id,
-            studentName: currentStudent.name,
-            className: currentStudent.className,
-            gender: currentStudent.gender,
-            sessionToken: sessionTokenRef.current,
-            answersBatch: batchPayload,
-            activeQuestionNumber:
-              typeof nextQuestionNum === 'number'
-                ? nextQuestionNum
-                : currentQuestionIdx + 1,
-          }),
+        const res = await MenaraAsesmenEngine.executeStudentAction({
+          actionType: 'save_answers_batch',
+          currentStudent,
+          sessionToken: sessionTokenRef.current,
+          answersBatch: batchPayload,
+          activeQuestionNumber:
+            typeof nextQuestionNum === 'number'
+              ? nextQuestionNum
+              : currentQuestionIdx + 1,
+        });
+
+        publishAsesmenMeshPayload({
+          eventType: 'student_sync',
+          studentPacket: res.studentSyncPacket,
         });
 
         if (batchPayload.length > 0) {
@@ -418,6 +496,7 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
       localAnswers,
       dirtyAnswerIds,
       currentQuestionIdx,
+      publishAsesmenMeshPayload,
     ]
   );
 
@@ -441,7 +520,7 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
       Boolean(asesmenState?.paketSaya);
     if (!isWorking || !currentStudent) return;
 
-    const recordTabSwitch = (reason: string) => {
+    const recordTabSwitch = async (reason: string) => {
       const now = Date.now();
       if (now - lastTabExitLogMsRef.current < 2500) return;
       lastTabExitLogMsRef.current = now;
@@ -451,17 +530,18 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
       );
       sounds.playError?.();
 
-      fetch('/api/menara-asesmen/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actionType: 'log_tab_exit',
-          studentId: currentStudent.id,
-          studentName: currentStudent.name,
-          className: currentStudent.className,
-          tabExitReason: reason,
-        }),
-      }).catch(() => {});
+      const res = await MenaraAsesmenEngine.executeStudentAction({
+        actionType: 'log_tab_exit',
+        currentStudent,
+        sessionToken: sessionTokenRef.current,
+        tabExitReason: reason,
+      });
+
+      setAsesmenState(res.data);
+      publishAsesmenMeshPayload({
+        eventType: 'student_sync',
+        studentPacket: res.studentSyncPacket,
+      });
     };
 
     const handleVisibilityChange = () => {
@@ -485,6 +565,7 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
     asesmenState?.hasilSaya,
     asesmenState?.paketSaya,
     currentStudent,
+    publishAsesmenMeshPayload,
   ]);
 
   // Auto-submit ketika waktu habis (00:00)
@@ -513,33 +594,20 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
     if (!currentStudent) return;
     setActionBusy(true);
     try {
-      const res = await fetch('/api/menara-asesmen/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actionType: 'join_lobby',
-          studentId: currentStudent.id,
-          studentName: currentStudent.name,
-          className: currentStudent.className,
-          gender: currentStudent.gender,
-          sessionToken: sessionTokenRef.current,
-        }),
+      const res = await MenaraAsesmenEngine.executeStudentAction({
+        actionType: 'join_lobby',
+        currentStudent,
+        sessionToken: sessionTokenRef.current,
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        showToast(json.error || 'Gagal bergabung ke lobi asesmen.');
-      } else {
-        setAsesmenState(json.data);
-        sounds.playClick();
-        showToast('✅ Berhasil masuk ke Lobi Menara Asesmen Individu!');
-        meshRef.current?.publish({
-          type: 'asesmen_tower_event',
-          senderId: currentStudent.id,
-          ts: Date.now(),
-        });
-      }
+      setAsesmenState(res.data);
+      sounds.playClick();
+      showToast('✅ Berhasil masuk ke Lobi Menara Asesmen Individu!');
+      publishAsesmenMeshPayload({
+        eventType: 'student_sync',
+        studentPacket: res.studentSyncPacket,
+      });
     } catch {
-      showToast('Gagal menghubungi server Menara Asesmen.');
+      showToast('Gagal bergabung ke lobi Menara Asesmen.');
     } finally {
       setActionBusy(false);
     }
@@ -616,40 +684,29 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
     });
 
     try {
-      const res = await fetch('/api/menara-asesmen/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actionType: 'submit_exam',
-          studentId: currentStudent.id,
-          studentName: currentStudent.name,
-          className: currentStudent.className,
-          gender: currentStudent.gender,
-          sessionToken: sessionTokenRef.current,
-          answersBatch: allAnswersPayload,
-        }),
+      const res = await MenaraAsesmenEngine.executeStudentAction({
+        actionType: 'submit_exam',
+        currentStudent,
+        sessionToken: sessionTokenRef.current,
+        answersBatch: allAnswersPayload,
       });
-      const json = await res.json();
-      if (json?.success && json.data) {
-        setAsesmenState(json.data);
-        setDirtyAnswerIds(new Set());
-        sounds.playSuccess();
-        showToast(
-          isAutoTimeout
-            ? '⏰ Waktu ujian habis! Jawaban Anda otomatis dikumpulkan dan dinilai.'
-            : '🎉 Jawaban Asesmen Anda berhasil dikumpulkan!'
-        );
-        // Sinkronisasi batch jawaban & hasil ke Google Spreadsheet
-        StorageService.syncAsesmenJawabanBatchToGAS(allAnswersPayload).catch(() => {});
-        if (json.hasil) {
-          StorageService.syncAsesmenHasilToGAS([json.hasil]).catch(() => {});
-        }
-        meshRef.current?.publish({
-          type: 'asesmen_tower_event',
-          senderId: currentStudent.id,
-          ts: Date.now(),
-        });
+
+      setAsesmenState(res.data);
+      setDirtyAnswerIds(new Set());
+      sounds.playSuccess();
+      showToast(
+        isAutoTimeout
+          ? '⏰ Waktu ujian habis! Jawaban Anda otomatis dikumpulkan dan dinilai.'
+          : '🎉 Jawaban Asesmen Anda berhasil dikumpulkan!'
+      );
+      StorageService.syncAsesmenJawabanBatchToGAS(allAnswersPayload).catch(() => {});
+      if (res.hasil) {
+        StorageService.syncAsesmenHasilToGAS([res.hasil]).catch(() => {});
       }
+      publishAsesmenMeshPayload({
+        eventType: 'student_sync',
+        studentPacket: res.studentSyncPacket,
+      });
     } catch {
       showToast('Gagal mengumpulkan jawaban. Coba lagi.');
     } finally {
@@ -714,50 +771,44 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
         Number(komposisiJenis.pg_mcma || 0) +
         Number(komposisiJenis.pg_kategori || 0);
 
-      const res = await fetch('/api/menara-asesmen/teacher-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actionType: 'save_config',
-          teacherId: currentStudent?.id,
-          teacherName: currentStudent?.name,
-          isTeacher: isTeacherAccount,
-          studentNumber: currentStudent?.studentNumber,
-          teacherPin: teacherPinInput,
-          sesiConfig: {
-            judul_asesmen: judulAsesmen,
-            tp_terpilih: selectedTpIds,
-            tp_detail: selectedTpDetails,
-            durasi: durasiMenit,
-            jumlah_soal: totalSoal,
-            komposisi_jenis: komposisiJenis,
-            komposisi_penyajian: komposisiPenyajian,
-            poin_per_jenis: poinPerJenis,
-            mcma_kredit_parsial: mcmaKreditParsial,
-            acak_soal: acakSoal,
-            acak_opsi: acakOpsi,
-            izinkan_menyusul: izinkanMenyusul,
-            tampilkan_pembahasan: tampilkanPembahasan,
-            xp_bonus_selesai: xpBonusSelesai,
-          },
-        }),
+      const res = await MenaraAsesmenEngine.executeTeacherAction({
+        actionType: 'save_config',
+        currentStudent,
+        isTeacherAccount,
+        teacherPin: teacherPinInput,
+        sesiConfig: {
+          judul_asesmen: judulAsesmen,
+          tp_terpilih: selectedTpIds,
+          tp_detail: selectedTpDetails,
+          durasi: durasiMenit,
+          jumlah_soal: totalSoal,
+          komposisi_jenis: komposisiJenis,
+          komposisi_penyajian: komposisiPenyajian,
+          poin_per_jenis: poinPerJenis,
+          mcma_kredit_parsial: mcmaKreditParsial,
+          acak_soal: acakSoal,
+          acak_opsi: acakOpsi,
+          izinkan_menyusul: izinkanMenyusul,
+          tampilkan_pembahasan: tampilkanPembahasan,
+          xp_bonus_selesai: xpBonusSelesai,
+        },
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        showToast(json.error || 'Gagal menyimpan konfigurasi.');
-      } else {
-        setAsesmenState(json.data);
-        sounds.playSuccess();
-        showToast('✅ Pengaturan Sesi Asesmen berhasil disimpan!');
-      }
+
+      setAsesmenState(res.data);
+      sounds.playSuccess();
+      showToast('✅ Pengaturan Sesi Asesmen berhasil disimpan!');
+      publishAsesmenMeshPayload({
+        eventType: 'state_sync',
+        store: res.canonicalStore,
+      });
     } catch {
-      showToast('Gagal menyimpan konfigurasi ke server.');
+      showToast('Gagal menyimpan konfigurasi.');
     } finally {
       setActionBusy(false);
     }
   };
 
-  // Handler Guru: Generate Soal Otomatis dengan Gemini API dari Bank Materi
+  // Handler Guru: Generate Soal Otomatis dengan Gemini API / Adaptive Engine dari Bank Materi
   const handleGenerateQuestionsWithAI = async () => {
     if (selectedTpIds.length === 0) {
       showToast('Pilih minimal 1 Tujuan Pembelajaran (TP) dari Bank Materi.');
@@ -773,33 +824,28 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
         Number(komposisiJenis.pg_mcma || 0) +
         Number(komposisiJenis.pg_kategori || 0);
 
-      const res = await fetch('/api/menara-asesmen/generate-soal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teacherId: currentStudent?.id,
-          teacherName: currentStudent?.name,
-          isTeacher: isTeacherAccount,
-          studentNumber: currentStudent?.studentNumber,
-          teacherPin: teacherPinInput,
-          tpDetailList: selectedTpDetails,
-          jumlahSoal: totalSoal,
-          komposisiJenis,
-          komposisiPenyajian,
-        }),
+      const res = await MenaraAsesmenEngine.generateQuestions({
+        currentStudent,
+        isTeacherAccount,
+        teacherPin: teacherPinInput,
+        tpDetailList: selectedTpDetails,
+        jumlahSoal: totalSoal,
+        komposisiJenis,
+        komposisiPenyajian,
+        poinPerJenis,
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        showToast(json.error || 'Gagal men-generate soal.');
-      } else {
-        setAsesmenState(json.data);
-        setTeacherSubTab('bank_soal');
-        sounds.playRewardXp();
-        showToast(
-          json.message ||
-            '✨ Soal TKA berhasil di-generate! Silakan tinjau, edit, dan periksa kunci jawaban.'
-        );
-      }
+
+      setAsesmenState(res.data);
+      setTeacherSubTab('bank_soal');
+      sounds.playRewardXp();
+      showToast(
+        res.message ||
+          '✨ Soal TKA berhasil di-generate! Silakan tinjau, edit, dan periksa kunci jawaban.'
+      );
+      publishAsesmenMeshPayload({
+        eventType: 'state_sync',
+        store: res.canonicalStore,
+      });
     } catch {
       showToast('Terjadi kesalahan saat men-generate soal.');
     } finally {
@@ -821,73 +867,62 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
   ) => {
     setActionBusy(true);
     try {
-      const res = await fetch('/api/menara-asesmen/teacher-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actionType,
-          teacherId: currentStudent?.id,
-          teacherName: currentStudent?.name,
-          isTeacher: isTeacherAccount,
-          studentNumber: currentStudent?.studentNumber,
-          teacherPin: teacherPinInput,
-          extraMinutes,
-        }),
+      const res = await MenaraAsesmenEngine.executeTeacherAction({
+        actionType,
+        currentStudent,
+        isTeacherAccount,
+        teacherPin: teacherPinInput,
+        extraMinutes,
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        showToast(json.error || 'Aksi gagal dijalankan.');
-      } else {
-        const nextData: MenaraAsesmenState = json.data;
-        setAsesmenState(nextData);
-        sounds.playSuccess();
 
-        if (actionType === 'buka_lobi') {
-          setTeacherSubTab('lobi_pantau');
-          showToast('🚪 Lobi Asesmen DIBUKA! Siswa kini dapat masuk dan menunggu di lobi.');
-          StorageService.syncAsesmenSessionAndBankToGAS({
-            sesi: nextData.sesi,
-            bankSoal: nextData.bankSoal,
-            stimulusList: nextData.stimulusList,
-            teacherId: currentStudent?.id || 'teacher-1',
-            teacherName: currentStudent?.name || 'Guru',
-            teacherPin: teacherPinInput,
-          }).catch(() => {});
-        } else if (actionType === 'mulai_asesmen') {
-          showToast('🚀 ASESMEN DIMULAI! Soal tampil serentak di layar seluruh siswa di lobi.');
-          StorageService.syncAsesmenSessionAndBankToGAS({
-            sesi: nextData.sesi,
-            bankSoal: nextData.bankSoal,
-            stimulusList: nextData.stimulusList,
-            teacherId: currentStudent?.id || 'teacher-1',
-            teacherName: currentStudent?.name || 'Guru',
-            teacherPin: teacherPinInput,
-          }).catch(() => {});
-        } else if (actionType === 'tambah_waktu') {
-          showToast(`⏱️ Waktu asesmen ditambah +${extraMinutes || 5} menit!`);
-        } else if (actionType === 'jeda') {
-          showToast('⏸️ Asesmen dijeda sementara.');
-        } else if (actionType === 'lanjut') {
-          showToast('▶️ Asesmen dilanjutkan kembali.');
-        } else if (actionType === 'akhiri_paksa') {
-          setTeacherSubTab('analisis');
-          showToast('🛑 Asesmen diakhiri! Seluruh jawaban siswa telah dinilai otomatis.');
-          if (nextData.semuaHasil && nextData.semuaHasil.length > 0) {
-            StorageService.syncAsesmenHasilToGAS(nextData.semuaHasil).catch(() => {});
-          }
-        } else if (actionType === 'reset_sesi') {
-          setLocalAnswers({});
-          showToast('🔄 Sesi baru siap! Data lobi & peserta telah direset.');
+      const nextData = res.data;
+      setAsesmenState(nextData);
+      sounds.playSuccess();
+
+      if (actionType === 'buka_lobi') {
+        setTeacherSubTab('lobi_pantau');
+        showToast('🚪 Lobi Asesmen DIBUKA! Siswa kini dapat masuk dan menunggu di lobi.');
+        StorageService.syncAsesmenSessionAndBankToGAS({
+          sesi: nextData.sesi,
+          bankSoal: nextData.bankSoal,
+          stimulusList: nextData.stimulusList,
+          teacherId: currentStudent?.id || 'teacher-1',
+          teacherName: currentStudent?.name || 'Guru',
+          teacherPin: teacherPinInput,
+        }).catch(() => {});
+      } else if (actionType === 'mulai_asesmen') {
+        showToast('🚀 ASESMEN DIMULAI! Soal tampil serentak di layar seluruh siswa di lobi.');
+        StorageService.syncAsesmenSessionAndBankToGAS({
+          sesi: nextData.sesi,
+          bankSoal: nextData.bankSoal,
+          stimulusList: nextData.stimulusList,
+          teacherId: currentStudent?.id || 'teacher-1',
+          teacherName: currentStudent?.name || 'Guru',
+          teacherPin: teacherPinInput,
+        }).catch(() => {});
+      } else if (actionType === 'tambah_waktu') {
+        showToast(`⏱️ Waktu asesmen ditambah +${extraMinutes || 5} menit!`);
+      } else if (actionType === 'jeda') {
+        showToast('⏸️ Asesmen dijeda sementara.');
+      } else if (actionType === 'lanjut') {
+        showToast('▶️ Asesmen dilanjutkan kembali.');
+      } else if (actionType === 'akhiri_paksa') {
+        setTeacherSubTab('analisis');
+        showToast('🛑 Asesmen diakhiri! Seluruh jawaban siswa telah dinilai otomatis.');
+        if (nextData.semuaHasil && nextData.semuaHasil.length > 0) {
+          StorageService.syncAsesmenHasilToGAS(nextData.semuaHasil).catch(() => {});
         }
-
-        meshRef.current?.publish({
-          type: 'asesmen_tower_event',
-          senderId: currentStudent?.id || 'teacher',
-          ts: Date.now(),
-        });
+      } else if (actionType === 'reset_sesi') {
+        setLocalAnswers({});
+        showToast('🔄 Sesi baru siap! Data lobi & peserta telah direset.');
       }
+
+      publishAsesmenMeshPayload({
+        eventType: 'state_sync',
+        store: res.canonicalStore,
+      });
     } catch {
-      showToast('Gagal menghubungi server.');
+      showToast('Gagal menjalankan aksi sesi.');
     } finally {
       setActionBusy(false);
     }
@@ -902,26 +937,22 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
     }
     setActionBusy(true);
     try {
-      const res = await fetch('/api/menara-asesmen/teacher-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actionType: 'save_question',
-          teacherId: currentStudent?.id,
-          teacherName: currentStudent?.name,
-          isTeacher: isTeacherAccount,
-          studentNumber: currentStudent?.studentNumber,
-          teacherPin: teacherPinInput,
-          questionItem: editingQuestion,
-        }),
+      const res = await MenaraAsesmenEngine.executeTeacherAction({
+        actionType: 'save_question',
+        currentStudent,
+        isTeacherAccount,
+        teacherPin: teacherPinInput,
+        questionItem: editingQuestion,
       });
-      const json = await res.json();
-      if (json?.success && json.data) {
-        setAsesmenState(json.data);
-        setEditingQuestion(null);
-        sounds.playSuccess();
-        showToast('✅ Butir soal & kunci jawaban berhasil disimpan!');
-      }
+
+      setAsesmenState(res.data);
+      setEditingQuestion(null);
+      sounds.playSuccess();
+      showToast('✅ Butir soal & kunci jawaban berhasil disimpan!');
+      publishAsesmenMeshPayload({
+        eventType: 'state_sync',
+        store: res.canonicalStore,
+      });
     } catch {
       showToast('Gagal menyimpan butir soal.');
     } finally {
@@ -932,25 +963,21 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
   const handleDeleteQuestion = async (idSoal: string) => {
     setActionBusy(true);
     try {
-      const res = await fetch('/api/menara-asesmen/teacher-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actionType: 'delete_question',
-          teacherId: currentStudent?.id,
-          teacherName: currentStudent?.name,
-          isTeacher: isTeacherAccount,
-          studentNumber: currentStudent?.studentNumber,
-          teacherPin: teacherPinInput,
-          questionId: idSoal,
-        }),
+      const res = await MenaraAsesmenEngine.executeTeacherAction({
+        actionType: 'delete_question',
+        currentStudent,
+        isTeacherAccount,
+        teacherPin: teacherPinInput,
+        questionId: idSoal,
       });
-      const json = await res.json();
-      if (json?.success && json.data) {
-        setAsesmenState(json.data);
-        sounds.playClick();
-        showToast(`🗑️ Soal ${idSoal} dihapus dari Bank Soal sesi.`);
-      }
+
+      setAsesmenState(res.data);
+      sounds.playClick();
+      showToast(`🗑️ Soal ${idSoal} dihapus dari Bank Soal sesi.`);
+      publishAsesmenMeshPayload({
+        eventType: 'state_sync',
+        store: res.canonicalStore,
+      });
     } catch {} finally {
       setActionBusy(false);
     }
@@ -960,26 +987,22 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
     if (!editingStimulus) return;
     setActionBusy(true);
     try {
-      const res = await fetch('/api/menara-asesmen/teacher-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actionType: 'save_stimulus',
-          teacherId: currentStudent?.id,
-          teacherName: currentStudent?.name,
-          isTeacher: isTeacherAccount,
-          studentNumber: currentStudent?.studentNumber,
-          teacherPin: teacherPinInput,
-          stimulusItem: editingStimulus,
-        }),
+      const res = await MenaraAsesmenEngine.executeTeacherAction({
+        actionType: 'save_stimulus',
+        currentStudent,
+        isTeacherAccount,
+        teacherPin: teacherPinInput,
+        stimulusItem: editingStimulus,
       });
-      const json = await res.json();
-      if (json?.success && json.data) {
-        setAsesmenState(json.data);
-        setEditingStimulus(null);
-        sounds.playSuccess();
-        showToast('✅ Stimulus soal grup berhasil disimpan!');
-      }
+
+      setAsesmenState(res.data);
+      setEditingStimulus(null);
+      sounds.playSuccess();
+      showToast('✅ Stimulus soal grup berhasil disimpan!');
+      publishAsesmenMeshPayload({
+        eventType: 'state_sync',
+        store: res.canonicalStore,
+      });
     } catch {
       showToast('Gagal menyimpan stimulus.');
     } finally {
@@ -3137,7 +3160,7 @@ export const MenaraAsesmenIndividuModal: React.FC<MenaraAsesmenIndividuModalProp
                 <div>
                   <label className="text-[10px] text-slate-400 block mb-1">ID Stimulus</label>
                   <select
-                    value={editingQuestion.id_stimulus}
+                    value={editingQuestion.id_stimulus || ''}
                     onChange={(e) =>
                       setEditingQuestion({
                         ...editingQuestion,

@@ -6135,7 +6135,8 @@ async function startServer() {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   } else {
-    const { createServer } = await import('vite');
+    const vitePkg = 'vite';
+    const { createServer } = await import(/* @vite-ignore */ vitePkg);
     const vite = await createServer({
       server: { middlewareMode: true },
       appType: 'spa',

@@ -1306,18 +1306,6 @@ export default function App() {
               )}
             </button>
 
-            {/* Tombol Teleport / Menu Cepat Lokasi Kota (Termasuk Arena Rumah Misteri) */}
-            <button
-              type="button"
-              onClick={() => setIsQuickNavOpen(true)}
-              className="flex items-center gap-1 bg-[#121e2c]/68 hover:bg-[#1a293b]/85 backdrop-blur-md text-sky-300 hover:text-white border border-sky-500/50 hover:border-sky-400 rounded-full px-2 sm:px-2.5 py-1 sm:py-1.5 shadow-lg text-[10px] sm:text-xs font-extrabold transition active:scale-95 shrink-0 cursor-pointer"
-              title="Teleport Cepat ke Bangunan & Arena Rumah Misteri"
-              aria-label="Teleport Cepat"
-            >
-              <Compass className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-              <span className="hidden sm:inline">Teleport</span>
-            </button>
-
             {/* Radio Background Music Controller (Dynamic 5 Time-of-Day Stations) */}
             <LofiAudioControl timePeriod={timePeriod} />
 
