@@ -1383,6 +1383,7 @@ export const INITIAL_SETTINGS: TownSettings = {
   townName: 'Kota Refleksi SMK Negeri 2 Gorontalo',
   academicYear: '2026/2027 Ganjil',
   teacherPin: 'Kiki123!',
+  bridgePassCode: 'REFLEKSIA2026',
   gasWebAppUrl:
     'https://script.google.com/macros/s/AKfycbwzHhVYKBfznA_k4dZlB1eGFevpeLoJDiSUbLKXJACQPgsKFxi0HfbNNbjUZBWa7finfw/exec',
   spreadsheetUrl:

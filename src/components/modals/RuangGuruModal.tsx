@@ -2108,6 +2108,7 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
   const [sheetUrlInput, setSheetUrlInput] = useState(settings?.spreadsheetUrl || '');
   const [townNameInput, setTownNameInput] = useState(settings?.townName || 'Kota Refleksi SMK Negeri 2 Gorontalo');
   const [teacherPinInput, setTeacherPinInput] = useState(settings?.teacherPin || 'Kiki123!');
+  const [bridgePassCodeInput, setBridgePassCodeInput] = useState(settings?.bridgePassCode || 'REFLEKSIA2026');
   const [academicYearInput, setAcademicYearInput] = useState(settings?.academicYear || '2026/2027 Ganjil');
 
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -2173,6 +2174,7 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
       townName: townNameInput.trim() || 'Kota Refleksi SMK Negeri 2 Gorontalo',
       academicYear: academicYearInput.trim() || '2026/2027 Ganjil',
       teacherPin: teacherPinInput.trim() || 'Kiki123!',
+      bridgePassCode: bridgePassCodeInput.trim() || 'REFLEKSIA2026',
       gasWebAppUrl: gasUrlInput.trim(),
       spreadsheetUrl: sheetUrlInput.trim(),
     };
@@ -2771,6 +2773,19 @@ export const RuangGuruModal: React.FC<RuangGuruModalProps> = ({
                     value={teacherPinInput}
                     onChange={(e) => setTeacherPinInput(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white text-xs font-mono focus:border-indigo-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-sky-300 mb-1 flex items-center justify-between">
+                    <span>🌉 Kode Izin Jembatan Refleksia Timur (Diberikan Guru ke Siswa)</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Wajib diisi siswa di pos jembatan</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={bridgePassCodeInput}
+                    onChange={(e) => setBridgePassCodeInput(e.target.value.toUpperCase())}
+                    placeholder="Contoh: REFLEKSIA2026"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-sky-400/40 text-sky-200 text-xs font-mono font-bold tracking-wider focus:border-sky-300 focus:outline-none"
                   />
                 </div>
               </div>

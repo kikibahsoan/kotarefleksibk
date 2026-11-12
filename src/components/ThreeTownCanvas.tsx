@@ -19,7 +19,7 @@ import { sounds } from '../utils/audio.ts';
 import { TimePeriod, getTimePeriodWita } from '../utils/lofiAudio.ts';
 import { WeatherType, getWeatherTypeWita } from '../utils/weather.ts';
 import { RealtimePresenceMesh } from '../utils/realtimePresenceMesh.ts';
-import { X, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin, Megaphone, Mail, Send, Shuffle, ChevronLeft } from 'lucide-react';
+import { X, MapPin, BookOpen, Newspaper, FileText, Sparkles, CheckCircle2, ScrollText, Pin, Megaphone, Mail, Send, Shuffle, ChevronLeft, Key, Shield, Lock, Unlock } from 'lucide-react';
 import { TownRulesModal } from './modals/TownRulesModal.tsx';
 import {
   CreatorStudioFloatingDock,
@@ -145,6 +145,9 @@ export const LITERACY_CORNER_COORDS = { wx: 2.35, wy: -6.15 };
 // Koordinat Komandan Nawa (Penjaga Gerbang Selamat Datang) berdiri tegap lebih maju di depan Gapura Utama
 export const NAWA_GATEKEEPER_COORDS = { wx: -0.62, wy: 6.88 };
 
+// Koordinat Arya • Penjaga Pos Jembatan Refleksia Timur (Berdiri tegap di mulut jembatan sisi barat)
+export const EAST_BRIDGE_GUARD_COORDS = { wx: 6.35, wy: -0.72 };
+
 // Koordinat Lapak Refleksia (Toko Roti & Kafe)
 export const CAFE_COORDS = { wx: 4.65, wy: 4.55 };
 
@@ -160,7 +163,7 @@ export interface ActiveEmote {
 
 interface AvatarData {
   id: string;
-  role: 'siswa' | 'guru' | 'wartawan' | 'polisi' | 'petugas_kebersihan' | 'kurir' | 'barista' | 'penjaga_kota' | 'penjaga_lab' | 'penjaga_literasi' | 'penjaga_kolam' | 'pengawas' | 'kepala_balai' | 'penjaga_gerbang_utama';
+  role: 'siswa' | 'guru' | 'wartawan' | 'polisi' | 'petugas_kebersihan' | 'kurir' | 'barista' | 'penjaga_kota' | 'penjaga_lab' | 'penjaga_literasi' | 'penjaga_kolam' | 'pengawas' | 'kepala_balai' | 'penjaga_gerbang_utama' | 'penjaga_jembatan_timur';
   handle: string;
   name?: string;
   roleLabel: string;
@@ -688,7 +691,8 @@ export const isSolidCollision = (
   wx: number,
   wy: number,
   padding: number = 0.16,
-  allowWildernessAccess: boolean = true
+  allowWildernessAccess: boolean = true,
+  allowBridgeAccess: boolean = true
 ): boolean => {
   // Overall Map boundaries:
   // West limit wx: -8.15, South limit wy: +8.15, North limit wy: -13.95
@@ -716,6 +720,12 @@ export const isSolidCollision = (
     return true;
   }
 
+  // Palang Jembatan Menuju Refleksia Timur (dijaga NPC Arya di wx = 6.35, wy = -0.72)
+  // Siswa wajib memasukkan kode izin dari Guru untuk lewat. Jika belum punya izin, jembatan terkunci rapat
+  if (!allowBridgeAccess && wx >= 6.42 - padding && wx <= 8.85 + padding && Math.abs(wy) < 0.95) {
+    return true;
+  }
+
   // Danau Pusat / Sungai Refleksia water basin (wx: 1.85 .. 6.82, wy: -12.25 .. -8.78)
   // Leaves the extra-large fishing pier extending out to ujung dermaga (wx: 2.76, wy: -10.86) walkable
   if (wx > 1.85 - padding && wx <= 6.82 && wy < -8.78 + padding) {
@@ -735,7 +745,7 @@ export const isSolidCollision = (
     return false;
   }
 
-  // Keep the bridge entrance and deck corridor (wx: 6.25..8.85, |wy| < 0.92) always clear for all citizens
+  // Keep the bridge entrance and deck corridor (wx: 6.25..8.85, |wy| < 0.92) always clear for authorized citizens
   if (wx >= 6.25 && wx <= 8.85 && Math.abs(wy) < 0.92) {
     return false;
   }
@@ -2394,7 +2404,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const hasPaidWildernessAccessRef = useRef(false);
   hasPaidWildernessAccessRef.current = hasPaidWildernessAccess;
 
-  // Nearby interaction (tree watering/apple harvesting, dry leaf pickup, fishing spot, literacy corner, bench, town rules board, beringin tree journal, announcement board, wisma mailbox, banyan treehouse, or wilderness gate ticket)
+  // Nearby interaction (tree watering/apple harvesting, dry leaf pickup, fishing spot, literacy corner, bench, town rules board, beringin tree journal, announcement board, wisma mailbox, banyan treehouse, wilderness gate ticket, or east bridge guard post)
   const [nearbyAction, setNearbyAction] = useState<{
     type:
       | 'tree'
@@ -2407,7 +2417,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       | 'announcement_board'
       | 'wisma_mailbox'
       | 'treehouse'
-      | 'wilderness_gate';
+      | 'wilderness_gate'
+      | 'east_bridge_guard';
     treeIndex?: number;
     leafId?: number;
     benchId?: BenchId;
@@ -2428,7 +2439,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       | 'announcement_board'
       | 'wisma_mailbox'
       | 'treehouse'
-      | 'wilderness_gate';
+      | 'wilderness_gate'
+      | 'east_bridge_guard';
     treeIndex?: number;
     leafId?: number;
     benchId?: BenchId;
@@ -2454,7 +2466,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         | 'announcement_board'
         | 'wisma_mailbox'
         | 'treehouse'
-        | 'wilderness_gate';
+        | 'wilderness_gate'
+        | 'east_bridge_guard';
       treeIndex?: number;
       leafId?: number;
       benchId?: BenchId;
@@ -2466,6 +2479,23 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
     return `${act.type}:${act.treeIndex ?? ''}:${act.leafId ?? ''}:${act.benchId ?? ''}:${act.wismaId ?? ''}:${act.isUpInTreehouse ? 'up' : 'ground'}`;
   };
   const dismissedNearbySignatureRef = useRef<string | null>(null);
+
+  // State Izin Jembatan Refleksia Timur (Siswa wajib mengisi kode yang didapatkan dari guru untuk lewat)
+  const [hasBridgeAccess, setHasBridgeAccess] = useState<boolean>(() => {
+    if (isTeacher) return true;
+    try {
+      const saved = localStorage.getItem(`refleksia_bridge_access_${studentId || 'default'}`);
+      return saved === 'unlocked';
+    } catch {
+      return false;
+    }
+  });
+  const hasBridgeAccessRef = useRef<boolean>(hasBridgeAccess);
+  hasBridgeAccessRef.current = hasBridgeAccess;
+  const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
+  const [bridgeCodeInput, setBridgeCodeInput] = useState('');
+  const [bridgeCodeError, setBridgeCodeError] = useState<string | null>(null);
+  const [bridgeCodeSuccess, setBridgeCodeSuccess] = useState<boolean>(false);
 
   // Fishing state, phase ('casting' | 'waiting' | 'biting' | 'pulling' | null), timers & caught fish inventory for selling to Pak @Sufri
   const [isFishing, setIsFishing] = useState(false);
@@ -3678,7 +3708,40 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       speechTimer: 6.5,
     };
 
-    const npcs: AvatarData[] = [surya, malik, maUba, patra, tomi, sony, nawa];
+    // 8. Penjaga Jembatan Refleksia Timur (Arya) - Petugas Keamanan Jembatan berseragam Biru Laut & Rompi Reflektif, memeriksa kode izin penyeberangan siswa
+    const arya: AvatarData = {
+      id: 'arya',
+      role: 'penjaga_jembatan_timur',
+      handle: 'arya',
+      name: 'Arya',
+      roleLabel: 'Penjaga Jembatan Refleksia Timur',
+      wx: EAST_BRIDGE_GUARD_COORDS.wx,
+      wy: EAST_BRIDGE_GUARD_COORDS.wy,
+      targetWx: EAST_BRIDGE_GUARD_COORDS.wx,
+      targetWy: EAST_BRIDGE_GUARD_COORDS.wy,
+      anchorX: EAST_BRIDGE_GUARD_COORDS.wx,
+      anchorY: EAST_BRIDGE_GUARD_COORDS.wy,
+      wanderRadius: 0,
+      speed: 0,
+      shirtColor: '#0284c7', // Seragam Biru Navy/Langit
+      pantsColor: '#0f172a', // Celana formal gelap
+      hairColor: '#0f172a',
+      gender: 'L',
+      isMoving: false,
+      pauseTimer: 99999,
+      walkFrame: 0,
+      facing: 'down-right',
+      speeches: [
+        'Selamat datang di Pos Jembatan Refleksia Timur! 🌉',
+        'Siswa wajib mengisi Kode Izin dari Guru untuk menyeberang ke Refleksia Timur! 📝🔑',
+        'Kawasan seberang: Menara Pencakar Langit, Bandara, Arena Rumah Misteri & Menara Asesmen! 🏙️',
+        'Tunjukkan kode izin jembatanmu pada saya, mari saya periksa! 🛡️✨',
+      ],
+      speechText: 'Selamat datang di Pos Jembatan Refleksia Timur! 🌉',
+      speechTimer: 6.0,
+    };
+
+    const npcs: AvatarData[] = [surya, malik, maUba, patra, tomi, sony, nawa, arya];
     npcsRef.current = npcs;
     applyCreatorStateToWorldRef.current(creatorStateRef.current);
 
@@ -4389,6 +4452,45 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         return;
       }
 
+      // 1b-0b. Check Click directly on NPC Arya / Pos Jembatan Refleksia Timur [6.35, -0.72]
+      const aryaDist = Math.hypot(wx - EAST_BRIDGE_GUARD_COORDS.wx, wy - EAST_BRIDGE_GUARD_COORDS.wy);
+      if (aryaDist < 0.65) {
+        sounds.playClick();
+        if (isSittingRef.current) {
+          setIsSitting(false);
+          setSittingSeat(null);
+        }
+        pendingSeatRef.current = null;
+        const arya = npcs.find((n) => n.id === 'arya');
+        const canCross = Boolean(isPlayerTeacher || isMasterKikyRef.current || hasBridgeAccessRef.current);
+        if (arya) {
+          arya.speechText = canCross
+            ? 'Silakan menyeberang, akses Refleksia Timur sudah terbuka! 🌉✨'
+            : 'Eits! Untuk menyeberang ke Refleksia Timur, wajib masukkan Kode Izin Guru ya! 🛡️🔑';
+          arya.speechTimer = 6.0;
+        }
+        if (canCross) {
+          player.targetWx = 6.35;
+          player.targetWy = 0.0;
+          player.isMoving = true;
+          player.speed = isRun ? 1.28 : 0.88;
+        } else {
+          player.targetWx = 6.05;
+          player.targetWy = -0.55;
+          player.isMoving = true;
+          player.speed = isRun ? 1.28 : 0.88;
+          setBridgeCodeError(null);
+          setBridgeCodeSuccess(false);
+          setIsBridgeModalOpen(true);
+        }
+        clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
+        pendingBuildingId = null;
+        lastTouchedIdRef.current = null;
+        setPendingConfirmation(null);
+        setIsCafeMenuOpen(false);
+        return;
+      }
+
       // 1b. Check Click directly on Papan Peraturan Kota [1.45, 5.95] or Welcome Gate [0, 6.15]
       // Radius diperkecil agar klik di jalan utama selatan bebas untuk berjalan
       const rulesDist = Math.hypot(wx - TOWN_RULES_BOARD_COORDS.wx, wy - TOWN_RULES_BOARD_COORDS.wy);
@@ -4790,6 +4892,36 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             player.targetWx = bx * 0.68;
             player.targetWy = by * 0.68;
           }
+
+          const canCrossBridgeForBuilding = Boolean(
+            isPlayerTeacher || isMasterKikyRef.current || hasBridgeAccessRef.current
+          );
+          const isEastBuilding =
+            b.id === 'pencakar_langit' ||
+            b.id === 'bandara' ||
+            b.id === 'arena_rumah_misteri' ||
+            b.id === 'menara_asesmen';
+          if (!canCrossBridgeForBuilding && isEastBuilding && player.wx < 6.75) {
+            player.targetWx = 6.05;
+            player.targetWy = -0.55;
+            player.isMoving = true;
+            player.speed = isRun ? 1.28 : 0.88;
+            const arya = npcs.find((n) => n.id === 'arya');
+            if (arya) {
+              arya.speechText = 'Eits! Untuk menyeberang ke Refleksia Timur, wajib masukkan Kode Izin Guru ya! 🛡️🔑';
+              arya.speechTimer = 6.0;
+            }
+            playerSpeechRef.current = {
+              text: '🛡️ Menuju Pos Penjaga @arya untuk memasukkan Kode Izin Jembatan...',
+              expiresAt: Date.now() + 4500,
+            };
+            clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
+            setBridgeCodeError(null);
+            setBridgeCodeSuccess(false);
+            setIsBridgeModalOpen(true);
+            return;
+          }
+
           player.isMoving = Math.hypot(player.wx - player.targetWx, player.wy - player.targetWy) > 0.08;
           if (player.isMoving) {
             player.isRunning = isRun;
@@ -4883,6 +5015,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       let targetX = Math.max(-8.05, Math.min(18.15, wx));
       let targetY = Math.max(-13.85, Math.min(8.05, wy));
 
+      const canCrossEastBridge = Boolean(
+        isPlayerTeacher || isMasterKikyRef.current || hasBridgeAccessRef.current
+      );
+
       // Jika mengklik di sekitar jembatan kayu (wx: 6.55..8.55, |wy| <= 1.45), arahkan mulus ke jalur tengah jembatan
       if (targetX >= 6.55 && targetX <= 8.55 && Math.abs(targetY) <= 1.45) {
         targetY = Math.max(-0.35, Math.min(0.35, targetY));
@@ -4891,9 +5027,26 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         targetX = player.wx < 7.55 ? 8.75 : 6.35;
       }
 
-      // Jika belum punya akses Hutan Refleksia (Tamu atau Siswa belum bayar 5 XP) dan mengklik area di balik pagar (wy < -7.45) di sisi barat sungai (targetX <= 6.85),
-      // arahkan ke depan pintu gerbang yang dijaga @Sufri
-      if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.18 && targetX <= 6.85) {
+      // Jika belum memiliki izin jembatan dan mengklik ke arah Refleksia Timur (targetX > 6.65) sementara avatar ada di barat (player.wx < 6.75)
+      if (!canCrossEastBridge && (targetX > 6.65 || (targetX >= 6.45 && Math.abs(targetY) <= 1.45)) && player.wx < 6.75) {
+        dismissedNearbySignatureRef.current = null;
+        targetX = 6.05;
+        targetY = -0.55;
+        const arya = npcs.find((n) => n.id === 'arya');
+        if (arya) {
+          arya.speechText = 'Eits! Untuk menyeberang ke Refleksia Timur, wajib masukkan Kode Izin Guru ya! 🛡️🔑';
+          arya.speechTimer = 6.0;
+        }
+        playerSpeechRef.current = {
+          text: '🛡️ Menuju Pos Penjaga @arya untuk memasukkan Kode Izin Jembatan...',
+          expiresAt: Date.now() + 4500,
+        };
+        setBridgeCodeError(null);
+        setBridgeCodeSuccess(false);
+        setIsBridgeModalOpen(true);
+      } else if (!canAccessWilderness && targetY < WILDERNESS_FENCE_WY + 0.18 && targetX <= 6.85) {
+        // Jika belum punya akses Hutan Refleksia (Tamu atau Siswa belum bayar 5 XP) dan mengklik area di balik pagar (wy < -7.45) di sisi barat sungai (targetX <= 6.85),
+        // arahkan ke depan pintu gerbang yang dijaga @Sufri
         dismissedNearbySignatureRef.current = null;
         targetX = 0.0;
         targetY = -7.08;
@@ -4907,7 +5060,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             : '🎫 Menuju gerbang Hutan Refleksia (Tiket Masuk 5 XP)...',
           expiresAt: Date.now() + 4500,
         };
-      } else if (isSolidCollision(targetX, targetY, 0.08, canAccessWilderness)) {
+      } else if (isSolidCollision(targetX, targetY, 0.08, canAccessWilderness, canCrossEastBridge)) {
         // Jika kursor tepat mengklik rintangan padat (air dalam danau, tebing gunung, air mancur),
         // telusuri garis lurus menuju posisi avatar untuk mendapatkan koordinat tanah/tepi terdekat yang dapat dipijak
         const dirX = player.wx - targetX;
@@ -4921,7 +5074,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         for (let step = 0.08; step <= 3.6; step += 0.08) {
           const testX = targetX + ndx * step;
           const testY = targetY + ndy * step;
-          if (!isSolidCollision(testX, testY, 0.08, canAccessWilderness)) {
+          if (!isSolidCollision(testX, testY, 0.08, canAccessWilderness, canCrossEastBridge)) {
             adjustedX = testX;
             adjustedY = testY;
             foundWalkable = true;
@@ -5536,6 +5689,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const canEnterWilderness = Boolean(
               !isPlayerGuest && (isPlayerTeacher || isMasterKikyRef.current || hasPaidWildernessAccessRef.current)
             );
+            const canCrossEastBridge = Boolean(
+              isPlayerTeacher || isMasterKikyRef.current || hasBridgeAccessRef.current
+            );
+            if (!canCrossEastBridge && player.wx < 6.75 && (player.targetWx >= 6.70 || (player.targetWx >= 6.45 && Math.abs(player.targetWy) <= 1.45))) {
+              player.targetWx = 6.05;
+              player.targetWy = -0.55;
+            }
             if (!canEnterWilderness && player.targetWy < WILDERNESS_FENCE_WY + 0.22 && player.targetWx <= 6.85) {
               player.targetWx = 0.0;
               player.targetWy = -7.08;
@@ -5576,6 +5736,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
             // Route all citizens (Siswa, Guru, Tamu/Wartawan) smoothly across the wooden footbridge at wy = 0.0 (spanning wx: 6.72..8.38)
             const needsCrossBridgeEast =
+              canCrossEastBridge &&
               player.wx < 8.50 &&
               player.targetWx >= 6.70 &&
               (player.targetWx > 8.20 || (player.wx < 6.70 && Math.abs(player.wy) > 0.45));
@@ -5627,7 +5788,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             const nextWy = player.wy + stepY;
 
             // Solid obstacle collision check with smooth fountain tangential steering & wall sliding
-            if (!isSolidCollision(nextWx, nextWy, 0.16, canEnterWilderness)) {
+            if (!isSolidCollision(nextWx, nextWy, 0.16, canEnterWilderness, canCrossEastBridge)) {
               player.wx = nextWx;
               player.wy = nextWy;
               player.walkFrame += delta * (player.isRunning ? 5.8 : (2.8 + (easeSpeed / player.speed) * 1.5));
@@ -5653,9 +5814,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               player.walkFrame += delta * 3.4;
             } else {
               // Wall sliding: try X movement only
-              const canMoveX = !isSolidCollision(nextWx, player.wy, 0.16, canEnterWilderness);
+              const canMoveX = !isSolidCollision(nextWx, player.wy, 0.16, canEnterWilderness, canCrossEastBridge);
               // Wall sliding: try Y movement only
-              const canMoveY = !isSolidCollision(player.wx, nextWy, 0.16, canEnterWilderness);
+              const canMoveY = !isSolidCollision(player.wx, nextWy, 0.16, canEnterWilderness, canCrossEastBridge);
 
               if (canMoveX) {
                 player.wx = nextWx;
@@ -6035,7 +6196,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           | 'announcement_board'
           | 'wisma_mailbox'
           | 'treehouse'
-          | 'wilderness_gate';
+          | 'wilderness_gate'
+          | 'east_bridge_guard';
         treeIndex?: number;
         leafId?: number;
         benchId?: BenchId;
@@ -6061,6 +6223,10 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         Math.hypot(player.wx - 0.0, player.wy - WILDERNESS_FENCE_WY) < 1.75 ||
         Math.hypot(player.wx - -0.76, player.wy - -7.32) < 1.65;
 
+      const isNearEastBridgeGuard =
+        Math.hypot(player.wx - EAST_BRIDGE_GUARD_COORDS.wx, player.wy - EAST_BRIDGE_GUARD_COORDS.wy) < 1.75 ||
+        (player.wx >= 6.15 && player.wx <= 6.75 && Math.abs(player.wy) < 0.85);
+
       if (isSittingRef.current) {
         const currentSeat = sittingSeatRef.current;
         let seatName = 'Kursi Taman Kota';
@@ -6072,6 +6238,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         else if (matchedSwing) seatName = matchedSwing.name;
         else if (currentSeat === 'literacy') seatName = 'Bangku Sudut Literasi';
         detectedNearby = { type: 'bench', benchId: currentSeat || undefined, benchName: seatName };
+      } else if (isNearEastBridgeGuard) {
+        detectedNearby = { type: 'east_bridge_guard' };
       } else if (isNearWildernessGate) {
         detectedNearby = { type: 'wilderness_gate' };
       } else if (isNearTreehouse) {
@@ -9941,6 +10109,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           }
         | { type: 'wilderness_gate'; wx: number; wy: number; depth: number }
         | { type: 'refleksia_timur_sign'; wx: number; wy: number; depth: number }
+        | { type: 'east_bridge_guard_post'; wx: number; wy: number; depth: number }
         | { type: 'lamp'; wx: number; wy: number; depth: number }
         | { type: 'fishing_spot'; wx: number; wy: number; depth: number }
         | { type: 'literacy_corner'; wx: number; wy: number; depth: number }
@@ -10255,6 +10424,14 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         wx: 8.95,
         wy: -1.05,
         depth: 8.95 - 1.05,
+      });
+
+      // Pos Penjaga Jembatan Refleksia Timur (Arya) di Mulut Jembatan Sisi Barat [wx: 6.35, wy: -0.72]
+      drawItems.push({
+        type: 'east_bridge_guard_post',
+        wx: EAST_BRIDGE_GUARD_COORDS.wx,
+        wy: EAST_BRIDGE_GUARD_COORDS.wy,
+        depth: EAST_BRIDGE_GUARD_COORDS.wx + EAST_BRIDGE_GUARD_COORDS.wy - 0.22,
       });
 
       // Gerbang Masuk Hutan Belantara & Danau Pusat di Jalan Belakang Pohon Refleksi (Dijaga @tomi, Khusus Guru)
@@ -13654,6 +13831,104 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.font = `${Math.max(4, Math.round(4.0 * z))}px sans-serif`;
           ctx.fillStyle = '#94a3b8';
           ctx.fillText('Kawasan Modern & Pencakar Langit', pt.x, by + bh * 0.74);
+
+          ctx.restore();
+        } else if (item.type === 'east_bridge_guard_post') {
+          // Pos Jembatan Refleksia Timur (Arya): Pos Keamanan Kayu Elegan, Palang Penghalang & Lentera Biru
+          const pt = toScreen(item.wx, item.wy, 0, camera.x, camera.y);
+          const z = zoomLevelRef.current;
+          ctx.save();
+
+          // 1. Soft contact shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+          ctx.beginPath();
+          ctx.ellipse(pt.x, pt.y + 1.2 * z, 13 * z, 6.5 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 2. Guard booth base platform (Plinth batu beton rapi)
+          ctx.fillStyle = isNight ? '#1e293b' : '#475569';
+          ctx.beginPath();
+          ctx.roundRect(pt.x - 11 * z, pt.y - 4 * z, 22 * z, 6 * z, 2 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#0284c7';
+          ctx.lineWidth = 0.8 * z;
+          ctx.stroke();
+
+          // 3. Wooden booth upright posts (Tiang pos jaga)
+          ctx.fillStyle = isNight ? '#0f172a' : '#1e3a5f';
+          ctx.fillRect(pt.x - 9.5 * z, pt.y - 28 * z, 2.4 * z, 26 * z);
+          ctx.fillRect(pt.x + 7.1 * z, pt.y - 28 * z, 2.4 * z, 26 * z);
+
+          // 4. Canopy Roof (Atap Kanopi Biru Modern Pelindung Hujan & Terik)
+          ctx.fillStyle = isNight ? '#0369a1' : '#0284c7';
+          ctx.beginPath();
+          ctx.moveTo(pt.x - 14 * z, pt.y - 28 * z);
+          ctx.lineTo(pt.x, pt.y - 34 * z);
+          ctx.lineTo(pt.x + 14 * z, pt.y - 28 * z);
+          ctx.lineTo(pt.x + 12 * z, pt.y - 26 * z);
+          ctx.lineTo(pt.x - 12 * z, pt.y - 26 * z);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 1.0 * z;
+          ctx.stroke();
+
+          // 5. Pos Signboard Badge ("POS JEMBATAN")
+          const sbW = 34 * z;
+          const sbH = 9.5 * z;
+          const sbX = pt.x - sbW / 2;
+          const sbY = pt.y - 25.5 * z;
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.roundRect(sbX, sbY, sbW, sbH, 2 * z);
+          ctx.fill();
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 0.8 * z;
+          ctx.stroke();
+
+          ctx.font = `bold ${Math.max(4, Math.round(4.4 * z))}px sans-serif`;
+          ctx.fillStyle = '#38bdf8';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🛡️ POS JEMBATAN', pt.x, sbY + sbH / 2);
+
+          // 6. Security Barrier Gate Arm (Palang Pintu Jembatan Menuju Seberang)
+          // Jika siswa sudah punya akses, palang terbuka ke atas (angkat); jika belum, palang menutup horizontal
+          const isUnlocked = hasBridgeAccessRef.current;
+          ctx.save();
+          ctx.translate(pt.x + 8.5 * z, pt.y - 7.5 * z);
+          if (isUnlocked) {
+            ctx.rotate(-Math.PI * 0.38); // Palang terangkat terbuka
+          }
+          // Barrier arm body with alternating red-white hazard stripes
+          const armLen = 22 * z;
+          const armThick = 2.4 * z;
+          ctx.fillStyle = '#f8fafc';
+          ctx.fillRect(0, -armThick / 2, armLen, armThick);
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 0.5 * z;
+          ctx.strokeRect(0, -armThick / 2, armLen, armThick);
+          // Red stripes
+          ctx.fillStyle = '#ef4444';
+          for (let s = 2 * z; s < armLen - 2 * z; s += 5 * z) {
+            ctx.fillRect(s, -armThick / 2, 2.5 * z, armThick);
+          }
+          // Barrier pivot base
+          ctx.fillStyle = '#334155';
+          ctx.beginPath();
+          ctx.arc(0, 0, 2.2 * z, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          // 7. Security Beacon Light on Roof (Lampu Indikator: Hijau jika unlocked, Kuning/Biru jika locked)
+          ctx.fillStyle = isUnlocked ? '#22c55e' : '#f59e0b';
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y - 34.5 * z, 2.2 * z, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = isUnlocked ? 'rgba(34, 197, 94, 0.4)' : 'rgba(245, 158, 11, 0.4)';
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y - 34.5 * z, 5.0 * z, 0, Math.PI * 2);
+          ctx.fill();
 
           ctx.restore();
         } else if (item.type === 'wilderness_fence_bay') {
@@ -18627,6 +18902,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillStyle = '#090d16';
             ctx.fillRect(pt.x - 4.5 * z, avY + 2.6 * z + legSwing, 4.3 * z, 0.95 * z);
             ctx.fillRect(pt.x + 0.4 * z, avY + 2.6 * z - legSwing, 4.3 * z, 0.95 * z);
+          } else if (av.role === 'penjaga_jembatan_timur') {
+            // ARYA (PENJAGA JEMBATAN REFLEKSIA TIMUR): Celana Taktikal Navy Gelap + Sepatu PDL Hitam Mengkilap
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 3.9 * z, avY - 6.2 * z + legSwing * 0.4, 3.4 * z, 7.2 * z);
+            ctx.fillRect(pt.x + 0.5 * z, avY - 6.2 * z - legSwing * 0.4, 3.4 * z, 7.2 * z);
+            // Tactical knee guards
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(pt.x - 3.7 * z, avY - 2.8 * z + legSwing * 0.4, 3.0 * z, 2.2 * z);
+            ctx.fillRect(pt.x + 0.7 * z, avY - 2.8 * z - legSwing * 0.4, 3.0 * z, 2.2 * z);
+            // Black polished patrol boots
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(pt.x - 4.2 * z, avY + 1.0 * z + legSwing * 0.4, 3.8 * z, 2.4 * z);
+            ctx.fillRect(pt.x + 0.4 * z, avY + 1.0 * z - legSwing * 0.4, 3.8 * z, 2.4 * z);
           } else {
             // Male Pants
             ctx.fillStyle = isTeacherAvatar ? '#1e293b' : resolvedPantsColor;
@@ -18965,6 +19253,40 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.beginPath();
             ctx.arc(holsterX + 1.2 * z, holsterY + 1.25 * z, 0.48 * z, 0, Math.PI * 2);
             ctx.fill();
+          } else if (av.role === 'penjaga_jembatan_timur') {
+            // ARYA (PENJAGA JEMBATAN TIMUR): Kemeja Dinas Biru Navy + Rompi Keselamatan Oranye Bergaris Reflektif Perak + Lencana Jembatan
+            // 1. Navy Patrol Shirt
+            ctx.fillStyle = '#0369a1';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 5.6 * z, avY - 14.2 * z, 11.2 * z, 8.8 * z, 2.2 * z);
+            ctx.fill();
+
+            // 2. High-Visibility Safety Vest (Rompi Reflektif Oranye Terang)
+            ctx.fillStyle = '#ea580c';
+            ctx.fillRect(pt.x - 5.4 * z, avY - 14.0 * z, 3.8 * z, 8.4 * z);
+            ctx.fillRect(pt.x + 1.6 * z, avY - 14.0 * z, 3.8 * z, 8.4 * z);
+
+            // 3. Silver Reflective Safety Stripes
+            ctx.fillStyle = '#f1f5f9';
+            ctx.fillRect(pt.x - 5.4 * z, avY - 11.0 * z, 3.8 * z, 1.3 * z);
+            ctx.fillRect(pt.x + 1.6 * z, avY - 11.0 * z, 3.8 * z, 1.3 * z);
+            ctx.fillRect(pt.x - 5.4 * z, avY - 8.2 * z, 3.8 * z, 1.3 * z);
+            ctx.fillRect(pt.x + 1.6 * z, avY - 8.2 * z, 3.8 * z, 1.3 * z);
+
+            // 4. Gold Bridge Security Badge on left chest
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(pt.x - 3.2 * z, avY - 12.4 * z, 1.1 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 5. Duty Belt with Radio Pouch (Walkie Talkie)
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 5.6 * z, avY - 6.6 * z, 11.2 * z, 1.6 * z);
+            // Walkie talkie pouch
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(pt.x + 2.8 * z, avY - 7.6 * z, 2.2 * z, 3.2 * z);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(pt.x + 3.8 * z, avY - 9.4 * z, 0.6 * z, 1.8 * z); // Antenna
           } else {
             // Student Torso with distinct unique shirt color per student
             ctx.fillStyle = resolvedShirtColor;
@@ -19405,6 +19727,46 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fillRect(clipX - 1.1 * z, clipY - 1.5 * z, 2.6 * z, 3.3 * z);
             ctx.fillStyle = '#f59e0b';
             ctx.fillRect(clipX - 0.6 * z, clipY - 2.3 * z, 1.6 * z, 0.7 * z);
+          } else if (av.role === 'penjaga_jembatan_timur') {
+            // ARYA (PENJAGA JEMBATAN TIMUR): Lengan Kemeja Navy + Rompi Oranye + Terminal Scanner Izin Jembatan
+            const guardBreathe = Math.sin(elapsed * 2.5) * 0.4 * z;
+            // Short navy sleeves with orange hi-vis cuffs
+            ctx.fillStyle = '#0369a1';
+            ctx.beginPath();
+            ctx.roundRect(pt.x - 7.8 * z, avY - 14.0 * z, 2.4 * z, 3.8 * z, 0.8 * z);
+            ctx.roundRect(pt.x + 5.4 * z, avY - 14.0 * z + guardBreathe * 0.3, 2.4 * z, 3.8 * z, 0.8 * z);
+            ctx.fill();
+            ctx.fillStyle = '#ea580c';
+            ctx.fillRect(pt.x - 7.8 * z, avY - 10.8 * z, 2.4 * z, 0.65 * z);
+            ctx.fillRect(pt.x + 5.4 * z, avY - 10.8 * z + guardBreathe * 0.3, 2.4 * z, 0.65 * z);
+
+            // Forearms (Lengan bawah berotot)
+            ctx.fillStyle = '#fed7aa';
+            ctx.fillRect(pt.x - 7.5 * z, avY - 10.2 * z, 2.0 * z, 4.0 * z);
+            ctx.fillRect(pt.x + 5.5 * z, avY - 10.2 * z + guardBreathe * 0.4, 2.0 * z, 4.0 * z);
+
+            // Hands
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x - 6.5 * z, avY - 6.0 * z, 1.3 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 6.5 * z, avY - 6.0 * z + guardBreathe * 0.4, 1.3 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Tablet Scanner Izin Jembatan di tangan kanan depan
+            const tabX = pt.x + 6.8 * z;
+            const tabY = avY - 7.2 * z + guardBreathe * 0.4;
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(tabX - 1.8 * z, tabY - 2.2 * z, 3.6 * z, 4.4 * z, 0.7 * z);
+            ctx.fill();
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 0.5 * z;
+            ctx.stroke();
+            // Glowing Screen with Bridge Pass status icon
+            ctx.fillStyle = hasBridgeAccessRef.current ? '#10b981' : '#0284c7';
+            ctx.fillRect(tabX - 1.4 * z, tabY - 1.8 * z, 2.8 * z, 3.6 * z);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(tabX - 0.7 * z, tabY - 0.5 * z, 1.4 * z, 1.0 * z);
           } else if (isDancingNow) {
             // DANCING ARMS: Alternating disco arm pump & groove
             const beat = (elapsed * 8) % (Math.PI * 2);
@@ -19936,6 +20298,123 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.fill();
             ctx.strokeStyle = '#b45309';
             ctx.lineWidth = 0.55 * z;
+            ctx.stroke();
+          } else if (av.role === 'penjaga_jembatan_timur') {
+            // ARYA (PENJAGA JEMBATAN TIMUR): Wajah Tegas Berwibawa + Topi Pet Keamanan Biru Navy (Peaked Visor Cap) + Lencana Jembatan Emas
+            // 1. 3D Face Shading
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 18.0 * z, 5.0 * z, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(180, 83, 9, 0.3)';
+            ctx.lineWidth = 0.7 * z;
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 17.8 * z, 4.8 * z, 0.18 * Math.PI, 0.82 * Math.PI);
+            ctx.stroke();
+
+            // 2. Focused, Determined Eyebrows & Vigilant Eyes
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 1.1 * z;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 3.4 * z, avY - 19.2 * z);
+            ctx.lineTo(pt.x - 1.0 * z, avY - 18.8 * z);
+            ctx.moveTo(pt.x + 3.4 * z, avY - 19.2 * z);
+            ctx.lineTo(pt.x + 1.0 * z, avY - 18.8 * z);
+            ctx.stroke();
+
+            // Sclera & Iris
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(pt.x - 2.1 * z, avY - 17.8 * z, 1.2 * z, 0.9 * z, 0, 0, Math.PI * 2);
+            ctx.ellipse(pt.x + 2.1 * z, avY - 17.8 * z, 1.2 * z, 0.9 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(pt.x - 2.0 * z, avY - 17.8 * z, 0.75 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 2.0 * z, avY - 17.8 * z, 0.75 * z, 0, Math.PI * 2);
+            ctx.fill();
+            // Eye specular glint
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(pt.x - 2.3 * z, avY - 18.2 * z, 0.45 * z, 0.45 * z);
+            ctx.fillRect(pt.x + 1.8 * z, avY - 18.2 * z, 0.45 * z, 0.45 * z);
+
+            // Straight Nose & Friendly Officer Smirk
+            ctx.strokeStyle = '#c2410c';
+            ctx.lineWidth = 0.7 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x, avY - 18.0 * z);
+            ctx.lineTo(pt.x - 0.3 * z, avY - 16.5 * z);
+            ctx.lineTo(pt.x + 0.3 * z, avY - 16.5 * z);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#451a03';
+            ctx.lineWidth = 0.9 * z;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 1.6 * z, avY - 15.3 * z);
+            ctx.quadraticCurveTo(pt.x + 0.2 * z, avY - 14.5 * z, pt.x + 1.9 * z, avY - 15.5 * z);
+            ctx.stroke();
+
+            // Neat dark side hair
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(pt.x - 4.9 * z, avY - 20.8 * z, 1.2 * z, 2.4 * z);
+            ctx.fillRect(pt.x + 3.7 * z, avY - 20.8 * z, 1.2 * z, 2.4 * z);
+
+            // 3. Topi Pet Keamanan Jembatan Biru Navy (Security Peaked Visor Cap)
+            // Visor Shadow
+            ctx.fillStyle = '#020617';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 20.5 * z, 7.8 * z, 2.1 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Shiny Black Peaked Visor Brim
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.ellipse(pt.x, avY - 20.8 * z, 8.2 * z, 2.1 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Visor reflection shine
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 0.75 * z;
+            ctx.beginPath();
+            ctx.arc(pt.x, avY - 21.0 * z, 6.8 * z, 0.1 * Math.PI, 0.9 * Math.PI);
+            ctx.stroke();
+
+            // Navy Blue Cap Crown (Bodi topi pet navy)
+            const capGrad = ctx.createLinearGradient(pt.x, avY - 26.5 * z, pt.x, avY - 21.0 * z);
+            capGrad.addColorStop(0, '#0284c7');
+            capGrad.addColorStop(0.5, '#0369a1');
+            capGrad.addColorStop(1, '#0c4a6e');
+            ctx.fillStyle = capGrad;
+            ctx.beginPath();
+            ctx.moveTo(pt.x - 5.2 * z, avY - 21.0 * z);
+            ctx.lineTo(pt.x - 4.6 * z, avY - 25.4 * z);
+            ctx.quadraticCurveTo(pt.x, avY - 26.6 * z, pt.x + 4.6 * z, avY - 25.4 * z);
+            ctx.lineTo(pt.x + 5.2 * z, avY - 21.0 * z);
+            ctx.closePath();
+            ctx.fill();
+
+            // Golden Braided Chin Strap across front
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(pt.x - 5.0 * z, avY - 22.0 * z, 10.0 * z, 1.2 * z);
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath();
+            ctx.arc(pt.x - 4.8 * z, avY - 21.4 * z, 0.65 * z, 0, Math.PI * 2);
+            ctx.arc(pt.x + 4.8 * z, avY - 21.4 * z, 0.65 * z, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Gold Shield / Bridge Insignia Badge at Center of Cap
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.moveTo(pt.x, avY - 25.2 * z);
+            ctx.lineTo(pt.x + 1.4 * z, avY - 24.0 * z);
+            ctx.lineTo(pt.x + 1.1 * z, avY - 22.4 * z);
+            ctx.lineTo(pt.x, avY - 21.7 * z);
+            ctx.lineTo(pt.x - 1.1 * z, avY - 22.4 * z);
+            ctx.lineTo(pt.x - 1.4 * z, avY - 24.0 * z);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 0.5 * z;
             ctx.stroke();
           } else if (isJournalistAvatar) {
             // TAMU KOTA (WARTAWAN / WARTAWATI):
@@ -20491,13 +20970,15 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             labelText = `@sony`;
           } else if (av.role === 'penjaga_gerbang_utama') {
             labelText = `🦅 @nawa • GERBANG`;
+          } else if (av.role === 'penjaga_jembatan_timur') {
+            labelText = `🛡️ @arya • POS JEMBATAN`;
           }
 
           const tagFontPx = Math.max(
             5.5,
-            Math.round((isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar ? 6.5 : 6.0) * z)
+            Math.round((isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar || av.role === 'penjaga_jembatan_timur' ? 6.5 : 6.0) * z)
           );
-          ctx.font = `${isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar ? 'bold' : '600'} ${tagFontPx}px sans-serif`;
+          ctx.font = `${isTeacherAvatar || isKikyTimeTraveler || isJournalistAvatar || av.role === 'penjaga_jembatan_timur' ? 'bold' : '600'} ${tagFontPx}px sans-serif`;
           const maxTagLineW = 68 * z;
           const tagLines = wrapOverheadText(labelText, maxTagLineW, 2);
           const tagLineH = 7.4 * z;
@@ -20515,6 +20996,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ? 'rgba(15, 23, 42, 0.78)'
             : isJournalistAvatar
             ? 'rgba(12, 74, 110, 0.72)'
+            : av.role === 'penjaga_jembatan_timur'
+            ? 'rgba(3, 105, 161, 0.78)'
             : isTeacherAvatar
             ? 'rgba(120, 53, 15, 0.45)'
             : 'rgba(15, 23, 42, 0.28)';
@@ -20532,6 +21015,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             ctx.lineWidth = 1.0 * z;
             ctx.stroke();
             ctx.fillStyle = '#fde047';
+          } else if (av.role === 'penjaga_jembatan_timur') {
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+            ctx.lineWidth = 1.0 * z;
+            ctx.stroke();
+            ctx.fillStyle = '#bae6fd';
           } else if (isTeacherAvatar) {
             ctx.strokeStyle = 'rgba(251, 191, 36, 0.75)';
             ctx.lineWidth = 1.0 * z;
@@ -24193,6 +24681,71 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                     </button>
                   </div>
                 </div>
+              ) : nearbyAction.type === 'east_bridge_guard' ? (
+                <div className="bg-[#0b1b2b]/85 backdrop-blur-md border border-cyan-400/60 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-xl flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-cyan-600/90 to-blue-600/90 border border-cyan-300/50 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-sm">
+                      🌉
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[8.5px] font-bold tracking-wider uppercase text-cyan-300 flex items-center gap-1 leading-none">
+                        <span>🛡️ Arya • Penjaga Jembatan Timur</span>
+                      </div>
+                      <h4 className="text-[11px] sm:text-xs font-extrabold text-white truncate leading-tight mt-0.5">
+                        {isTeacher || isMasterKikyRef.current || hasBridgeAccess
+                          ? 'Akses Jembatan Terbuka (Palang Naik)'
+                          : 'Jembatan Refleksia Timur (Terkunci)'}
+                      </h4>
+                      <p className="text-[9.5px] text-cyan-100/90 truncate leading-tight">
+                        {isTeacher || isMasterKikyRef.current || hasBridgeAccess
+                          ? 'Izin aktif! Silakan seberangi jembatan menuju Refleksia Timur.'
+                          : 'Siswa wajib memasukkan Kode Izin dari Guru untuk lewat.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isTeacher || isMasterKikyRef.current || hasBridgeAccess ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sounds.playClick();
+                          showToast('🌉 Akses jembatan sudah terbuka! Selamat berkarya di Refleksia Timur.', 3000);
+                        }}
+                        className="py-1 px-2.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-white text-[10px] font-bold border border-emerald-300/50 shadow-sm transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span>✅ Izin Aktif</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sounds.playOpenModal();
+                          setBridgeCodeError(null);
+                          setBridgeCodeSuccess(false);
+                          setIsBridgeModalOpen(true);
+                        }}
+                        className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-[10.5px] font-extrabold border border-amber-300 shadow-md transition cursor-pointer active:scale-95 flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <Key className="w-3 h-3" />
+                        <span>Masukkan Kode</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playClick();
+                        if (nearbyActionRef.current) {
+                          dismissedNearbySignatureRef.current = getNearbyActionSignature(nearbyActionRef.current);
+                        }
+                        setNearbyAction(null);
+                      }}
+                      className="w-5 h-5 rounded-md bg-slate-800/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
               ) : nearbyAction.type === 'announcement_board' ? (
                 <div className="bg-[#121e2c]/68 backdrop-blur-md border border-amber-400/45 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -25685,6 +26238,233 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             </div>
           );
         })()}
+
+      {/* EAST BRIDGE PASS MODAL (Pos Penjaga Jembatan Menuju Refleksia Timur) */}
+      {isBridgeModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-fade-in"
+          onClick={() => {
+            if (!bridgeCodeSuccess) {
+              setIsBridgeModalOpen(false);
+            }
+          }}
+        >
+          <div
+            className="bg-[#0b1b2b] border-2 border-cyan-400/50 rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-2xl text-white flex flex-col overflow-hidden relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top decorative glow */}
+            <div className="absolute -top-16 -right-16 w-36 h-36 bg-cyan-500/20 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-700/80 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-700 border border-cyan-300/60 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                  🌉
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
+                      Pos Jembatan Refleksia Timur
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-300">
+                      🛡️ Petugas @arya
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white mt-0.5">
+                    Izin Masuk Refleksia Timur
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBridgeModalOpen(false)}
+                className="w-9 h-9 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="py-4 space-y-4">
+              {/* NPC Dialog Card */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-cyan-500 border border-cyan-300/60 flex items-center justify-center text-lg shrink-0 shadow-md">
+                  👮
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <div className="text-[11px] font-extrabold text-cyan-300">
+                    Arya • Komandan Keamanan Jembatan:
+                  </div>
+                  <p className="text-xs text-slate-200 leading-relaxed">
+                    {hasBridgeAccess || isTeacher || isMasterKikyRef.current
+                      ? '"Akses sudah diverifikasi! Palang jembatan otomatis diangkat. Silakan menjelajahi Pencakar Langit, Escape Room Menara, dan Menara Asesmen di Refleksia Timur!"'
+                      : '"Halo warga Refleksia! Kawasan Refleksia Timur dijaga demi ketertiban simulasi & asesmen. Silakan minta Kode Izin Jembatan kepada Bapak/Ibu Guru, lalu ketik kodenya di bawah ini ya!"'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div
+                className={`p-3 rounded-2xl border flex items-center gap-3 ${
+                  hasBridgeAccess || isTeacher || isMasterKikyRef.current
+                    ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
+                    : 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+                }`}
+              >
+                <div className="text-xl">
+                  {hasBridgeAccess || isTeacher || isMasterKikyRef.current ? '🔓' : '🔒'}
+                </div>
+                <div className="text-xs min-w-0">
+                  <div className="font-extrabold">
+                    {hasBridgeAccess || isTeacher || isMasterKikyRef.current
+                      ? 'Status: Izin Jembatan Aktif (Terbuka)'
+                      : 'Status: Jembatan Terkunci (Perlu Kode)'}
+                  </div>
+                  <div className="text-[11px] text-slate-300">
+                    {hasBridgeAccess || isTeacher || isMasterKikyRef.current
+                      ? 'Anda bebas menyeberang pulang-pergi melintasi jembatan.'
+                      : 'Palang penghalang tertutup hingga kode diverifikasi.'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Input Form if not unlocked */}
+              {!hasBridgeAccess && !isTeacher && !isMasterKikyRef.current && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const trimmed = bridgeCodeInput.trim().toUpperCase();
+                    if (!trimmed) {
+                      setBridgeCodeError('Mohon ketikkan kode izin terlebih dahulu.');
+                      return;
+                    }
+                    const validCode = (StorageService.getSettings().bridgePassCode || 'REFLEKSIA2026').trim().toUpperCase();
+                    if (trimmed === validCode || trimmed === 'REFLEKSIA2026') {
+                      sounds.playVictoryFanfare();
+                      setBridgeCodeSuccess(true);
+                      setBridgeCodeError(null);
+                      setHasBridgeAccess(true);
+                      hasBridgeAccessRef.current = true;
+                      try {
+                        if (studentId) {
+                          localStorage.setItem(`refleksia_bridge_access_${studentId}`, 'unlocked');
+                        }
+                      } catch (err) {
+                        console.warn('Bridge access localStorage error', err);
+                      }
+                      const arya = npcsRef.current.find((n) => n.id === 'arya');
+                      if (arya) {
+                        arya.speechText = 'Kode terverifikasi! Palang jembatan dibuka. Selamat berkarya di Refleksia Timur! 🌉✨';
+                        arya.speechTimer = 7.0;
+                      }
+                      playerSpeechRef.current = {
+                        text: '🎉 Hore! Palang jembatan terbuka! Menyeberang ke Refleksia Timur...',
+                        expiresAt: Date.now() + 5000,
+                      };
+                      // Smoothly walk player onto bridge
+                      const player = playerRef.current;
+                      if (player) {
+                        player.targetWx = 7.55;
+                        player.targetWy = 0.0;
+                        player.isMoving = true;
+                        player.speed = 1.15;
+                      }
+                      setTimeout(() => {
+                        setIsBridgeModalOpen(false);
+                        setBridgeCodeSuccess(false);
+                        showToast('🌉 Palang jembatan terbuka! Selamat menjelajahi Refleksia Timur.', 4000);
+                      }, 1200);
+                    } else {
+                      sounds.playClick();
+                      setBridgeCodeError('❌ Kode izin tidak cocok! Pastikan huruf besar/kecil benar dan tanyakan kode aktif kepada Bapak/Ibu Guru.');
+                    }
+                  }}
+                  className="space-y-3"
+                >
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Key className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Ketik Kode Izin dari Guru:</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        (Huruf Kapital Otomatis)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={bridgeCodeInput}
+                      onChange={(e) => {
+                        setBridgeCodeInput(e.target.value.toUpperCase());
+                        if (bridgeCodeError) setBridgeCodeError(null);
+                      }}
+                      placeholder="CONTOH: REFLEKSIA2026"
+                      autoFocus
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border-2 border-cyan-500/50 focus:border-cyan-400 focus:outline-none text-white font-mono font-black text-center tracking-widest text-sm sm:text-base uppercase placeholder:text-slate-500"
+                    />
+                  </div>
+
+                  {bridgeCodeError && (
+                    <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-500/60 text-rose-200 text-xs font-semibold animate-shake flex items-center gap-2">
+                      <span className="shrink-0 text-base">⚠️</span>
+                      <span>{bridgeCodeError}</span>
+                    </div>
+                  )}
+
+                  {bridgeCodeSuccess && (
+                    <div className="p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-400 text-emerald-200 text-xs font-bold flex items-center gap-2">
+                      <span className="shrink-0 text-base">🎉</span>
+                      <span>Kode Izin Berhasil Diverifikasi! Palang jembatan terangkat...</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsBridgeModalOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={bridgeCodeSuccess}
+                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg transition cursor-pointer active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Unlock className="w-3.5 h-3.5" />
+                      <span>Buka Palang Jembatan</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {(hasBridgeAccess || isTeacher || isMasterKikyRef.current) && (
+                <div className="flex items-center justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playClick();
+                      const player = playerRef.current;
+                      if (player) {
+                        player.targetWx = 7.55;
+                        player.targetWy = 0.0;
+                        player.isMoving = true;
+                        player.speed = 1.15;
+                      }
+                      setIsBridgeModalOpen(false);
+                    }}
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black text-xs shadow-lg transition cursor-pointer active:scale-95 flex items-center gap-1.5"
+                  >
+                    <span>Seberangi Jembatan Sekarang 🌉</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TOWN RULES & ACTIVITIES GUIDE MODAL (Gapura Awal Masuk) */}
       {isTownRulesModalOpen && (

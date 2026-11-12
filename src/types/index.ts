@@ -195,6 +195,7 @@ export interface TownSettings {
   teacherPin: string;
   gasWebAppUrl?: string;
   spreadsheetUrl?: string;
+  bridgePassCode?: string;
 }
 
 export interface BuildingInfo {

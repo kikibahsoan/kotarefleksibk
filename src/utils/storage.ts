@@ -1194,6 +1194,10 @@ export const StorageService = {
       saved.teacherPin = 'Kiki123!';
       modified = true;
     }
+    if (!saved.bridgePassCode || saved.bridgePassCode.trim().length === 0) {
+      saved.bridgePassCode = 'REFLEKSIA2026';
+      modified = true;
+    }
     if (modified) {
       safeSet(STORAGE_KEYS.SETTINGS, saved);
     }
