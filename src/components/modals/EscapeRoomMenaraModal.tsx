@@ -41,6 +41,7 @@ import {
 import { StorageService } from '../../utils/storage.ts';
 import { sounds } from '../../utils/audio.ts';
 import { RealtimePresenceMesh } from '../../utils/realtimePresenceMesh.ts';
+import { EscapeTowerEngine } from '../../utils/escapeTowerEngine.ts';
 
 interface EscapeRoomMenaraModalProps {
   onClose: () => void;
@@ -373,13 +374,20 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
     return () => window.clearInterval(interval);
   }, [participantIdentity]);
 
-  const [towerState, setTowerState] = useState<EscapeTowerState | null>(null);
-  const [isVerifiedTeacher, setIsVerifiedTeacher] = useState<boolean>(Boolean(student.isTeacher));
   const [selectedGroup, setSelectedGroup] = useState<MysteryGroupNumber>(() => {
     const saved = localStorage.getItem(`escape_tower_group_${effectiveStudentId}`);
     const parsed = saved ? parseInt(saved, 10) : 1;
     return (parsed >= 1 && parsed <= 8 ? parsed : 1) as MysteryGroupNumber;
   });
+  const [towerState, setTowerState] = useState<EscapeTowerState | null>(() =>
+    EscapeTowerEngine.getInitialHydratedState(
+      student,
+      effectiveStudentId,
+      effectiveStudentName,
+      selectedGroup
+    )
+  );
+  const [isVerifiedTeacher, setIsVerifiedTeacher] = useState<boolean>(Boolean(student.isTeacher));
 
   const [activeRightTab, setActiveRightTab] = useState<'teacher' | 'group' | 'scoreboard' | 'info'>(
     student.isTeacher ? 'teacher' : 'group'
@@ -488,39 +496,23 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
     } catch {}
   }, []);
 
-  // Fetch state from Server (polled every 2.4s as required: "Polling 2-3 detik agar ringan untuk Spreadsheet")
+  // Fetch state from Server + Local/Mesh Hybrid Engine (polled every 2.4s as required: "Polling 2-3 detik agar ringan untuk Spreadsheet")
   const fetchEscapeTowerState = useCallback(async () => {
     try {
-      const params = new URLSearchParams({
-        studentId: effectiveStudentId,
-        studentName: effectiveStudentName,
-        className: student.className || 'X DKV',
-        gender: student.gender === 'P' ? 'P' : 'L',
-        isTeacher: String(Boolean(student.isTeacher)),
-        studentNumber: student.studentNumber || '',
-        kelompok: String(selectedGroupRef.current),
+      const json = await EscapeTowerEngine.fetchState({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        selectedGroup: selectedGroupRef.current,
       });
-      const res = await fetch(`/api/escape-tower/state?${params.toString()}`);
-      if (!res.ok) return;
-      const json = await res.json();
-      if (json && json.success && json.data) {
-        const nextState = json.data as EscapeTowerState;
-        setTowerState(nextState);
-        if (typeof json.isVerifiedTeacher === 'boolean') {
-          setIsVerifiedTeacher(json.isVerifiedTeacher);
-        }
+      if (json && json.data) {
+        setTowerState(json.data);
+        setIsVerifiedTeacher(Boolean(json.isVerifiedTeacher));
       }
     } catch {
       // Ignore transient network errors during polling
     }
-  }, [
-    effectiveStudentId,
-    effectiveStudentName,
-    student.className,
-    student.gender,
-    student.isTeacher,
-    student.studentNumber,
-  ]);
+  }, [effectiveStudentId, effectiveStudentName, student]);
 
   // Initialize Teacher Draft when verified teacher receives state
   useEffect(() => {
@@ -570,6 +562,16 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
         });
         setMeshPeersVersion((v) => v + 1);
       }
+
+      const merged = EscapeTowerEngine.mergeIncomingMeshPayload(
+        payload,
+        effectiveStudentId,
+        Boolean(student.isTeacher),
+        selectedGroupRef.current
+      );
+      if (merged) {
+        setTowerState(merged);
+      }
       if (
         payload.eventType === 'teacher_state_sync' ||
         payload.eventType === 'student_action' ||
@@ -578,7 +580,7 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
         fetchEscapeTowerState();
       }
     },
-    [fetchEscapeTowerState]
+    [effectiveStudentId, fetchEscapeTowerState, student]
   );
 
   // Setup 4-Layer Real-Time Sync (WSS Mesh + BroadcastChannel + SSE + 2.4s Polling)
@@ -587,21 +589,13 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
 
     // Auto-register student in selected group on mount
     if (!student.isTeacher) {
-      fetch('/api/escape-tower/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: effectiveStudentId,
-          studentName: effectiveStudentName,
-          className: student.className,
-          gender: student.gender,
-          isTeacher: false,
-          studentNumber: student.studentNumber,
-          actionType: 'join_group',
-          kelompok: selectedGroupRef.current,
-        }),
+      EscapeTowerEngine.executeStudentAction({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        actionType: 'join_group',
+        kelompok: selectedGroupRef.current,
       })
-        .then((r) => r.json())
         .then((json) => {
           if (json?.data) setTowerState(json.data);
         })
@@ -866,21 +860,13 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
     });
 
     try {
-      const res = await fetch('/api/escape-tower/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: effectiveStudentId,
-          studentName: effectiveStudentName,
-          className: student.className,
-          gender: student.gender,
-          isTeacher: student.isTeacher,
-          studentNumber: student.studentNumber,
-          actionType: 'join_group',
-          kelompok,
-        }),
+      const json = await EscapeTowerEngine.executeStudentAction({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        actionType: 'join_group',
+        kelompok,
       });
-      const json = await res.json();
       if (json?.data) {
         setTowerState(json.data);
         showTempStatus(`Bergabung ke Kelompok ${kelompok}!`);
@@ -894,27 +880,25 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
   const syncSharedGroupDraft = async (nextDraft: string) => {
     setLocalAnswerText(nextDraft);
     try {
-      await fetch('/api/escape-tower/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: effectiveStudentId,
-          studentName: effectiveStudentName,
-          className: student.className,
-          gender: student.gender,
-          isTeacher: student.isTeacher,
-          studentNumber: student.studentNumber,
-          actionType: 'sync_draft',
-          kelompok: selectedGroup,
-          draft_jawaban: nextDraft,
-        }),
+      const json = await EscapeTowerEngine.executeStudentAction({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        actionType: 'sync_draft',
+        kelompok: selectedGroup,
+        draft_jawaban: nextDraft,
       });
+      if (json?.data) {
+        setTowerState(json.data);
+      }
       publishEscapeMeshEvent({
         eventType: 'student_action',
         actionType: 'sync_draft',
         studentId: effectiveStudentId,
         studentName: effectiveStudentName,
         kelompok: selectedGroup,
+        draft_jawaban: nextDraft,
+        groupProgress: json?.data?.progres?.[selectedGroup],
       });
     } catch {}
   };
@@ -924,22 +908,14 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
     sounds.playClick();
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/escape-tower/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: effectiveStudentId,
-          studentName: effectiveStudentName,
-          className: student.className,
-          gender: student.gender,
-          isTeacher: student.isTeacher,
-          studentNumber: student.studentNumber,
-          actionType: 'request_hint',
-          kelompok: selectedGroup,
-        }),
+      const json = await EscapeTowerEngine.executeStudentAction({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        actionType: 'request_hint',
+        kelompok: selectedGroup,
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         showTempError(json.error || 'Gagal meminta petunjuk.');
       } else if (json.data) {
         const nextState = json.data as EscapeTowerState;
@@ -957,10 +933,12 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
           studentId: effectiveStudentId,
           studentName: effectiveStudentName,
           kelompok: selectedGroup,
+          groupProgress: prog,
+          scores: nextState.skor,
         });
       }
     } catch {
-      showTempError('Gagal menghubungi server untuk membuka petunjuk.');
+      showTempError('Gagal membuka petunjuk.');
     } finally {
       setIsSubmitting(false);
     }
@@ -983,23 +961,15 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/escape-tower/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: effectiveStudentId,
-          studentName: effectiveStudentName,
-          className: student.className,
-          gender: student.gender,
-          isTeacher: student.isTeacher,
-          studentNumber: student.studentNumber,
-          actionType: 'submit_answer',
-          kelompok: selectedGroup,
-          jawaban: finalAnswer,
-        }),
+      const json = await EscapeTowerEngine.executeStudentAction({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        actionType: 'submit_answer',
+        kelompok: selectedGroup,
+        jawaban: finalAnswer,
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         sounds.playBounceKnockback();
         showTempError(json.error || 'Gagal mengirim jawaban.');
         return;
@@ -1032,9 +1002,13 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
         studentId: effectiveStudentId,
         studentName: effectiveStudentName,
         kelompok: selectedGroup,
+        jawaban: finalAnswer,
+        groupProgress: json.data?.progres?.[selectedGroup],
+        scores: json.data?.skor,
+        lantai_sekarang: json.data?.progres?.[selectedGroup]?.lantai_sekarang,
       });
     } catch {
-      showTempError('Gagal memverifikasi jawaban ke server.');
+      showTempError('Gagal memverifikasi jawaban.');
     } finally {
       setIsSubmitting(false);
     }
@@ -1065,48 +1039,33 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
       studentId: effectiveStudentId,
       studentName: effectiveStudentName,
       kelompok: selectedGroup,
+      chatContent: trimmed,
     });
 
     try {
-      const res = await fetch('/api/escape-tower/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: effectiveStudentId,
-          studentName: effectiveStudentName,
-          className: student.className,
-          gender: student.gender,
-          isTeacher: student.isTeacher,
-          studentNumber: student.studentNumber,
-          actionType: 'send_group_chat',
-          kelompok: selectedGroup,
-          chatContent: trimmed,
-        }),
+      const json = await EscapeTowerEngine.executeStudentAction({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        actionType: 'send_group_chat',
+        kelompok: selectedGroup,
+        chatContent: trimmed,
       });
-      const json = await res.json();
       if (json?.data) setTowerState(json.data);
     } catch {}
   };
 
-  // Teacher Action Handler (Verified on Server)
+  // Teacher Action Handler (Hybrid Server + Client/Mesh Engine)
   const executeTeacherAction = async (actionType: string, extraPayload: Record<string, any> = {}) => {
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
-      const res = await fetch('/api/escape-tower/teacher-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teacherId: student.id,
-          teacherName: student.name,
-          isTeacher: student.isTeacher,
-          studentNumber: student.studentNumber,
-          actionType,
-          ...extraPayload,
-        }),
+      const json = await EscapeTowerEngine.executeTeacherAction({
+        student,
+        actionType,
+        extraPayload,
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         showTempError(json.error || 'Gagal menjalankan aksi Guru.');
         return null;
       }
@@ -1120,6 +1079,7 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
           studentId: effectiveStudentId,
           studentName: effectiveStudentName,
           isTeacher: true,
+          canonicalStore: json.canonicalStore,
         });
 
         // Sync to Google Spreadsheet (Escape_Konfigurasi, Escape_Sesi, Escape_Skor)
@@ -1145,7 +1105,7 @@ export const EscapeRoomMenaraModal: React.FC<EscapeRoomMenaraModalProps> = ({
         return nextState;
       }
     } catch {
-      showTempError('Gagal terhubung ke server.');
+      showTempError('Gagal menjalankan aksi Guru.');
     } finally {
       setIsSubmitting(false);
     }

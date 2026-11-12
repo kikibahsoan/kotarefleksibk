@@ -29,6 +29,7 @@ import {
 import { StorageService } from '../../utils/storage.ts';
 import { sounds } from '../../utils/audio.ts';
 import { RealtimePresenceMesh } from '../../utils/realtimePresenceMesh.ts';
+import { MysteryArenaEngine } from '../../utils/mysteryArenaEngine.ts';
 
 interface ArenaRumahMisteriModalProps {
   onClose: () => void;
@@ -135,8 +136,9 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
   student,
   onAddXp,
 }) => {
-  const [arenaState, setArenaState] = useState<MysteryArenaState | null>(null);
-  const [isTeacherVerifiedServer, setIsTeacherVerifiedServer] = useState<boolean>(false);
+  const [isTeacherVerifiedServer, setIsTeacherVerifiedServer] = useState<boolean>(
+    Boolean(student.isTeacher)
+  );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -211,6 +213,15 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
 
   const effectiveStudentId = participantIdentity.id;
   const effectiveStudentName = participantIdentity.name;
+
+  const [arenaState, setArenaState] = useState<MysteryArenaState | null>(() =>
+    MysteryArenaEngine.getInitialHydratedState(
+      student,
+      effectiveStudentId,
+      effectiveStudentName,
+      selectedGroup
+    )
+  );
 
   // Live peers discovered via Global WebSocket Mesh (WSS MQTT) or BroadcastChannel across URLs/tabs
   const [meshPeersVersion, setMeshPeersVersion] = useState<number>(0);
@@ -439,7 +450,7 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     [effectiveStudentId]
   );
 
-  // 1.2-second real-time polling + presence heartbeat
+  // 1.2-second real-time polling + presence heartbeat (Server + Client/Mesh Hybrid Engine)
   const fetchArenaState = useCallback(async () => {
     try {
       // Keep local tab registry fresh
@@ -451,24 +462,15 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
         } catch {}
       }
 
-      const query = new URLSearchParams({
-        studentId: effectiveStudentId,
-        studentName: effectiveStudentName,
-        className: student.className || 'X DKV',
-        gender: student.gender === 'P' ? 'P' : 'L',
-        isTeacher: student.isTeacher ? 'true' : 'false',
-        studentNumber: student.studentNumber || '',
-        kelompok: String(selectedGroupRef.current),
-        _t: String(Date.now()),
+      const res = await MysteryArenaEngine.fetchState({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        selectedGroup: selectedGroupRef.current,
       });
-      const res = await fetch(`/api/mystery-arena/state?${query.toString()}`, {
-        cache: 'no-store',
-      });
-      if (!res.ok) return;
-      const json = await res.json();
-      if (json && json.data) {
-        setArenaState(json.data);
-        setIsTeacherVerifiedServer(Boolean(json.isVerifiedTeacher));
+      if (res && res.data) {
+        setArenaState(res.data);
+        setIsTeacherVerifiedServer(Boolean(res.isVerifiedTeacher));
       }
     } catch {
       // ignore transient network errors during polling
@@ -478,17 +480,14 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     effectiveStudentName,
     participantIdentity.regKey,
     participantIdentity.tabId,
-    student.className,
-    student.gender,
-    student.isTeacher,
-    student.studentNumber,
+    student,
   ]);
 
   // 4-Layer Real-Time Synchronization:
-  // 1. Global WSS MQTT Presence Mesh (connects ais-dev, ais-pre, mobile & laptop in <50ms)
+  // 1. Global WSS MQTT Presence Mesh (connects ais-dev, ais-pre, Vercel, mobile & laptop in <50ms)
   // 2. Local BroadcastChannel
   // 3. Express SSE (/api/presence/stream)
-  // 4. Fast 1.2s HTTP Polling (/api/mystery-arena/state)
+  // 4. Fast 1.2s HTTP Polling (/api/mystery-arena/state with local fallback)
   useEffect(() => {
     let isMounted = true;
 
@@ -520,78 +519,40 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
         payload.eventType === 'student_action'
       ) {
         const pid = String(payload.studentId || '').trim();
-        if (!pid || pid === effectiveStudentId) return;
+        if (pid && pid !== effectiveStudentId) {
+          const pIsTeacher = Boolean(payload.isTeacher);
+          const pGroup = pIsTeacher
+            ? null
+            : ((Math.max(1, Math.min(8, Number(payload.kelompok) || 1)) as MysteryGroupNumber) || 1);
+          const pHouse =
+            payload.rumah_dipilih && Number(payload.rumah_dipilih) >= 1 && Number(payload.rumah_dipilih) <= 5
+              ? (Number(payload.rumah_dipilih) as MysteryHouseNumber)
+              : null;
 
-        const pIsTeacher = Boolean(payload.isTeacher);
-        const pGroup = pIsTeacher
-          ? null
-          : ((Math.max(1, Math.min(8, Number(payload.kelompok) || 1)) as MysteryGroupNumber) || 1);
-        const pHouse =
-          payload.rumah_dipilih && Number(payload.rumah_dipilih) >= 1 && Number(payload.rumah_dipilih) <= 5
-            ? (Number(payload.rumah_dipilih) as MysteryHouseNumber)
-            : null;
-
-        meshPeersRef.current.set(pid, {
-          studentId: pid,
-          studentName: String(payload.studentName || 'Siswa DKV'),
-          className: String(payload.className || 'X DKV'),
-          gender: payload.gender === 'P' ? 'P' : 'L',
-          isTeacher: pIsTeacher,
-          kelompok: pGroup,
-          arenaWx: typeof payload.arenaWx === 'number' ? payload.arenaWx : 0.5,
-          arenaWy: typeof payload.arenaWy === 'number' ? payload.arenaWy : 0.65,
-          rumah_dipilih: pHouse,
-          lastSeen: now,
-        });
-        setMeshPeersVersion((v) => v + 1);
-
-        // Bridge cross-URL / cross-instance peer action to our local Express server so server state is 100% synced
-        const actType = payload.actionType || 'join_group';
-        fetch('/api/mystery-arena/student-action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          meshPeersRef.current.set(pid, {
             studentId: pid,
-            studentName: payload.studentName || 'Siswa DKV',
-            className: payload.className || 'X DKV',
+            studentName: String(payload.studentName || 'Siswa DKV'),
+            className: String(payload.className || 'X DKV'),
             gender: payload.gender === 'P' ? 'P' : 'L',
             isTeacher: pIsTeacher,
-            studentNumber: payload.studentNumber || '',
-            actionType: actType,
-            kelompok: pGroup || 1,
+            kelompok: pGroup,
+            arenaWx: typeof payload.arenaWx === 'number' ? payload.arenaWx : 0.5,
+            arenaWy: typeof payload.arenaWy === 'number' ? payload.arenaWy : 0.65,
             rumah_dipilih: pHouse,
-            chatContent: payload.chatContent,
-          }),
-        })
-          .then((r) => (r.ok ? r.json() : null))
-          .then((d) => {
-            if (isMounted && d?.data) {
-              setArenaState(d.data);
-            }
-          })
-          .catch(() => {});
-      } else if (payload.eventType === 'teacher_state_broadcast' && payload.sanitizedState) {
-        // Instant round status update from teacher across devices/URLs
-        const incomingState = payload.sanitizedState as MysteryArenaState;
-        setArenaState((prev) => {
-          if (!prev) return incomingState;
-          return {
-            ...prev,
-            currentRound: {
-              ...incomingState.currentRound,
-              // Preserve teacher's rumah_benar if this viewer is a verified teacher
-              rumah_benar:
-                student.isTeacher && prev.currentRound?.rumah_benar
-                  ? incomingState.currentRound.rumah_benar ?? prev.currentRound.rumah_benar
-                  : incomingState.currentRound.rumah_benar,
-            },
-            choices: incomingState.choices || prev.choices,
-            scores: incomingState.scores || prev.scores,
-            studentGroupMap: { ...(prev.studentGroupMap || {}), ...(incomingState.studentGroupMap || {}) },
-            winningGroups: incomingState.winningGroups || prev.winningGroups,
-          };
-        });
-        fetchArenaState();
+            lastSeen: now,
+          });
+          setMeshPeersVersion((v) => v + 1);
+        }
+      }
+
+      const merged = MysteryArenaEngine.mergeIncomingMeshPayload(
+        payload,
+        effectiveStudentId,
+        Boolean(student.isTeacher),
+        selectedGroupRef.current
+      );
+      if (merged && isMounted) {
+        setArenaState(merged);
       }
     };
 
@@ -693,23 +654,15 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
 
   // Register presence / auto-join group on open or when selectedGroup changes
   useEffect(() => {
-    fetch('/api/mystery-arena/student-action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        studentId: effectiveStudentId,
-        studentName: effectiveStudentName,
-        className: student.className,
-        gender: student.gender,
-        isTeacher: student.isTeacher,
-        studentNumber: student.studentNumber,
-        actionType: 'join_group',
-        kelompok: selectedGroup,
-      }),
+    MysteryArenaEngine.executeStudentAction({
+      student,
+      effectiveStudentId,
+      effectiveStudentName,
+      actionType: 'join_group',
+      kelompok: selectedGroup,
     })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.data) setArenaState(d.data);
+      .then((res) => {
+        if (res?.data) setArenaState(res.data);
       })
       .catch(() => {});
 
@@ -729,13 +682,10 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     effectiveStudentName,
     publishArenaMeshEvent,
     selectedGroup,
-    student.className,
-    student.gender,
-    student.isTeacher,
-    student.studentNumber,
+    student,
   ]);
 
-  // Teacher Action Handler (Verified on Server)
+  // Teacher Action Handler (Hybrid Server + Client/Mesh Engine)
   const handleTeacherAction = async (
     actionType: 'start_round' | 'open_choices' | 'close_choices' | 'detonate' | 'next_round' | 'reset_arena' | 'assign_student_group',
     extraPayload?: Record<string, any>
@@ -744,26 +694,16 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     setIsSubmittingTeacherAction(true);
     setErrorMessage(null);
     try {
-      const payload = {
-        teacherId: student.id,
-        teacherName: student.name,
-        isTeacher: student.isTeacher,
-        studentNumber: student.studentNumber,
+      const json = await MysteryArenaEngine.executeTeacherAction({
+        student,
         actionType,
         soal: soalInput,
         rumah_benar: rumahBenarInput,
         poin_benar: poinBenarInput,
         timer_detik: timerSecondsInput,
-        ...extraPayload,
-      };
-
-      const res = await fetch('/api/mystery-arena/teacher-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        extraPayload,
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
+      if (!json.success || !json.data) {
         showTempError(json.error || 'Gagal menjalankan aksi guru.');
         return;
       }
@@ -772,9 +712,10 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
       setArenaState(nextState);
       sounds.playClick();
 
-      // Broadcast sanitized state over Mesh & BroadcastChannel (anti-peek: hide rumah_benar unless status === 'meledak')
+      // Broadcast state over Mesh & BroadcastChannel (anti-peek: hide rumah_benar unless status === 'meledak')
       publishArenaMeshEvent({
         eventType: 'teacher_state_broadcast',
+        canonicalStore: json.canonicalStore,
         sanitizedState: {
           ...nextState,
           currentRound: {
@@ -818,7 +759,7 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
         showTempStatus('✅ Kelompok siswa berhasil diperbarui.');
       }
     } catch {
-      showTempError('Gagal menghubungi server Arena Rumah Misteri.');
+      showTempError('Gagal menjalankan aksi Guru.');
     } finally {
       setIsSubmittingTeacherAction(false);
     }
@@ -848,21 +789,13 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     });
 
     try {
-      const res = await fetch('/api/mystery-arena/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: effectiveStudentId,
-          studentName: effectiveStudentName,
-          className: student.className,
-          gender: student.gender,
-          isTeacher: student.isTeacher,
-          studentNumber: student.studentNumber,
-          actionType: 'join_group',
-          kelompok,
-        }),
+      const json = await MysteryArenaEngine.executeStudentAction({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        actionType: 'join_group',
+        kelompok,
       });
-      const json = await res.json();
       if (json?.data) {
         setArenaState(json.data);
         showTempStatus(`👥 Bergabung ke Kelompok ${kelompok}!`);
@@ -898,23 +831,15 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     });
 
     try {
-      const res = await fetch('/api/mystery-arena/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: effectiveStudentId,
-          studentName: effectiveStudentName,
-          className: student.className,
-          gender: student.gender,
-          isTeacher: student.isTeacher,
-          studentNumber: student.studentNumber,
-          actionType: 'select_house',
-          kelompok: selectedGroup,
-          rumah_dipilih: rumah,
-        }),
+      const json = await MysteryArenaEngine.executeStudentAction({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        actionType: 'select_house',
+        kelompok: selectedGroup,
+        rumah_dipilih: rumah,
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         showTempError(json.error || 'Tidak dapat memilih rumah saat ini.');
         return;
       }
@@ -928,7 +853,7 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
         }
       }
     } catch {
-      showTempError('Gagal mengirim pilihan rumah.');
+      showTempError('Tidak dapat memilih rumah saat ini.');
     }
   };
 
@@ -954,22 +879,14 @@ export const ArenaRumahMisteriModal: React.FC<ArenaRumahMisteriModalProps> = ({
     });
 
     try {
-      const res = await fetch('/api/mystery-arena/student-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: effectiveStudentId,
-          studentName: effectiveStudentName,
-          className: student.className,
-          gender: student.gender,
-          isTeacher: student.isTeacher,
-          studentNumber: student.studentNumber,
-          actionType: 'send_group_chat',
-          kelompok: selectedGroup,
-          chatContent: trimmed,
-        }),
+      const json = await MysteryArenaEngine.executeStudentAction({
+        student,
+        effectiveStudentId,
+        effectiveStudentName,
+        actionType: 'send_group_chat',
+        kelompok: selectedGroup,
+        chatContent: trimmed,
       });
-      const json = await res.json();
       if (json?.data) {
         setArenaState(json.data);
       }
