@@ -291,7 +291,7 @@ export const TREES_LIST: [number, number][] = [
   [2.45, 6.25],
   [6.15, 6.65],
   // East riverbank edge (framing the long flowing river at wx=7.0..8.1 & Masjid Al-Hikmah at [5.45, -4.85])
-  [6.35, -0.45],
+  [6.25, -2.85],
   [6.35, 2.2],
   [6.25, 4.6],
   [6.35, -7.2],
@@ -1629,7 +1629,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       DEFAULT_CAMPFIRE_SNAPSHOT.wy
     );
 
-    // 2B. Apply Existing Trees coordinate overrides in-place
+    // 2B. Apply Existing Trees coordinate overrides in-place (ensuring no tree blocks Pos Penjaga Jembatan @arya)
     TREES_LIST.forEach((treeCoord, idx) => {
       const def = DEFAULT_TREES_SNAPSHOT[idx];
       if (!def) return;
@@ -1640,6 +1640,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       } else {
         treeCoord[0] = def[0];
         treeCoord[1] = def[1];
+      }
+      if (
+        Math.hypot(treeCoord[0] - EAST_BRIDGE_GUARD_COORDS.wx, treeCoord[1] - EAST_BRIDGE_GUARD_COORDS.wy) < 1.55 ||
+        (treeCoord[0] >= 5.35 && treeCoord[0] <= 7.15 && Math.abs(treeCoord[1]) < 1.35)
+      ) {
+        treeCoord[0] = 6.25;
+        treeCoord[1] = -2.85;
       }
     });
 
@@ -10306,6 +10313,9 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
         if (avData.role === 'penjaga_gerbang_utama' || (avData.wy > WELCOME_GATE_COORDS.wy + 0.18 && Math.abs(avData.wx) < 1.25)) {
           return Math.max(avData.wx + avData.wy, WELCOME_GATE_COORDS.wx + WELCOME_GATE_COORDS.wy + 0.72);
         }
+        if (avData.role === 'penjaga_jembatan_timur') {
+          return Math.max(avData.wx + avData.wy, EAST_BRIDGE_GUARD_COORDS.wx + EAST_BRIDGE_GUARD_COORDS.wy + 0.55);
+        }
         return avData.wx + avData.wy;
       };
       function currentSeatIdOrDefault(s: BenchId) {
@@ -10340,6 +10350,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
       trees.forEach(([tx, ty], tIdx) => {
         if (creatorStateRef.current.existingOverrides?.[`tree_${tIdx}`]?.isHidden) return;
+        // Pastikan tidak ada pohon yang menghalangi Pos Jaga & NPC Penjaga Jembatan @arya
+        if (
+          Math.hypot(tx - EAST_BRIDGE_GUARD_COORDS.wx, ty - EAST_BRIDGE_GUARD_COORDS.wy) < 1.55 ||
+          (tx >= 5.35 && tx <= 7.15 && Math.abs(ty) < 1.35)
+        ) {
+          return;
+        }
         drawItems.push({ type: 'tree', wx: tx, wy: ty, depth: tx + ty, index: tIdx });
       });
 
@@ -26341,7 +26358,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                       return;
                     }
                     const validCode = (StorageService.getSettings().bridgePassCode || 'REFLEKSIA2026').trim().toUpperCase();
-                    if (trimmed === validCode || trimmed === 'REFLEKSIA2026') {
+                    if (trimmed === validCode) {
                       sounds.playVictoryFanfare();
                       setBridgeCodeSuccess(true);
                       setBridgeCodeError(null);
@@ -26400,7 +26417,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
                         setBridgeCodeInput(e.target.value.toUpperCase());
                         if (bridgeCodeError) setBridgeCodeError(null);
                       }}
-                      placeholder="CONTOH: REFLEKSIA2026"
+                      placeholder="Masukkan kode izin dari Guru..."
                       autoFocus
                       className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border-2 border-cyan-500/50 focus:border-cyan-400 focus:outline-none text-white font-mono font-black text-center tracking-widest text-sm sm:text-base uppercase placeholder:text-slate-500"
                     />
