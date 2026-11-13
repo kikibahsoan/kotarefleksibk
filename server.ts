@@ -6127,6 +6127,192 @@ app.post('/api/menara-asesmen/student-action', (req, res) => {
   });
 });
 
+// ============================================================================
+// AIR MANCUR WARGA: DAFTAR HADIR SISWA HARIAN (LEMPAR KOIN 1 XP -> SHEET "Daftar_Hadir")
+// ============================================================================
+interface ServerFountainAttendanceRow {
+  id_absen: string;
+  tanggal: string;
+  waktu: string;
+  student_id: string;
+  nama_siswa: string;
+  kelas: string;
+  gender?: 'L' | 'P';
+  koin_xp: number;
+  status: 'HADIR';
+  timestamp: number;
+}
+
+const FOUNTAIN_ATTENDANCE_FILE = path.join(__dirname, 'server_fountain_attendance.json');
+let fountainAttendanceRows: ServerFountainAttendanceRow[] = [];
+
+function loadFountainAttendanceFromFile() {
+  try {
+    if (fs.existsSync(FOUNTAIN_ATTENDANCE_FILE)) {
+      const raw = fs.readFileSync(FOUNTAIN_ATTENDANCE_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        fountainAttendanceRows = parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load fountain attendance file:', e);
+  }
+}
+loadFountainAttendanceFromFile();
+
+function saveFountainAttendanceToFile() {
+  try {
+    fs.writeFileSync(FOUNTAIN_ATTENDANCE_FILE, JSON.stringify(fountainAttendanceRows, null, 2), 'utf-8');
+  } catch {
+    // Ignore read-only filesystem on serverless (Vercel)
+  }
+}
+
+function mergeFountainAttendanceRows(incoming: ServerFountainAttendanceRow[]) {
+  const map = new Map<string, ServerFountainAttendanceRow>();
+  fountainAttendanceRows.forEach((r) => {
+    if (!r || !r.tanggal || !r.student_id) return;
+    map.set(`${r.tanggal}_${r.student_id}`, r);
+  });
+  incoming.forEach((r) => {
+    if (!r || !r.tanggal || !r.student_id) return;
+    const key = `${r.tanggal}_${r.student_id}`;
+    const existing = map.get(key);
+    if (!existing || (r.timestamp || 0) < (existing.timestamp || Infinity)) {
+      map.set(key, {
+        id_absen: String(r.id_absen || `absen_${r.tanggal}_${r.student_id}`),
+        tanggal: String(r.tanggal),
+        waktu: String(r.waktu || '07:00:00'),
+        student_id: String(r.student_id),
+        nama_siswa: String(r.nama_siswa || 'Siswa'),
+        kelas: String(r.kelas || 'X DKV'),
+        gender: r.gender === 'P' ? 'P' : 'L',
+        koin_xp: typeof r.koin_xp === 'number' ? r.koin_xp : 1,
+        status: 'HADIR',
+        timestamp: Number(r.timestamp || Date.now()),
+      });
+    }
+  });
+  fountainAttendanceRows = Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
+  saveFountainAttendanceToFile();
+}
+
+app.get('/api/fountain-attendance', async (req, res) => {
+  const gasUrl = String(req.query.gasUrl || process.env.GAS_WEB_APP_URL || '').trim();
+  if (gasUrl && gasUrl.startsWith('https://script.google.com/')) {
+    try {
+      const separator = gasUrl.includes('?') ? '&' : '?';
+      const gasRes = await fetch(`${gasUrl}${separator}action=get_absensi_air_mancur`, {
+        method: 'GET',
+      });
+      if (gasRes.ok) {
+        const gasData: any = await gasRes.json();
+        if (Array.isArray(gasData?.rows)) {
+          mergeFountainAttendanceRows(gasData.rows);
+        }
+      }
+    } catch {}
+  }
+  const tanggalFilter = String(req.query.tanggal || '').trim();
+  const rows = tanggalFilter
+    ? fountainAttendanceRows.filter((r) => r.tanggal === tanggalFilter)
+    : fountainAttendanceRows;
+  return res.json({
+    success: true,
+    rows,
+    allRowsCount: fountainAttendanceRows.length,
+  });
+});
+
+app.post('/api/fountain-attendance', async (req, res) => {
+  const { action, entry, entries, gasUrl: bodyGasUrl } = req.body || {};
+  const gasUrl = String(bodyGasUrl || process.env.GAS_WEB_APP_URL || '').trim();
+  let gasSynced = false;
+
+  if (action === 'record_attendance' && entry && entry.tanggal && entry.student_id) {
+    mergeFountainAttendanceRows([entry]);
+    const savedEntry =
+      fountainAttendanceRows.find(
+        (r) => r.tanggal === entry.tanggal && r.student_id === entry.student_id
+      ) || entry;
+
+    if (gasUrl && gasUrl.startsWith('https://script.google.com/')) {
+      try {
+        await fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'save_absensi_air_mancur',
+            sheetName: 'Daftar_Hadir',
+            entry: savedEntry,
+            row: {
+              ID_Absen: savedEntry.id_absen,
+              Tanggal: savedEntry.tanggal,
+              Waktu: savedEntry.waktu,
+              NIS_ID: savedEntry.student_id,
+              Nama_Siswa: savedEntry.nama_siswa,
+              Kelas: savedEntry.kelas,
+              Koin_XP: savedEntry.koin_xp,
+              Status: savedEntry.status,
+            },
+          }),
+        });
+        gasSynced = true;
+      } catch (e) {
+        console.warn('Server forwarding to GAS Daftar_Hadir failed:', e);
+      }
+    }
+
+    return res.json({
+      success: true,
+      gasSynced,
+      entry: savedEntry,
+      rows: fountainAttendanceRows,
+    });
+  }
+
+  if (action === 'sync_batch' && Array.isArray(entries)) {
+    mergeFountainAttendanceRows(entries);
+    if (gasUrl && gasUrl.startsWith('https://script.google.com/') && entries.length > 0) {
+      try {
+        await fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'save_absensi_air_mancur_batch',
+            sheetName: 'Daftar_Hadir',
+            entries,
+            rows: entries.map((r: any) => ({
+              ID_Absen: r.id_absen,
+              Tanggal: r.tanggal,
+              Waktu: r.waktu,
+              NIS_ID: r.student_id,
+              Nama_Siswa: r.nama_siswa,
+              Kelas: r.kelas,
+              Koin_XP: r.koin_xp,
+              Status: r.status || 'HADIR',
+            })),
+          }),
+        });
+        gasSynced = true;
+      } catch (e) {
+        console.warn('Server batch forwarding to GAS Daftar_Hadir failed:', e);
+      }
+    }
+    return res.json({
+      success: true,
+      gasSynced,
+      rows: fountainAttendanceRows,
+    });
+  }
+
+  return res.json({
+    success: true,
+    rows: fountainAttendanceRows,
+  });
+});
+
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {

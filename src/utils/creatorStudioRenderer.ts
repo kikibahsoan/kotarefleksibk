@@ -903,7 +903,8 @@ export function drawCustomCreatorBuilding3D(
   now: number,
   isHovered: boolean,
   isSelectedInStudio: boolean,
-  isNearPlayer: boolean
+  isNearPlayer: boolean,
+  overheadTagAlpha: number = 1.0
 ) {
   const { wx, wy, modelType, accentColor, roofColor } = building;
   const sc = Math.max(0.55, Math.min(2.0, building.scale || 1.0));
@@ -2316,51 +2317,57 @@ export function drawCustomCreatorBuilding3D(
     }
   }
 
-  // 3. Floating Building Label Badge
-  const labelZ =
-    modelType === 'modern_tower' || modelType === 'builtin_pencakar_langit'
-      ? 2.48 * sc
-      : modelType === 'ferris_park' || modelType === 'office_hq' || modelType === 'builtin_studio_onair'
-      ? 1.66 * sc
-      : 1.35 * sc;
-  const labelAnchor = project(wx, wy, labelZ);
+  // 3. Floating Building Label Badge (opens when avatar approaches building, disappears after 5s stationary)
+  const effectiveTagAlpha = isSelectedInStudio ? 1.0 : overheadTagAlpha;
+  if ((isSelectedInStudio || isNearPlayer || isHovered) && effectiveTagAlpha > 0.005) {
+    ctx.save();
+    ctx.globalAlpha = (ctx.globalAlpha || 1.0) * effectiveTagAlpha;
+    const labelZ =
+      modelType === 'modern_tower' || modelType === 'builtin_pencakar_langit'
+        ? 2.48 * sc
+        : modelType === 'ferris_park' || modelType === 'office_hq' || modelType === 'builtin_studio_onair'
+        ? 1.66 * sc
+        : 1.35 * sc;
+    const labelAnchor = project(wx, wy, labelZ);
 
-  const badgeTitle = `${building.icon} ${building.name}`;
-  ctx.font = '800 11px "Inter", system-ui, sans-serif';
-  const titleW = ctx.measureText(badgeTitle).width;
-  ctx.font = '600 9px "Inter", system-ui, sans-serif';
-  const subW = building.tagline ? ctx.measureText(building.tagline).width : 0;
+    const badgeTitle = `${building.icon} ${building.name}`;
+    ctx.font = '800 11px "Inter", system-ui, sans-serif';
+    const titleW = ctx.measureText(badgeTitle).width;
+    ctx.font = '600 9px "Inter", system-ui, sans-serif';
+    const subW = building.tagline ? ctx.measureText(building.tagline).width : 0;
 
-  const boxW = Math.max(titleW, subW) + 18;
-  const boxH = building.tagline ? 30 : 20;
-  const bx = labelAnchor.x - boxW / 2;
-  const by = labelAnchor.y - boxH;
+    const boxW = Math.max(titleW, subW) + 18;
+    const boxH = building.tagline ? 30 : 20;
+    const bx = labelAnchor.x - boxW / 2;
+    const by = labelAnchor.y - boxH;
 
-  ctx.fillStyle = isSelectedInStudio
-    ? 'rgba(120, 53, 15, 0.94)'
-    : 'rgba(15, 23, 42, 0.90)';
-  ctx.strokeStyle = isSelectedInStudio
-    ? '#fbbf24'
-    : isHovered || isNearPlayer
-    ? '#38bdf8'
-    : building.accentColor;
-  ctx.lineWidth = isSelectedInStudio ? 2 : 1.4;
+    ctx.fillStyle = isSelectedInStudio
+      ? 'rgba(120, 53, 15, 0.94)'
+      : 'rgba(15, 23, 42, 0.90)';
+    ctx.strokeStyle = isSelectedInStudio
+      ? '#fbbf24'
+      : isHovered || isNearPlayer
+      ? '#38bdf8'
+      : building.accentColor;
+    ctx.lineWidth = isSelectedInStudio ? 2 : 1.4;
 
-  ctx.beginPath();
-  ctx.roundRect(bx, by, boxW, boxH, 8);
-  ctx.fill();
-  ctx.stroke();
+    ctx.beginPath();
+    ctx.roundRect(bx, by, boxW, boxH, 8);
+    ctx.fill();
+    ctx.stroke();
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '800 10.5px "Inter", system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(badgeTitle, labelAnchor.x, by + 10);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 10.5px "Inter", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeTitle, labelAnchor.x, by + 10);
 
-  if (building.tagline) {
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '600 8.5px "Inter", system-ui, sans-serif';
-    ctx.fillText(building.tagline, labelAnchor.x, by + 22);
+    if (building.tagline) {
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '600 8.5px "Inter", system-ui, sans-serif';
+      ctx.fillText(building.tagline, labelAnchor.x, by + 22);
+    }
+    ctx.restore();
   }
 
   ctx.restore();

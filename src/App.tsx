@@ -1429,6 +1429,8 @@ export default function App() {
         <MonumenWargaChatModal
           onClose={() => setActiveBuilding(null)}
           student={student}
+          isTeacher={Boolean(student.isTeacher)}
+          onDeductXp={handleDeductPoints}
         />
       )}
 

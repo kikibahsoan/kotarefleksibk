@@ -1210,6 +1210,20 @@ export interface MenaraAsesmenState {
   serverTime: number;
 }
 
+export interface FountainAttendanceRow {
+  id_absen: string; // absen_YYYY-MM-DD_studentId
+  tanggal: string; // YYYY-MM-DD (WITA)
+  waktu: string; // HH:mm:ss (WITA)
+  student_id: string;
+  nama_siswa: string;
+  kelas: string;
+  gender?: 'L' | 'P';
+  koin_xp: number; // 1 XP coin thrown into fountain
+  status: 'HADIR';
+  timestamp: number;
+}
+
+
 
 
 

@@ -34,6 +34,7 @@ import {
   AsesmenPaketSiswaRow,
   AsesmenJawabanRow,
   AsesmenHasilRow,
+  FountainAttendanceRow,
 } from '../types/index.ts';
 import {
   INITIAL_MATERI,
@@ -71,6 +72,7 @@ const STORAGE_KEYS = {
   WEEKLY_XP_LOGS: 'kota_refleksi_weekly_xp_logs',
   CITY_ENTRY_LOGS: 'kota_refleksi_city_entry_logs',
   CREATOR_CITY_STATE: 'kota_refleksi_creator_city_state',
+  FOUNTAIN_ATTENDANCE: 'kota_refleksi_fountain_attendance',
 };
 
 const INITIAL_BANK_MATERI: BankMateriEntry[] = [
@@ -3599,7 +3601,203 @@ export const StorageService = {
       return false;
     }
   },
+
+  // ============================================================================
+  // AIR MANCUR WARGA — DAFTAR HADIR SISWA HARIAN (LEMPAR KOIN 1 XP -> SHEET "Daftar_Hadir")
+  // ============================================================================
+  getWitaDateString(date: Date = new Date()): string {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Makassar',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(date);
+      const y = parts.find((p) => p.type === 'year')?.value || String(date.getFullYear());
+      const m = parts.find((p) => p.type === 'month')?.value || String(date.getMonth() + 1).padStart(2, '0');
+      const d = parts.find((p) => p.type === 'day')?.value || String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    } catch {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  },
+
+  getWitaTimeString(date: Date = new Date()): string {
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Makassar',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }).format(date);
+    } catch {
+      const hh = String(date.getHours()).padStart(2, '0');
+      const mm = String(date.getMinutes()).padStart(2, '0');
+      const ss = String(date.getSeconds()).padStart(2, '0');
+      return `${hh}:${mm}:${ss}`;
+    }
+  },
+
+  getFountainAttendance(): FountainAttendanceRow[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.FOUNTAIN_ATTENDANCE);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveFountainAttendanceList(rows: FountainAttendanceRow[]): void {
+    try {
+      const dedupMap = new Map<string, FountainAttendanceRow>();
+      rows.forEach((r) => {
+        if (!r || !r.tanggal || !r.student_id) return;
+        const key = `${r.tanggal}_${r.student_id}`;
+        const existing = dedupMap.get(key);
+        if (!existing || (r.timestamp || 0) < (existing.timestamp || Infinity)) {
+          dedupMap.set(key, {
+            ...r,
+            id_absen: r.id_absen || `absen_${r.tanggal}_${r.student_id}`,
+          });
+        }
+      });
+      const sorted = Array.from(dedupMap.values()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      localStorage.setItem(STORAGE_KEYS.FOUNTAIN_ATTENDANCE, JSON.stringify(sorted));
+    } catch (e) {
+      console.warn('Gagal menyimpan daftar hadir Air Mancur ke localStorage:', e);
+    }
+  },
+
+  recordFountainAttendance(entry: FountainAttendanceRow): FountainAttendanceRow[] {
+    const current = this.getFountainAttendance();
+    const existsIdx = current.findIndex(
+      (r) => r.tanggal === entry.tanggal && r.student_id === entry.student_id
+    );
+    if (existsIdx === -1) {
+      current.push(entry);
+      this.saveFountainAttendanceList(current);
+    }
+    return this.getFountainAttendance();
+  },
+
+  async syncFountainAttendanceToGAS(entry: FountainAttendanceRow): Promise<boolean> {
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || settings.gasWebAppUrl || '').trim();
+    let gasSent = false;
+
+    // 1. Kirim ke Server Kota Refleksia (/api/fountain-attendance) untuk sinkronisasi lintas perangkat & backup penerusan ke GAS
+    try {
+      const res = await fetch('/api/fountain-attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'record_attendance',
+          entry,
+          gasUrl: url,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.rows)) {
+          this.saveFountainAttendanceList(data.rows);
+        }
+        if (data?.gasSynced) {
+          gasSent = true;
+        }
+      }
+    } catch (e) {
+      console.warn('Sinkronisasi server daftar hadir Air Mancur fallback ke direct GAS:', e);
+    }
+
+    // 2. Kirim langsung ke Google Apps Script Web App URL (Sheet "Daftar_Hadir")
+    if (url && url.startsWith('https://script.google.com/')) {
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'save_absensi_air_mancur',
+            sheetName: 'Daftar_Hadir',
+            entry,
+            row: {
+              ID_Absen: entry.id_absen,
+              Tanggal: entry.tanggal,
+              Waktu: entry.waktu,
+              NIS_ID: entry.student_id,
+              Nama_Siswa: entry.nama_siswa,
+              Kelas: entry.kelas,
+              Koin_XP: entry.koin_xp,
+              Status: entry.status,
+            },
+          }),
+        });
+        gasSent = true;
+      } catch (e) {
+        console.warn('Gagal mengirim absensi Air Mancur ke Google Spreadsheet:', e);
+      }
+    }
+
+    return gasSent;
+  },
+
+  async syncFountainAttendanceBatchToGAS(entries: FountainAttendanceRow[]): Promise<boolean> {
+    if (!Array.isArray(entries) || entries.length === 0) return false;
+    const settings = this.getSettings();
+    const url = (settings.spreadsheetUrl || settings.gasWebAppUrl || '').trim();
+    let ok = false;
+
+    try {
+      const res = await fetch('/api/fountain-attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sync_batch',
+          entries,
+          gasUrl: url,
+        }),
+      });
+      if (res.ok) ok = true;
+    } catch {}
+
+    if (url && url.startsWith('https://script.google.com/')) {
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'save_absensi_air_mancur_batch',
+            sheetName: 'Daftar_Hadir',
+            entries,
+            rows: entries.map((entry) => ({
+              ID_Absen: entry.id_absen,
+              Tanggal: entry.tanggal,
+              Waktu: entry.waktu,
+              NIS_ID: entry.student_id,
+              Nama_Siswa: entry.nama_siswa,
+              Kelas: entry.kelas,
+              Koin_XP: entry.koin_xp,
+              Status: entry.status,
+            })),
+          }),
+        });
+        ok = true;
+      } catch (e) {
+        console.warn('Gagal sinkronisasi batch Daftar_Hadir ke Spreadsheet:', e);
+      }
+    }
+
+    return ok;
+  },
 };
+
 
 
 

@@ -114,7 +114,7 @@ export const BUILDINGS_INFO: BuildingInfo[] = [
   { id: 'bengkel_latihan', name: 'Lab DKV', tagline: 'Studio Desain Minimalis, Atom & Kuis', position: [2.8, 0, 2.8], color: 0x0ea5e9, icon: '⚛️' },
   { id: 'masjid', name: 'Masjid Al-Hikmah', tagline: 'Belajar Iqro (1-6) & Tuntunan Sholat', position: [5.45, 0, -4.85], color: 0x10b981, icon: '🕌' },
   { id: 'bank_materi', name: 'Bank Materi Guru', tagline: 'Khusus Guru • Input TP, Materi Esensial & Generate AI', position: [-5.35, 0, -4.85], color: 0x6366f1, icon: '🏦' },
-  { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Sapa & Obrolan Langsung', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
+  { id: 'monumen_warga', name: 'Air Mancur Warga', tagline: 'Daftar Hadir Siswa Harian • Lempar Koin 1 XP', position: [0, 0, 0], color: 0x06b6d4, icon: '⛲' },
   { id: 'pencakar_langit', name: 'Gedung Pencakar Langit (Escape Room Menara)', tagline: 'Refleksia Timur • Escape Room Menara (Lantai 1–5) & Tantangan Karier', position: [14.0, 0, -10.5], color: 0x0284c7, icon: '🏙️' },
   { id: 'bandara', name: 'Bandara Refleksia Timur', tagline: 'Gerbang Udara • Landasan Pacu, Pesawat Terbang & Target Masa Depan', position: [10.8, 0, -11.8], color: 0x38bdf8, icon: '✈️' },
   { id: 'arena_rumah_misteri', name: 'Arena Rumah Misteri', tagline: 'Refleksia Timur Depan • Game Kelompok Langsung (Rumah 1–5)', position: [13.5, 0, 3.6], color: 0xf43f5e, icon: '🏠' },
@@ -1503,6 +1503,7 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
   const [pendingConfirmation, setPendingConfirmation] = useState<EntryConfirmation | null>(null);
   const pendingConfirmationRef = useRef<EntryConfirmation | null>(null);
   pendingConfirmationRef.current = pendingConfirmation;
+  const lastMovePopupTickTimeRef = useRef<number>(0);
 
   // Exclusive Master kikybahsoan movement mode ('walk' | 'teleport')
   const isMasterKiky = isTimeTravelerAccount(studentName, studentId);
@@ -4310,9 +4311,34 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             cb.name === 'Menara Asesmen Individu' ||
             cb.name === 'Menara Inovasi Digital';
 
-          if (isMenaraAsesmenCb && !isCreatorStudioOpenRef.current) {
-            onSelectBuildingRef.current('menara_asesmen');
-          } else if (Math.hypot(player.wx - cb.wx, player.wy - cb.wy) < 1.85 || isRun) {
+          const canCrossBridgeForCustomBuilding = Boolean(
+            isPlayerTeacher || isMasterKikyRef.current || hasBridgeAccessRef.current
+          );
+          if (!canCrossBridgeForCustomBuilding && cb.wx > 6.85 && player.wx < 6.75) {
+            player.targetWx = 6.05;
+            player.targetWy = -0.55;
+            player.isMoving = true;
+            player.speed = isRun ? 1.28 : 0.88;
+            const arya = npcs.find((n) => n.id === 'arya');
+            if (arya) {
+              arya.speechText = 'Eits! Untuk menyeberang ke Refleksia Timur, wajib masukkan Kode Izin Guru ya! 🛡️🔑';
+              arya.speechTimer = 6.0;
+            }
+            playerSpeechRef.current = {
+              text: '🛡️ Menuju Pos Penjaga @arya untuk memasukkan Kode Izin Jembatan...',
+              expiresAt: Date.now() + 4500,
+            };
+            clickRippleRef.current = { wx: player.targetWx, wy: player.targetWy, time: performance.now(), isRun };
+            setBridgeCodeError(null);
+            setBridgeCodeSuccess(false);
+            setIsBridgeModalOpen(true);
+            return;
+          }
+
+          const isAlreadyNearCustomBuilding =
+            Math.hypot(player.wx - cb.wx, player.wy - cb.wy) < 1.85 * sc ||
+            Math.hypot(player.wx - standWx, player.wy - standWy) < 1.35 * sc;
+          if (!isCreatorStudioOpenRef.current && isAlreadyNearCustomBuilding) {
             if (isMenaraAsesmenCb) {
               onSelectBuildingRef.current('menara_asesmen');
             } else {
@@ -4861,7 +4887,11 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             setSittingSeat(null);
           }
           pendingSeatRef.current = null;
-          if (b.id === 'menara_asesmen' && !isCreatorStudioOpenRef.current) {
+          if (
+            b.id === 'menara_asesmen' &&
+            !isCreatorStudioOpenRef.current &&
+            Math.hypot(player.wx - bx, player.wy - by) < 1.85
+          ) {
             onSelectBuildingRef.current('menara_asesmen');
           }
           // Walk to doorstep so proximity check triggers pendingConfirmation pop-up
@@ -5613,8 +5643,19 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
       // When avatar stays still in a position for >= 5s, tags fade out softly (smooth transition between 4.2s and 5.0s)
       const pMoved = player.isMoving || Math.hypot(player.wx - playerStationaryLastPosRef.current.wx, player.wy - playerStationaryLastPosRef.current.wy) > 0.04;
       if (pMoved) {
+        const prevStationarySecs = (currentTime - playerStationaryStartTimeRef.current) / 1000;
         playerStationaryStartTimeRef.current = currentTime;
         playerStationaryLastPosRef.current = { wx: player.wx, wy: player.wy };
+        if (prevStationarySecs >= 5.0 || !pendingConfirmationRef.current) {
+          lastTouchedIdRef.current = null;
+        }
+        if (
+          (pendingConfirmationRef.current || nearbyActionRef.current) &&
+          currentTime - lastMovePopupTickTimeRef.current > 350
+        ) {
+          lastMovePopupTickTimeRef.current = currentTime;
+          setPopupInteractionTick((t) => t + 1);
+        }
       }
       const stationarySecs = (currentTime - playerStationaryStartTimeRef.current) / 1000;
       let overheadTagAlpha = 1.0;
@@ -6006,37 +6047,68 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           Math.hypot(player.wx - LITERACY_CORNER_COORDS.wx, player.wy - LITERACY_CORNER_COORDS.wy) < 1.45;
 
         let touchedBuilding: BuildingInfo | null = null;
+        let bestBuildingDist = Infinity;
+        let touchedCreatorBuilding: CreatorBuildingItem | null = null;
+        let bestCreatorBuildingDist = Infinity;
+
         if (!isNearBeringinSpot && !isNearRulesSpot && !isNearAnnBoardSpot && !isNearWismaSpot && !isNearLiteracySpot) {
           for (const b of BUILDINGS_INFO) {
             const [bx, , by] = b.position;
             // Avoid triggering Balai Kota when walking behind it toward Pohon Beringin
             if (b.id === 'balai_kota' && player.wy < -4.65) continue;
             let isNear = false;
+            let effDist = Math.hypot(player.wx - bx, player.wy - by);
             if (b.id === 'pencakar_langit') {
-              isNear = player.wx >= 10.5 && player.wx <= 17.5 && player.wy >= -11.5 && player.wy <= -7.5;
+              const dDoor = Math.hypot(player.wx - bx, player.wy - (by + 1.25));
+              const dDefaultDoor = Math.hypot(player.wx - 14.0, player.wy - -8.5);
+              effDist = Math.min(effDist, dDoor, dDefaultDoor);
+              isNear =
+                (player.wx >= 11.8 && player.wx <= 17.5 && player.wy >= -11.5 && player.wy <= -7.2) ||
+                effDist < 2.25;
             } else if (b.id === 'bandara') {
-              isNear = player.wx >= 8.5 && player.wx <= 13.0 && player.wy >= -13.5 && player.wy <= -9.8;
+              const dTerm = Math.hypot(player.wx - 10.8, player.wy - -11.15);
+              const dDoor = Math.hypot(player.wx - 10.8, player.wy - -10.9);
+              effDist = Math.min(effDist, dTerm, dDoor);
+              isNear =
+                (player.wx >= 8.5 && player.wx <= 13.0 && player.wy >= -14.0 && player.wy <= -9.8) ||
+                effDist < 2.15;
             } else if (b.id === 'arena_rumah_misteri') {
-              isNear = player.wx >= 11.0 && player.wx <= 16.0 && player.wy >= 1.4 && player.wy <= 5.2;
+              const dDoor = Math.hypot(player.wx - bx, player.wy - (by + 0.8));
+              effDist = Math.min(effDist, dDoor);
+              isNear =
+                (player.wx >= 11.0 && player.wx <= 16.0 && player.wy >= 1.2 && player.wy <= 5.5) ||
+                effDist < 2.25;
+            } else if (b.id === 'menara_asesmen') {
+              const dDoor = Math.hypot(player.wx - bx, player.wy - (by + 0.65));
+              effDist = Math.min(effDist, dDoor);
+              isNear = effDist < 1.75;
             } else {
-              const bDist = Math.hypot(player.wx - bx, player.wy - by);
               const threshold = b.id === 'monumen_warga' ? 1.45 : 1.75;
-              isNear = bDist < threshold;
+              isNear = effDist < threshold;
             }
-            if (isNear) {
+            if (isNear && effDist < bestBuildingDist) {
+              bestBuildingDist = effDist;
               touchedBuilding = b;
-              break;
             }
           }
-        }
 
-        let touchedCreatorBuilding: CreatorBuildingItem | null = null;
-        if (!touchedBuilding && !isNearBeringinSpot && !isNearRulesSpot && !isNearAnnBoardSpot && !isNearWismaSpot && !isNearLiteracySpot) {
           for (const cb of creatorStateRef.current.customBuildings || []) {
-            const cbDist = Math.hypot(player.wx - cb.wx, player.wy - cb.wy);
-            if (cbDist < 1.65 * (cb.scale || 1)) {
+            const sc = cb.scale || 1;
+            const dCenter = Math.hypot(player.wx - cb.wx, player.wy - cb.wy);
+            const dDoor = Math.hypot(player.wx - cb.wx, player.wy - (cb.wy + 0.65 * sc));
+            const cbDist = Math.min(dCenter, dDoor);
+            if (cbDist < 1.75 * sc && cbDist < bestCreatorBuildingDist) {
+              bestCreatorBuildingDist = cbDist;
               touchedCreatorBuilding = cb;
-              break;
+            }
+          }
+
+          // When both a built-in building and a custom building are within range (e.g., Menara Asesmen [9.5, -3.5] vs Lab Sains & AI [11.0, -3.5]), pick whichever is closer to the avatar
+          if (touchedBuilding && touchedCreatorBuilding) {
+            if (bestCreatorBuildingDist <= bestBuildingDist + 0.05) {
+              touchedBuilding = null;
+            } else {
+              touchedCreatorBuilding = null;
             }
           }
         }
@@ -6065,12 +6137,13 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             touchedCreatorBuilding.modelType === 'modern_tower' ||
             touchedCreatorBuilding.name === 'Menara Asesmen Individu' ||
             touchedCreatorBuilding.name === 'Menara Inovasi Digital';
-          if (lastTouchedIdRef.current !== touchedCreatorBuilding.id) {
-            lastTouchedIdRef.current = touchedCreatorBuilding.id;
+          const targetId = isMenaraAsesmenTouched ? 'menara_asesmen' : touchedCreatorBuilding.id;
+          if (lastTouchedIdRef.current !== targetId) {
+            lastTouchedIdRef.current = targetId;
             sounds.playClick();
             setPendingConfirmation({
               type: isMenaraAsesmenTouched ? 'building' : 'creator_building',
-              id: isMenaraAsesmenTouched ? 'menara_asesmen' : touchedCreatorBuilding.id,
+              id: targetId,
               name: isMenaraAsesmenTouched ? 'Menara Asesmen Individu' : touchedCreatorBuilding.name,
               tagline: isMenaraAsesmenTouched
                 ? 'Refleksia Timur • Asesmen Sumatif Mandiri Berbasis Lobi (TKA Individu)'
@@ -6092,37 +6165,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             });
           }
         } else if (lastTouchedIdRef.current) {
-          // Player has moved away from building/cafe: auto-dismiss top popup
-          const prevId = lastTouchedIdRef.current;
-          let away = false;
-          if (prevId === 'cafe') {
-            if (cafeDist > 2.05) away = true;
-          } else {
-            const prevCb = (creatorStateRef.current.customBuildings || []).find((c) => c.id === prevId);
-            if (prevCb) {
-              if (Math.hypot(player.wx - prevCb.wx, player.wy - prevCb.wy) > 2.05 * (prevCb.scale || 1)) {
-                away = true;
-              }
-            } else {
-              const prevB = BUILDINGS_INFO.find((b) => b.id === prevId);
-              if (prevB) {
-                if (prevB.id === 'pencakar_langit') {
-                  if (player.wx < 9.8 || player.wx > 18.2 || player.wy < -12.2 || player.wy > -7.0) away = true;
-                } else if (prevB.id === 'bandara') {
-                  if (player.wx < 8.0 || player.wx > 13.5 || player.wy < -14.0 || player.wy > -9.2) away = true;
-                } else if (prevB.id === 'arena_rumah_misteri') {
-                  if (player.wx < 10.4 || player.wx > 16.6 || player.wy < 0.8 || player.wy > 5.8) away = true;
-                } else {
-                  const d = Math.hypot(player.wx - prevB.position[0], player.wy - prevB.position[2]);
-                  if (d > 2.15 || (prevB.id === 'balai_kota' && player.wy < -4.65)) away = true;
-                }
-              }
-            }
-          }
-          if (away) {
-            lastTouchedIdRef.current = null;
-            setPendingConfirmation(null);
-          }
+          lastTouchedIdRef.current = null;
+          setPendingConfirmation(null);
         }
       }
 
@@ -16970,33 +17014,38 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             drawIsoBoxSky(ctx, bx, by + 1.2, 0, 2.2, 0.75, 7.5, '#0284c7', '#0369a1', '#075985', camera.x, camera.y);
             drawIsoBoxSky(ctx, bx, by + 1.2, 7.5, 2.4, 0.85, 2.0, '#38bdf8', '#0284c7', '#0369a1', camera.x, camera.y);
 
-            // Glowing Signboard "🏙️ REFLEKSIA TIMUR • PENCAKAR LANGIT" + "🔐 ESCAPE ROOM MENARA"
-            ctx.fillStyle = '#0f172a';
-            ctx.beginPath();
-            ctx.roundRect(canopyC.x - 48 * z, canopyC.y - 18 * z, 96 * z, 13 * z, 3.5 * z);
-            ctx.fill();
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 1.1 * z;
-            ctx.stroke();
+            // Glowing Signboard "🏙️ REFLEKSIA TIMUR • PENCAKAR LANGIT" + "🔐 ESCAPE ROOM MENARA" (fades out after 5s stationary)
+            if (overheadTagAlpha > 0.005) {
+              ctx.save();
+              ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
+              ctx.fillStyle = '#0f172a';
+              ctx.beginPath();
+              ctx.roundRect(canopyC.x - 48 * z, canopyC.y - 18 * z, 96 * z, 13 * z, 3.5 * z);
+              ctx.fill();
+              ctx.strokeStyle = '#38bdf8';
+              ctx.lineWidth = 1.1 * z;
+              ctx.stroke();
 
-            ctx.fillStyle = '#e0f2fe';
-            ctx.font = `bold ${Math.round(4.8 * z)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🏙️ REFLEKSIA TIMUR • PENCAKAR LANGIT', canopyC.x, canopyC.y - 12 * z);
+              ctx.fillStyle = '#e0f2fe';
+              ctx.font = `bold ${Math.round(4.8 * z)}px sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('🏙️ REFLEKSIA TIMUR • PENCAKAR LANGIT', canopyC.x, canopyC.y - 12 * z);
 
-            // Escape Room Menara Badge right above the main canopy sign
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-            ctx.beginPath();
-            ctx.roundRect(canopyC.x - 44 * z, canopyC.y - 31 * z, 88 * z, 11 * z, 3.5 * z);
-            ctx.fill();
-            ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 1.0 * z;
-            ctx.stroke();
+              // Escape Room Menara Badge right above the main canopy sign
+              ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+              ctx.beginPath();
+              ctx.roundRect(canopyC.x - 44 * z, canopyC.y - 31 * z, 88 * z, 11 * z, 3.5 * z);
+              ctx.fill();
+              ctx.strokeStyle = '#fbbf24';
+              ctx.lineWidth = 1.0 * z;
+              ctx.stroke();
 
-            ctx.fillStyle = '#fde047';
-            ctx.font = `bold ${Math.round(4.3 * z)}px sans-serif`;
-            ctx.fillText('🔐 ESCAPE ROOM MENARA • LANTAI 1–5', canopyC.x, canopyC.y - 25.5 * z);
+              ctx.fillStyle = '#fde047';
+              ctx.font = `bold ${Math.round(4.3 * z)}px sans-serif`;
+              ctx.fillText('🔐 ESCAPE ROOM MENARA • LANTAI 1–5', canopyC.x, canopyC.y - 25.5 * z);
+              ctx.restore();
+            }
           } else if (b.id === 'bandara') {
             // =========================================================================
             // 12. BANDARA REFLEKSIA TIMUR (Terminal, Menara ATC, Landasan Pacu & 2 Pesawat Parkir)
@@ -17162,20 +17211,25 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             drawIsoBoxAirport(ctx, 10.8, -11.15, 0, 1.4, 0.45, 6.5, '#0284c7', '#0369a1', '#075985', camera.x, camera.y);
             drawIsoBoxAirport(ctx, 10.8, -11.15, 6.5, 1.55, 0.55, 1.5, '#38bdf8', '#0284c7', '#0369a1', camera.x, camera.y);
 
-            // Glowing Signboard "✈️ BANDARA REFLEKSIA TIMUR"
-            ctx.fillStyle = '#0f172a';
-            ctx.beginPath();
-            ctx.roundRect(termCanopy.x - 42 * z, termCanopy.y - 15 * z, 84 * z, 12 * z, 3 * z);
-            ctx.fill();
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 1.0 * z;
-            ctx.stroke();
+            // Glowing Signboard "✈️ BANDARA REFLEKSIA TIMUR" (fades out after 5s stationary)
+            if (overheadTagAlpha > 0.005) {
+              ctx.save();
+              ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
+              ctx.fillStyle = '#0f172a';
+              ctx.beginPath();
+              ctx.roundRect(termCanopy.x - 42 * z, termCanopy.y - 15 * z, 84 * z, 12 * z, 3 * z);
+              ctx.fill();
+              ctx.strokeStyle = '#38bdf8';
+              ctx.lineWidth = 1.0 * z;
+              ctx.stroke();
 
-            ctx.fillStyle = '#38bdf8';
-            ctx.font = `bold ${Math.round(4.4 * z)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('✈️ BANDARA REFLEKSIA TIMUR', termCanopy.x, termCanopy.y - 9 * z);
+              ctx.fillStyle = '#38bdf8';
+              ctx.font = `bold ${Math.round(4.4 * z)}px sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('✈️ BANDARA REFLEKSIA TIMUR', termCanopy.x, termCanopy.y - 9 * z);
+              ctx.restore();
+            }
 
             // 2. Air Traffic Control (ATC) Tower
             const atcX = 9.75;
@@ -17516,16 +17570,21 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
               const hy = by - 0.72;
               drawIsoBoxArena(hx, hy, 5, 0.52, 0.52, 16, '#f8fafc', mh.wallL, mh.wallR);
               drawIsoRoofArena(hx, hy, 21, 0.62, 0.62, 11, mh.roofL, mh.roofR);
-              const roofPt = toScreen(hx, hy, 34, camera.x, camera.y);
-              ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-              ctx.beginPath();
-              ctx.roundRect(roofPt.x - 10 * z, roofPt.y - 6 * z, 20 * z, 10 * z, 3 * z);
-              ctx.fill();
-              ctx.fillStyle = '#fde047';
-              ctx.font = `bold ${Math.max(6, Math.round(6.5 * z))}px sans-serif`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(`R${mh.num}`, roofPt.x, roofPt.y - 1 * z);
+              if (overheadTagAlpha > 0.005) {
+                ctx.save();
+                ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
+                const roofPt = toScreen(hx, hy, 34, camera.x, camera.y);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                ctx.beginPath();
+                ctx.roundRect(roofPt.x - 10 * z, roofPt.y - 6 * z, 20 * z, 10 * z, 3 * z);
+                ctx.fill();
+                ctx.fillStyle = '#fde047';
+                ctx.font = `bold ${Math.max(6, Math.round(6.5 * z))}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`R${mh.num}`, roofPt.x, roofPt.y - 1 * z);
+                ctx.restore();
+              }
             });
 
             // 3. Group Gathering Pads in the Middle (Area Kelompok di Depan Guru)
@@ -17541,25 +17600,42 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             drawIsoBoxArena(podWx, podWy, 5, 0.85, 0.48, 6, '#fbbf24', '#d97706', '#b45309');
             drawIsoBoxArena(podWx, podWy, 11, 0.35, 0.28, 8, '#fde047', '#f59e0b', '#92400e');
 
-            // 5. Grand Archway Banner Signboard "ARENA RUMAH MISTERI"
-            const archPt = toScreen(bx, by + 1.05, 26, camera.x, camera.y);
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-            ctx.beginPath();
-            ctx.roundRect(archPt.x - 52 * z, archPt.y - 9 * z, 104 * z, 16 * z, 6 * z);
-            ctx.fill();
-            ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 1.2 * z;
-            ctx.stroke();
-            ctx.fillStyle = '#fef08a';
-            ctx.font = `bold ${Math.max(7, Math.round(7.5 * z))}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🏠 ARENA RUMAH MISTERI', archPt.x, archPt.y - 1 * z);
+            // 5. Grand Archway Banner Signboard "ARENA RUMAH MISTERI" (fades out after 5s stationary)
+            if (overheadTagAlpha > 0.005) {
+              ctx.save();
+              ctx.globalAlpha = (ctx.globalAlpha || 1.0) * overheadTagAlpha;
+              const archPt = toScreen(bx, by + 1.05, 26, camera.x, camera.y);
+              ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+              ctx.beginPath();
+              ctx.roundRect(archPt.x - 52 * z, archPt.y - 9 * z, 104 * z, 16 * z, 6 * z);
+              ctx.fill();
+              ctx.strokeStyle = '#fbbf24';
+              ctx.lineWidth = 1.2 * z;
+              ctx.stroke();
+              ctx.fillStyle = '#fef08a';
+              ctx.font = `bold ${Math.max(7, Math.round(7.5 * z))}px sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('🏠 ARENA RUMAH MISTERI', archPt.x, archPt.y - 1 * z);
+              ctx.restore();
+            }
           }
 
-          // Floating Building Label ONLY when touched, hovered or active (compact & semi-transparent, fades after 5s stationary)
-          const tagAlpha = isHovered ? 1.0 : overheadTagAlpha;
-          const shouldShowLabel = (isHovered || activeBuilding === b.id || lastTouchedIdRef.current === b.id) && tagAlpha > 0.005;
+          // Floating Building Label ONLY when touched, hovered or active (compact & semi-transparent, ALWAYS fades after 5s stationary)
+          const hasCustomMenaraAsesmen =
+            b.id === 'menara_asesmen' &&
+            (creatorStateRef.current.customBuildings || []).some(
+              (cb) =>
+                cb.id === 'cbuild-mw7csayu-ahr' ||
+                cb.modelType === 'modern_tower' ||
+                cb.name === 'Menara Asesmen Individu' ||
+                cb.name === 'Menara Inovasi Digital'
+            );
+          const tagAlpha = overheadTagAlpha;
+          const shouldShowLabel =
+            !hasCustomMenaraAsesmen &&
+            (isHovered || activeBuilding === b.id || lastTouchedIdRef.current === b.id) &&
+            tagAlpha > 0.005;
           if (shouldShowLabel) {
             ctx.save();
             ctx.globalAlpha = (ctx.globalAlpha || 1.0) * tagAlpha;
@@ -22494,7 +22570,17 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
           ctx.restore();
         } else if (item.type === 'custom_creator_building') {
           const cb = item.building;
-          const isNearCb = Math.hypot(player.wx - cb.wx, player.wy - cb.wy) < 2.2 * (cb.scale || 1);
+          const sc = cb.scale || 1;
+          const isMenaraAsesmenCb =
+            cb.id === 'cbuild-mw7csayu-ahr' ||
+            cb.modelType === 'modern_tower' ||
+            cb.name === 'Menara Asesmen Individu' ||
+            cb.name === 'Menara Inovasi Digital';
+          const isNearCb =
+            lastTouchedIdRef.current === cb.id ||
+            (isMenaraAsesmenCb && lastTouchedIdRef.current === 'menara_asesmen') ||
+            Math.hypot(player.wx - cb.wx, player.wy - cb.wy) < 1.85 * sc ||
+            Math.hypot(player.wx - cb.wx, player.wy - (cb.wy + 0.65 * sc)) < 1.75 * sc;
           const isSelectedInCreator =
             isCreatorStudioOpenRef.current &&
             creatorSelectedTargetRef.current?.kind === 'custom_building' &&
@@ -22507,7 +22593,8 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
             currentTime,
             false,
             isSelectedInCreator,
-            isNearCb
+            isNearCb,
+            overheadTagAlpha
           );
         } else if (item.type === 'custom_creator_prop') {
           const cp = item.prop;
