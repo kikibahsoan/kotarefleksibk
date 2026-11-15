@@ -1,7 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Materi, LearningObjective, Student, Reflection, MentorFeedback, BuildingId } from '../../types/index.ts';
 import { validateReflection } from '../../utils/rules.ts';
-import { X, Star, Mic, MicOff, Send, Sparkles, AlertCircle, HeartHandshake, CheckCircle2 } from 'lucide-react';
+import { INITIAL_STUDENTS } from '../../data/initialData.ts';
+import {
+  PUSAT_REFLEKSI_ARCHIVE_REFLECTIONS,
+  PUSAT_REFLEKSI_ARCHIVE_FEEDBACKS,
+} from '../../data/archiveSeeds.ts';
+import {
+  X,
+  Star,
+  Mic,
+  MicOff,
+  Send,
+  Sparkles,
+  AlertCircle,
+  HeartHandshake,
+  CheckCircle2,
+  FolderOpen,
+  PenLine,
+  Search,
+  Bot,
+  Calendar,
+  Lightbulb,
+  BookOpen,
+  ListChecks,
+} from 'lucide-react';
 
 interface TamanRefleksiModalProps {
   onClose: () => void;
@@ -11,6 +34,8 @@ interface TamanRefleksiModalProps {
   preselectedMateriId?: string;
   onSubmitReflection: (reflection: Reflection, feedback: MentorFeedback) => void;
   onNavigateBuilding: (buildingId: BuildingId) => void;
+  reflections?: Reflection[];
+  feedbacks?: MentorFeedback[];
 }
 
 const MOODS = [
@@ -21,6 +46,82 @@ const MOODS = [
   { emoji: '💡', label: 'Tercerahkan' },
 ];
 
+const SYSTEM_TAG_PREFIXES = [
+  '[PASAR_PRESTASI]',
+  '[HASIL_TES_LAB_DKV]',
+  '[PODCAST_MENARA_MENTOR]',
+  '[JURNAL_POHON_BERINGIN]',
+  '[JURNAL 4F PERPUSTAKAAN]',
+  '[CREATOR_CITY_STATE]',
+  '[BANK_MATERI_AI]',
+];
+
+const BERPIKIR_KOMPUTASIONAL_MATERI_IDS = new Set([
+  'materi-bk-01',
+  'materi-bk-02',
+  'materi-bk-03',
+  'materi-bk-04',
+  'materi-bk-05',
+]);
+
+function isGenuineStudentReflection(r: Reflection): boolean {
+  if (!r || !r.id || !r.studentName) return false;
+  if (
+    r.id.startsWith('pasar-') ||
+    r.id.startsWith('dkvtest-') ||
+    r.id.startsWith('pod-') ||
+    r.id.startsWith('sticky-') ||
+    r.id.startsWith('j4f-') ||
+    r.id.startsWith('creator-city') ||
+    r.id.startsWith('materi-ai-')
+  ) {
+    return false;
+  }
+  const titleUpper = (r.materiTitle || '').toUpperCase();
+  if (SYSTEM_TAG_PREFIXES.some((prefix) => titleUpper.includes(prefix))) {
+    return false;
+  }
+  return Boolean(r.answers?.understood || r.answers?.difficult || r.answers?.actionPlan);
+}
+
+function isBerpikirKomputasionalReflection(r: Reflection): boolean {
+  if (!r) return false;
+  if (r.materiId && BERPIKIR_KOMPUTASIONAL_MATERI_IDS.has(r.materiId)) return true;
+  const titleUpper = (r.materiTitle || '').toUpperCase();
+  return (
+    titleUpper.includes('BUKU 1') ||
+    titleUpper.includes('BUKU 2') ||
+    titleUpper.includes('BUKU 3') ||
+    titleUpper.includes('BUKU 4') ||
+    titleUpper.includes('BUKU 5') ||
+    titleUpper.includes('BERPIKIR KOMPUTASIONAL') ||
+    titleUpper.includes('VON NEUMANN') ||
+    titleUpper.includes('SISTEM OPERASI') ||
+    titleUpper.includes('KOMPUTASI DATA') ||
+    titleUpper.includes('STRUKTUR DATA') ||
+    titleUpper.includes('ALGORITMA PENCARIAN')
+  );
+}
+
+function normalizeOfficialReflection(r: Reflection): Reflection | null {
+  if (!r) return null;
+  const nameUpper = (r.studentName || '').trim().toUpperCase();
+  const officialStudent = INITIAL_STUDENTS.find(
+    (s) =>
+      !s.isTeacher &&
+      (s.id === r.studentId || s.name.trim().toUpperCase() === nameUpper) &&
+      (s.className.includes('X DKV 2') || s.className.includes('X DKV 3'))
+  );
+  if (!officialStudent) return null;
+  return {
+    ...r,
+    studentId: officialStudent.id,
+    studentName: officialStudent.name,
+    studentNumber: officialStudent.studentNumber,
+    className: officialStudent.className,
+  };
+}
+
 export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
   onClose,
   materis,
@@ -29,7 +130,13 @@ export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
   preselectedMateriId,
   onSubmitReflection,
   onNavigateBuilding,
+  reflections = [],
+  feedbacks = [],
 }) => {
+  const [activeTab, setActiveTab] = useState<'write' | 'archive'>('write');
+  const [archiveClassFilter, setArchiveClassFilter] = useState<'ALL' | 'X DKV 2' | 'X DKV 3' | 'MINE'>('ALL');
+  const [archiveSearch, setArchiveSearch] = useState('');
+
   const [selectedMateriId, setSelectedMateriId] = useState<string>(
     preselectedMateriId || materis[0]?.id || ''
   );
@@ -46,6 +153,83 @@ export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
 
   const selectedMateri = materis.find((m) => m.id === selectedMateriId);
   const relatedObjective = objectives.find((tp) => tp.materiId === selectedMateriId);
+
+  // Merge user-submitted genuine reflections with the 20 Pusat Refleksi archive seeds (5 X DKV 2 + 15 X DKV 3)
+  // Validated strictly against official X DKV 2 & X DKV 3 student roster and Berpikir Komputasional (Buku 1-5)
+  const mergedReflections = useMemo(() => {
+    const map = new Map<string, Reflection>();
+    // 1. Place the 20 official Pusat Refleksi archive seeds first (5 X DKV 2 + 15 X DKV 3 on Berpikir Komputasional)
+    PUSAT_REFLEKSI_ARCHIVE_REFLECTIONS.forEach((seed) => {
+      const normalized = normalizeOfficialReflection(seed);
+      if (normalized && isBerpikirKomputasionalReflection(normalized)) {
+        map.set(normalized.id, normalized);
+      }
+    });
+    // 2. Include any new student reflections submitted during the session if they belong to official X DKV 2 / X DKV 3 students on Berpikir Komputasional
+    reflections.forEach((r) => {
+      if (
+        !r.id.startsWith('ref-pusat-') &&
+        !r.id.startsWith('ref-assa-') &&
+        isGenuineStudentReflection(r) &&
+        isBerpikirKomputasionalReflection(r)
+      ) {
+        const normalized = normalizeOfficialReflection(r);
+        if (normalized && !map.has(normalized.id)) {
+          map.set(normalized.id, normalized);
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [reflections]);
+
+  const feedbackByReflectionId = useMemo(() => {
+    const map = new Map<string, MentorFeedback>();
+    feedbacks.forEach((fb) => {
+      if (fb && fb.reflectionId) {
+        map.set(fb.reflectionId, fb);
+      }
+    });
+    // Authoritative Pusat Refleksi archive feedbacks always take precedence for ref-pusat-*
+    PUSAT_REFLEKSI_ARCHIVE_FEEDBACKS.forEach((fb) => {
+      map.set(fb.reflectionId, fb);
+    });
+    return map;
+  }, [feedbacks]);
+
+  const countDkv2 = useMemo(
+    () => mergedReflections.filter((r) => (r.className || '').includes('X DKV 2')).length,
+    [mergedReflections]
+  );
+  const countDkv3 = useMemo(
+    () => mergedReflections.filter((r) => (r.className || '').includes('X DKV 3')).length,
+    [mergedReflections]
+  );
+
+  const filteredArchiveReflections = useMemo(() => {
+    return mergedReflections.filter((r) => {
+      if (archiveClassFilter === 'X DKV 2' && !(r.className || '').includes('X DKV 2')) return false;
+      if (archiveClassFilter === 'X DKV 3' && !(r.className || '').includes('X DKV 3')) return false;
+      if (
+        archiveClassFilter === 'MINE' &&
+        r.studentId !== student.id &&
+        r.studentName.toLowerCase() !== student.name.toLowerCase()
+      ) {
+        return false;
+      }
+      if (archiveSearch.trim()) {
+        const q = archiveSearch.toLowerCase();
+        const matchName = (r.studentName || '').toLowerCase().includes(q);
+        const matchTitle = (r.materiTitle || '').toLowerCase().includes(q);
+        const matchUnderstood = (r.answers?.understood || '').toLowerCase().includes(q);
+        const matchDifficult = (r.answers?.difficult || '').toLowerCase().includes(q);
+        const matchPlan = (r.answers?.actionPlan || '').toLowerCase().includes(q);
+        if (!matchName && !matchTitle && !matchUnderstood && !matchDifficult && !matchPlan) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [mergedReflections, archiveClassFilter, archiveSearch, student.id, student.name]);
 
   // Web Speech API handler
   const handleToggleSpeech = (field: 'understood' | 'difficult' | 'actionPlan') => {
@@ -199,313 +383,593 @@ export const TamanRefleksiModal: React.FC<TamanRefleksiModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-sm animate-backdrop-fade">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100 animate-fade-in-up">
+      <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100 animate-fade-in-up">
         {/* Header */}
-        <div className="bg-gradient-to-r from-amber-700 via-orange-700 to-rose-700 px-6 py-5 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl shadow-inner">
-              🌍
+        <div className="bg-gradient-to-r from-amber-700 via-orange-700 to-rose-700 px-6 py-4 text-white flex flex-col gap-3 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl shadow-inner">
+                🌍
+              </div>
+              <div>
+                <h2 className="text-xl font-extrabold font-display leading-tight">Pusat Refleksi</h2>
+                <p className="text-xs text-amber-100 font-medium">
+                  Refleksikan Belajarmu, Dapatkan Umpan Balik AI Mentor & Jelajahi Arsip Refleksi Warga
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-extrabold font-display leading-tight">Pusat Refleksi</h2>
-              <p className="text-xs text-amber-100 font-medium">Refleksikan Belajarmu & Terima Masukan Personal (+3 Poin)</p>
-            </div>
+            <button
+              onClick={onClose}
+              aria-label="Tutup Pusat Refleksi"
+              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Tutup Pusat Refleksi"
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition"
-          >
-            <X className="w-5 h-5 text-white" />
-          </button>
+
+          {/* Top Mode Tabs */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab('write')}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all ${
+                activeTab === 'write'
+                  ? 'bg-white text-rose-800 shadow-lg scale-[1.02]'
+                  : 'bg-black/25 text-amber-100 hover:bg-black/40 border border-white/15'
+              }`}
+            >
+              <PenLine className="w-4 h-4" />
+              <span>Tulis Refleksi Baru (+1 XP)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('archive')}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all ${
+                activeTab === 'archive'
+                  ? 'bg-white text-rose-800 shadow-lg scale-[1.02]'
+                  : 'bg-black/25 text-amber-100 hover:bg-black/40 border border-white/15'
+              }`}
+            >
+              <FolderOpen className="w-4 h-4" />
+              <span>Arsip Refleksi ({mergedReflections.length})</span>
+            </button>
+          </div>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1">
-          {/* Step 1: Select Materi */}
-          <div>
-            <label htmlFor="materi-select" className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-              1. Materi yang Baru Dipelajari <span className="text-pink-400">*</span>
-            </label>
-            <select
-              id="materi-select"
-              value={selectedMateriId}
-              onChange={(e) => setSelectedMateriId(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 font-medium"
-            >
-              {materis.map((m) => (
-                <option key={m.id} value={m.id} className="bg-slate-900 text-white">
-                  [{m.subject}] {m.title}
-                </option>
-              ))}
-            </select>
-
-            {relatedObjective && (
-              <div className="mt-2.5 p-3 rounded-xl bg-pink-950/40 border border-pink-700/40 text-xs text-pink-200">
-                <strong className="text-pink-300">🎯 Target Tujuan Pembelajaran Guru:</strong> {relatedObjective.goalStatement}
-              </div>
-            )}
-          </div>
-
-          {/* Step 2: Scale of Understanding & Mood (Revamped tactile UI) */}
-          <div className="space-y-4 p-4 sm:p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
-            {/* 2A. Skala Pemahaman */}
+        {/* TAB 1: WRITE NEW REFLECTION */}
+        {activeTab === 'write' ? (
+          <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1">
+            {/* Step 1: Select Materi */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                  <span>2. Skala Pemahaman Materi</span>
-                  <span className="text-pink-400">*</span>
-                </label>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => setScale(num)}
-                      className="p-0.5 transition transform hover:scale-125 active:scale-95"
-                      aria-label={`Pilih ${num} bintang`}
-                    >
-                      <Star
-                        className={`w-5 h-5 transition-colors ${
-                          num <= scale
-                            ? 'fill-amber-400 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]'
-                            : 'fill-transparent text-slate-600 hover:text-slate-500'
+              <label htmlFor="materi-select" className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                1. Materi yang Baru Dipelajari <span className="text-pink-400">*</span>
+              </label>
+              <select
+                id="materi-select"
+                value={selectedMateriId}
+                onChange={(e) => setSelectedMateriId(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 font-medium"
+              >
+                {materis.map((m) => (
+                  <option key={m.id} value={m.id} className="bg-slate-900 text-white">
+                    [{m.subject}] {m.title}
+                  </option>
+                ))}
+              </select>
+
+              {relatedObjective && (
+                <div className="mt-2.5 p-3 rounded-xl bg-pink-950/40 border border-pink-700/40 text-xs text-pink-200">
+                  <strong className="text-pink-300">🎯 Target Tujuan Pembelajaran Guru:</strong> {relatedObjective.goalStatement}
+                </div>
+              )}
+            </div>
+
+            {/* Step 2: Scale of Understanding & Mood */}
+            <div className="space-y-4 p-4 sm:p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+              {/* 2A. Skala Pemahaman */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                    <span>2. Skala Pemahaman Materi</span>
+                    <span className="text-pink-400">*</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setScale(num)}
+                        className="p-0.5 transition transform hover:scale-125 active:scale-95"
+                        aria-label={`Pilih ${num} bintang`}
+                      >
+                        <Star
+                          className={`w-5 h-5 transition-colors ${
+                            num <= scale
+                              ? 'fill-amber-400 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]'
+                              : 'fill-transparent text-slate-600 hover:text-slate-500'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 5 Expressive Scale Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    { lvl: 1, title: 'Perlu Bimbingan', sub: 'Belum paham dasar', stars: '★' },
+                    { lvl: 2, title: 'Mulai Paham', sub: 'Ada yang bingung', stars: '★★' },
+                    { lvl: 3, title: 'Cukup Mengerti', sub: 'Paham intinya', stars: '★★★' },
+                    { lvl: 4, title: 'Paham Baik', sub: 'Bisa praktikkan', stars: '★★★★' },
+                    { lvl: 5, title: 'Sangat Mahir', sub: 'Siap bantu kawan', stars: '★★★★★' },
+                  ].map((item) => {
+                    const isSelected = scale === item.lvl;
+                    return (
+                      <button
+                        key={item.lvl}
+                        type="button"
+                        onClick={() => setScale(item.lvl)}
+                        className={`p-2.5 rounded-xl text-left border transition-all duration-200 flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-gradient-to-b from-amber-500/25 to-amber-700/20 border-amber-400 text-white shadow-lg ring-1 ring-amber-400/50 scale-[1.02]'
+                            : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-400 hover:text-slate-200'
                         }`}
-                      />
-                    </button>
-                  ))}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className={`text-xs font-mono font-black ${isSelected ? 'text-amber-300' : 'text-slate-500'}`}>
+                            {item.stars}
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                            isSelected ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-700 text-slate-400'
+                          }`}>
+                            Lv.{item.lvl}
+                          </span>
+                        </div>
+                        <div>
+                          <div className={`text-xs font-bold leading-tight ${isSelected ? 'text-amber-200' : 'text-slate-200'}`}>
+                            {item.title}
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
+                            {item.sub}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* 5 Expressive Scale Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                {[
-                  { lvl: 1, title: 'Perlu Bimbingan', sub: 'Belum paham dasar', stars: '★' },
-                  { lvl: 2, title: 'Mulai Paham', sub: 'Ada yang bingung', stars: '★★' },
-                  { lvl: 3, title: 'Cukup Mengerti', sub: 'Paham intinya', stars: '★★★' },
-                  { lvl: 4, title: 'Paham Baik', sub: 'Bisa praktikkan', stars: '★★★★' },
-                  { lvl: 5, title: 'Sangat Mahir', sub: 'Siap bantu kawan', stars: '★★★★★' },
-                ].map((item) => {
-                  const isSelected = scale === item.lvl;
-                  return (
-                    <button
-                      key={item.lvl}
-                      type="button"
-                      onClick={() => setScale(item.lvl)}
-                      className={`p-2.5 rounded-xl text-left border transition-all duration-200 flex flex-col justify-between ${
-                        isSelected
-                          ? 'bg-gradient-to-b from-amber-500/25 to-amber-700/20 border-amber-400 text-white shadow-lg ring-1 ring-amber-400/50 scale-[1.02]'
-                          : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between w-full mb-1">
-                        <span className={`text-xs font-mono font-black ${isSelected ? 'text-amber-300' : 'text-slate-500'}`}>
-                          {item.stars}
+              {/* 2B. Suasana Hati Saat Belajar */}
+              <div className="pt-2 border-t border-slate-700/50">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2 flex items-center gap-1.5">
+                  <span>💭 Suasana Hati Saat Belajar</span>
+                  <span className="text-pink-400">*</span>
+                </label>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {MOODS.map((m) => {
+                    const isSelected = moodEmoji === m.emoji;
+                    return (
+                      <button
+                        key={m.emoji}
+                        type="button"
+                        onClick={() => setMoodEmoji(m.emoji)}
+                        className={`p-2.5 rounded-xl text-center border transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
+                          isSelected
+                            ? 'bg-gradient-to-b from-pink-500/25 to-rose-700/20 border-pink-400 text-white shadow-lg ring-1 ring-pink-400/50 scale-[1.02]'
+                            : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-2xl transition transform group-hover:scale-110">
+                          {m.emoji}
                         </span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                          isSelected ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-700 text-slate-400'
-                        }`}>
-                          Lv.{item.lvl}
+                        <span className={`text-xs font-bold ${isSelected ? 'text-pink-200' : 'text-slate-200'}`}>
+                          {m.label}
                         </span>
-                      </div>
-                      <div>
-                        <div className={`text-xs font-bold leading-tight ${isSelected ? 'text-amber-200' : 'text-slate-200'}`}>
-                          {item.title}
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
-                          {item.sub}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* 2B. Suasana Hati Saat Belajar */}
-            <div className="pt-2 border-t border-slate-700/50">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2 flex items-center gap-1.5">
-                <span>💭 Suasana Hati Saat Belajar</span>
-                <span className="text-pink-400">*</span>
-              </label>
-
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                {MOODS.map((m) => {
-                  const isSelected = moodEmoji === m.emoji;
-                  return (
-                    <button
-                      key={m.emoji}
-                      type="button"
-                      onClick={() => setMoodEmoji(m.emoji)}
-                      className={`p-2.5 rounded-xl text-center border transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
-                        isSelected
-                          ? 'bg-gradient-to-b from-pink-500/25 to-rose-700/20 border-pink-400 text-white shadow-lg ring-1 ring-pink-400/50 scale-[1.02]'
-                          : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-2xl transition transform group-hover:scale-110">
-                        {m.emoji}
-                      </span>
-                      <span className={`text-xs font-bold ${isSelected ? 'text-pink-200' : 'text-slate-200'}`}>
-                        {m.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Step 3: Guided Reflection Questions */}
-          <div className="space-y-4">
-            {/* Question 1 */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="q1-input" className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>Apa yang sudah kamu pahami dari materi ini?</span>
-                  <span className="text-pink-400">*</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleToggleSpeech('understood')}
-                  title="Dikte dengan suara"
-                  className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition ${
-                    isListening && activeSpeechField === 'understood'
-                      ? 'bg-red-600 text-white border-red-500 animate-pulse'
-                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                  }`}
-                >
-                  {isListening && activeSpeechField === 'understood' ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                  <span className="text-[10px]">Suara</span>
-                </button>
-              </div>
-              <textarea
-                id="q1-input"
-                required
-                rows={2}
-                value={understood}
-                onChange={(e) => setUnderstood(e.target.value)}
-                placeholder="Ceritakan dengan kata-katamu sendiri apa yang berhasil kamu mengerti..."
-                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-              />
-            </div>
-
-            {/* Question 2 */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="q2-input" className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4 text-amber-400" />
-                  <span>Bagian mana yang masih terasa sulit atau membingungkan?</span>
-                  <span className="text-pink-400">*</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleToggleSpeech('difficult')}
-                  title="Dikte dengan suara"
-                  className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition ${
-                    isListening && activeSpeechField === 'difficult'
-                      ? 'bg-red-600 text-white border-red-500 animate-pulse'
-                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                  }`}
-                >
-                  {isListening && activeSpeechField === 'difficult' ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                  <span className="text-[10px]">Suara</span>
-                </button>
-              </div>
-              <textarea
-                id="q2-input"
-                required
-                rows={2}
-                value={difficult}
-                onChange={(e) => setDifficult(e.target.value)}
-                placeholder="Jujurlah, tidak ada salah dalam refleksi. Sebutkan istilah atau konsep yang bikin pusing..."
-                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-              />
-            </div>
-
-            {/* Question 3 */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="q3-input" className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <HeartHandshake className="w-4 h-4 text-sky-400" />
-                  <span>Apa strategi atau rencanamu agar bisa lebih paham?</span>
-                  <span className="text-pink-400">*</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleToggleSpeech('actionPlan')}
-                  title="Dikte dengan suara"
-                  className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition ${
-                    isListening && activeSpeechField === 'actionPlan'
-                      ? 'bg-red-600 text-white border-red-500 animate-pulse'
-                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                  }`}
-                >
-                  {isListening && activeSpeechField === 'actionPlan' ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                  <span className="text-[10px]">Suara</span>
-                </button>
-              </div>
-              <textarea
-                id="q3-input"
-                required
-                rows={2}
-                value={actionPlan}
-                onChange={(e) => setActionPlan(e.target.value)}
-                placeholder="Misal: membaca ulang catatan, mencoba latihan mandiri di VS Code, atau bertanya ke guru..."
-                className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-              />
-            </div>
-
-            {/* Custom Question from Teacher if exists */}
-            {selectedMateri?.customQuestions?.[0] && (
-              <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-700/50">
-                <label htmlFor="custom-q-input" className="block text-xs font-bold text-indigo-300 mb-1.5">
-                  Pertanyaan Khusus dari Guru: "{selectedMateri.customQuestions[0]}"
-                </label>
-                <input
-                  id="custom-q-input"
-                  type="text"
-                  value={customAnswer}
-                  onChange={(e) => setCustomAnswer(e.target.value)}
-                  placeholder="Tuliskan jawabanmu di sini..."
-                  className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            {/* Step 3: Guided Reflection Questions */}
+            <div className="space-y-4">
+              {/* Question 1 */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="q1-input" className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Apa yang sudah kamu pahami dari materi ini?</span>
+                    <span className="text-pink-400">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSpeech('understood')}
+                    title="Dikte dengan suara"
+                    className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition ${
+                      isListening && activeSpeechField === 'understood'
+                        ? 'bg-red-600 text-white border-red-500 animate-pulse'
+                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {isListening && activeSpeechField === 'understood' ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                    <span className="text-[10px]">Suara</span>
+                  </button>
+                </div>
+                <textarea
+                  id="q1-input"
+                  required
+                  rows={2}
+                  value={understood}
+                  onChange={(e) => setUnderstood(e.target.value)}
+                  placeholder="Ceritakan dengan kata-katamu sendiri apa yang berhasil kamu mengerti..."
+                  className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
                 />
+              </div>
+
+              {/* Question 2 */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="q2-input" className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                    <span>Bagian mana yang masih terasa sulit atau membingungkan?</span>
+                    <span className="text-pink-400">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSpeech('difficult')}
+                    title="Dikte dengan suara"
+                    className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition ${
+                      isListening && activeSpeechField === 'difficult'
+                        ? 'bg-red-600 text-white border-red-500 animate-pulse'
+                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {isListening && activeSpeechField === 'difficult' ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                    <span className="text-[10px]">Suara</span>
+                  </button>
+                </div>
+                <textarea
+                  id="q2-input"
+                  required
+                  rows={2}
+                  value={difficult}
+                  onChange={(e) => setDifficult(e.target.value)}
+                  placeholder="Jujurlah, tidak ada salah dalam refleksi. Sebutkan istilah atau konsep yang bikin pusing..."
+                  className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                />
+              </div>
+
+              {/* Question 3 */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="q3-input" className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <HeartHandshake className="w-4 h-4 text-sky-400" />
+                    <span>Apa strategi atau rencanamu agar bisa lebih paham?</span>
+                    <span className="text-pink-400">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSpeech('actionPlan')}
+                    title="Dikte dengan suara"
+                    className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition ${
+                      isListening && activeSpeechField === 'actionPlan'
+                        ? 'bg-red-600 text-white border-red-500 animate-pulse'
+                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {isListening && activeSpeechField === 'actionPlan' ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                    <span className="text-[10px]">Suara</span>
+                  </button>
+                </div>
+                <textarea
+                  id="q3-input"
+                  required
+                  rows={2}
+                  value={actionPlan}
+                  onChange={(e) => setActionPlan(e.target.value)}
+                  placeholder="Misal: membaca ulang catatan, mencoba latihan mandiri di VS Code, atau bertanya ke guru..."
+                  className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                />
+              </div>
+
+              {/* Custom Question from Teacher if exists */}
+              {selectedMateri?.customQuestions?.[0] && (
+                <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-700/50">
+                  <label htmlFor="custom-q-input" className="block text-xs font-bold text-indigo-300 mb-1.5">
+                    Pertanyaan Khusus dari Guru: "{selectedMateri.customQuestions[0]}"
+                  </label>
+                  <input
+                    id="custom-q-input"
+                    type="text"
+                    value={customAnswer}
+                    onChange={(e) => setCustomAnswer(e.target.value)}
+                    placeholder="Tuliskan jawabanmu di sini..."
+                    className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-medium">
+                {error}
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white shadow-xl shadow-pink-600/30 transition transform active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2.5"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Sparkles className="w-5 h-5 animate-spin text-amber-300" />
+                    <span>AI Mentor Kota sedang membaca refleksimu...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>Kirim Refleksi & Dapatkan Umpan Balik AI (+1 Poin)</span>
+                  </>
+                )}
+              </button>
+              <p className="text-center text-[11px] text-slate-400 mt-2">
+                Refleksi ini dibaca oleh gurumu dan diproses AI Mentor Kota secara aman.
+              </p>
+            </div>
+          </form>
+        ) : (
+          /* TAB 2: ARSIP REFLEKSI SISWA */
+          <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 bg-slate-900">
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-800/80 border border-slate-700/80 p-3.5 rounded-2xl">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setArchiveClassFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    archiveClassFilter === 'ALL'
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Semua Kelas ({mergedReflections.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setArchiveClassFilter('X DKV 2')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    archiveClassFilter === 'X DKV 2'
+                      ? 'bg-sky-500 text-slate-950 shadow'
+                      : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  X DKV 2 ({countDkv2})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setArchiveClassFilter('X DKV 3')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    archiveClassFilter === 'X DKV 3'
+                      ? 'bg-emerald-500 text-slate-950 shadow'
+                      : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  X DKV 3 ({countDkv3})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setArchiveClassFilter('MINE')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    archiveClassFilter === 'MINE'
+                      ? 'bg-pink-500 text-white shadow'
+                      : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Refleksi Saya
+                </button>
+              </div>
+
+              <div className="relative flex-1 max-w-xs">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={archiveSearch}
+                  onChange={(e) => setArchiveSearch(e.target.value)}
+                  placeholder="Cari nama siswa atau materi..."
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+
+            {/* Archive Cards List */}
+            {filteredArchiveReflections.length === 0 ? (
+              <div className="text-center py-12 bg-slate-800/40 rounded-2xl border border-slate-800 p-6">
+                <FolderOpen className="w-10 h-10 text-slate-500 mx-auto mb-2" />
+                <p className="text-sm font-bold text-slate-300">Belum ada arsip refleksi yang sesuai filter.</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Coba pilih filter "Semua Kelas" atau tulis refleksi baru pada tab di atas.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredArchiveReflections.map((item) => {
+                  const fb = feedbackByReflectionId.get(item.id);
+                  const isDkv2 = (item.className || '').includes('X DKV 2');
+                  const customEntries = item.answers?.customAnswers
+                    ? Object.entries(item.answers.customAnswers)
+                    : [];
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl bg-slate-800/70 border border-slate-700/80 overflow-hidden shadow-lg"
+                    >
+                      {/* Card Top Bar */}
+                      <div className="px-4 py-3 bg-slate-800 border-b border-slate-700/80 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/30 to-rose-500/30 border border-amber-400/40 flex items-center justify-center text-lg">
+                            {item.moodEmoji || '😊'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs sm:text-sm font-extrabold text-white">
+                                {item.studentName}
+                              </span>
+                              <span
+                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                  isDkv2
+                                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                }`}
+                              >
+                                {isDkv2 ? 'X DKV 2' : 'X DKV 3'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-amber-300 font-semibold mt-0.5">
+                              <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                              <span>{item.materiTitle}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {/* Star Scale Badge */}
+                          <div className="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-xl border border-amber-500/30">
+                            {[1, 2, 3, 4, 5].map((starNum) => (
+                              <Star
+                                key={starNum}
+                                className={`w-3.5 h-3.5 ${
+                                  starNum <= (item.scale || 4)
+                                    ? 'fill-amber-400 text-amber-400'
+                                    : 'text-slate-600'
+                                }`}
+                              />
+                            ))}
+                            <span className="text-[11px] font-extrabold text-amber-300 ml-1">
+                              {item.scale || 4}/5
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>{item.createdAt}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Reflection Answers */}
+                      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                        <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-700/40">
+                          <div className="font-bold text-emerald-300 flex items-center gap-1.5 mb-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            <span>Yang Sudah Dipahami</span>
+                          </div>
+                          <p className="text-slate-200 leading-relaxed">{item.answers?.understood}</p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-700/40">
+                          <div className="font-bold text-amber-300 flex items-center gap-1.5 mb-1">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Bagian yang Masih Sulit</span>
+                          </div>
+                          <p className="text-slate-200 leading-relaxed">{item.answers?.difficult}</p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-sky-950/30 border border-sky-700/40">
+                          <div className="font-bold text-sky-300 flex items-center gap-1.5 mb-1">
+                            <HeartHandshake className="w-3.5 h-3.5 shrink-0" />
+                            <span>Strategi & Rencana Belajar</span>
+                          </div>
+                          <p className="text-slate-200 leading-relaxed">{item.answers?.actionPlan}</p>
+                        </div>
+                      </div>
+
+                      {/* Optional Custom Question Answer */}
+                      {customEntries.length > 0 && (
+                        <div className="px-4 pb-3">
+                          {customEntries.map(([questionText, answerText]) => (
+                            <div
+                              key={questionText}
+                              className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-700/40 text-xs"
+                            >
+                              <div className="font-bold text-indigo-300 mb-0.5">
+                                🎯 Pertanyaan Guru: "{questionText}"
+                              </div>
+                              <p className="text-slate-200">{answerText}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* AI Mentor Feedback Section */}
+                      {fb && (
+                        <div className="mx-4 mb-4 p-3.5 rounded-2xl bg-gradient-to-br from-purple-950/50 via-slate-900 to-indigo-950/50 border border-purple-700/50 space-y-2.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <div className="font-extrabold text-purple-300 flex items-center gap-1.5">
+                              <Bot className="w-4 h-4 text-purple-400" />
+                              <span>Umpan Balik AI Mentor Kota</span>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30 font-semibold">
+                              Terverifikasi AI Mentor
+                            </span>
+                          </div>
+
+                          <p className="text-slate-200 italic leading-relaxed bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                            "{fb.apresiasi}"
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div className="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800">
+                              <div className="font-bold text-amber-300 flex items-center gap-1 mb-1">
+                                <Lightbulb className="w-3.5 h-3.5" />
+                                <span>Saran Konkret & Pertanyaan Pemantik</span>
+                              </div>
+                              {Array.isArray(fb.saran) && fb.saran.length > 0 ? (
+                                <ul className="list-disc list-inside text-slate-300 space-y-0.5 mb-1.5">
+                                  {fb.saran.map((s: string, idx: number) => (
+                                    <li key={idx}>{s}</li>
+                                  ))}
+                                </ul>
+                              ) : typeof fb.saran === 'string' && fb.saran ? (
+                                <p className="text-slate-300 mb-1.5">{fb.saran}</p>
+                              ) : null}
+                              {fb.pertanyaan_pemantik && (
+                                <div className="text-[11px] text-amber-200/90 font-medium mt-1">
+                                  💬 Pemantik: "{fb.pertanyaan_pemantik}"
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800">
+                              <div className="font-bold text-emerald-300 flex items-center gap-1 mb-1">
+                                <ListChecks className="w-3.5 h-3.5" />
+                                <span>3 Langkah Rencana Belajar</span>
+                              </div>
+                              {Array.isArray(fb.rencana_belajar) && fb.rencana_belajar.length > 0 && (
+                                <ol className="list-decimal list-inside text-slate-300 space-y-0.5">
+                                  {fb.rencana_belajar.map((step: string, idx: number) => (
+                                    <li key={idx}>{step}</li>
+                                  ))}
+                                </ol>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
-
-          {error && (
-            <div className="p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs font-medium">
-              {error}
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white shadow-xl shadow-pink-600/30 transition transform active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2.5"
-            >
-              {isSubmitting ? (
-                <>
-                  <Sparkles className="w-5 h-5 animate-spin text-amber-300" />
-                  <span>AI Mentor Kota sedang membaca refleksimu...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  <span>Kirim Refleksi & Dapatkan Umpan Balik AI (+1 Poin)</span>
-                </>
-              )}
-            </button>
-            <p className="text-center text-[11px] text-slate-400 mt-2">
-              Refleksi ini dibaca oleh gurumu dan diproses AI Mentor Kota secara aman.
-            </p>
-          </div>
-        </form>
+        )}
       </div>
     </div>
   );

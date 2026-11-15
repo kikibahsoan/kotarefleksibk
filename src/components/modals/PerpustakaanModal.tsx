@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, BookOpen, Send, Sparkles, CheckCircle2, History, FileText, ArrowRight, Video, ChevronLeft, HelpCircle, Layers, Users, User, Search, Filter } from 'lucide-react';
 import { Materi, ReflectionEntry, Student } from '../../types/index.ts';
 import { INITIAL_MATERI } from '../../data/initialData.ts';
+import { LIBRARY_4F_ARCHIVE_SEEDS } from '../../data/archiveSeeds.ts';
 import { sounds } from '../../utils/audio.ts';
 
 interface PerpustakaanModalProps {
@@ -98,64 +99,29 @@ const BOOK_SHELF_THEMES = [
   },
 ];
 
-const INITIAL_4F_SEEDS: ReflectionEntry[] = [
-  {
-    id: 'j4f-seed-1',
-    studentId: 'guru-1',
-    studentName: 'NAZIEFAH',
-    className: 'Guru DKV',
-    title: 'Model IPO & Arsitektur Von Neumann',
-    subject: 'Informatika',
-    facts: 'Mendampingi kelas membedah alur Input-Proses-Output pada perancangan poster digital dan pipeline rendering grafis.',
-    feelings: 'Bangga melihat siswa langsung paham fungsi RAM sebagai meja kerja sementara bagi software desain.',
-    findings: 'Analogi meja kerja nyata sangat mempercepat pemahaman arsitektur komputer bagi siswa SMK DKV.',
-    future: 'Akan menyiapkan studi kasus perbandingan rendering CPU vs GPU di lab komputer.',
-    date: '31 Okt 2026',
-    xpEarned: 2,
-  },
-  {
-    id: 'j4f-seed-2',
-    studentId: 'std-2',
-    studentName: 'Siti Rahma',
-    className: 'X DKV 2',
-    title: 'Algoritma Penjadwalan Antrean Render',
-    subject: 'Informatika',
-    facts: 'Mempelajari perbedaan FIFO dan Shortest Job First (SJF) saat mengelola antrean cetak poster di lab.',
-    feelings: 'Awalnya bingung dengan konsep starvation pada SJF, tapi setelah simulasi jadi sangat paham.',
-    findings: 'Sistem operasi bekerja persis seperti asisten manajer yang adil dalam membagi waktu prosesor.',
-    future: 'Menerapkan prioritas pengerjaan tugas dari deadline terpendek seperti prinsip SJF.',
-    date: '31 Okt 2026',
-    xpEarned: 2,
-  },
-  {
-    id: 'j4f-seed-3',
-    studentId: 'std-1',
-    studentName: 'Raditya Pratama',
-    className: 'X DKV 2',
-    title: 'Struktur Data Stack pada Tombol Undo',
-    subject: 'Informatika',
-    facts: 'Bereksperimen dengan fungsi Undo (Ctrl+Z) di Photoshop dan menyadari itu adalah implementasi Stack (LIFO).',
-    feelings: 'Sangat kagum! Ternyata fitur yang sering saya pakai sehari-hari adalah algoritma komputasi nyata.',
-    findings: 'Aksi terakhir yang kita lakukan adalah aksi pertama yang dibatalkan oleh Stack memory.',
-    future: 'Akan lebih teliti merancang hierarki layer agar tidak boros memori stack.',
-    date: '30 Okt 2026',
-    xpEarned: 2,
-  },
-  {
-    id: 'j4f-seed-4',
-    studentId: 'std-13',
-    studentName: 'Dewa Bagus',
-    className: 'X DKV 3',
-    title: 'Kecepatan Binary Search vs Linear Search',
-    subject: 'Informatika',
-    facts: 'Menguji pencarian 1.000 file foto klien dengan binary search yang hanya perlu maksimal 10 langkah.',
-    feelings: 'Terkesima karena efisiensi binary search jauh lebih cepat daripada mencari acak satu per satu.',
-    findings: 'Syarat wajib binary search adalah file harus dinamai secara teratur (Sorting) terlebih dahulu.',
-    future: 'Mulai hari ini saya akan merapikan folder aset proyek dengan penomoran tanggal baku.',
-    date: '30 Okt 2026',
-    xpEarned: 2,
-  },
-];
+const LEGACY_4F_SEED_IDS = new Set([
+  'j4f-seed-1',
+  'j4f-seed-2',
+  'j4f-seed-3',
+  'j4f-seed-4',
+  'j4f-init-01',
+  'j4f-init-02',
+]);
+
+function mergeWithLibrary4FSeeds(list: ReflectionEntry[]): ReflectionEntry[] {
+  const map = new Map<string, ReflectionEntry>();
+  (list || []).forEach((item) => {
+    if (item && item.id && !LEGACY_4F_SEED_IDS.has(item.id)) {
+      map.set(item.id, item);
+    }
+  });
+  LIBRARY_4F_ARCHIVE_SEEDS.forEach((seed) => {
+    if (seed && seed.id && !map.has(seed.id)) {
+      map.set(seed.id, seed);
+    }
+  });
+  return Array.from(map.values());
+}
 
 export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
   onClose,
@@ -199,10 +165,14 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
       const saved = localStorage.getItem('kota_refleksi_jurnal4f');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const merged = mergeWithLibrary4FSeeds(parsed);
+          localStorage.setItem('kota_refleksi_jurnal4f', JSON.stringify(merged));
+          return merged;
+        }
       }
     } catch {}
-    return INITIAL_4F_SEEDS;
+    return [...LIBRARY_4F_ARCHIVE_SEEDS];
   });
 
   // Fetch shared 4F journals from server and listen for real-time broadcasts
@@ -214,10 +184,11 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
         if (res.ok) {
           const json = await res.json();
           const list = Array.isArray(json) ? json : (json?.data || []);
-          if (isMounted && Array.isArray(list) && list.length > 0) {
-            setLocalArchives(list);
+          if (isMounted && Array.isArray(list)) {
+            const merged = mergeWithLibrary4FSeeds(list);
+            setLocalArchives(merged);
             try {
-              localStorage.setItem('kota_refleksi_jurnal4f', JSON.stringify(list));
+              localStorage.setItem('kota_refleksi_jurnal4f', JSON.stringify(merged));
             } catch {}
           }
         }
@@ -912,7 +883,7 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
                 if (filterClass !== 'all') {
                   if (filterClass === 'Guru DKV') {
                     if (r.className !== 'Guru DKV' && r.className !== 'Guru & Pengawas') return false;
-                  } else if (r.className !== filterClass) {
+                  } else if (!r.className || !r.className.includes(filterClass)) {
                     return false;
                   }
                 }

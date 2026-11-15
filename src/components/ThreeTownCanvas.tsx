@@ -26705,6 +26705,58 @@ export const ThreeTownCanvas = React.memo<ThreeTownCanvasProps>(function ThreeTo
 
             {/* Daftar Pengumuman Guru & Leaderboard Mingguan Balai Kota */}
             <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+              {/* Sorotan Utama Papan Pengumuman: Peningkatan Partisipasi Refleksi & Rata-rata Nilai Asesmen TKA */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-emerald-950/70 via-slate-900 to-amber-950/50 border border-emerald-400/50 shadow-lg">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                      Sorotan Capaian Kelas
+                    </span>
+                    <span className="text-xs font-extrabold text-amber-300">
+                      X DKV 2 &amp; X DKV 3 • Berpikir Komputasional
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-lg border border-emerald-500/40">
+                    Terverifikasi
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm font-bold text-white leading-relaxed mb-3">
+                  Peningkatan Partisipasi refleksi mandiri meningkat dari{' '}
+                  <span className="text-amber-300 font-black">10% menjadi 60%</span>. Pada hasil asesmen TKA individu rata-rata nilai kelas naik dari{' '}
+                  <span className="text-emerald-300 font-black">60 menjadi 80</span>.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-amber-400/35 flex items-center justify-between">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Partisipasi Refleksi Mandiri
+                      </div>
+                      <div className="text-xs font-bold text-amber-200 mt-0.5">
+                        Meningkat Signifikan (+50%)
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-slate-400 line-through mr-1.5">10%</span>
+                      <span className="text-base sm:text-lg font-black text-amber-400">60%</span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-emerald-400/35 flex items-center justify-between">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Rata-Rata Asesmen TKA Individu
+                      </div>
+                      <div className="text-xs font-bold text-emerald-200 mt-0.5">
+                        Rata-rata Nilai Kelas (+20 Poin)
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-slate-400 line-through mr-1.5">60</span>
+                      <span className="text-base sm:text-lg font-black text-emerald-400">80</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <WeeklyLeaderboardBalaiKota currentStudentName={studentName} compact />
 
               <div className="text-xs font-extrabold text-amber-300 pt-1 flex items-center gap-1.5">

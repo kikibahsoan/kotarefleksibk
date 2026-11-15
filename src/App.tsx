@@ -1378,6 +1378,8 @@ export default function App() {
           preselectedMateriId={preselectedMateriForReflection}
           onSubmitReflection={handleSubmitReflection}
           onNavigateBuilding={(id) => handleSelectBuilding(id)}
+          reflections={reflections}
+          feedbacks={feedbacks}
         />
       )}
 

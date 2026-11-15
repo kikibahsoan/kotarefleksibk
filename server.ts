@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
+import { LIBRARY_4F_ARCHIVE_SEEDS } from './src/data/archiveSeeds.ts';
 
 dotenv.config();
 
@@ -600,18 +601,44 @@ function saveServerStickyNotesToFile() {
 }
 
 function loadServer4FFromFile(): ServerJurnal4F[] {
+  const seedList: ServerJurnal4F[] = LIBRARY_4F_ARCHIVE_SEEDS.map((s) => ({
+    id: s.id,
+    title: s.title,
+    subject: s.subject,
+    facts: s.facts,
+    feelings: s.feelings,
+    findings: s.findings,
+    future: s.future,
+    date: s.date,
+    xpEarned: s.xpEarned,
+    studentId: s.studentId || 'std-dkv',
+    studentName: s.studentName || 'Siswa DKV',
+    className: s.className || 'X DKV',
+  }));
+
   try {
     if (fs.existsSync(JURNAL_4F_FILE_PATH)) {
       const raw = fs.readFileSync(JURNAL_4F_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        const legacyIds = new Set(['j4f-init-01', 'j4f-init-02', 'j4f-seed-1', 'j4f-seed-2', 'j4f-seed-3', 'j4f-seed-4']);
+        const filteredExisting = parsed.filter(
+          (item: ServerJurnal4F) => item && item.id && !legacyIds.has(item.id) && !item.id.startsWith('j4f-assa-')
+        );
+        const existingMap = new Map<string, ServerJurnal4F>();
+        filteredExisting.forEach((item: ServerJurnal4F) => existingMap.set(item.id, item));
+        seedList.forEach((seed) => {
+          if (!existingMap.has(seed.id)) {
+            existingMap.set(seed.id, seed);
+          }
+        });
+        return Array.from(existingMap.values());
       }
     }
   } catch (err) {
     console.warn('[server.ts] Could not read server_4f_journals.json:', err);
   }
-  return INITIAL_SERVER_4F;
+  return seedList;
 }
 
 let server4FJournals: ServerJurnal4F[] = loadServer4FFromFile();

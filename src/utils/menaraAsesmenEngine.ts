@@ -760,6 +760,13 @@ export function buildViewFromCanonicalStore(
     });
   }
 
+  const computedAvg =
+    semuaHasilList.length > 0
+      ? Math.round(
+          (semuaHasilList.reduce((acc, item) => acc + item.nilai, 0) / semuaHasilList.length) * 10
+        ) / 10
+      : 80;
+
   return {
     sesi,
     stimulusList: store.stimulusList,
@@ -769,6 +776,7 @@ export function buildViewFromCanonicalStore(
     hasilSaya,
     pesertaLive: pesertaLiveList,
     semuaHasil: isVerifiedTeacher || sesi.status === 'selesai' ? semuaHasilList : [],
+    rataRataKelas: computedAvg,
     analisisButir,
     analisisTp,
     serverTime: Date.now(),

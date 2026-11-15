@@ -10,6 +10,10 @@ import {
   TownSettings,
   PublicChatMessage,
 } from '../types/index.ts';
+import {
+  PUSAT_REFLEKSI_ARCHIVE_REFLECTIONS,
+  PUSAT_REFLEKSI_ARCHIVE_FEEDBACKS,
+} from './archiveSeeds.ts';
 
 export const SMK_CLASSES = [
   'X DKV 2 (Desain Komunikasi Visual)',
@@ -1359,11 +1363,22 @@ export const INITIAL_STUDENTS: Student[] = [
   },
 ];
 
-export const INITIAL_REFLECTIONS: Reflection[] = [];
+export const INITIAL_REFLECTIONS: Reflection[] = [...PUSAT_REFLEKSI_ARCHIVE_REFLECTIONS];
 
-export const INITIAL_FEEDBACKS: MentorFeedback[] = [];
+export const INITIAL_FEEDBACKS: MentorFeedback[] = [...PUSAT_REFLEKSI_ARCHIVE_FEEDBACKS];
 
 export const INITIAL_MESSAGES: Message[] = [
+  {
+    id: 'msg-ann-capaian-tka-2026',
+    studentId: 'teacher-1',
+    studentName: 'Abdul Rahman Bahsoan, S.Kom.',
+    className: 'Pengumuman Resmi Guru (X DKV 2 & X DKV 3)',
+    content:
+      '[PENGUMUMAN] Peningkatan Partisipasi refleksi mandiri meningkat dari 10% menjadi 60%. Pada hasil asesmen TKA individu rata-rata nilai kelas naik dari 60 menjadi 80.',
+    status: 'replied',
+    createdAt: '2026-11-15 08:00',
+    repliedAt: '2026-11-15 08:00',
+  },
   {
     id: 'msg-bk-01',
     studentId: 'std-dkv2-05',

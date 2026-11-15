@@ -150,6 +150,16 @@ const INITIAL_MUSEUM_WORKS: MuseumArtworkItem[] = [
 
 const INITIAL_STAGE_ITEMS: StagePresentationItem[] = [
   {
+    id: 'stage-seed-capaian-tka',
+    speakerName: 'Abdul Rahman Bahsoan, S.Kom.',
+    className: 'X DKV 2 & X DKV 3',
+    topic: 'Capaian Partisipasi Refleksi Mandiri & Hasil Asesmen TKA Individu',
+    summary:
+      'Peningkatan Partisipasi refleksi mandiri meningkat dari 10% menjadi 60%. Pada hasil asesmen TKA individu rata-rata nilai kelas naik dari 60 menjadi 80.',
+    kind: 'Pengumuman Kelas',
+    createdAt: '15 November 2026',
+  },
+  {
     id: 'stage-seed-1',
     speakerName: 'Perwakilan Kelas X DKV 2 & X DKV 3',
     className: 'X DKV 2 & X DKV 3',

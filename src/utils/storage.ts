@@ -876,15 +876,37 @@ export const StorageService = {
   getReflections(): Reflection[] {
     const items = safeGet<Reflection[]>(STORAGE_KEYS.REFLECTIONS, INITIAL_REFLECTIONS);
     const deletedIds = new Set(this.getDeletedReflectionIds());
-    // Automatically purge old dummy reflections and deleted ones
-    const cleaned = (items || []).filter(
-      (r) =>
-        r.id !== 'ref-bk-001' &&
-        r.id !== 'ref-bk-002' &&
-        !r.id.startsWith('dummy-') &&
-        !deletedIds.has(r.id)
-    );
-    if (cleaned.length !== (items || []).length) {
+    const seedMap = new Map(INITIAL_REFLECTIONS.map((s) => [s.id, s]));
+    // Automatically purge old dummy reflections and deleted ones, and refresh any ref-pusat-* seed with its latest definition
+    let updatedExistingSeed = false;
+    const cleaned = (items || [])
+      .filter(
+        (r) =>
+          r &&
+          r.id &&
+          r.id !== 'ref-bk-001' &&
+          r.id !== 'ref-bk-002' &&
+          !r.id.startsWith('dummy-') &&
+          !deletedIds.has(r.id)
+      )
+      .map((r) => {
+        const freshSeed = seedMap.get(r.id);
+        if (freshSeed && (r.materiId !== freshSeed.materiId || r.studentName !== freshSeed.studentName || r.className !== freshSeed.className)) {
+          updatedExistingSeed = true;
+          return freshSeed;
+        }
+        return r;
+      });
+    const seenIds = new Set(cleaned.map((r) => r.id));
+    let addedSeed = false;
+    INITIAL_REFLECTIONS.forEach((seed) => {
+      if (seed && seed.id && !seenIds.has(seed.id) && !deletedIds.has(seed.id)) {
+        cleaned.push(seed);
+        seenIds.add(seed.id);
+        addedSeed = true;
+      }
+    });
+    if (addedSeed || updatedExistingSeed || cleaned.length !== (items || []).length) {
       safeSet(STORAGE_KEYS.REFLECTIONS, cleaned);
     }
     return cleaned;
@@ -950,15 +972,39 @@ export const StorageService = {
 
   getFeedbacks(): MentorFeedback[] {
     const items = safeGet<MentorFeedback[]>(STORAGE_KEYS.FEEDBACKS, INITIAL_FEEDBACKS);
-    const cleaned = (items || []).filter(
-      (f) =>
-        f.id !== 'fb-bk-001' &&
-        f.id !== 'fb-bk-002' &&
-        f.reflectionId !== 'ref-bk-001' &&
-        f.reflectionId !== 'ref-bk-002' &&
-        !f.id.startsWith('dummy-')
-    );
-    if (cleaned.length !== (items || []).length) {
+    const deletedRefIds = new Set(this.getDeletedReflectionIds());
+    const seedFbMap = new Map(INITIAL_FEEDBACKS.map((s) => [s.id, s]));
+    let updatedExistingSeed = false;
+    const cleaned = (items || [])
+      .filter(
+        (f) =>
+          f &&
+          f.id &&
+          f.id !== 'fb-bk-001' &&
+          f.id !== 'fb-bk-002' &&
+          f.reflectionId !== 'ref-bk-001' &&
+          f.reflectionId !== 'ref-bk-002' &&
+          !f.id.startsWith('dummy-') &&
+          !deletedRefIds.has(f.reflectionId)
+      )
+      .map((f) => {
+        const freshSeed = seedFbMap.get(f.id);
+        if (freshSeed && f.apresiasi !== freshSeed.apresiasi) {
+          updatedExistingSeed = true;
+          return freshSeed;
+        }
+        return f;
+      });
+    const seenFbIds = new Set(cleaned.map((f) => f.id));
+    let addedSeed = false;
+    INITIAL_FEEDBACKS.forEach((seed) => {
+      if (seed && seed.id && !seenFbIds.has(seed.id) && !deletedRefIds.has(seed.reflectionId)) {
+        cleaned.push(seed);
+        seenFbIds.add(seed.id);
+        addedSeed = true;
+      }
+    });
+    if (addedSeed || updatedExistingSeed || cleaned.length !== (items || []).length) {
       safeSet(STORAGE_KEYS.FEEDBACKS, cleaned);
     }
     return cleaned;
@@ -1755,16 +1801,34 @@ export const StorageService = {
       }
     });
 
-    // 4. Pastikan selalu ada pengumuman sistem default jika belum ada pesan
-    if (announcements.length === 0) {
+    // 4. Pastikan pengumuman capaian peningkatan partisipasi refleksi & rata-rata TKA selalu tampil di urutan teratas Papan Pengumuman
+    const impactAnnouncementId = 'ann-capaian-tka-refleksi-2026';
+    if (!seenIds.has(impactAnnouncementId)) {
+      seenIds.add(impactAnnouncementId);
+      announcements.unshift({
+        id: impactAnnouncementId,
+        teacherId: 'teacher-1',
+        teacherName: 'Abdul Rahman Bahsoan, S.Kom.',
+        subject: 'Capaian Dampak Pembelajaran & Hasil Asesmen TKA Individu (X DKV 2 & X DKV 3)',
+        title: 'Capaian Refleksi Mandiri & Peningkatan Nilai Asesmen TKA Individu',
+        content:
+          'Peningkatan Partisipasi refleksi mandiri meningkat dari 10% menjadi 60%. Pada hasil asesmen TKA individu rata-rata nilai kelas naik dari 60 menjadi 80.',
+        priority: 'penting',
+        createdAt: 'Terbaru • Semester Ganjil',
+        timestamp: Date.now() + 60000,
+      });
+    }
+
+    // 5. Pastikan selalu ada pengumuman sambutan jika daftar masih minimal
+    if (announcements.length <= 1) {
       announcements.push({
         id: 'ann-default-1',
         teacherId: 'teacher-1',
-        teacherName: 'Mohamad Rizki Bahsoan, S.Kom',
-        subject: 'Komputer Grafis & Berpikir Komputasional',
+        teacherName: 'Abdul Rahman Bahsoan, S.Kom.',
+        subject: 'Informatika (Berpikir Komputasional) & Dasar DKV',
         title: 'Pengumuman Pembelajaran & Misi Harian Warga',
         content:
-          'Selamat datang di Kota Refleksia SMKN 2 Gorontalo! Jangan lupa membaca materi terbaru di Perpustakaan Kampus, mengerjakan kuis di Lab DKV & Tefa, serta menuliskan Jurnal Refleksi 4F hari ini.',
+          'Selamat datang di Kota Refleksia SMKN 2 Gorontalo! Jangan lupa membaca materi Buku 1 s.d. Buku 5 Berpikir Komputasional di Perpustakaan Kampus, mengerjakan kuis di Lab DKV & Tefa, serta menuliskan Jurnal Refleksi 4F dan Refleksi Mandiri hari ini.',
         priority: 'penting',
         createdAt: 'Hari ini',
         timestamp: Date.now(),
