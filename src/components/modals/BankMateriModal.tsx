@@ -140,6 +140,271 @@ export const BankMateriModal: React.FC<BankMateriModalProps> = ({
 
   const finalMapel = useCustomMapel && customMapel.trim() ? customMapel.trim() : mataPelajaran;
 
+  const ensureCurriculumInputs = () => {
+    const cleanMapel = (finalMapel || 'Informatika & Berpikir Komputasional').trim();
+    const mapelLower = cleanMapel.toLowerCase();
+
+    let resolvedElemen = elemen.trim();
+    let resolvedTp = tujuanPembelajaran.trim();
+    let resolvedEss = materiEsensial.trim();
+
+    if (!resolvedElemen) {
+      if (mapelLower.includes('informatika') || mapelLower.includes('komputasional')) {
+        resolvedElemen = 'Berpikir Komputasional: Algoritma, Struktur Data & Pengolahan Data IPO';
+      } else if (mapelLower.includes('fotografi') || mapelLower.includes('videografi')) {
+        resolvedElemen = 'Fotografi Pencahayaan, Segitiga Exposure & Komposisi Sinematik';
+      } else if (mapelLower.includes('multimedia') || mapelLower.includes('interaktif') || mapelLower.includes('ui')) {
+        resolvedElemen = 'Antarmuka Pengguna (UI/UX), Wireframe & Prototipe Interaktif';
+      } else if (mapelLower.includes('wirausaha') || mapelLower.includes('kik')) {
+        resolvedElemen = 'Kewirausahaan Kreatif, HAKI, Kalkulasi Harga Pokok & Manajemen Tefa';
+      } else {
+        resolvedElemen = 'Prinsip Desain Grafis, Tipografi, Kontras Warna & Hierarki Visual';
+      }
+      setElemen(resolvedElemen);
+    }
+
+    if (!resolvedTp) {
+      if (mapelLower.includes('informatika') || mapelLower.includes('komputasional')) {
+        resolvedTp = `Peserta didik mampu memahami dan menerapkan konsep ${resolvedElemen} (Model Input-Process-Output, Sistem Operasi, Struktur Data Stack/Queue, serta Algoritma Pencarian & Pengurutan) dalam menyelesaikan permasalahan kejuruan DKV secara sistematis.`;
+      } else {
+        resolvedTp = `Peserta didik mampu menganalisis prinsip ${resolvedElemen} pada mata pelajaran ${cleanMapel} serta menerapkannya dalam pembuatan karya desain komunikasi visual yang efektif, estetis, dan komunikatif.`;
+      }
+      setTujuanPembelajaran(resolvedTp);
+    }
+
+    if (!resolvedEss) {
+      if (mapelLower.includes('informatika') || mapelLower.includes('komputasional')) {
+        resolvedEss = `1. Model Input-Process-Output (IPO) pada arsitektur Von Neumann dan peran CPU, RAM, serta SSD saat mengolah aset grafis.\n2. Penjadwalan proses Sistem Operasi menggunakan algoritma FIFO dan Shortest Job First (SJF) serta pencegahan Deadlock.\n3. Struktur data Array, Stack (LIFO pada fitur Undo & tumpukan Layer), dan Queue (FIFO pada antrean cetak/render).\n4. Efisiensi algoritma pencarian (Linear Search vs Binary Search) dan pengurutan (Sorting) untuk manajemen ribuan file aset desain.`;
+      } else {
+        resolvedEss = `1. Konsep fundamental dan prinsip utama pada elemen ${resolvedElemen} (${cleanMapel}).\n2. Pengaturan komposisi visual, kontras warna, tipografi, dan ruang kosong (White Space) agar pesan utama terbaca dalam 3 detik.\n3. Standar alur kerja produksi kreatif mulai dari riset data audiens (Input), pengolahan konsep di kanvas kerja (Process), hingga ekspor karya cetak CMYK 300 DPI maupun digital sRGB (Output).`;
+      }
+      setMateriEsensial(resolvedEss);
+    }
+
+    return {
+      cleanMapel,
+      cleanEl: resolvedElemen,
+      cleanTp: resolvedTp,
+      cleanEss: resolvedEss,
+    };
+  };
+
+  const buildClientSmartDistribution = (params: {
+    cleanMapel: string;
+    cleanEl: string;
+    cleanTp: string;
+    cleanEss: string;
+  }) => {
+    const { cleanMapel, cleanEl, cleanTp, cleanEss } = params;
+    const tName = teacher.name || 'Guru Pengampu DKV';
+
+    return {
+      ringkasanAI: `Materi "${cleanEl}" pada mata pelajaran ${cleanMapel} (${kelasTarget}) yang disusun oleh ${tName} ini berfokus pada pencapaian Tujuan Pembelajaran: "${cleanTp}". Siswa dipandu menguasai konsep esensial secara bertahap mulai dari literasi di Perpustakaan, refleksi diri di Pusat Refleksi, diskusi lisan di Studio ON AIR, hingga evaluasi 5 jenjang di Lab DKV & Tefa.`,
+      modulPerpustakaan: `BAB 1 — PENGANTAR ELEMEN: ${cleanEl.toUpperCase()}\nMata Pelajaran: ${cleanMapel} (${kelasTarget})\nGuru Pengampu: ${tName}\n\nTujuan Pembelajaran:\n${cleanTp}\n\nBAB 2 — INTI MATERI ESENSIAL\n${cleanEss}\n\nBAB 3 — PENERAPAN KONTEKSTUAL & LANGKAH PRAKTIS DI KOTA REFLEKSIA\n1. Pahami konsep kunci dan istilah utama pada materi ${cleanEl}.\n2. Hubungkan poin-poin materi esensial di atas dengan tugas praktik atau proyek kejuruan sebagai siswa SMK jurusan DKV.\n3. Evaluasi hasil belajarmu melalui pencatatan Jurnal 4F (Facts, Feelings, Findings, Future) serta latihan kuis berjenjang di Lab DKV & Tefa.`,
+      pertanyaanRefleksi: [
+        `Dari materi "${cleanEl}" (${cleanMapel}), bagian konsep esensial mana yang paling cepat kamu pahami dan mengapa?`,
+        `Tantangan atau kesulitan apa yang kamu temukan saat mencoba mencapai Tujuan Pembelajaran: "${cleanTp}"?`,
+        `Langkah konkret apa yang akan kamu lakukan pada proyek atau latihan berikutnya untuk menerapkan materi ini secara lebih optimal?`,
+      ],
+      topikPodcastMentor: `Kupas Tuntas ${cleanMapel}: Strategi Menguasai Elemen "${cleanEl}" bersama ${tName}`,
+      pertanyaanPemantikPodcast: `Setelah mempelajari materi esensial "${cleanEl}", bagaimana cara kamu menjelaskan kembali konsep utamanya dengan bahasa sendiri serta menerapkannya dalam karya nyata?`,
+      misiBalaiKota: `Misi Kota (${cleanMapel}): Pelajari modul "${cleanEl}" di Perpustakaan, tulis refleksi di Pusat Refleksi, dan taklukkan Kuis 5 Jenjang di Lab DKV & Tefa!`,
+      tantanganBangunanLain: [
+        {
+          buildingId: 'perpustakaan',
+          buildingName: 'Perpustakaan Kampus',
+          buildingIcon: '📚',
+          activityTitle: `Modul Bacaan & Jurnal 4F: ${cleanEl}`,
+          materialSummary: `Baca modul lengkap ${cleanMapel} yang disusun oleh ${tName} tentang "${cleanEl}", lalu rangkum temuanmu di Jurnal 4F.`,
+          challengePrompt: `Baca 3 Bab modul "${cleanEl}" di Rak Buku Perpustakaan dan simpan Jurnal 4F (+XP).`,
+        },
+        {
+          buildingId: 'taman_refleksi',
+          buildingName: 'Pusat Refleksi',
+          buildingIcon: '🌿',
+          activityTitle: `Refleksi Mandiri: ${cleanEl}`,
+          materialSummary: `Evaluasi pemahamanmu terhadap Tujuan Pembelajaran: "${cleanTp}".`,
+          challengePrompt: `Pilih materi "${cleanMapel}: ${cleanEl}" di Pusat Refleksi lalu jawab 3 pertanyaan refleksi Guru.`,
+        },
+        {
+          buildingId: 'menara_mentor',
+          buildingName: 'Studio ON AIR',
+          buildingIcon: '🎙️',
+          activityTitle: `Podcast Interaktif AI Mentor: ${cleanEl}`,
+          materialSummary: `Diskusikan poin penguatan materi "${cleanEl}" bersama Host AI Mentor di Studio ON AIR.`,
+          challengePrompt: `Rekam episode Podcast membahas "${cleanEl}" dan dapatkan umpan balik langsung.`,
+        },
+        {
+          buildingId: 'bengkel_latihan',
+          buildingName: 'Lab DKV & Tefa',
+          buildingIcon: '🛠️',
+          activityTitle: `Kuis Berjenjang 5 Level: ${cleanEl}`,
+          materialSummary: `Uji penguasaan materi esensial "${cleanEl}" dari Jenjang 1 (Dasar) hingga Jenjang 5 (Mahir).`,
+          challengePrompt: `Kerjakan 5 soal kuis "${cleanMapel} - ${cleanEl}" di Lab DKV & Tefa.`,
+        },
+        {
+          buildingId: 'balai_kota',
+          buildingName: 'Balai Kota',
+          buildingIcon: '🏛️',
+          activityTitle: `Papan Misi & Capaian Pembelajaran: ${cleanMapel}`,
+          materialSummary: `Target Capaian (${kelasTarget}): ${cleanTp}`,
+          challengePrompt: `Cek progres penyelesaian misi materi "${cleanEl}" di Balai Kota.`,
+        },
+        {
+          buildingId: 'kantor_pos',
+          buildingName: 'Kantor Pos',
+          buildingIcon: '📮',
+          activityTitle: `Kotak Konsultasi Guru: ${tName}`,
+          materialSummary: `Kirimkan pertanyaan kepada ${tName} jika ada bagian dari materi "${cleanEl}" yang masih belum jelas.`,
+          challengePrompt: `Kirim pesan konsultasi materi "${cleanEl}" melalui Kantor Pos.`,
+        },
+        {
+          buildingId: 'monumen_warga',
+          buildingName: 'Monumen Warga',
+          buildingIcon: '🗿',
+          activityTitle: `Diskusi Warga: Berbagi Insight ${cleanEl}`,
+          materialSummary: `Diskusikan ide penerapan materi "${cleanEl}" bersama teman sekelas di ruang obrolan Monumen Warga.`,
+          challengePrompt: `Bagikan 1 kesimpulan menarik tentang "${cleanEl}" di Monumen Warga.`,
+        },
+        {
+          buildingId: 'pasar_prestasi',
+          buildingName: 'Pasar Prestasi',
+          buildingIcon: '🏆',
+          activityTitle: `Penghargaan Penguasaan Materi ${cleanMapel}`,
+          materialSummary: `Setiap aktivitas belajar pada materi "${cleanEl}" menambah skor keaktifan dan XP warga di Pasar Prestasi.`,
+          challengePrompt: `Kumpulkan XP dari misi Bank Materi untuk masuk Top 5 Warga Berprestasi.`,
+        },
+        {
+          buildingId: 'masjid',
+          buildingName: 'Masjid Al-Hikmah',
+          buildingIcon: '🕌',
+          activityTitle: `Integrasi Karakter & Keberkahan Ilmu: ${cleanMapel}`,
+          materialSummary: `Niatkan mempelajari "${cleanEl}" dengan jujur, tekun, dan penuh tanggung jawab agar ilmu yang diperoleh membawa manfaat.`,
+          challengePrompt: `Jaga adab menuntut ilmu dan ketekunan belajar di Kota Refleksia.`,
+        },
+      ] as BankMateriBuildingDistribution[],
+      kuisBengkel: [
+        {
+          question: `[Jenjang 1 - Dasar] Berdasarkan materi "${cleanEl}" pada mata pelajaran ${cleanMapel}, apa tujuan pembelajaran utama yang ingin dicapai?`,
+          options: [
+            cleanTp.length > 115 ? cleanTp.slice(0, 115) + '...' : cleanTp,
+            'Menghafal daftar istilah tanpa memahami penerapannya dalam proyek',
+            'Melewatkan tahapan perencanaan dan analisis konsep dasar',
+            'Mengabaikan kaidah keselamatan kerja dan kolaborasi tim',
+          ],
+          correctIndex: 0,
+          explanation: `Tujuan pembelajaran utama pada elemen "${cleanEl}" adalah: ${cleanTp}`,
+        },
+        {
+          question: `[Jenjang 2 - Pemahaman] Manakah pernyataan berikut yang paling sesuai dengan pokok Materi Esensial "${cleanEl}" yang diajarkan oleh ${tName}?`,
+          options: [
+            'Konsep materi tidak memiliki kaitan dengan praktik nyata siswa',
+            cleanEss.length > 115 ? cleanEss.slice(0, 115) + '...' : cleanEss,
+            'Seluruh tahapan dikerjakan secara acak tanpa struktur yang jelas',
+            'Evaluasi hasil karya tidak diperlukan dalam proses belajar',
+          ],
+          correctIndex: 1,
+          explanation: `Materi esensial menekankan pada pemahaman konsep inti: ${cleanEss.slice(0, 140)}`,
+        },
+        {
+          question: `[Jenjang 3 - Penerapan] Saat menerapkan elemen "${cleanEl}" dalam tugas praktik ${cleanMapel}, langkah awal yang paling tepat dilakukan siswa adalah...`,
+          options: [
+            'Langsung mengumpulkan tugas tanpa membaca instruksi dan tujuan pembelajaran',
+            'Memahami prinsip dasar materi esensial lalu menyusun rencana kerja sesuai indikator capaian',
+            'Menyalin pekerjaan teman tanpa melakukan proses analisis mandiri',
+            'Menghindari diskusi maupun refleksi ketika menemui kesulitan teknis',
+          ],
+          correctIndex: 1,
+          explanation:
+            'Penerapan yang baik selalu dimulai dari pemahaman materi esensial dan perencanaan kerja yang mengacu pada Tujuan Pembelajaran.',
+        },
+        {
+          question: `[Jenjang 4 - Analisis] Mengapa siswa perlu melakukan refleksi setelah mempelajari elemen "${cleanEl}" pada mata pelajaran ${cleanMapel}?`,
+          options: [
+            'Untuk memetakan bagian konsep yang sudah dikuasai dan merancang perbaikan pada bagian yang masih sulit',
+            'Agar tidak perlu mengikuti latihan soal di Lab DKV & Tefa',
+            'Hanya sebagai formalitas tanpa dampak pada peningkatan keterampilan',
+            'Untuk menggantikan seluruh kegiatan praktik kejuruan di kelas',
+          ],
+          correctIndex: 0,
+          explanation:
+            'Refleksi membantu siswa menyadari kekuatan dan celah pemahamannya sehingga dapat menyusun strategi tindak lanjut yang terukur.',
+        },
+        {
+          question: `[Jenjang 5 - Evaluasi & Kreasi] Bagaimana indikator bahwa seorang siswa telah mencapai level Mahir pada elemen "${cleanEl}" (${cleanMapel})?`,
+          options: [
+            'Hanya mampu menyebutkan judul materi tanpa bisa memberi contoh',
+            'Mampu mengintegrasikan konsep materi esensial ke dalam karya/solusi nyata secara mandiri, kritis, dan kreatif',
+            'Bergantung sepenuhnya pada bantuan orang lain saat menyelesaikan masalah dasar',
+            'Belum dapat menghubungkan tujuan pembelajaran dengan hasil pekerjaan',
+          ],
+          correctIndex: 1,
+          explanation:
+            'Pada jenjang Mahir, siswa mampu mengevaluasi dan menerapkan konsep esensial secara kreatif serta mandiri sesuai Tujuan Pembelajaran.',
+        },
+      ],
+      source: 'smart-curriculum-ai',
+    };
+  };
+
+  const requestOrBuildAiDistribution = async (inputs: {
+    cleanMapel: string;
+    cleanEl: string;
+    cleanTp: string;
+    cleanEss: string;
+  }) => {
+    const fallbackData = buildClientSmartDistribution(inputs);
+    try {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 14000);
+      const response = await fetch('/api/bank-materi/generate-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          teacherName: teacher.name,
+          mataPelajaran: inputs.cleanMapel,
+          kelasTarget,
+          elemen: inputs.cleanEl,
+          tujuanPembelajaran: inputs.cleanTp,
+          materiEsensial: inputs.cleanEss,
+        }),
+      });
+      window.clearTimeout(timer);
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result && result.success && result.data) {
+          const d = result.data;
+          return {
+            ringkasanAI: d.ringkasanAI || fallbackData.ringkasanAI,
+            modulPerpustakaan: d.modulPerpustakaan || fallbackData.modulPerpustakaan,
+            pertanyaanRefleksi:
+              Array.isArray(d.pertanyaanRefleksi) && d.pertanyaanRefleksi.length > 0
+                ? d.pertanyaanRefleksi
+                : fallbackData.pertanyaanRefleksi,
+            topikPodcastMentor: d.topikPodcastMentor || fallbackData.topikPodcastMentor,
+            pertanyaanPemantikPodcast:
+              d.pertanyaanPemantikPodcast || fallbackData.pertanyaanPemantikPodcast,
+            misiBalaiKota: d.misiBalaiKota || fallbackData.misiBalaiKota,
+            tantanganBangunanLain:
+              Array.isArray(d.tantanganBangunanLain) && d.tantanganBangunanLain.length > 0
+                ? d.tantanganBangunanLain
+                : fallbackData.tantanganBangunanLain,
+            kuisBengkel:
+              Array.isArray(d.kuisBengkel) && d.kuisBengkel.length > 0
+                ? d.kuisBengkel
+                : fallbackData.kuisBengkel,
+            source: result.source || 'gemini-ai',
+          };
+        }
+      }
+    } catch {
+      // Fallback to client smart curriculum generator seamlessly
+    }
+    return fallbackData;
+  };
+
   const handleQuickTemplate = () => {
     sounds.playClick();
     setElemen('Identitas Visual, Logo & Psikologi Warna Brand');
@@ -157,16 +422,8 @@ export const BankMateriModal: React.FC<BankMateriModalProps> = ({
   };
 
   const handleGenerateAI = async () => {
-    if (!finalMapel.trim() || !elemen.trim() || !tujuanPembelajaran.trim() || !materiEsensial.trim()) {
-      setStatusBanner({
-        type: 'error',
-        message:
-          'Mohon lengkapi Mata Pelajaran, Elemen, Tujuan Pembelajaran, dan Materi Esensial terlebih dahulu sebelum klik Generate AI.',
-      });
-      return;
-    }
-
     sounds.playClick();
+    const inputs = ensureCurriculumInputs();
     setIsGeneratingAI(true);
     setStatusBanner({
       type: 'info',
@@ -175,60 +432,40 @@ export const BankMateriModal: React.FC<BankMateriModalProps> = ({
     });
 
     try {
-      const response = await fetch('/api/bank-materi/generate-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teacherName: teacher.name,
-          mataPelajaran: finalMapel,
-          kelasTarget,
-          elemen: elemen.trim(),
-          tujuanPembelajaran: tujuanPembelajaran.trim(),
-          materiEsensial: materiEsensial.trim(),
-        }),
+      const d = await requestOrBuildAiDistribution(inputs);
+      const tempMateriId = `materi-bm-${Date.now()}`;
+      const formattedKuis: QuizQuestion[] = (d.kuisBengkel || []).map((q: any, idx: number) => ({
+        id: `q-bm-${Date.now()}-${idx + 1}`,
+        materiId: tempMateriId,
+        materiTitle: `${inputs.cleanMapel}: ${inputs.cleanEl}`,
+        question: q.question,
+        options: Array.isArray(q.options) ? q.options : ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'],
+        correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
+        explanation: q.explanation || 'Pembahasan sesuai Materi Esensial.',
+      }));
+
+      setGeneratedPreview({
+        ringkasanAI: d.ringkasanAI,
+        modulPerpustakaan: d.modulPerpustakaan,
+        pertanyaanRefleksi: d.pertanyaanRefleksi || [],
+        topikPodcastMentor: d.topikPodcastMentor,
+        pertanyaanPemantikPodcast: d.pertanyaanPemantikPodcast,
+        misiBalaiKota: d.misiBalaiKota,
+        tantanganBangunanLain: d.tantanganBangunanLain || [],
+        kuisBengkel: formattedKuis,
+        source: d.source,
       });
 
-      if (!response.ok) {
-        throw new Error('Gagal memanggil server AI');
-      }
-
-      const result = await response.json();
-      if (result.success && result.data) {
-        const d = result.data;
-        const tempMateriId = `materi-bm-${Date.now()}`;
-        const formattedKuis: QuizQuestion[] = (d.kuisBengkel || []).map((q: any, idx: number) => ({
-          id: `q-bm-${Date.now()}-${idx + 1}`,
-          materiId: tempMateriId,
-          materiTitle: `${finalMapel}: ${elemen.trim()}`,
-          question: q.question,
-          options: Array.isArray(q.options) ? q.options : ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'],
-          correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
-          explanation: q.explanation || 'Pembahasan sesuai Materi Esensial.',
-        }));
-
-        setGeneratedPreview({
-          ringkasanAI: d.ringkasanAI,
-          modulPerpustakaan: d.modulPerpustakaan,
-          pertanyaanRefleksi: d.pertanyaanRefleksi || [],
-          topikPodcastMentor: d.topikPodcastMentor,
-          pertanyaanPemantikPodcast: d.pertanyaanPemantikPodcast,
-          misiBalaiKota: d.misiBalaiKota,
-          tantanganBangunanLain: d.tantanganBangunanLain || [],
-          kuisBengkel: formattedKuis,
-          source: result.source,
-        });
-
-        sounds.playRewardXp();
-        setStatusBanner({
-          type: 'success',
-          message:
-            '✨ Berhasil Generate AI! Periksa hasil distribusi untuk ke-9 bangunan di bawah, lalu klik "🚀 Simpan ke Spreadsheet & Sebarkan ke Seluruh Kota" (atau sistem akan menyimpannya otomatis).',
-        });
-      }
-    } catch (err) {
+      sounds.playRewardXp();
+      setStatusBanner({
+        type: 'success',
+        message:
+          '✨ Berhasil Generate AI! Periksa hasil distribusi untuk ke-9 bangunan di samping/bawah, lalu klik "🚀 Simpan ke Spreadsheet & Sebarkan" untuk menyimpannya ke Google Spreadsheet.',
+      });
+    } catch {
       setStatusBanner({
         type: 'error',
-        message: 'Terjadi kendala saat menghubungi AI Server. Silakan coba kembali.',
+        message: 'Terjadi kendala saat mengolah materi. Silakan coba kembali.',
       });
     } finally {
       setIsGeneratingAI(false);
@@ -236,45 +473,40 @@ export const BankMateriModal: React.FC<BankMateriModalProps> = ({
   };
 
   const handleSaveAndDistribute = async () => {
-    if (!finalMapel.trim() || !elemen.trim() || !tujuanPembelajaran.trim() || !materiEsensial.trim()) {
-      setStatusBanner({
-        type: 'error',
-        message: 'Pastikan Mata Pelajaran, Elemen, Tujuan Pembelajaran, dan Materi Esensial sudah terisi.',
-      });
-      return;
-    }
-
     sounds.playClick();
+    const inputs = ensureCurriculumInputs();
     setIsSaving(true);
+    setStatusBanner({
+      type: 'info',
+      message:
+        '🚀 Sedang menyimpan ke Google Spreadsheet (Sheet Bank_Materi_Guru) & menyebarkan materi ke 9 bangunan Refleksia City...',
+    });
 
     try {
       let previewToUse = generatedPreview;
 
-      // Jika Guru langsung klik Simpan tanpa klik Generate AI dulu, jalankan Generate AI otomatis!
+      // Jika Guru langsung klik Simpan tanpa klik Generate AI dulu, jalankan Generate AI otomatis dengan fallback aman!
       if (!previewToUse) {
-        const response = await fetch('/api/bank-materi/generate-ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            teacherName: teacher.name,
-            mataPelajaran: finalMapel,
-            kelasTarget,
-            elemen: elemen.trim(),
-            tujuanPembelajaran: tujuanPembelajaran.trim(),
-            materiEsensial: materiEsensial.trim(),
-          }),
-        });
-        const result = await response.json();
-        if (result.success && result.data) {
-          previewToUse = result.data;
-        }
+        const d = await requestOrBuildAiDistribution(inputs);
+        previewToUse = {
+          ...d,
+          kuisBengkel: (d.kuisBengkel || []).map((q: any, idx: number) => ({
+            id: `q-bm-${Date.now()}-${idx + 1}`,
+            materiId: `materi-bm-${Date.now()}`,
+            materiTitle: `${inputs.cleanMapel}: ${inputs.cleanEl}`,
+            question: q.question,
+            options: Array.isArray(q.options) ? q.options : ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D'],
+            correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
+            explanation: q.explanation || 'Sesuai Materi Esensial.',
+          })),
+        };
       }
 
       const now = Date.now();
       const bmId = `bm-${now}`;
       const mId = `materi-${bmId}`;
       const oId = `tp-${bmId}`;
-      const fullTitle = `${finalMapel}: ${elemen.trim()}`;
+      const fullTitle = `${inputs.cleanMapel}: ${inputs.cleanEl}`;
 
       const formattedKuis: QuizQuestion[] = (previewToUse?.kuisBengkel || []).map(
         (q: any, idx: number) => ({
@@ -292,30 +524,30 @@ export const BankMateriModal: React.FC<BankMateriModalProps> = ({
         id: bmId,
         materiId: mId,
         objectiveId: oId,
-        teacherId: teacher.id,
-        teacherName: teacher.name,
-        mataPelajaran: finalMapel,
+        teacherId: teacher.id || 'teacher-1',
+        teacherName: teacher.name || 'Guru Pengampu DKV',
+        mataPelajaran: inputs.cleanMapel,
         kelasTarget,
-        elemen: elemen.trim(),
-        tujuanPembelajaran: tujuanPembelajaran.trim(),
-        materiEsensial: materiEsensial.trim(),
+        elemen: inputs.cleanEl,
+        tujuanPembelajaran: inputs.cleanTp,
+        materiEsensial: inputs.cleanEss,
         ringkasanAI:
           previewToUse?.ringkasanAI ||
-          `Materi ${finalMapel} (${elemen.trim()}) oleh ${teacher.name} untuk kelas ${kelasTarget}.`,
-        modulPerpustakaan: previewToUse?.modulPerpustakaan || materiEsensial.trim(),
+          `Materi ${inputs.cleanMapel} (${inputs.cleanEl}) oleh ${teacher.name} untuk kelas ${kelasTarget}.`,
+        modulPerpustakaan: previewToUse?.modulPerpustakaan || inputs.cleanEss,
         pertanyaanRefleksi: previewToUse?.pertanyaanRefleksi || [
-          `Apa konsep utama dari materi "${elemen.trim()}" yang sudah kamu pahami?`,
-          `Bagian mana dari Tujuan Pembelajaran "${tujuanPembelajaran.trim()}" yang masih menantang?`,
+          `Apa konsep utama dari materi "${inputs.cleanEl}" yang sudah kamu pahami?`,
+          `Bagian mana dari Tujuan Pembelajaran "${inputs.cleanTp}" yang masih menantang?`,
           `Apa rencana tindakanmu untuk menerapkan materi ini pada karya berikutnya?`,
         ],
         topikPodcastMentor:
-          previewToUse?.topikPodcastMentor || `Diskusi ${finalMapel}: ${elemen.trim()}`,
+          previewToUse?.topikPodcastMentor || `Diskusi ${inputs.cleanMapel}: ${inputs.cleanEl}`,
         pertanyaanPemantikPodcast:
           previewToUse?.pertanyaanPemantikPodcast ||
-          `Bagaimana cara kamu menerapkan materi "${elemen.trim()}" pada proyek kejuruan DKV?`,
+          `Bagaimana cara kamu menerapkan materi "${inputs.cleanEl}" pada proyek kejuruan DKV?`,
         misiBalaiKota:
           previewToUse?.misiBalaiKota ||
-          `Pelajari modul "${elemen.trim()}" di Perpustakaan, tulis Refleksi, dan kerjakan Kuis 5 Jenjang di Lab DKV!`,
+          `Pelajari modul "${inputs.cleanEl}" di Perpustakaan, tulis Refleksi, dan kerjakan Kuis 5 Jenjang di Lab DKV!`,
         tantanganBangunanLain: previewToUse?.tantanganBangunanLain || [],
         kuisBengkel: formattedKuis,
         createdAt: new Date().toLocaleDateString('id-ID', {
@@ -331,7 +563,7 @@ export const BankMateriModal: React.FC<BankMateriModalProps> = ({
       sounds.playRewardXp();
       setStatusBanner({
         type: 'success',
-        message: `🎉 Materi "${finalMapel} — ${elemen.trim()}" berhasil disimpan ke Google Spreadsheet dan OTOMATIS TERSEBAR ke seluruh 9 bangunan Refleksia City!`,
+        message: `🎉 Materi "${inputs.cleanMapel} — ${inputs.cleanEl}" berhasil disimpan ke Google Spreadsheet dan OTOMATIS TERSEBAR ke seluruh 9 bangunan Refleksia City!`,
       });
 
       // Reset form & switch to list
@@ -342,6 +574,7 @@ export const BankMateriModal: React.FC<BankMateriModalProps> = ({
       setSelectedDetailEntry(newEntry);
       setActiveTab('daftar');
     } catch (err) {
+      console.error('Failed saving Bank Materi:', err);
       setStatusBanner({
         type: 'error',
         message: 'Gagal menyimpan materi. Silakan coba lagi.',
@@ -649,13 +882,27 @@ export const BankMateriModal: React.FC<BankMateriModalProps> = ({
                   />
                 </div>
 
+                {statusBanner && (
+                  <div
+                    className={`px-3.5 py-2.5 rounded-xl border text-xs font-medium flex items-center justify-between gap-2 ${
+                      statusBanner.type === 'success'
+                        ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
+                        : statusBanner.type === 'error'
+                        ? 'bg-rose-950/80 border-rose-500/50 text-rose-200'
+                        : 'bg-indigo-950/80 border-indigo-500/50 text-indigo-200'
+                    }`}
+                  >
+                    <span>{statusBanner.message}</span>
+                  </div>
+                )}
+
                 {/* ACTION BUTTONS */}
                 <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
                   <button
                     type="button"
                     onClick={handleGenerateAI}
                     disabled={isGeneratingAI || isSaving}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 hover:from-amber-400 hover:to-pink-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 transition-all disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 hover:from-amber-400 hover:to-pink-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 transition-all disabled:opacity-50 cursor-pointer"
                   >
                     <Sparkles className={`w-4 h-4 ${isGeneratingAI ? 'animate-spin' : ''}`} />
                     <span>
@@ -669,7 +916,7 @@ export const BankMateriModal: React.FC<BankMateriModalProps> = ({
                     type="button"
                     onClick={handleSaveAndDistribute}
                     disabled={isSaving || isGeneratingAI}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 cursor-pointer"
                   >
                     <Send className="w-4 h-4" />
                     <span>

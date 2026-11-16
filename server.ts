@@ -85,7 +85,7 @@ Berikan umpan balik mentor dalam format JSON!`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
         systemInstruction,
@@ -217,7 +217,7 @@ Analisis dan berikan ringkasan pedagogis dalam JSON!`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
         systemInstruction,
@@ -929,7 +929,7 @@ app.post('/api/gemini/podcast-host', async (req, res) => {
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-4-hydrogen',
         contents: `Siswa bernama ${studentName} (${className}) sedang menjadi bintang tamu di Podcast Studio ON AIR Menara Mentor membahas materi "${materiTitle}".
 Ringkasan materi: ${materiSummary || materiTitle}.
 Siswa baru saja menjawab tentang Hal yang Sudah Dikuasai: "${sudahDikuasai}".
@@ -980,7 +980,7 @@ Sebagai Host Podcast cewek sekaligus AI Mentor yang super friendly, akrab, hanga
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-4-hydrogen',
         contents: `Kamu adalah Host Podcast cewek sekaligus AI Mentor Kota di SMK Negeri 2 Gorontalo (Jurusan DKV) yang gayanya friendly, hangat, asyik, akrab, dan santai.
 Bintang tamu siswa: ${studentName} (${className}).
 Materi yang dibahas: "${materiTitle}".
@@ -1046,7 +1046,7 @@ Tugasmu di segmen podcast ini:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: `Kamu adalah Host Podcast cewek sekaligus AI Mentor di Menara Mentor Kota yang gayanya friendly, akrab, hangat, dan santai.
 Siswa ${studentName} (${className}) baru saja menyelesaikan sesi podcast materi "${materiTitle}".
 Jawaban siswa atas pertanyaan pemantik: "${jawabanPemantikSiswa || '-'}"
@@ -1725,7 +1725,10 @@ app.get('/api/bank-materi', (_req, res) => {
   });
 });
 
-app.post('/api/bank-materi', (req, res) => {
+const DEFAULT_GAS_WEB_APP_URL =
+  'https://script.google.com/macros/s/AKfycbwzHhVYKBfznA_k4dZlB1eGFevpeLoJDiSUbLKXJACQPgsKFxi0HfbNNbjUZBWa7finfw/exec';
+
+app.post('/api/bank-materi', async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const entry = req.body as ServerBankMateriEntry;
   if (!entry || !entry.id || !entry.mataPelajaran) {
@@ -1743,6 +1746,17 @@ app.post('/api/bank-materi', (req, res) => {
   }
   saveServerBankMateri(serverBankMateriList);
 
+  // Forward to Google Spreadsheet via GAS Web App in background so server also guarantees persistence
+  fetch(DEFAULT_GAS_WEB_APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'save_bank_materi',
+      timestamp: new Date().toISOString(),
+      bankMateri: entry,
+    }),
+  }).catch(() => {});
+
   res.json({
     success: true,
     data: entry,
@@ -1755,6 +1769,17 @@ app.delete('/api/bank-materi/:id', (req, res) => {
   const { id } = req.params;
   serverBankMateriList = serverBankMateriList.filter((item) => item.id !== id);
   saveServerBankMateri(serverBankMateriList);
+
+  fetch(DEFAULT_GAS_WEB_APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'delete_bank_materi',
+      timestamp: new Date().toISOString(),
+      id,
+    }),
+  }).catch(() => {});
+
   res.json({
     success: true,
     deletedId: id,
@@ -1970,7 +1995,7 @@ Tugas Anda adalah mengolah input Guru tersebut menjadi paket pembelajaran lengka
    - explanation (pembahasan jelas mengapa jawaban tersebut benar).`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -5452,7 +5477,7 @@ Spesifikasi Wajib:
 - Setiap soal WAJIB memiliki kunci_jawaban dan pembahasan yang jelas dalam Bahasa Indonesia.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-4-hydrogen',
         contents: prompt,
         config: {
           systemInstruction:

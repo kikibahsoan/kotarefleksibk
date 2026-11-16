@@ -1553,7 +1553,7 @@ export const StorageService = {
     const updated = [entry, ...filtered];
     this.setBankMateri(updated);
 
-    // 1. Simpan ke Server API (/api/bank-materi)
+    // 1. Simpan ke Server API (/api/bank-materi) yang juga meneruskan ke Google Spreadsheet
     try {
       fetch('/api/bank-materi', {
         method: 'POST',
@@ -1563,12 +1563,7 @@ export const StorageService = {
     } catch {}
 
     // 2. Kirim ke Google Spreadsheet menggunakan action 'save_bank_materi' (GAS v2.7)
-    await this.syncWithGAS('save_bank_materi', {
-      bankMateri: entry,
-    });
-
-    // 3. Kirim juga ke submit_reflection bertanda [BANK_MATERI_AI] agar tetap tersimpan
-    // meskipun Guru belum sempat memperbarui skrip GAS ke versi 2.7
+    // dan cadangan submit_reflection bertanda [BANK_MATERI_AI] secara paralel
     const fallbackReflection: Reflection = {
       id: `bankmateri-${entry.id}`,
       studentId: entry.teacherId || 'teacher-bank-materi',
@@ -1587,9 +1582,16 @@ export const StorageService = {
       },
       createdAt: entry.createdAt,
     };
-    await this.syncWithGAS('submit_reflection', {
-      reflection: fallbackReflection,
-    });
+
+    const syncTask = Promise.allSettled([
+      this.syncWithGAS('save_bank_materi', { bankMateri: entry }),
+      this.syncWithGAS('submit_reflection', { reflection: fallbackReflection }),
+    ]);
+
+    await Promise.race([
+      syncTask,
+      new Promise<void>((resolve) => setTimeout(resolve, 3500)),
+    ]);
 
     try {
       window.dispatchEvent(new CustomEvent('kota_refleksi_bank_materi_updated', { detail: updated }));
