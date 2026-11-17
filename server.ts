@@ -1468,9 +1468,34 @@ interface ServerBankMateriEntry {
   materiEsensial: string;
   ringkasanAI: string;
   modulPerpustakaan: string;
+  ilustrasiVisual?: {
+    id: string;
+    title: string;
+    badge: string;
+    caption: string;
+    visualType: 'flow_diagram' | 'comparison_visual' | 'daily_tech_scene';
+    steps: {
+      stepLabel: string;
+      icon: string;
+      description: string;
+    }[];
+    takeaway: string;
+  }[];
+  implementasiSehariHari?: {
+    id: string;
+    title: string;
+    icon: string;
+    dailyProblem: string;
+    conceptApplication: string;
+    realBenefit: string;
+  }[];
   pertanyaanRefleksi: string[];
   topikPodcastMentor: string;
+  ringkasanMendalamPodcast?: string;
+  studiKasusPodcast?: string;
+  poinDiskusiPodcast?: string[];
   pertanyaanPemantikPodcast: string;
+  daftarPemantikPodcast?: string[];
   misiBalaiKota: string;
   tantanganBangunanLain: {
     buildingId: string;
@@ -1799,54 +1824,151 @@ app.post('/api/bank-materi/generate-ai', async (req, res) => {
   } = req.body || {};
 
   const buildFallbackDistribution = () => {
-    const cleanEss = String(materiEsensial || '').trim();
+    const rawEss = String(materiEsensial || '').trim();
     const cleanTp = String(tujuanPembelajaran || '').trim();
     const cleanEl = String(elemen || '').trim();
     const cleanMapel = String(mataPelajaran || '').trim();
 
+    const expandedMateriEsensial =
+      rawEss.length >= 160
+        ? rawEss
+        : `${rawEss ? rawEss + '\n\n' : ''}Pengembangan Materi Esensial berdasarkan Tujuan Pembelajaran (${cleanTp}):\n1. Konsep Dasar & Definisi Inti ${cleanEl}: Memahami prinsip kerja, fungsi utama, dan komponen kunci pada mata pelajaran ${cleanMapel}.\n2. Mekanisme & Alur Pemecahan Masalah: Menyusun tahapan sistematis (Analisis Kebutuhan -> Perancangan Solusi -> Implementasi Teknis -> Pengujian/Evaluasi).\n3. Penerapan Teknologi dalam Kehidupan Sehari-hari: Menghubungkan konsep ${cleanEl} untuk menyelesaikan kendala teknologi harian seperti efisiensi informasi digital, otomasi tugas harian, serta kejelasan komunikasi visual.\n4. Evaluasi Kualitas & Mitigasi Kesalahan: Mengidentifikasi penyebab kegagalan teknis di lapangan dan memilih solusi paling efektif berbasis data.`;
+
     return {
-      ringkasanAI: `Materi "${cleanEl}" pada mata pelajaran ${cleanMapel} (${kelasTarget}) yang disusun oleh ${teacherName} ini berfokus pada pencapaian Tujuan Pembelajaran: "${cleanTp}". Siswa dipandu menguasai konsep esensial secara bertahap mulai dari literasi di Perpustakaan, refleksi diri di Pusat Refleksi, diskusi lisan di Studio ON AIR, hingga evaluasi 5 jenjang di Lab DKV & Tefa.`,
-      modulPerpustakaan: `BAB 1 — PENGANTAR ELEMEN: ${cleanEl.toUpperCase()}\nMata Pelajaran: ${cleanMapel} (${kelasTarget})\nGuru Pengampu: ${teacherName}\n\nTujuan Pembelajaran:\n${cleanTp}\n\nBAB 2 — INTI MATERI ESENSIAL\n${cleanEss}\n\nBAB 3 — PENERAPAN KONTEKSTUAL & LANGKAH PRAKTIS DI KOTA REFLEKSIA\n1. Pahami konsep kunci dan istilah utama pada materi ${cleanEl}.\n2. Hubungkan poin-poin materi esensial di atas dengan tugas praktik atau kehidupan sehari-hari sebagai siswa SMK jurusan DKV.\n3. Evaluasi hasil belajarmu melalui pencatatan Jurnal 4F (Facts, Feelings, Findings, Future) serta latihan kuis berjenjang di Lab DKV & Tefa.`,
-      pertanyaanRefleksi: [
-        `Dari materi "${cleanEl}" (${cleanMapel}), bagian konsep esensial mana yang paling cepat kamu pahami dan mengapa?`,
-        `Tantangan atau kesulitan apa yang kamu temukan saat mencoba mencapai Tujuan Pembelajaran: "${cleanTp}"?`,
-        `Langkah konkret apa yang akan kamu lakukan pada proyek atau latihan berikutnya untuk menerapkan materi ini secara lebih optimal?`,
+      materiEsensialDikembangkan: expandedMateriEsensial,
+      ringkasanAI: `Materi "${cleanEl}" pada mata pelajaran ${cleanMapel} (${kelasTarget}) yang dikembangkan dari Tujuan Pembelajaran "${cleanTp}" membekali siswa dengan penguasaan konsep esensial, ilustrasi visual cara kerja sistem, serta penerapan nyata dalam memecahkan masalah teknologi di kehidupan sehari-hari.`,
+      modulPerpustakaan: `BAB 1 — PENGANTAR KONSEP & TUJUAN PEMBELAJARAN: ${cleanEl.toUpperCase()}\nMata Pelajaran: ${cleanMapel} (${kelasTarget})\nGuru Pengampu: ${teacherName}\n\nTujuan Pembelajaran Utama:\n"${cleanTp}"\n\nMengapa materi "${cleanEl}" sangat penting? Dalam kehidupan modern yang serba digital, hampir seluruh aktivitas harian kita—mulai dari berkomunikasi lewat smartphone, bertransaksi digital, mencari rute perjalanan, hingga mengelola informasi sekolah—bergantung pada cara kerja teknologi yang terstruktur. Bab ini mengantarkan kita memahami bagaimana konsep ${cleanEl} menjadi pondasi utama dalam menyelesaikan berbagai persoalan nyata secara efektif.\n\nBAB 2 — PENGEMBANGAN MENDALAM MATERI ESENSIAL\n${expandedMateriEsensial}\n\nPrinsip Utama yang Wajib Dikuasai:\n• Pemetaan Masalah (Problem Identification): Membedakan gejala permukaan dengan akar masalah teknis yang sebenarnya.\n• Penyusunan Solusi Terstruktur: Menggunakan kaidah ${cleanEl} agar langkah penyelesaian tidak dilakukan secara coba-coba (trial and error).\n• Optimasi & Efisiensi: Memastikan solusi yang dirancang hemat waktu, mudah digunakan oleh masyarakat, dan minim risiko kesalahan.\n\nBAB 3 — ILUSTRASI VISUAL & SKEMA KERJA SISTEM\nUntuk memahami cara kerja "${cleanEl}" secara utuh, perhatikan skema alur visual Input -> Proses Transformasi Konsep -> Output Solusi Nyata pada kartu Infografis Interaktif di bawah modul ini:\n1. Tahap Input (Situasi Harian): Mengumpulkan data, kebutuhan pengguna, dan kendala teknologi yang dihadapi sehari-hari.\n2. Tahap Proses (Penerapan ${cleanEl}): Mengolah data menggunakan aturan, struktur, dan langkah sistematis sesuai materi esensial.\n3. Tahap Output (Dampak Nyata): Menghasilkan solusi teknologi/visual yang cepat, akurat, aman, dan langsung mempermudah aktivitas warga.\n\nBAB 4 — IMPLEMENTASI MATERI DALAM KEHIDUPAN SEHARI-HARI\nBagaimana konsep "${cleanEl}" bekerja di sekitar kita setiap hari?\n• Kasus 1 (Efisiensi Aplikasi & Layanan Harian): Saat memesan makanan/transportasi atau mengisi daftar hadir digital, konsep ${cleanEl} memastikan data tersusun rapi dan proses berjalan dalam hitungan detik.\n• Kasus 2 (Pemecahan Masalah Perangkat & Informasi Digital): Ketika koneksi lambat, memori ponsel penuh, atau informasi publik membingungkan, kita menggunakan prinsip analisis pada ${cleanEl} untuk mengurai masalah dan mengambil keputusan tepat.\n• Kasus 3 (Inovasi Lingkungan Sekolah & Masyarakat): Siswa SMK dapat merancang sistem informasi, panduan visual, atau alur otomatisasi sederhana berbasis ${cleanEl} yang langsung membantu warga sekolah.`,
+      ilustrasiVisual: [
+        {
+          id: `vis-${Date.now()}-1`,
+          title: `Diagram Alur Cara Kerja: ${cleanEl} dalam Kehidupan Sehari-hari`,
+          badge: 'Infografis Interaktif #1',
+          caption: `Visualisasi tahapan sistematis bagaimana konsep "${cleanEl}" mengubah masalah teknologi harian menjadi solusi yang terukur.`,
+          visualType: 'flow_diagram' as const,
+          steps: [
+            {
+              stepLabel: '1. Identifikasi Masalah Harian (Input)',
+              icon: '🔍',
+              description: `Mengamati kendala teknologi yang dialami pengguna sehari-hari terkait ${cleanEl} dan mengumpulkan informasi kunci yang relevan.`,
+            },
+            {
+              stepLabel: '2. Pemrosesan Konsep Esensial (Process)',
+              icon: '⚙️',
+              description: `Menerapkan prinsip inti "${cleanTp.slice(0, 90)}" untuk menyusun langkah penyelesaian yang logis, rapi, dan efisien.`,
+            },
+            {
+              stepLabel: '3. Solusi Teknologi Teruji (Output)',
+              icon: '🚀',
+              description: `Menghasilkan solusi siap pakai yang menghemat waktu, mencegah kesalahan teknis, dan mudah dipahami oleh pengguna.`,
+            },
+          ],
+          takeaway: `Pemahaman "${cleanEl}" bukan sekadar hafalan teori, melainkan kerangka kerja visual untuk menyelesaikan masalah teknologi setiap hari.`,
+        },
+        {
+          id: `vis-${Date.now()}-2`,
+          title: `Perbandingan Visual: Tanpa Konsep vs. Dengan Penerapan ${cleanEl}`,
+          badge: 'Infografis Interaktif #2',
+          caption: `Ilustrasi kontras antara penanganan masalah teknologi secara acak dibandingkan dengan penerapan "${cleanEl}".`,
+          visualType: 'comparison_visual' as const,
+          steps: [
+            {
+              stepLabel: 'Kondisi Awal: Penanganan Acak & Tidak Terstruktur',
+              icon: '⚠️',
+              description: `Pengguna kebingungan saat menghadapi masalah teknologi harian karena informasi berantakan dan langkah kerja tidak berurutan.`,
+            },
+            {
+              stepLabel: 'Transformasi: Integrasi Materi Esensial',
+              icon: '📐',
+              description: `Konsep ${cleanEl} diterapkan untuk memilah prioritas, menata alur kerja, dan memvalidasi setiap tahapan secara sistematis.`,
+            },
+            {
+              stepLabel: 'Hasil Akhir: Sistem Efisien & Tepat Sasaran',
+              icon: '✅',
+              description: `Masalah terselesaikan lebih cepat, risiko kesalahan turun drastis, dan hasil kerja memenuhi capaian Tujuan Pembelajaran.`,
+            },
+          ],
+          takeaway: `Dengan menerapkan ${cleanEl}, setiap kendala teknologi sehari-hari dapat dianalisis dan diselesaikan secara akurat.`,
+        },
       ],
-      topikPodcastMentor: `Kupas Tuntas ${cleanMapel}: Strategi Menguasai Elemen "${cleanEl}" bersama ${teacherName}`,
-      pertanyaanPemantikPodcast: `Setelah mempelajari materi esensial "${cleanEl}", bagaimana cara kamu menjelaskan kembali konsep utamanya dengan bahasa sendiri serta menerapkannya dalam karya nyata?`,
-      misiBalaiKota: `Misi Kota (${cleanMapel}): Pelajari modul "${cleanEl}" di Perpustakaan, tulis refleksi di Pusat Refleksi, dan taklukkan Kuis 5 Jenjang di Lab DKV & Tefa!`,
+      implementasiSehariHari: [
+        {
+          id: `imp-${Date.now()}-1`,
+          title: `Optimasi Penggunaan Aplikasi & Perangkat Digital Harian`,
+          icon: '📱',
+          dailyProblem: `Dalam aktivitas sehari-hari, banyak pengguna mengalami kendala aplikasi lambat, data berantakan, atau salah langkah saat menggunakan layanan teknologi.`,
+          conceptApplication: `Menerapkan prinsip "${cleanEl}" (${cleanTp.slice(0, 100)}) untuk mengorganisir data, menyusun urutan langkah yang benar, dan menyaring informasi penting.`,
+          realBenefit: `Aktivitas digital harian (belajar, transaksi, komunikasi) berjalan jauh lebih cepat, hemat kuota/memori, dan bebas dari kesalahan pengoperasian.`,
+        },
+        {
+          id: `imp-${Date.now()}-2`,
+          title: `Penyelesaian Masalah Sistem Layanan di Lingkungan Sekolah`,
+          icon: '🏫',
+          dailyProblem: `Antrean layanan perpustakaan, absensi pagi, atau pengumpulan tugas digital sering tersendat karena alur informasi yang tidak terstruktur.`,
+          conceptApplication: `Menggunakan konsep materi esensial "${cleanEl}" untuk memetakan ulang alur layanan menjadi tahapan sederhana yang mudah diikuti seluruh siswa.`,
+          realBenefit: `Mengurangi waktu tunggu siswa secara signifikan dan meningkatkan ketertiban serta akurasi data di sekolah.`,
+        },
+        {
+          id: `imp-${Date.now()}-3`,
+          title: `Keamanan Informasi & Pengambilan Keputusan di Media Digital`,
+          icon: '🛡️',
+          dailyProblem: `Masyarakat sering terjebak informasi palsu, tautan berbahaya, atau kebingungan saat membaca panduan teknis perangkat baru.`,
+          conceptApplication: `Melakukan evaluasi kritis dan verifikasi bertahap berbasis "${cleanEl}" sebelum mengambil keputusan atau membagikan informasi digital.`,
+          realBenefit: `Melindungi keamanan akun pribadi serta membantu keluarga dan warga sekitar menggunakan teknologi secara cerdas dan aman.`,
+        },
+      ],
+      pertanyaanRefleksi: [
+        `Dari pengembangan materi "${cleanEl}" (${cleanMapel}) dan contoh penerapannya dalam kehidupan sehari-hari, konsep mana yang paling membuka wawasan barumu hari ini?`,
+        `Masalah teknologi sehari-hari apa yang pernah kamu alami sendiri dan ternyata bisa diselesaikan menggunakan prinsip Tujuan Pembelajaran: "${cleanTp}"?`,
+        `Bagaimana rencana konkretmu untuk menerapkan konsep "${cleanEl}" dalam aktivitas harian atau tugas proyek berikutnya?`,
+      ],
+      topikPodcastMentor: `Kupas Tuntas ${cleanMapel}: Implementasi Nyata "${cleanEl}" dalam Memecahkan Masalah Teknologi Sehari-hari`,
+      ringkasanMendalamPodcast: `Episode spesial Studio ON AIR bersama ${teacherName} ini mengupas secara mendalam bagaimana elemen "${cleanEl}" pada mata pelajaran ${cleanMapel} diturunkan langsung dari Tujuan Pembelajaran: "${cleanTp}". Kita tidak hanya membahas definisi konsep, tetapi membedah bagaimana konsep esensial ini bekerja di balik teknologi yang kita gunakan setiap hari—mulai dari bangun tidur hingga beraktivitas di sekolah dan masyarakat. Siswa diajak berpikir kritis menganalisis masalah teknologi di sekitar mereka dan merumuskan solusi praktis berbasis materi esensial.`,
+      studiKasusPodcast: `Studi Kasus Siaran ON AIR: Di lingkungan tempat tinggal dan sekolah kita, banyak warga atau teman siswa yang sering mengalami kendala saat menggunakan sistem teknologi harian (misalnya sistem antrean digital yang membingungkan, pengelolaan file tugas yang berantakan hingga hilang, atau penyebaran informasi digital yang kurang efektif). Dengan menerapkan prinsip "${cleanEl}" secara sistematis mulai dari identifikasi masalah, pemetaan komponen penting, hingga perancangan solusi yang ramah pengguna, masalah tersebut berhasil diatasi dengan hasil yang terukur!`,
+      poinDiskusiPodcast: [
+        `1. Bedah Konsep Inti: Apa hubungan langsung antara Tujuan Pembelajaran "${cleanTp}" dengan materi esensial "${cleanEl}"?`,
+        `2. Fenomena Sehari-hari: Mengapa masalah teknologi di sekitar kita sering gagal diselesaikan jika kita mengabaikan prinsip dasar "${cleanEl}"?`,
+        `3. Studi Kasus Lapangan: Membedah contoh nyata penerapan "${cleanEl}" pada aplikasi smartphone, sistem sekolah, dan kehidupan warga.`,
+        `4. Langkah Aksi Siswa: Tips praktis menerapkan materi ini secara langsung mulai hari ini.`,
+      ],
+      pertanyaanPemantikPodcast: `Coba amati satu masalah teknologi yang paling sering kamu atau keluargamu temui dalam kehidupan sehari-hari. Bagaimana kamu akan menggunakan konsep "${cleanEl}" untuk menganalisis penyebabnya dan merancang solusi yang paling efektif?`,
+      daftarPemantikPodcast: [
+        `Coba amati satu masalah teknologi yang paling sering kamu atau keluargamu temui dalam kehidupan sehari-hari. Bagaimana kamu akan menggunakan konsep "${cleanEl}" untuk menganalisis penyebabnya dan merancang solusi yang paling efektif?`,
+        `Jika sebuah aplikasi atau sistem digital di sekolah tiba-tiba membingungkan penggunanya, indikator apa dari materi "${cleanEl}" yang pertama kali akan kamu evaluasi?`,
+        `Menurut pendapatmu, apa dampak nyata yang dirasakan masyarakat jika seorang perancang teknologi menerapkan "${cleanEl}" dengan baik dibandingkan yang mengabaikannya?`,
+      ],
+      misiBalaiKota: `Misi Kota (${cleanMapel}): Pelajari modul berilustrasi "${cleanEl}" di Perpustakaan, bedah studi kasusnya di Studio ON AIR, dan pecahkan soal HOTS teknologi sehari-hari di Lab DKV & Menara Asesmen!`,
       tantanganBangunanLain: [
         {
           buildingId: 'perpustakaan',
           buildingName: 'Perpustakaan Kampus',
           buildingIcon: '📚',
-          activityTitle: `Modul Bacaan & Jurnal 4F: ${cleanEl}`,
-          materialSummary: `Baca modul lengkap ${cleanMapel} yang disusun oleh ${teacherName} tentang "${cleanEl}", lalu rangkum temuanmu di Jurnal 4F.`,
-          challengePrompt: `Baca 3 Bab modul "${cleanEl}" di Rak Buku Perpustakaan dan simpan Jurnal 4F (+XP).`,
+          activityTitle: `Modul Visual & Implementasi Sehari-hari: ${cleanEl}`,
+          materialSummary: `Pelajari 4 Bab lengkap "${cleanEl}" beserta Diagram Infografis Interaktif dan 3 kartu Implementasi Masalah Teknologi Kehidupan Sehari-hari.`,
+          challengePrompt: `Baca modul berilustrasi "${cleanEl}" di Rak Buku Perpustakaan dan tulis Jurnal Pemahaman (+XP).`,
         },
         {
           buildingId: 'taman_refleksi',
           buildingName: 'Pusat Refleksi',
           buildingIcon: '🌿',
-          activityTitle: `Refleksi Mandiri: ${cleanEl}`,
-          materialSummary: `Evaluasi pemahamanmu terhadap Tujuan Pembelajaran: "${cleanTp}".`,
-          challengePrompt: `Pilih materi "${cleanMapel}: ${cleanEl}" di Pusat Refleksi lalu jawab 3 pertanyaan refleksi Guru.`,
+          activityTitle: `Refleksi Kontekstual: ${cleanEl}`,
+          materialSummary: `Refleksikan keterkaitan Tujuan Pembelajaran "${cleanTp}" dengan pengalaman menggunakan teknologi sehari-hari.`,
+          challengePrompt: `Pilih materi "${cleanMapel}: ${cleanEl}" di Pusat Refleksi lalu jawab 3 pertanyaan refleksi mendalam.`,
         },
         {
           buildingId: 'menara_mentor',
           buildingName: 'Studio ON AIR',
           buildingIcon: '🎙️',
-          activityTitle: `Podcast Interaktif AI Mentor: ${cleanEl}`,
-          materialSummary: `Diskusikan poin penguatan materi "${cleanEl}" bersama Host AI Mentor di Studio ON AIR.`,
-          challengePrompt: `Rekam episode Podcast membahas "${cleanEl}" dan dapatkan umpan balik langsung.`,
+          activityTitle: `Siaran Podcast & Bedah Kasus Teknologi: ${cleanEl}`,
+          materialSummary: `Pelajari Ringkasan Mendalam, Studi Kasus Teknologi Sehari-hari, dan Poin Diskusi "${cleanEl}" lalu siarkan bersama Host AI Mentor.`,
+          challengePrompt: `Mulai siaran Podcast ON AIR membahas studi kasus "${cleanEl}" dalam kehidupan sehari-hari.`,
         },
         {
           buildingId: 'bengkel_latihan',
           buildingName: 'Lab DKV & Tefa',
           buildingIcon: '🛠️',
-          activityTitle: `Kuis Berjenjang 5 Level: ${cleanEl}`,
-          materialSummary: `Uji penguasaan materi esensial "${cleanEl}" dari Jenjang 1 (Dasar) hingga Jenjang 5 (Mahir).`,
-          challengePrompt: `Kerjakan 5 soal kuis "${cleanMapel} - ${cleanEl}" di Lab DKV & Tefa.`,
+          activityTitle: `Kuis 5 Jenjang Penerapan Teknologi Harian: ${cleanEl}`,
+          materialSummary: `Uji kemampuan memecahkan masalah teknologi sehari-hari menggunakan konsep "${cleanEl}" dari Jenjang 1 (Dasar) hingga Jenjang 5 (Mahir).`,
+          challengePrompt: `Kerjakan 5 soal studi kasus sehari-hari "${cleanMapel} - ${cleanEl}" di Lab DKV & Tefa.`,
         },
         {
           buildingId: 'balai_kota',
@@ -1861,22 +1983,22 @@ app.post('/api/bank-materi/generate-ai', async (req, res) => {
           buildingName: 'Kantor Pos',
           buildingIcon: '📮',
           activityTitle: `Kotak Konsultasi Guru: ${teacherName}`,
-          materialSummary: `Kirimkan pertanyaan kepada ${teacherName} jika ada bagian dari materi "${cleanEl}" yang masih belum jelas.`,
+          materialSummary: `Konsultasikan ide penerapan "${cleanEl}" untuk masalah teknologi sehari-hari kepada ${teacherName}.`,
           challengePrompt: `Kirim pesan konsultasi materi "${cleanEl}" melalui Kantor Pos.`,
         },
         {
           buildingId: 'monumen_warga',
           buildingName: 'Monumen Warga',
           buildingIcon: '🗿',
-          activityTitle: `Diskusi Warga: Berbagi Insight ${cleanEl}`,
-          materialSummary: `Diskusikan ide penerapan materi "${cleanEl}" bersama teman sekelas di ruang obrolan Monumen Warga.`,
-          challengePrompt: `Bagikan 1 kesimpulan menarik tentang "${cleanEl}" di Monumen Warga.`,
+          activityTitle: `Diskusi Warga: Solusi Teknologi Harian ${cleanEl}`,
+          materialSummary: `Diskusikan contoh penerapan "${cleanEl}" di kehidupan sehari-hari bersama teman sekelas di Monumen Warga.`,
+          challengePrompt: `Bagikan 1 contoh penerapan nyata "${cleanEl}" di Monumen Warga.`,
         },
         {
           buildingId: 'pasar_prestasi',
           buildingName: 'Pasar Prestasi',
           buildingIcon: '🏆',
-          activityTitle: `Penghargaan Penguasaan Materi ${cleanMapel}`,
+          activityTitle: `Penghargaan Pemecah Masalah ${cleanMapel}`,
           materialSummary: `Setiap aktivitas belajar pada materi "${cleanEl}" menambah skor keaktifan dan XP warga di Pasar Prestasi.`,
           challengePrompt: `Kumpulkan XP dari misi Bank Materi untuk masuk Top 5 Warga Berprestasi.`,
         },
@@ -1884,69 +2006,66 @@ app.post('/api/bank-materi/generate-ai', async (req, res) => {
           buildingId: 'masjid',
           buildingName: 'Masjid Al-Hikmah',
           buildingIcon: '🕌',
-          activityTitle: `Integrasi Karakter & Keberkahan Ilmu: ${cleanMapel}`,
-          materialSummary: `Niatkan mempelajari "${cleanEl}" dengan jujur, tekun, dan penuh tanggung jawab agar ilmu yang diperoleh membawa manfaat.`,
-          challengePrompt: `Jaga adab menuntut ilmu dan ketekunan belajar di Kota Refleksia.`,
+          activityTitle: `Etika & Kebermanfaatan Teknologi: ${cleanMapel}`,
+          materialSummary: `Gunakan ilmu "${cleanEl}" untuk menghadirkan solusi teknologi yang jujur, aman, dan bermanfaat bagi masyarakat.`,
+          challengePrompt: `Jaga adab menuntut ilmu dan pemanfaatan teknologi yang positif di Kota Refleksia.`,
         },
       ],
       kuisBengkel: [
         {
-          question: `[Jenjang 1 - Dasar] Berdasarkan materi "${cleanEl}" pada mata pelajaran ${cleanMapel}, apa tujuan pembelajaran utama yang ingin dicapai?`,
+          question: `[Jenjang 1 - Dasar] Dalam kehidupan sehari-hari, seorang siswa sering mengalami kebingungan saat mengelola data dan informasi digital di perangkatnya karena tidak terstruktur. Berdasarkan materi "${cleanEl}" (${cleanMapel}), langkah dasar apa yang harus dilakukan sesuai Tujuan Pembelajaran?`,
           options: [
-            cleanTp.length > 110 ? cleanTp.slice(0, 110) + '...' : cleanTp,
-            'Menghafal daftar istilah tanpa memahami penerapannya dalam proyek',
-            'Melewatkan tahapan perencanaan dan analisis konsep dasar',
-            'Mengabaikan kaidah keselamatan kerja dan kolaborasi tim',
+            `Mengidentifikasi kebutuhan utama lalu menerapkan prinsip dasar "${cleanEl}" (${cleanTp.slice(0, 85)}) secara teratur`,
+            'Menyimpan seluruh file dan informasi secara acak tanpa kategori maupun aturan yang jelas',
+            'Menghapus seluruh aplikasi penting tanpa memeriksa fungsi dan kegunaannya terlebih dahulu',
+            'Membiarkan masalah berlarut-larut tanpa mencari tahu penyebab utamanya',
           ],
           correctIndex: 0,
-          explanation: `Tujuan pembelajaran utama pada elemen "${cleanEl}" adalah: ${cleanTp}`,
+          explanation: `Sesuai Tujuan Pembelajaran (${cleanTp}), langkah dasar pemecahan masalah teknologi harian dimulai dari identifikasi kebutuhan dan penerapan konsep "${cleanEl}" secara terstruktur.`,
         },
         {
-          question: `[Jenjang 2 - Pemahaman] Manakah pernyataan berikut yang paling sesuai dengan pokok Materi Esensial "${cleanEl}" yang diajarkan oleh ${teacherName}?`,
+          question: `[Jenjang 2 - Pemahaman] Mengapa pemahaman terhadap Materi Esensial "${cleanEl}" sangat membantu masyarakat saat menghadapi kendala penggunaan aplikasi atau layanan teknologi sehari-hari?`,
           options: [
-            'Konsep materi tidak memiliki kaitan dengan praktik nyata siswa',
-            cleanEss.length > 110 ? cleanEss.slice(0, 110) + '...' : cleanEss,
-            'Seluruh tahapan dikerjakan secara acak tanpa struktur yang jelas',
-            'Evaluasi hasil karya tidak diperlukan dalam proses belajar',
+            'Karena membuat perangkat elektronik tidak membutuhkan daya listrik sama sekali',
+            `Karena memberikan kerangka berpikir sistematis untuk memahami cara kerja sistem dan menemukan letak kesalahan dengan cepat`,
+            'Karena menghilangkan kebutuhan untuk membaca petunjuk keamanan digital',
+            'Karena semua masalah teknologi dapat selesai sendiri tanpa tindakan pengguna',
           ],
           correctIndex: 1,
-          explanation: `Materi esensial menekankan pada pemahaman konsep inti: ${cleanEss.slice(0, 140)}`,
+          explanation: `Materi esensial "${cleanEl}" membekali pengguna dengan pemahaman alur sistem sehingga saat terjadi kendala teknologi harian, penyebabnya dapat dipetakan secara logis.`,
         },
         {
-          question: `[Jenjang 3 - Penerapan] Saat menerapkan elemen "${cleanEl}" dalam tugas praktik ${cleanMapel}, langkah awal yang paling tepat dilakukan siswa adalah...`,
+          question: `[Jenjang 3 - Penerapan] Keluarga di rumah mengeluhkan proses pencarian dokumen digital dan pengaturan jadwal kegiatan di ponsel yang selalu memakan waktu lama hingga sering terlambat. Bagaimana cara menerapkan konsep "${cleanEl}" untuk menyelesaikan masalah tersebut?`,
           options: [
-            'Langsung mengumpulkan tugas tanpa membaca instruksi dan tujuan pembelajaran',
-            'Memahami prinsip dasar materi esensial lalu menyusun rencana kerja sesuai indikator capaian',
-            'Menyalin pekerjaan teman tanpa melakukan proses analisis mandiri',
-            'Menghindari diskusi maupun refleksi ketika menemui kesulitan teknis',
+            'Membeli ponsel baru setiap minggu meskipun cara penggunaannya tetap berantakan',
+            `Menyusun struktur pengelompokan yang jelas, menetapkan prioritas informasi, dan menerapkan alur kerja "${cleanEl}" yang konsisten`,
+            'Menggabungkan seluruh dokumen pribadi dan jadwal ke dalam satu catatan panjang tanpa judul',
+            'Menonaktifkan seluruh fitur pengingat dan pencarian pada perangkat ponsel',
           ],
           correctIndex: 1,
-          explanation:
-            'Penerapan yang baik selalu dimulai dari pemahaman materi esensial dan perencanaan kerja yang mengacu pada Tujuan Pembelajaran.',
+          explanation: `Penerapan "${cleanEl}" dalam kehidupan sehari-hari dilakukan dengan menata struktur informasi dan alur kerja secara konsisten sehingga waktu pencarian menjadi jauh lebih singkat.`,
         },
         {
-          question: `[Jenjang 4 - Analisis] Mengapa siswa perlu melakukan refleksi setelah mempelajari elemen "${cleanEl}" pada mata pelajaran ${cleanMapel}?`,
+          question: `[Jenjang 4 - Analisis] Sebuah sistem pendaftaran kegiatan siswa secara online mengalami kemacetan karena 65% pengguna salah mengisi kolom data penting. Jika dianalisis menggunakan konsep "${cleanEl}", akar masalah dan solusi perbaikan yang paling tepat adalah...`,
           options: [
-            'Untuk memetakan bagian konsep yang sudah dikuasai dan merancang perbaikan pada bagian yang masih sulit',
-            'Agar tidak perlu mengikuti latihan soal di Lab DKV & Tefa',
-            'Hanya sebagai formalitas tanpa dampak pada peningkatan keterampilan',
-            'Untuk menggantikan seluruh kegiatan praktik kejuruan di kelas',
-          ],
-          correctIndex: 0,
-          explanation:
-            'Refleksi membantu siswa menyadari kekuatan dan celah pemahamannya sehingga dapat menyusun strategi tindak lanjut yang terukur.',
-        },
-        {
-          question: `[Jenjang 5 - Evaluasi & Kreasi] Bagaimana indikator bahwa seorang siswa telah mencapai level Mahir pada elemen "${cleanEl}" (${cleanMapel})?`,
-          options: [
-            'Hanya mampu menyebutkan judul materi tanpa bisa memberi contoh',
-            'Mampu mengintegrasikan konsep materi esensial ke dalam karya/solusi nyata secara mandiri, kritis, dan kreatif',
-            'Bergantung sepenuhnya pada bantuan orang lain saat menyelesaikan masalah dasar',
-            'Belum dapat menghubungkan tujuan pembelajaran dengan hasil pekerjaan',
+            'Menyalahkan seluruh pengguna dan menutup pendaftaran tanpa memperbaiki sistem',
+            'Alur informasi dan validasi input belum menerapkan prinsip materi esensial; solusinya adalah menyederhanakan tahapan dan memperjelas petunjuk pada titik krusial',
+            'Menambah jumlah kolom isian menjadi tiga kali lipat tanpa memberi keterangan',
+            'Menghapus fitur penyimpanan otomatis sehingga siswa harus mengetik ulang dari awal',
           ],
           correctIndex: 1,
-          explanation:
-            'Pada jenjang Mahir, siswa mampu mengevaluasi dan menerapkan konsep esensial secara kreatif serta mandiri sesuai Tujuan Pembelajaran.',
+          explanation: `Analisis berbasis "${cleanEl}" menunjukkan bahwa tingginya kesalahan pengguna disebabkan oleh alur sistem yang belum ramah pengguna; perbaikannya fokus pada penyederhanaan tahapan dan kejelasan panduan.`,
+        },
+        {
+          question: `[Jenjang 5 - Evaluasi & Kreasi] Kamu diminta merancang solusi teknologi sederhana berbasis "${cleanEl}" untuk mengatasi masalah antrean panjang dan kesalahan pesanan di kantin sekolah pada jam istirahat. Rancangan solusi manakah yang paling efektif, realistis, dan memenuhi indikator Tujuan Pembelajaran?`,
+          options: [
+            'Meminta siswa berteriak bersamaan di depan kasir tanpa catatan pesanan',
+            `Merancang sistem pemesanan/katalog terstruktur berbasis "${cleanEl}" yang memisahkan kategori menu, menampilkan rincian biaya otomatis, dan mengurutkan antrean secara transparan`,
+            'Membuat aturan yang melarang siswa membeli makanan selama jam istirahat berlangsung',
+            'Menggunakan formulir kertas tanpa nomor urut yang dikumpulkan secara acak di meja kasir',
+          ],
+          correctIndex: 1,
+          explanation: `Pada level Evaluasi & Kreasi (HOTS), solusi terbaik mengintegrasikan konsep "${cleanEl}" untuk menciptakan sistem yang terstruktur, transparan, dan langsung menyelesaikan masalah nyata di lingkungan sekolah.`,
         },
       ],
     };
@@ -1961,38 +2080,36 @@ app.post('/api/bank-materi/generate-ai', async (req, res) => {
   }
 
   try {
-    const prompt = `Anda adalah Arsitek Kurikulum AI Kota Refleksia untuk SMK Jurusan Desain Komunikasi Visual (DKV).
-Seorang Guru baru saja menginput data Bank Materi berikut:
+    const prompt = `Anda adalah Arsitek Kurikulum AI Kota Refleksia untuk SMK Jurusan Desain Komunikasi Visual (DKV) & Informatika.
+Seorang Guru menginput data Bank Materi berikut:
 - Nama Guru: ${teacherName}
 - Mata Pelajaran: ${mataPelajaran}
 - Kelas Target: ${kelasTarget}
 - Elemen Kurikulum: ${elemen}
 - Tujuan Pembelajaran (TP): ${tujuanPembelajaran}
-- Materi Esensial: ${materiEsensial}
+- Materi Esensial Awal: ${materiEsensial}
 
-Tugas Anda adalah mengolah input Guru tersebut menjadi paket pembelajaran lengkap yang OTOMATIS TERSEBAR ke seluruh 9 bangunan di Refleksia City agar bisa langsung diakses dan dipelajari oleh siswa:
-1. "ringkasanAI": Ringkasan eksekutif materi (2-3 kalimat padat dan inspiratif).
-2. "modulPerpustakaan": Modul bacaan lengkap dan mendalam (minimal 3 BAB: BAB 1 Pengantar & Konteks, BAB 2 Kupas Tuntas Materi Esensial, BAB 3 Studi Kasus & Penerapan Praktis bagi siswa SMK DKV) untuk dipasang di gedung Perpustakaan Kampus.
-3. "pertanyaanRefleksi": Array berisi tepat 3 pertanyaan refleksi kontekstual & mendalam untuk dijawab siswa di gedung Pusat Refleksi.
-4. "topikPodcastMentor": Judul/topik diskusi menarik untuk disiarkan bersama AI Host di gedung Studio ON AIR (Menara Mentor).
-5. "pertanyaanPemantikPodcast": 1 pertanyaan pemantik HOTS yang akan ditanyakan oleh Host Podcast AI kepada siswa saat siaran di Studio ON AIR.
-6. "misiBalaiKota": 1 kalimat misi aksi nyata warga Kota Refleksia yang tampil di papan pengumuman Balai Kota.
-7. "tantanganBangunanLain": Array berisi tepat 9 objek distribusi untuk masing-masing bangunan di Kota Refleksia:
-   - buildingId: "perpustakaan" (buildingName: "Perpustakaan Kampus", buildingIcon: "📚")
-   - buildingId: "taman_refleksi" (buildingName: "Pusat Refleksi", buildingIcon: "🌿")
-   - buildingId: "menara_mentor" (buildingName: "Studio ON AIR", buildingIcon: "🎙️")
-   - buildingId: "bengkel_latihan" (buildingName: "Lab DKV & Tefa", buildingIcon: "🛠️")
-   - buildingId: "balai_kota" (buildingName: "Balai Kota", buildingIcon: "🏛️")
-   - buildingId: "kantor_pos" (buildingName: "Kantor Pos", buildingIcon: "📮")
-   - buildingId: "monumen_warga" (buildingName: "Monumen Warga", buildingIcon: "🗿")
-   - buildingId: "pasar_prestasi" (buildingName: "Pasar Prestasi", buildingIcon: "🏆")
-   - buildingId: "masjid" (buildingName: "Masjid Al-Hikmah", buildingIcon: "🕌")
-   Setiap objek memiliki activityTitle, materialSummary (konten spesifik materi di bangunan tersebut), dan challengePrompt (instruksi aktivitas bagi siswa).
-8. "kuisBengkel": Array berisi tepat 5 soal pilihan ganda berjenjang (Jenjang 1 Dasar, Jenjang 2 Pemahaman, Jenjang 3 Penerapan, Jenjang 4 Analisis, Jenjang 5 Evaluasi/Kreasi) untuk gedung Lab DKV & Tefa (Bengkel Latihan). Setiap soal wajib memiliki:
-   - question (diawali label "[Jenjang 1 - Dasar]" s.d. "[Jenjang 5 - Mahir]")
-   - options (array berisi tepat 4 pilihan jawaban dalam Bahasa Indonesia)
-   - correctIndex (angka 0, 1, 2, atau 3)
-   - explanation (pembahasan jelas mengapa jawaban tersebut benar).`;
+TUGAS UTAMA ANDA (OPTIMASI AI BANK MATERI):
+Kembangkan secara mendalam Materi Esensial dan Tujuan Pembelajaran tersebut menjadi paket materi komprehensif untuk 4 gedung utama:
+1. "materiEsensialDikembangkan": Pengembangan lengkap dan terstruktur dari Materi Esensial agar selaras penuh dengan Tujuan Pembelajaran (minimal 4 poin konsep utama beserta penjelasannya).
+2. "ringkasanAI": Ringkasan eksekutif materi (2-3 kalimat padat, jelas, dan kontekstual).
+3. GEDUNG 1 — PERPUSTAKAAN KAMPUS:
+   - "modulPerpustakaan": Modul bacaan sangat lengkap (4 BAB: BAB 1 Pengantar & Konteks Tujuan Pembelajaran, BAB 2 Kupas Tuntas Materi Esensial, BAB 3 Penjelasan Visual & Skema Cara Kerja Konsep, BAB 4 Implementasi Nyata Materi dalam Memecahkan Masalah Teknologi Kehidupan Sehari-hari).
+   - "ilustrasiVisual": Array berisi tepat 2 objek diagram infografis interaktif & ilustrasi visual kontekstual untuk mendampingi modul di Perpustakaan Kampus. Setiap objek memiliki id, title, badge, caption, visualType ("flow_diagram" atau "comparison_visual" atau "daily_tech_scene"), steps (array 3 langkah berisi stepLabel, icon emoji, dan description), serta takeaway.
+   - "implementasiSehariHari": Array berisi tepat 3 contoh nyata implementasi materi dalam menyelesaikan masalah teknologi di kehidupan sehari-hari. Setiap objek memiliki id, title, icon (emoji), dailyProblem (masalah teknologi sehari-hari), conceptApplication (cara menerapkan materi ini), dan realBenefit (dampak/solusi nyata).
+4. GEDUNG 2 — STUDIO ON AIR (PODCAST & RADIO KAMPUS):
+   - "topikPodcastMentor": Judul episode diskusi Podcast yang menarik dan kontekstual.
+   - "ringkasanMendalamPodcast": Uraian materi mendalam (2-3 paragraf) untuk bekal siswa dan AI Co-Host sebelum siaran dimulai.
+   - "studiKasusPodcast": 1 cerita studi kasus nyata masalah teknologi dalam kehidupan sehari-hari yang berhasil dipecahkan dengan materi ini.
+   - "poinDiskusiPodcast": Array berisi 4 poin alur bahasan utama selama siaran ON AIR.
+   - "pertanyaanPemantikPodcast": 1 pertanyaan pemantik HOTS utama untuk ditanyakan Host AI kepada siswa.
+   - "daftarPemantikPodcast": Array berisi 3 pertanyaan pemantik HOTS seputar penerapan materi dalam kehidupan sehari-hari.
+5. GEDUNG 3 — LAB DKV & TEFA (BENGKEL LATIHAN):
+   - "kuisBengkel": Array berisi tepat 5 soal pilihan ganda berjenjang (diawali label "[Jenjang 1 - Dasar]", "[Jenjang 2 - Pemahaman]", "[Jenjang 3 - Penerapan]", "[Jenjang 4 - Analisis]", "[Jenjang 5 - Evaluasi & Kreasi]").
+   - WAJIB: Ke-5 soal harus mengangkat SKENARIO PENERAPAN MATERI DALAM MEMECAHKAN MASALAH TEKNOLOGI DI KEHIDUPAN SEHARI-HARI!
+6. "pertanyaanRefleksi": Array berisi tepat 3 pertanyaan refleksi mendalam untuk Pusat Refleksi.
+7. "misiBalaiKota": 1 kalimat misi aksi nyata warga Kota Refleksia.
+8. "tantanganBangunanLain": Array berisi tepat 9 objek distribusi bangunan Kota Refleksia.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-4-hydrogen',
@@ -2002,14 +2119,67 @@ Tugas Anda adalah mengolah input Guru tersebut menjadi paket pembelajaran lengka
         responseSchema: {
           type: Type.OBJECT,
           properties: {
+            materiEsensialDikembangkan: { type: Type.STRING },
             ringkasanAI: { type: Type.STRING },
             modulPerpustakaan: { type: Type.STRING },
+            ilustrasiVisual: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  badge: { type: Type.STRING },
+                  caption: { type: Type.STRING },
+                  visualType: { type: Type.STRING },
+                  steps: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        stepLabel: { type: Type.STRING },
+                        icon: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                      },
+                      required: ['stepLabel', 'icon', 'description'],
+                    },
+                  },
+                  takeaway: { type: Type.STRING },
+                },
+                required: ['id', 'title', 'badge', 'caption', 'visualType', 'steps', 'takeaway'],
+              },
+            },
+            implementasiSehariHari: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  icon: { type: Type.STRING },
+                  dailyProblem: { type: Type.STRING },
+                  conceptApplication: { type: Type.STRING },
+                  realBenefit: { type: Type.STRING },
+                },
+                required: ['id', 'title', 'icon', 'dailyProblem', 'conceptApplication', 'realBenefit'],
+              },
+            },
             pertanyaanRefleksi: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
             },
             topikPodcastMentor: { type: Type.STRING },
+            ringkasanMendalamPodcast: { type: Type.STRING },
+            studiKasusPodcast: { type: Type.STRING },
+            poinDiskusiPodcast: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
             pertanyaanPemantikPodcast: { type: Type.STRING },
+            daftarPemantikPodcast: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
             misiBalaiKota: { type: Type.STRING },
             tantanganBangunanLain: {
               type: Type.ARRAY,
@@ -2051,11 +2221,18 @@ Tugas Anda adalah mengolah input Guru tersebut menjadi paket pembelajaran lengka
             },
           },
           required: [
+            'materiEsensialDikembangkan',
             'ringkasanAI',
             'modulPerpustakaan',
+            'ilustrasiVisual',
+            'implementasiSehariHari',
             'pertanyaanRefleksi',
             'topikPodcastMentor',
+            'ringkasanMendalamPodcast',
+            'studiKasusPodcast',
+            'poinDiskusiPodcast',
             'pertanyaanPemantikPodcast',
+            'daftarPemantikPodcast',
             'misiBalaiKota',
             'tantanganBangunanLain',
             'kuisBengkel',
@@ -2075,14 +2252,33 @@ Tugas Anda adalah mengolah input Guru tersebut menjadi paket pembelajaran lengka
       success: true,
       source: 'gemini-ai',
       data: {
+        materiEsensialDikembangkan: parsed.materiEsensialDikembangkan || fb.materiEsensialDikembangkan,
         ringkasanAI: parsed.ringkasanAI || fb.ringkasanAI,
         modulPerpustakaan: parsed.modulPerpustakaan || fb.modulPerpustakaan,
+        ilustrasiVisual:
+          Array.isArray(parsed.ilustrasiVisual) && parsed.ilustrasiVisual.length > 0
+            ? parsed.ilustrasiVisual
+            : fb.ilustrasiVisual,
+        implementasiSehariHari:
+          Array.isArray(parsed.implementasiSehariHari) && parsed.implementasiSehariHari.length > 0
+            ? parsed.implementasiSehariHari
+            : fb.implementasiSehariHari,
         pertanyaanRefleksi:
           Array.isArray(parsed.pertanyaanRefleksi) && parsed.pertanyaanRefleksi.length >= 3
             ? parsed.pertanyaanRefleksi.slice(0, 3)
             : fb.pertanyaanRefleksi,
         topikPodcastMentor: parsed.topikPodcastMentor || fb.topikPodcastMentor,
+        ringkasanMendalamPodcast: parsed.ringkasanMendalamPodcast || fb.ringkasanMendalamPodcast,
+        studiKasusPodcast: parsed.studiKasusPodcast || fb.studiKasusPodcast,
+        poinDiskusiPodcast:
+          Array.isArray(parsed.poinDiskusiPodcast) && parsed.poinDiskusiPodcast.length > 0
+            ? parsed.poinDiskusiPodcast
+            : fb.poinDiskusiPodcast,
         pertanyaanPemantikPodcast: parsed.pertanyaanPemantikPodcast || fb.pertanyaanPemantikPodcast,
+        daftarPemantikPodcast:
+          Array.isArray(parsed.daftarPemantikPodcast) && parsed.daftarPemantikPodcast.length > 0
+            ? parsed.daftarPemantikPodcast
+            : fb.daftarPemantikPodcast,
         misiBalaiKota: parsed.misiBalaiKota || fb.misiBalaiKota,
         tantanganBangunanLain:
           Array.isArray(parsed.tantanganBangunanLain) && parsed.tantanganBangunanLain.length > 0
@@ -5309,42 +5505,42 @@ app.post('/api/menara-asesmen/generate-soal', async (req, res) => {
     if (countGrup > 0) {
       const primaryTp = validTpList[0] || {
         id_tp: 'tp-bm-001',
-        mata_pelajaran: 'Dasar-Dasar DKV',
+        mata_pelajaran: 'Informatika & Dasar-Dasar DKV',
         kelas: 'X DKV',
-        tujuan_pembelajaran: 'Menerapkan prinsip desain dan alur kerja kreatif DKV',
-        isi_materi: 'Materi desain komunikasi visual dan berpikir komputasional.',
+        tujuan_pembelajaran: 'Menerapkan konsep berpikir komputasional dan desain sistem informasi dalam kehidupan sehari-hari',
+        isi_materi: 'Materi pemecahan masalah teknologi sehari-hari, efisiensi algoritma, dan komunikasi visual.',
       };
       stims.push({
         id_stimulus: `STIM-TEKS-${Date.now().toString(36).slice(-4).toUpperCase()}`,
         jenis: 'teks',
-        judul: `Studi Kasus Produksi: ${primaryTp.mata_pelajaran} (${primaryTp.kelas})`,
-        isi: `Tim kreatif siswa ${primaryTp.kelas} sedang mengerjakan proyek berbasis Tujuan Pembelajaran: "${primaryTp.tujuan_pembelajaran}".\n\nRingkasan Materi Acuan:\n${primaryTp.isi_materi || primaryTp.tujuan_pembelajaran}\n\nDalam tahap evaluasi kualitas (Quality Control), guru meminta setiap desainer memeriksa ketepatan konsep, efisiensi langkah kerja, serta kejelasan pesan visual sebelum karya dipublikasikan kepada warga Kota Refleksia.`,
+        judul: `Studi Kasus HOTS Masalah Teknologi Harian: ${primaryTp.mata_pelajaran}`,
+        isi: `Di lingkungan masyarakat dan sekolah, warga mengalami kendala nyata pada sistem layanan digital harian (seperti antrean kantin digital yang sering macet saat jam istirahat, notifikasi informasi darurat yang terlambat terbaca, serta pencatatan data peminjaman alat yang sering ganda).\n\nMengacu pada Tujuan Pembelajaran: "${primaryTp.tujuan_pembelajaran}" serta Materi Esensial:\n${primaryTp.isi_materi || primaryTp.tujuan_pembelajaran}\n\nTim siswa diminta melakukan analisis akar masalah (Level Kognitif C4), mengevaluasi beberapa alternatif perbaikan sistem teknologi (Level Kognitif C5), dan merumuskan rancangan solusi yang paling efisien, aman, serta mudah digunakan oleh warga sehari-hari (Level Kognitif C6).`,
       });
       stims.push({
         id_stimulus: `STIM-TABEL-${Date.now().toString(36).slice(-4).toUpperCase()}`,
         jenis: 'tabel',
-        judul: `Tabel Evaluasi Indikator Capaian — ${primaryTp.mata_pelajaran}`,
+        judul: `Tabel Evaluasi Kinerja Sistem Teknologi Harian Sebelum & Sesudah Optimasi`,
         isi: JSON.stringify({
-          headers: ['Aspek Penilaian', 'Standar Kualitas Minimal', 'Target Unggul (TKA)'],
+          headers: ['Masalah Teknologi Sehari-hari', 'Kondisi Awal (Tanpa Konsep TP)', 'Hasil Optimasi Berbasis Materi Esensial'],
           rows: [
-            ['Ketepatan Konsep TP', 'Memenuhi 1 indikator dasar', 'Selaras penuh dengan Tujuan Pembelajaran'],
-            ['Struktur & Keterbacaan', 'Cukup terbaca di layar standar', 'Hierarki jelas, kontras tinggi & responsif'],
-            ['Efisiensi Alur Kerja', 'Urutan langkah terdokumentasi', 'Terstruktur (Input-Process-Output) & bebas revisi mayor'],
+            ['Waktu Proses Layanan Harian', 'Rata-rata 120 detik/pengguna (sering antre)', 'Rata-rata 25 detik/pengguna (otomatis & terstruktur)'],
+            ['Tingkat Kesalahan Input Pengguna', '38% salah klik akibat tampilan & alur rumit', '4% kesalahan berkat validasi & hierarki jelas'],
+            ['Keamanan & Ketepatan Data Harian', 'Sering duplikat dan sulit dilacak ulang', 'Tersinkronisasi real-time dengan kode unik terverifikasi'],
           ],
         }),
       });
       stims.push({
         id_stimulus: `STIM-GRAFIK-${Date.now().toString(36).slice(-4).toUpperCase()}`,
         jenis: 'grafik',
-        judul: `Grafik Penguasaan Kompetensi Kelas pada ${primaryTp.mata_pelajaran}`,
+        judul: `Grafik Efektivitas Pemecahan Masalah Teknologi Sehari-hari (${primaryTp.mata_pelajaran})`,
         isi: JSON.stringify({
-          title: 'Persentase Ketercapaian Indikator Karya Siswa (%)',
+          title: 'Indeks Efisiensi & Kepuasan Pengguna setelah Penerapan Konsep (%)',
           unit: '%',
           bars: [
-            { label: 'Perencanaan & Analisis Brief', value: 88, color: '#10b981' },
-            { label: 'Eksekusi Visual & Komposisi', value: 82, color: '#38bdf8' },
-            { label: 'Ketepatan Spesifikasi Output', value: 76, color: '#a855f7' },
-            { label: 'Dokumentasi & Evaluasi Mandiri', value: 69, color: '#f59e0b' },
+            { label: 'Kecepatan Akses Informasi Harian', value: 91, color: '#10b981' },
+            { label: 'Akurasi Pemrosesan Data Otomatis', value: 87, color: '#38bdf8' },
+            { label: 'Kemudahan Penggunaan oleh Warga', value: 85, color: '#a855f7' },
+            { label: 'Penurunan Keluhan Gangguan Teknis', value: 82, color: '#f59e0b' },
           ],
         }),
       });
@@ -5374,16 +5570,16 @@ app.post('/api/menara-asesmen/generate-soal', async (req, res) => {
           tipe_penyajian: isGrupQuestion ? 'grup' : 'tunggal',
           id_stimulus: chosenStim ? chosenStim.id_stimulus : '',
           teks_soal: isGrupQuestion
-            ? `Berdasarkan stimulus "${chosenStim?.judul}" di samping serta mengacu pada TP "${tpItem.tujuan_pembelajaran}", keputusan paling tepat yang harus diambil siswa adalah...`
-            : `Dalam mempelajari materi "${tpItem.mata_pelajaran}" dengan tujuan pembelajaran "${tpItem.tujuan_pembelajaran}", langkah penerapan manakah yang paling tepat dilakukan oleh siswa?`,
+            ? `[HOTS - Analisis & Evaluasi] Berdasarkan data pada stimulus "${chosenStim?.judul}" di samping, apabila warga masih mengalami kendala saat menggunakan layanan teknologi harian, strategi pemecahan masalah manakah yang PALING EFEKTIF sesuai Tujuan Pembelajaran "${tpItem.tujuan_pembelajaran}"?`
+            : `[HOTS - Studi Kasus Sehari-hari] Dalam aktivitas sehari-hari, banyak pengguna ponsel dan layanan digital mengalami kesalahan pemrosesan data akibat alur sistem yang tidak terstruktur. Berdasarkan konsep "${tpItem.mata_pelajaran}" (${tpItem.tujuan_pembelajaran}), solusi rancangan manakah yang paling tepat untuk mengatasi masalah tersebut?`,
           opsi: [
-            `Menerapkan konsep inti "${tpItem.tujuan_pembelajaran.slice(0, 95)}" secara sistematis sesuai standar kualitas desain dan komputasi`,
-            'Melewati tahapan perencanaan konsep dan langsung mengekspor file tanpa pemeriksaan kualitas',
-            'Mengabaikan keterbacaan visual serta struktur data agar waktu pengerjaan lebih singkat',
-            'Menggunakan pengaturan acak yang bertentangan dengan spesifikasi materi pembelajaran',
+            `Menganalisis pola masalah harian lalu menerapkan konsep inti "${tpItem.tujuan_pembelajaran.slice(0, 95)}" secara sistematis agar alur teknologi lebih cepat, akurat, dan ramah pengguna`,
+            'Menambah fitur-fitur rumit tanpa melakukan analisis kebutuhan maupun pengujian pada pengguna sehari-hari',
+            'Menghapus seluruh sistem validasi data agar pengguna bisa memasukkan data acak tanpa pemeriksaan',
+            'Mengabaikan kendala teknis yang dialami pengguna dan tetap mempertahankan cara manual yang lambat',
           ],
           kunci_jawaban: '0',
-          pembahasan: `Jawaban A tepat karena selaras langsung dengan tuntutan Tujuan Pembelajaran (${tpItem.tujuan_pembelajaran}) dan materi esensial.`,
+          pembahasan: `Pembahasan HOTS: Opsi A merupakan hasil analisis akar masalah (C4) dan evaluasi solusi terbaik (C5) yang menerapkan "${tpItem.tujuan_pembelajaran}" untuk meningkatkan efisiensi serta akurasi teknologi dalam kehidupan sehari-hari.`,
         });
       } else if (qType === 'pg_mcma') {
         questions.push({
@@ -5395,17 +5591,17 @@ app.post('/api/menara-asesmen/generate-soal', async (req, res) => {
           tipe_penyajian: isGrupQuestion ? 'grup' : 'tunggal',
           id_stimulus: chosenStim ? chosenStim.id_stimulus : '',
           teks_soal: isGrupQuestion
-            ? `Perhatikan stimulus "${chosenStim?.judul}"! Pilihlah SEMUA pernyataan evaluasi yang TEPAT sesuai kompetensi "${tpItem.tujuan_pembelajaran}"! (Jawaban benar lebih dari satu)`
-            : `Manakah dari langkah-langkah berikut yang merupakan praktik TEPAT dalam mencapai tujuan pembelajaran: "${tpItem.tujuan_pembelajaran}"? (Pilih semua yang benar)`,
+            ? `[HOTS - Evaluasi Multi-Aspek] Perhatikan stimulus "${chosenStim?.judul}"! Pilihlah SEMUA keputusan rekayasa/solusi teknologi sehari-hari yang TEPAT berdasarkan kompetensi "${tpItem.tujuan_pembelajaran}"! (Jawaban benar lebih dari satu)`
+            : `[HOTS - Penerapan Teknologi Harian] Sebuah keluarga ingin mengoptimalkan sistem pengelolaan informasi dan keamanan perangkat digital di rumah. Manakah tindakan yang TEPAT sesuai prinsip "${tpItem.tujuan_pembelajaran}"? (Pilih semua yang benar)`,
           opsi: [
-            `Menganalisis kebutuhan proyek berdasarkan materi "${tpItem.mata_pelajaran}" sebelum mengeksekusi karya`,
-            'Memastikan hasil kerja memenuhi indikator ketepatan konsep, keterbacaan, dan kerapian struktur',
-            'Menghapus seluruh dokumentasi proses dan mengabaikan instruksi pada tujuan pembelajaran',
-            'Melakukan evaluasi mandiri terhadap kesesuaian output akhir dengan standar yang ditetapkan',
+            `Memetakan akar permasalahan teknologi harian menggunakan prinsip "${tpItem.mata_pelajaran}" sebelum menentukan langkah solusi`,
+            'Menyusun struktur data dan tampilan informasi yang jelas agar mudah diakses kembali dalam situasi mendesak sehari-hari',
+            'Membiarkan seluruh data, kata sandi, dan pengaturan perangkat bercampur secara acak tanpa struktur pengamanan',
+            'Melakukan evaluasi berkala terhadap kecepatan, keamanan, dan kemudahan penggunaan sistem oleh anggota keluarga/warga',
           ],
           kunci_jawaban: JSON.stringify([0, 1, 3]),
           pembahasan:
-            'Pernyataan 1, 2, dan 4 merupakan tahapan analisis, eksekusi terstandar, dan evaluasi yang mendukung ketercapaian Tujuan Pembelajaran secara utuh.',
+            'Pembahasan HOTS: Pernyataan 1 (Analisis masalah), Pernyataan 2 (Perancangan struktur solusi), dan Pernyataan 4 (Evaluasi keberlanjutan sistem) adalah langkah berpikir tingkat tinggi yang tepat dalam menyelesaikan masalah teknologi sehari-hari.',
         });
       } else {
         questions.push({
@@ -5417,33 +5613,33 @@ app.post('/api/menara-asesmen/generate-soal', async (req, res) => {
           tipe_penyajian: isGrupQuestion ? 'grup' : 'tunggal',
           id_stimulus: chosenStim ? chosenStim.id_stimulus : '',
           teks_soal: isGrupQuestion
-            ? `Berdasarkan data pada stimulus "${chosenStim?.judul}", tentukan apakah setiap pernyataan berikut SESUAI atau TIDAK SESUAI dengan konsep "${tpItem.tujuan_pembelajaran}"!`
-            : `Tentukan apakah setiap pernyataan berikut BENAR atau SALAH terkait penguasaan kompetensi "${tpItem.tujuan_pembelajaran}"!`,
+            ? `[HOTS - Analisis Kritis Stimulus] Berdasarkan fakta dan data pada stimulus "${chosenStim?.judul}", analisis apakah setiap simpulan penerapan teknologi sehari-hari berikut SESUAI atau TIDAK SESUAI dengan konsep "${tpItem.tujuan_pembelajaran}"!`
+            : `[HOTS - Evaluasi Kasus Teknologi Sehari-hari] Tentukan apakah setiap pernyataan analisis pemecahan masalah teknologi harian berikut BENAR atau SALAH berdasarkan kompetensi "${tpItem.tujuan_pembelajaran}"!`,
           opsi: [],
           label_kategori: isGrupQuestion ? ['Sesuai', 'Tidak Sesuai'] : ['Benar', 'Salah'],
           pernyataan_kategori: [
             {
               id_pernyataan: 'p1',
-              teks: `Penerapan konsep pada materi "${tpItem.mata_pelajaran}" wajib mengacu pada indikator: ${tpItem.tujuan_pembelajaran.slice(0, 110)}.`,
+              teks: `Penyelesaian masalah teknologi sehari-hari (seperti antrean layanan digital atau pengelolaan data harian) menjadi jauh lebih cepat apabila dirancang mengikuti indikator: ${tpItem.tujuan_pembelajaran.slice(0, 110)}.`,
               label_opsi: isGrupQuestion ? ['Sesuai', 'Tidak Sesuai'] : ['Benar', 'Salah'],
               kunci: 'A',
             },
             {
               id_pernyataan: 'p2',
-              teks: 'Kualitas karya akhir tetap dianggap unggul meskipun seluruh prinsip dasar pada materi diabaikan sepenuhnya.',
+              teks: 'Apabila sebuah aplikasi harian sering membuat pengguna salah klik dan kehilangan data, perancang tidak perlu mengevaluasi alur sistem maupun struktur informasinya.',
               label_opsi: isGrupQuestion ? ['Sesuai', 'Tidak Sesuai'] : ['Benar', 'Salah'],
               kunci: 'B',
             },
             {
               id_pernyataan: 'p3',
-              teks: 'Evaluasi bertahap dari perencanaan hingga output membantu mencegah kesalahan teknis produksi.',
+              teks: 'Pengujian solusi teknologi pada skenario kehidupan nyata membantu memastikan sistem benar-benar efektif dan meminimalkan tingkat kesalahan pengguna.',
               label_opsi: isGrupQuestion ? ['Sesuai', 'Tidak Sesuai'] : ['Benar', 'Salah'],
               kunci: 'A',
             },
           ],
           kunci_jawaban: JSON.stringify({ p1: 'A', p2: 'B', p3: 'A' }),
           pembahasan:
-            'Pernyataan 1 Benar/Sesuai, Pernyataan 2 Salah/Tidak Sesuai karena mengabaikan prinsip dasar menurunkan mutu karya, dan Pernyataan 3 Benar/Sesuai.',
+            'Pembahasan HOTS: Pernyataan 1 Benar/Sesuai (dampak positif penerapan konsep TP pada efisiensi harian), Pernyataan 2 Salah/Tidak Sesuai (kegagalan sistem wajib dievaluasi akar masalahnya), dan Pernyataan 3 Benar/Sesuai (pentingnya validasi nyata).',
         });
       }
     }
@@ -5460,11 +5656,14 @@ app.post('/api/menara-asesmen/generate-soal', async (req, res) => {
         )
         .join('\n\n');
 
-      const prompt = `Buat paket soal Asesmen Sumatif Mandiri setara TKA (Tes Kemampuan Akademik) untuk siswa SMK Desain Komunikasi Visual (DKV) berdasarkan Tujuan Pembelajaran (TP) dari Bank Materi berikut:
+      const prompt = `Buat paket soal Asesmen Sumatif Mandiri setara TKA (Tes Kemampuan Akademik) berstandar HOTS (Higher-Order Thinking Skills — Level Kognitif C4 Analisis, C5 Evaluasi, dan C6 Kreasi) dengan FOKUS UTAMA PADA PEMECAHAN MASALAH TEKNOLOGI DALAM KEHIDUPAN SEHARI-HARI berdasarkan Tujuan Pembelajaran (TP) dari Bank Materi berikut:
 
 ${tpPromptText}
 
 Spesifikasi Wajib:
+- KARAKTERISTIK SOAL (WAJIB HOTS & KONTEKSTUAL SEHARI-HARI):
+  * Setiap soal WAJIB menyajikan skenario masalah teknologi nyata dalam kehidupan sehari-hari siswa, keluarga, sekolah, atau masyarakat (contoh: efisiensi aplikasi harian, keamanan akun digital, antrean layanan publik digital, manajemen data perangkat harian, otomatisasi jadwal, atau komunikasi visual informasi publik).
+  * Hindari soal hafalan definisi (C1/C2). Buat soal yang menuntut siswa MENGANALISIS akar masalah (C4), MENGEVALUASI perbandingan data/keputusan terbaik (C5), atau MERANCANG solusi teknologi yang tepat (C6).
 - Total Soal: ${totalCount} butir
 - Komposisi Jenis Soal:
   * pg_tunggal (Pilihan Ganda Sederhana 4 opsi, 1 jawaban benar): ${countTunggal} soal
@@ -5473,8 +5672,8 @@ Spesifikasi Wajib:
 - Komposisi Penyajian:
   * Soal Tunggal (tipe_penyajian = "tunggal", id_stimulus = ""): ${countStandalone} soal
   * Soal Grup Berstimulus (tipe_penyajian = "grup", berbagi id_stimulus dari daftar stimulusList): ${countGrup} soal
-- Untuk stimulusList, buat minimal 2 stimulus berkualitas tinggi (kombinasikan jenis "teks", "tabel" dalam format JSON {headers, rows}, atau "grafik" dalam format JSON {title, unit, bars:[{label, value, color}]}).
-- Setiap soal WAJIB memiliki kunci_jawaban dan pembahasan yang jelas dalam Bahasa Indonesia.`;
+- Untuk stimulusList, buat minimal 2 stimulus HOTS berkualitas tinggi bertema masalah teknologi dalam kehidupan sehari-hari (kombinasikan jenis "teks" studi kasus nyata, "tabel" dalam format JSON {headers, rows}, atau "grafik" dalam format JSON {title, unit, bars:[{label, value, color}]}).
+- Setiap soal WAJIB memiliki kunci_jawaban dan pembahasan penalaran HOTS yang jelas dalam Bahasa Indonesia.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-4-hydrogen',

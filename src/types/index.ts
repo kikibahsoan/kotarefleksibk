@@ -65,6 +65,29 @@ export interface Student {
   totalActivities?: number;
 }
 
+export interface BankMateriVisualIllustration {
+  id: string;
+  title: string;
+  badge: string;
+  caption: string;
+  visualType: 'flow_diagram' | 'comparison_visual' | 'daily_tech_scene';
+  steps: Array<{
+    stepLabel: string;
+    icon: string;
+    description: string;
+  }>;
+  takeaway: string;
+}
+
+export interface BankMateriDailyImplementation {
+  id: string;
+  title: string;
+  icon: string;
+  dailyProblem: string;
+  conceptApplication: string;
+  realBenefit: string;
+}
+
 export interface Materi {
   id: string;
   title: string;
@@ -84,6 +107,12 @@ export interface Materi {
   materiEsensial?: string;
   teacherName?: string;
   bankMateriId?: string;
+  ilustrasiVisual?: BankMateriVisualIllustration[];
+  implementasiSehariHari?: BankMateriDailyImplementation[];
+  ringkasanMendalamPodcast?: string;
+  studiKasusPodcast?: string;
+  poinDiskusiPodcast?: string[];
+  daftarPemantikPodcast?: string[];
 }
 
 export interface LearningObjective {
@@ -298,9 +327,15 @@ export interface BankMateriEntry {
   materiEsensial: string;
   ringkasanAI: string;
   modulPerpustakaan: string;
+  ilustrasiVisual?: BankMateriVisualIllustration[];
+  implementasiSehariHari?: BankMateriDailyImplementation[];
   pertanyaanRefleksi: string[];
   topikPodcastMentor: string;
+  ringkasanMendalamPodcast?: string;
+  studiKasusPodcast?: string;
+  poinDiskusiPodcast?: string[];
   pertanyaanPemantikPodcast: string;
+  daftarPemantikPodcast?: string[];
   misiBalaiKota: string;
   tantanganBangunanLain: BankMateriBuildingDistribution[];
   kuisBengkel: QuizQuestion[];

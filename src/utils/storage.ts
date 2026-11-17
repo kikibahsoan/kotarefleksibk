@@ -92,18 +92,110 @@ const INITIAL_BANK_MATERI: BankMateriEntry[] = [
     ringkasanAI:
       'Materi ini membekali siswa DKV dengan fondasi penyusunan tata letak visual menggunakan Hierarki Tipografi, Kontras Warna, Grid System, dan White Space agar karya publikasi memiliki pesan yang langsung tertangkap audiens dalam 3 detik pertama.',
     modulPerpustakaan:
-      'BAB 1 — MENGAPA HIERARKI VISUAL PENTING DALAM DESAIN PUBLIKASI?\nKetika seseorang melihat poster atau konten media sosial, mata mereka hanya membutuhkan waktu kurang dari 3 detik untuk memutuskan apakah informasi tersebut menarik atau membingungkan. Hierarki visual adalah seni memandu pandangan mata pembaca dari elemen terpenting menuju detail pendukung.\n\nBAB 2 — 4 PILAR UTAMA KOMPOSISI GRAFIS\n1. Ukuran & Skala (Scale): Elemen yang lebih besar otomatis dipersepsikan lebih penting. Pastikan Headline memiliki ukuran paling dominan dibanding Body Text.\n2. Kontras Warna & Nilai Gelap-Terang: Gunakan kontras tinggi antara teks utama dan latar belakang agar keterbacaan (readability) tetap terjaga dari jarak jauh.\n3. Keseimbangan & Sistem Grid: Gunakan margin yang konsisten dan rata kiri/tengah yang jelas agar desain tidak terlihat berantakan.\n4. White Space (Ruang Negatif): Jangan memenuhi seluruh kanvas dengan teks atau ornamen. Ruang kosong memberi nafas bagi mata audiens.\n\nBAB 3 — RUMUS CEPAT EVALUASI KARYA (TES 3 DETIK)\nCoba jauhkan desainmu atau kecilkan ukurannya hingga 25%. Apakah judul utamanya masih terbaca jelas? Apa elemen pertama yang dilihat matamu? Jika mata langsung tertuju pada pesan inti, maka hierarki visualmu sudah berhasil!',
+      'BAB 1 — MENGAPA HIERARKI VISUAL PENTING DALAM DESAIN PUBLIKASI & TEKNOLOGI HARIAN?\nKetika seseorang melihat layar aplikasi, poster digital, atau antarmuka mesin layanan mandiri, mata mereka hanya membutuhkan waktu kurang dari 3 detik untuk memutuskan apakah informasi tersebut jelas atau membingungkan. Hierarki visual adalah seni memandu pandangan mata pengguna dari elemen terpenting menuju detail pendukung.\n\nBAB 2 — 4 PILAR UTAMA KOMPOSISI GRAFIS & ANTARMUKA DIGITAL\n1. Ukuran & Skala (Scale): Elemen yang lebih besar otomatis dipersepsikan lebih penting. Pastikan Headline atau tombol aksi utama memiliki ukuran paling dominan.\n2. Kontras Warna & Nilai Gelap-Terang: Gunakan kontras tinggi antara teks utama dan latar belakang agar keterbacaan (readability) tetap terjaga di layar ponsel maupun papan informasi luar ruang.\n3. Keseimbangan & Sistem Grid: Gunakan margin yang konsisten dan tata letak modular agar informasi teknologi tidak terlihat berantakan.\n4. White Space (Ruang Negatif): Jangan memenuhi seluruh layar atau kanvas dengan teks. Ruang kosong memberi nafas bagi mata pengguna dan mencegah salah klik.\n\nBAB 3 — IMPLEMENTASI DALAM KEHIDUPAN SEHARI-HARI & TES 3 DETIK\nDalam kehidupan sehari-hari, prinsip ini diterapkan pada aplikasi pemesanan transportasi online, papan pengumuman jadwal di bandara/rumah sakit, hingga infografis keamanan akun digital. Coba kecilkan desainmu hingga 25%: jika pesan utama dan langkah tindakan langsung terbaca dalam 3 detik, maka hierarki visualmu telah bekerja secara efektif!',
+    ilustrasiVisual: [
+      {
+        id: 'vis-seed-1',
+        title: 'Diagram Alur Pemindaian Mata 3 Detik (Visual Hierarchy Flow)',
+        badge: 'Infografis Interaktif #1',
+        caption: 'Bagan urutan fokus mata pengguna saat membaca antarmuka aplikasi atau poster digital dalam kehidupan sehari-hari.',
+        visualType: 'flow_diagram',
+        steps: [
+          {
+            stepLabel: 'Detik 1: Titik Fokus Utama (Focal Point)',
+            icon: '🎯',
+            description: 'Mata langsung menangkap Judul Utama (Headline) atau Notifikasi Penting berukuran paling besar dan berkontras tinggi.',
+          },
+          {
+            stepLabel: 'Detik 2: Konteks & Visual Pendukung',
+            icon: '🖼️',
+            description: 'Pandangan berpindah ke ikon/ilustrasi visual dan subjudul yang menjelaskan inti informasi secara cepat.',
+          },
+          {
+            stepLabel: 'Detik 3: Detail & Tombol Aksi (CTA)',
+            icon: '⚡',
+            description: 'Pengguna membaca informasi rinci (waktu, lokasi, instruksi) dan langsung mengambil tindakan berkat ruang kosong (White Space) yang rapi.',
+          },
+        ],
+        takeaway: 'Tanpa urutan skala dan kontras yang jelas, pengguna akan melewatkan informasi penting pada layar aplikasi maupun pengumuman publik.',
+      },
+      {
+        id: 'vis-seed-2',
+        title: 'Perbandingan Visual: Layar Semrawut vs. Sistem Grid & White Space',
+        badge: 'Infografis Interaktif #2',
+        caption: 'Simulasi perbedaan tampilan informasi teknologi sehari-hari sebelum dan sesudah menerapkan materi esensial.',
+        visualType: 'comparison_visual',
+        steps: [
+          {
+            stepLabel: 'Masalah: Tanpa Hierarki & Tanpa Ruang Kosong',
+            icon: '⚠️',
+            description: 'Semua teks berukuran sama, warna huruf menyatu dengan latar belakang, menyebabkan pengguna salah menekan tombol dan gagal memahami peringatan.',
+          },
+          {
+            stepLabel: 'Transformasi: Penerapan Grid & Kontras Nilai',
+            icon: '📐',
+            description: 'Informasi dikelompokkan dalam kartu rapi, teks utama diberi kontras tinggi, dan jarak antar elemen diatur konsisten.',
+          },
+          {
+            stepLabel: 'Hasil Nyata: Komunikasi Cepat & Bebas Salah Paham',
+            icon: '✅',
+            description: 'Warga dan pengguna aplikasi dapat menemukan informasi krusial 3 kali lebih cepat tanpa kelelahan mata.',
+          },
+        ],
+        takeaway: 'Kombinasi Kontras + Grid + White Space adalah kunci efisiensi komunikasi visual di era teknologi digital.',
+      },
+    ],
+    implementasiSehariHari: [
+      {
+        id: 'imp-seed-1',
+        title: 'Antarmuka Aplikasi Transportasi & Pembayaran Harian (QRIS)',
+        icon: '📱',
+        dailyProblem: 'Sering terjadi kesalahan nominal transfer atau salah pilih titik jemput karena tombol konfirmasi dan nominal angka terlalu kecil serta rapat.',
+        conceptApplication: 'Menerapkan prinsip Scale (memperbesar nominal pembayaran), Contrast (warna tombol konfirmasi yang tegas), dan White Space di sekitar tombol utama.',
+        realBenefit: 'Mencegah salah transaksi dalam aktivitas pembayaran digital sehari-hari dan mempercepat waktu penggunaan aplikasi.',
+      },
+      {
+        id: 'imp-seed-2',
+        title: 'Infografis Peringatan Cuaca & Keamanan Jaringan Sekolah',
+        icon: '🛡️',
+        dailyProblem: 'Siswa sering mengabaikan pengumuman keamanan Wi-Fi atau jadwal ujian karena teks pengumuman terlalu panjang seperti paragraf koran.',
+        conceptApplication: 'Mengubah teks panjang menjadi tata letak berhierarki dengan ikon peringatan visual, poin-poin ringkas, dan penekanan warna pada langkah pengamanan.',
+        realBenefit: 'Seluruh siswa langsung memahami langkah pengamanan akun dalam sekali lihat di layar ponsel maupun mading digital.',
+      },
+      {
+        id: 'imp-seed-3',
+        title: 'Kemasan & Katalog Produk UMKM Lokal di Media Sosial',
+        icon: '🛍️',
+        dailyProblem: 'Katalog produk usaha warga sulit laku di marketplace karena foto produk tertutup banyak tulisan warna-warni yang bertabrakan.',
+        conceptApplication: 'Menerapkan Modular Grid System untuk menata foto produk, nama barang, keunggulan utama, dan harga secara bersih dan proporsional.',
+        realBenefit: 'Meningkatkan kepercayaan pembeli online dan memudahkan pelanggan membandingkan informasi produk secara instan.',
+      },
+    ],
     pertanyaanRefleksi: [
-      'Saat melihat sebuah poster atau desain publikasi, bagian mana dari prinsip hierarki visual (ukuran, kontras warna, atau ruang kosong) yang paling mudah kamu terapkan?',
-      'Kendala apa yang paling sering kamu alami ketika menyusun banyak teks di dalam satu kanvas desain agar tidak terlihat penuh dan semrawut?',
-      'Bagaimana langkah perbaikan yang akan kamu terapkan pada proyek poster DKV berikutnya setelah memahami konsep Grid System dan White Space?',
+      'Saat menggunakan aplikasi harian di ponsel atau melihat poster digital, bagian mana dari prinsip hierarki visual (ukuran, kontras warna, atau ruang kosong) yang paling mudah kamu terapkan?',
+      'Kendala apa yang paling sering kamu alami ketika menyusun banyak informasi di dalam satu layar/kanvas agar tidak terlihat penuh dan membingungkan pengguna?',
+      'Bagaimana langkah perbaikan yang akan kamu terapkan pada proyek desain solusi teknologi sehari-hari berikutnya setelah memahami konsep Grid System dan White Space?',
     ],
     topikPodcastMentor:
-      'Strategi menyusun Hierarki Visual & Tipografi agar poster karya siswa DKV langsung menarik perhatian audiens dalam 3 detik pertama.',
+      'Strategi menyusun Hierarki Visual & Tipografi agar antarmuka aplikasi dan poster digital langsung dipahami pengguna dalam 3 detik pertama.',
+    ringkasanMendalamPodcast:
+      'Dalam episode Studio ON AIR ini, kita membedah bagaimana Tujuan Pembelajaran Hierarki Visual, Kontras, Grid System, dan White Space bekerja nyata di balik layar aplikasi smartphone, papan navigasi publik, hingga poster kampanye teknologi sehari-hari. Desain bukan sekadar hiasan estetika, melainkan solusi pemecahan masalah informasi agar manusia tidak mengalami kebingungan kognitif (information overload) saat berinteraksi dengan teknologi setiap hari.',
+    studiKasusPodcast:
+      'Studi Kasus Nyata: Sebuah aplikasi kantin digital sekolah mengalami banyak keluhan karena siswa sering salah memesan menu dan antrean kasir menjadi macet. Setelah diteliti, ternyata seluruh nama menu, harga, dan tombol pesan menggunakan ukuran font yang sama di atas latar foto yang ramai. Dengan menerapkan Hierarki Visual (memperjelas foto & harga), Kontras Tinggi pada tombol pesan, serta White Space antar kartu menu, waktu transaksi turun dari 90 detik menjadi 15 detik!',
+    poinDiskusiPodcast: [
+      'Mengapa otak manusia memproses ukuran (scale) dan warna kontras jauh lebih cepat daripada membaca kalimat panjang di layar ponsel?',
+      'Bagaimana kesalahan tata letak visual pada aplikasi sehari-hari dapat menyebabkan salah klik atau kebingungan pengguna?',
+      'Praktik penerapan "Tes 3 Detik" dan White Space untuk menyulap informasi teknologi yang rumit menjadi infografis yang ramah pengguna.',
+    ],
     pertanyaanPemantikPodcast:
-      'Jika kamu diminta mendesain ulang satu poster kegiatan sekolah yang penuh teks, elemen apa yang akan kamu perbesar pertama kali dan bagian mana yang akan kamu beri ruang kosong (white space)?',
+      'Jika kamu diminta memperbaiki tampilan sebuah aplikasi layanan sekolah atau poster informasi publik yang penuh teks dan membingungkan, elemen apa yang akan kamu ubah pertama kali agar pengguna bisa memahaminya dalam 3 detik?',
+    daftarPemantikPodcast: [
+      'Jika kamu diminta memperbaiki tampilan sebuah aplikasi layanan sekolah atau poster informasi publik yang penuh teks dan membingungkan, elemen apa yang akan kamu ubah pertama kali agar pengguna bisa memahaminya dalam 3 detik?',
+      'Pernahkah kamu mengalami kesulitan menggunakan sebuah aplikasi atau membaca petunjuk digital karena desainnya berantakan? Prinsip materi esensial apa yang sebenarnya dilanggar pada kasus tersebut?',
+      'Bagaimana cara menyeimbangkan keinginan menampilkan banyak informasi teknis dengan kebutuhan menjaga ruang kosong (White Space) agar mata pengguna tetap nyaman?',
+    ],
     misiBalaiKota:
-      'Misi Kota: Amati 1 desain poster/informasi di lingkungan sekolah atau kota, lalu identifikasi Headline utama, kontras warna, dan penggunaan White Space-nya!',
+      'Misi Kota: Amati 1 aplikasi harian di ponselmu atau poster informasi di lingkungan sekolah, lalu identifikasi Headline utama, kontras warna, dan penggunaan White Space-nya!',
     tantanganBangunanLain: [
       {
         buildingId: 'perpustakaan',
@@ -1510,6 +1602,12 @@ export const StorageService = {
         materiEsensial: bm.materiEsensial,
         teacherName: bm.teacherName,
         bankMateriId: bm.id,
+        ilustrasiVisual: bm.ilustrasiVisual,
+        implementasiSehariHari: bm.implementasiSehariHari,
+        ringkasanMendalamPodcast: bm.ringkasanMendalamPodcast,
+        studiKasusPodcast: bm.studiKasusPodcast,
+        poinDiskusiPodcast: bm.poinDiskusiPodcast,
+        daftarPemantikPodcast: bm.daftarPemantikPodcast,
       };
       materiMap.set(mId, generatedMateri);
 

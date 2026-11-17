@@ -68,34 +68,34 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
     {
       id_stimulus: 'stim-1',
       id_sesi: sesiId,
-      judul: 'Wacana 1: Kampanye Poster Digital & Cetak Festival Kreatif SMK',
+      judul: 'Wacana 1 [HOTS - Studi Kasus Teknologi Sehari-hari]: Mengatasi Kegagalan Publikasi Digital & Cetak di Sekolah',
       jenis: 'teks',
-      isi: 'Tim kreatif kelas X DKV mendapat proyek merancang media publikasi "Festival Karya SMK Gorontalo". Mereka harus menyiapkan dua versi karya:\n1) Spanduk & Poster Cetak ukuran A2 untuk dipasang di papan pengumuman sekolah.\n2) E-Poster & Feed Instagram ukuran 1080×1350 piksel untuk dipublikasikan di media sosial.\n\nSaat uji cetak pertama, warna poster terlihat kusam karena file masih menggunakan mode warna RGB dengan resolusi 72 DPI, serta judul acara sulit terbaca karena jarak antar teks terlalu rapat tanpa ruang kosong (white space).',
-      sumber: 'Studi Kasus Produksi Desain SMK Negeri 2 Gorontalo',
+      isi: 'Saat mempersiapkan publikasi "Pekan Inovasi & Bazar Digital SMK", panitia siswa menghadapi masalah teknologi sehari-hari:\n1) Poster pengumuman digital yang dibagikan di grup WhatsApp & Instagram terlihat penuh teks rapat tanpa ruang kosong (white space), sehingga 70% siswa salah membaca jam pelaksanaan acara.\n2) Ketika file poster yang sama langsung dicetak ke mesin percetakan spanduk ukuran A2 tanpa mengubah pengaturan aplikasi (masih RGB 72 DPI), warna cetak berubah kusam dan teks pecah (blur).\n3) Saat panitia hendak membatalkan 3 perubahan warna terakhir di aplikasi desain, mereka menggunakan fitur Undo (Ctrl+Z) yang bekerja dengan struktur data Stack (LIFO).',
+      sumber: 'Studi Kasus Masalah Teknologi Sehari-hari — SMK Negeri 2 Gorontalo',
     },
     {
       id_stimulus: 'stim-2',
       id_sesi: sesiId,
-      judul: 'Tabel 1: Spesifikasi Teknis Media Publikasi & Struktur Memori Aplikasi Desain',
+      judul: 'Tabel 1 [HOTS - Analisis Sistem]: Diagnosa Masalah Teknologi Harian & Solusi Komputasional/Visual',
       jenis: 'tabel',
       isi: JSON.stringify({
-        headers: ['Komponen Kerja', 'Spesifikasi / Prinsip', 'Fungsi Utama dalam Proyek DKV'],
+        headers: ['Masalah Teknologi Sehari-hari', 'Prinsip / Spesifikasi Teknis', 'Solusi Penerapan Nyata'],
         rows: [
-          ['Mode Warna CMYK', '300 DPI (Cyan, Magenta, Yellow, Key)', 'Standar warna tinta mesin cetak fisik (spanduk/poster)'],
-          ['Mode Warna RGB', '72–150 PPI (Red, Green, Blue)', 'Standar tampilan layar monitor, HP, dan media sosial'],
-          ['Stack (Tumpukan)', 'LIFO (Last-In, First-Out)', 'Menyimpan riwayat langkah kerja untuk fitur Undo (Ctrl+Z)'],
-          ['Queue (Antrean)', 'FIFO (First-In, First-Out)', 'Mengatur antrean dokumen pada mesin printer/plotter'],
+          ['Warna poster cetak fisik kusam & buram', 'Mode Warna CMYK • Resolusi 300 DPI', 'Konversi profil warna ke CMYK 300 DPI sebelum ekspor file cetak'],
+          ['Layar HP lambat memuat gambar e-poster', 'Mode Warna RGB • 72–150 PPI', 'Optimasi ukuran piksel 1080×1350 px RGB agar tajam dan hemat kuota'],
+          ['Salah langkah saat mengedit desain di aplikasi', 'Stack (Tumpukan) • Prinsip LIFO', 'Memanfaatkan fitur Undo (Ctrl+Z) untuk membatalkan aksi paling akhir lebih dulu'],
+          ['Dokumen menumpuk saat dicetak bersama di lab', 'Queue (Antrean) • Prinsip FIFO', 'Sistem spooler printer memproses dokumen sesuai urutan waktu kirim pertama'],
         ],
       }),
-      sumber: 'Modul Bank Materi Informatika & Dasar DKV',
+      sumber: 'Modul Bank Materi Informatika & Dasar DKV — Penerapan Sehari-hari',
     },
     {
       id_stimulus: 'stim-3',
       id_sesi: sesiId,
-      judul: 'Grafik 1: Persentase Keterbacaan Poster Berdasarkan Komposisi Visual (%)',
+      judul: 'Grafik 1 [HOTS - Evaluasi Data]: Tingkat Keberhasilan Audiens Menemukan Informasi Penting di Layar HP (%)',
       jenis: 'grafik',
       isi: JSON.stringify({
-        title: 'Tingkat Keterbacaan Pesan Poster oleh Audiens dalam 3 Detik Pertama (%)',
+        title: 'Keberhasilan Warga Sekolah Menemukan Info Utama pada E-Poster HP dalam 3 Detik (%)',
         unit: '%',
         bars: [
           { label: 'Desain A (Hierarki Jelas + White Space 30%)', value: 92, color: '#10b981' },
@@ -104,7 +104,7 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
           { label: 'Desain D (Tanpa Margin & Kontras Rendah)', value: 19, color: '#f43f5e' },
         ],
       }),
-      sumber: 'Riset Evaluasi Visual Lab DKV Refleksia',
+      sumber: 'Riset Evaluasi Visual & UX Layar Gawai Lab DKV Refleksia',
     },
   ];
 
@@ -121,19 +121,19 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
       id_stimulus: 'stim-1',
       nomor_urut: 1,
       teks_soal:
-        'Berdasarkan Wacana 1, langkah perbaikan paling tepat agar hasil cetak poster A2 tidak kusam dan judul utama langsung terbaca oleh warga sekolah adalah...',
+        '[HOTS - Analisis C4 • Masalah Teknologi Sehari-hari] Berdasarkan Wacana 1, mengapa 70% siswa salah membaca jam acara di layar HP dan hasil cetak spanduk menjadi kusam, serta bagaimana solusi teknis paling tepat untuk memperbaiki keduanya?',
       opsi: [
-        'Mengubah mode warna ke CMYK 300 DPI serta memperbesar ukuran judul dengan ruang kosong (white space) yang proporsional',
-        'Mengubah ukuran kanvas menjadi 72 DPI RGB dan memenuhi seluruh latar dengan teks dekoratif',
-        'Menyamakan ukuran huruf judul, subjudul, dan isi informasi agar terlihat seragam',
-        'Menurunkan kontras warna antara teks judul dan warna latar belakang poster',
+        'Ketiadaan hierarki visual/white space membuat mata audiens gagal fokus di layar HP, dan mode RGB 72 DPI tidak sesuai untuk mesin cetak; solusinya terapkan skala kontras + white space serta ubah file cetak ke CMYK 300 DPI',
+        'Ukuran layar HP siswa terlalu kecil; solusinya memperkecil ukuran seluruh font menjadi 8 pt dan tetap mencetak file dengan mode RGB 72 DPI',
+        'Menyamakan ukuran huruf judul, subjudul, dan isi informasi agar terlihat seragam di WhatsApp maupun di spanduk cetak',
+        'Menurunkan kontras warna antara teks judul dan warna latar belakang poster agar hemat tinta printer',
       ],
       pernyataan_kategori: [],
       label_kategori: ['Benar', 'Salah'],
       kunci_jawaban: '0',
       poin_soal: 10,
       pembahasan:
-        'Media cetak fisik wajib menggunakan mode warna CMYK dengan resolusi minimal 300 DPI, serta menerapkan hierarki visual dan white space agar judul langsung terbaca.',
+        'Analisis C4: Masalah keterbacaan di HP disebabkan tidak adanya hierarki visual & white space, sedangkan warna cetak kusam disebabkan file masih RGB 72 DPI. Solusi nyatanya adalah menata hierarki + white space dan menyiapkan file cetak dalam CMYK 300 DPI.',
     },
     {
       id_soal: 'soal-2',
@@ -147,19 +147,19 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
       id_stimulus: 'stim-1',
       nomor_urut: 2,
       teks_soal:
-        'Berdasarkan Wacana 1, pilihlah SEMUA keputusan teknis yang BENAR saat tim DKV mengekspor karya untuk dua kebutuhan media tersebut! (Jawaban benar lebih dari satu)',
+        '[HOTS - Evaluasi C5 • Masalah Teknologi Sehari-hari] Berdasarkan Wacana 1, pilihlah SEMUA keputusan teknis yang TEPAT saat tim siswa memperbaiki file untuk layar smartphone dan mesin cetak percetakan! (Jawaban benar lebih dari satu)',
       opsi: [
-        'File E-Poster Instagram diekspor dalam mode warna RGB karena ditayangkan pada layar gawai/smartphone',
-        'File Poster Cetak A2 disiapkan menggunakan mode warna CMYK dengan resolusi 300 DPI',
-        'Menghapus seluruh margin dan ruang kosong (white space) agar poster terlihat padat',
-        'Menempatkan informasi utama (Judul & Tanggal Acara) sebagai focal point dengan kontras tertinggi',
+        'Mengekspor file E-Poster WhatsApp/Instagram dalam mode warna RGB agar warna tampil cerah di layar smartphone tanpa membebani kuota data',
+        'Menyiapkan file master Poster Cetak A2 menggunakan mode warna CMYK dengan resolusi 300 DPI agar tajam saat dicetak',
+        'Menghapus seluruh margin dan ruang kosong (white space) agar seluruh teks muat dalam satu layar kecil',
+        'Menempatkan informasi krusial (Judul, Hari, dan Jam Acara) sebagai focal point dengan kontras tertinggi agar terbaca dalam 3 detik',
       ],
       pernyataan_kategori: [],
       label_kategori: ['Benar', 'Salah'],
       kunci_jawaban: JSON.stringify([0, 1, 3]),
       poin_soal: 15,
       pembahasan:
-        'Pernyataan 1, 2, dan 4 benar: RGB untuk layar digital, CMYK 300 DPI untuk cetak fisik, dan focal point kontras tinggi untuk hierarki visual.',
+        'Evaluasi C5: Pernyataan 1, 2, dan 4 merupakan keputusan teknis yang tepat untuk mengatasi masalah tampilan layar HP dan kualitas cetak fisik.',
     },
     {
       id_soal: 'soal-3',
@@ -173,28 +173,28 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
       id_stimulus: 'stim-2',
       nomor_urut: 3,
       teks_soal:
-        'Perhatikan Tabel 1! Tentukan apakah setiap pernyataan mengenai penerapan konsep Informatika & produksi desain berikut BENAR atau SALAH!',
+        '[HOTS - Evaluasi C5 • Masalah Teknologi Sehari-hari] Perhatikan Tabel 1! Tentukan apakah setiap analisis cara kerja fitur teknologi sehari-hari berikut BENAR atau SALAH!',
       opsi: [],
       pernyataan_kategori: [
         {
           id_pernyataan: 'S1',
-          teks: 'Saat desainer menekan Ctrl+Z (Undo), aksi terakhir yang baru saja dilakukan akan dibatalkan lebih dulu sesuai prinsip LIFO pada Stack.',
+          teks: 'Saat siswa salah memberi warna lalu menekan Ctrl+Z (Undo) di aplikasi desain, perubahan terakhir dibatalkan lebih dulu karena memori riwayat menggunakan struktur Stack (LIFO).',
           teks_pernyataan:
-            'Saat desainer menekan Ctrl+Z (Undo), aksi terakhir yang baru saja dilakukan akan dibatalkan lebih dulu sesuai prinsip LIFO pada Stack.',
+            'Saat siswa salah memberi warna lalu menekan Ctrl+Z (Undo) di aplikasi desain, perubahan terakhir dibatalkan lebih dulu karena memori riwayat menggunakan struktur Stack (LIFO).',
           kunci: 'A',
         },
         {
           id_pernyataan: 'S2',
-          teks: 'Antrean pencetakan 5 poster pada mesin printer laboratorium bekerja menggunakan prinsip LIFO (yang terakhir dikirim dicetak paling awal).',
+          teks: 'Ketika 5 siswa mengirim file tugas ke 1 printer lab secara bersamaan, printer menggunakan prinsip LIFO sehingga file yang dikirim paling akhir akan dicetak paling awal.',
           teks_pernyataan:
-            'Antrean pencetakan 5 poster pada mesin printer laboratorium bekerja menggunakan prinsip LIFO (yang terakhir dikirim dicetak paling awal).',
+            'Ketika 5 siswa mengirim file tugas ke 1 printer lab secara bersamaan, printer menggunakan prinsip LIFO sehingga file yang dikirim paling akhir akan dicetak paling awal.',
           kunci: 'B',
         },
         {
           id_pernyataan: 'S3',
-          teks: 'Tahap mengubah sketsa dan teks mentah menjadi layout poster di aplikasi desain merupakan bagian dari tahap Process dalam alur IPO.',
+          teks: 'Proses mengolah foto mentah dan naskah pengumuman menjadi poster siap publikasi di aplikasi desain merupakan tahap Process dalam alur komputasi Input-Process-Output (IPO).',
           teks_pernyataan:
-            'Tahap mengubah sketsa dan teks mentah menjadi layout poster di aplikasi desain merupakan bagian dari tahap Process dalam alur IPO.',
+            'Proses mengolah foto mentah dan naskah pengumuman menjadi poster siap publikasi di aplikasi desain merupakan tahap Process dalam alur komputasi Input-Process-Output (IPO).',
           kunci: 'A',
         },
       ],
@@ -202,7 +202,7 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
       kunci_jawaban: JSON.stringify({ S1: 'A', S2: 'B', S3: 'A' }),
       poin_soal: 15,
       pembahasan:
-        'S1 Benar (Stack = LIFO untuk Undo), S2 Salah (antrean printer menggunakan Queue = FIFO), S3 Benar (pengolahan layout adalah tahap Process pada IPO).',
+        'S1 Benar (Stack = LIFO untuk fitur Undo), S2 Salah (antrean printer menggunakan Queue = FIFO), S3 Benar (pengolahan layout di aplikasi adalah tahap Process pada IPO).',
     },
     {
       id_soal: 'soal-4',
@@ -216,28 +216,28 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
       id_stimulus: 'stim-3',
       nomor_urut: 4,
       teks_soal:
-        'Berdasarkan data Grafik 1, tentukan apakah kesimpulan evaluasi desain berikut SESUAI atau TIDAK SESUAI!',
+        '[HOTS - Analisis Data C4 • Masalah Keterbacaan Layar HP] Berdasarkan data Grafik 1, tentukan apakah keputusan desain untuk mengatasi masalah pesan tidak terbaca di layar HP berikut SESUAI atau TIDAK SESUAI!',
       opsi: [],
       pernyataan_kategori: [
         {
           id_pernyataan: 'S1',
-          teks: 'Kombinasi hierarki visual yang jelas dan ruang kosong (white space) 30% menghasilkan keterbacaan tertinggi hingga 92%.',
+          teks: 'Menerapkan hierarki visual yang jelas disertai ruang kosong (white space) 30% seperti Desain A efektif meningkatkan keberhasilan baca di layar HP hingga 92%.',
           teks_pernyataan:
-            'Kombinasi hierarki visual yang jelas dan ruang kosong (white space) 30% menghasilkan keterbacaan tertinggi hingga 92%.',
+            'Menerapkan hierarki visual yang jelas disertai ruang kosong (white space) 30% seperti Desain A efektif meningkatkan keberhasilan baca di layar HP hingga 92%.',
           kunci: 'A',
         },
         {
           id_pernyataan: 'S2',
-          teks: 'Menyeragamkan ukuran seluruh huruf pada poster (Desain C) membuat pesan lebih cepat ditangkap dibanding Desain B.',
+          teks: 'Menyeragamkan ukuran seluruh huruf dan memenuhi layar dengan teks (Desain C) lebih efektif mengatasi masalah salah baca dibanding Desain B.',
           teks_pernyataan:
-            'Menyeragamkan ukuran seluruh huruf pada poster (Desain C) membuat pesan lebih cepat ditangkap dibanding Desain B.',
+            'Menyeragamkan ukuran seluruh huruf dan memenuhi layar dengan teks (Desain C) lebih efektif mengatasi masalah salah baca dibanding Desain B.',
           kunci: 'B',
         },
         {
           id_pernyataan: 'S3',
-          teks: 'Selisih tingkat keterbacaan antara Desain A dan Desain D mencapai 73 poin persentase.',
+          teks: 'Perbaikan komposisi dari Desain D ke Desain A meningkatkan keterbacaan pesan di layar HP sebesar 73 poin persentase.',
           teks_pernyataan:
-            'Selisih tingkat keterbacaan antara Desain A dan Desain D mencapai 73 poin persentase.',
+            'Perbaikan komposisi dari Desain D ke Desain A meningkatkan keterbacaan pesan di layar HP sebesar 73 poin persentase.',
           kunci: 'A',
         },
       ],
@@ -259,19 +259,19 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
       id_stimulus: '',
       nomor_urut: 5,
       teks_soal:
-        'Seorang fotografer SMK ingin mencari 1 file foto tertentu dari 500 file yang sudah diurutkan berdasarkan nomor urut nama file (IMG_0001 sampai IMG_0500). Algoritma pencarian paling efisien untuk menemukan file tersebut adalah...',
+        '[HOTS - Analisis C4 • Masalah Pengelolaan File di Laptop] Seorang fotografer dokumentasi sekolah kesulitan menemukan 1 file foto pesanan guru dari 1.000 file di laptopnya. Jika seluruh file sudah diurutkan terlebih dahulu berdasarkan nama (IMG_0001 s.d. IMG_1000), strategi komputasional paling efisien yang bekerja di balik fitur pencarian cepat adalah...',
       opsi: [
-        'Binary Search (Pencarian Bagi Dua pada data terurut)',
-        'Random Guessing (Tebak Acak tanpa pola)',
-        'Menghapus separuh folder secara manual',
-        'Mengubah seluruh ekstensi file menjadi TXT',
+        'Binary Search (Pencarian Bagi Dua pada data terurut sehingga jumlah pengecekan jauh lebih sedikit)',
+        'Membuka satu per satu file secara acak tanpa memperhatikan urutan nomor file',
+        'Menghapus separuh folder secara manual agar kapasitas penyimpanan berkurang',
+        'Mengubah seluruh ekstensi file foto menjadi TXT sebelum dicari',
       ],
       pernyataan_kategori: [],
       label_kategori: ['Benar', 'Salah'],
       kunci_jawaban: '0',
       poin_soal: 10,
       pembahasan:
-        'Binary Search sangat cepat dan efisien digunakan ketika kumpulan data sudah berada dalam keadaan terurut (sorted).',
+        'Analisis C4: Ketika data pada penyimpanan komputer sudah terurut (sorted), algoritma Binary Search membagi dua ruang pencarian secara berulang sehingga jauh lebih cepat dibanding pencarian satu per satu.',
     },
     {
       id_soal: 'soal-6',
@@ -285,19 +285,19 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
       id_stimulus: '',
       nomor_urut: 6,
       teks_soal:
-        'Manakah di antara prinsip berikut yang secara langsung membantu menciptakan Hierarki Visual yang kuat pada desain poster layanan masyarakat? (Pilih semua jawaban yang benar)',
+        '[HOTS - Kreasi Solusi C6 • Desain Informasi Sehari-hari] Ketika merancang infografis pengumuman sekolah untuk dibaca di layar smartphone, langkah desain manakah yang terbukti efektif mencegah masalah kelelahan mata (visual clutter) pada pembaca? (Pilih semua jawaban yang benar)',
       opsi: [
-        'Perbedaan ukuran (size/scale) yang tegas antara judul utama dan teks penjelasan',
-        'Penggunaan kontras warna antara elemen utama (focal point) dengan latar belakang',
-        'Pengaturan jarak pengelompokan informasi (proximity) dan ruang kosong (white space)',
-        'Menggunakan 9 jenis font dekoratif yang berbeda dalam satu kalimat pendek',
+        'Membedakan ukuran (scale) secara tegas antara judul utama, subjudul, dan rincian isi informasi',
+        'Memberikan kontras warna yang jelas antara elemen fokus utama (focal point) dengan warna latar belakang',
+        'Mengelompokkan informasi sejenis (proximity) dan menyediakan ruang kosong (white space) minimal 25–30%',
+        'Menggunakan 9 jenis font dekoratif berbeda dalam satu paragraf agar terlihat ramai',
       ],
       pernyataan_kategori: [],
       label_kategori: ['Benar', 'Salah'],
       kunci_jawaban: JSON.stringify([0, 1, 2]),
       poin_soal: 15,
       pembahasan:
-        'Skala ukuran, kontras warna, proximity, dan white space memperkuat hierarki visual, sedangkan terlalu banyak font dekoratif justru merusak keterbacaan.',
+        'Kreasi Solusi C6: Skala ukuran, kontras warna, proximity, dan white space adalah solusi desain untuk mencegah visual clutter pada layar smartphone.',
     },
   ];
 
@@ -305,7 +305,7 @@ export function createDefaultCanonicalStore(): CanonicalMenaraAsesmenStore {
     version: 1,
     sesi: {
       id_sesi: sesiId,
-      judul_asesmen: 'Asesmen Sumatif Mandiri (TKA) — Dasar DKV & Berpikir Komputasional',
+      judul_asesmen: 'Asesmen Sumatif Mandiri (TKA HOTS) — Pemecahan Masalah Teknologi Sehari-hari',
       tp_terpilih: defaultTpDetail.map((t) => t.id_tp),
       tp_detail: defaultTpDetail,
       jumlah_soal: defaultBankSoal.length,
@@ -835,39 +835,39 @@ export function buildAdaptiveQuestionsFromTpList(params: {
     stimuli.push({
       id_stimulus: 'stim-gen-1',
       id_sesi: sesiId,
-      judul: `Wacana Kontekstual: Proyek Studio ${tp0.mata_pelajaran} (${tp0.kelas})`,
+      judul: `Wacana HOTS (Studi Kasus Teknologi Sehari-hari): ${tp0.mata_pelajaran} (${tp0.kelas})`,
       jenis: 'teks',
-      isi: `Dalam kegiatan pembelajaran "${tp0.mata_pelajaran}" di Kota Refleksia, tim siswa kelas ${tp0.kelas} diminta menyelesaikan tantangan proyek nyata dengan capaian utama:\n"${tp0.tujuan_pembelajaran}"\n\nRingkasan Materi Rujukan:\n${tp0.isi_materi || tp0.tujuan_pembelajaran}\n\nTim harus menganalisis kebutuhan pengguna, memilih spesifikasi teknis yang tepat, melakukan uji kualitas karya, dan memastikan hasil akhir komunikatif serta sesuai standar kejuruan.`,
-      sumber: `Bank Materi Kota Refleksia • ${tp0.mata_pelajaran}`,
+      isi: `Dalam aktivitas digital sehari-hari di sekolah dan masyarakat, siswa kelas ${tp0.kelas} menemukan masalah teknis terkait materi "${tp0.mata_pelajaran}". Sering kali pengguna perangkat teknologi (smartphone, laptop, aplikasi desain, maupun mesin cetak) mengalami kendala performa, kesalahan alur kerja, atau pesan visual yang gagal dipahami audiens karena mengabaikan kaidah:\n"${tp0.tujuan_pembelajaran}"\n\nLandasan Materi & Solusi:\n${tp0.isi_materi || tp0.tujuan_pembelajaran}\n\nTim siswa ditugaskan menganalisis akar masalah (C4), mengevaluasi ketepatan spesifikasi teknis (C5), serta merancang solusi praktis yang efisien (C6) agar sistem/karya berjalan optimal dalam kehidupan sehari-hari.`,
+      sumber: `Studi Kasus HOTS Masalah Teknologi Sehari-hari • ${tp0.mata_pelajaran}`,
     });
 
     if (targetGrupCount >= 3) {
       stimuli.push({
         id_stimulus: 'stim-gen-2',
         id_sesi: sesiId,
-        judul: `Tabel Evaluasi Indikator: ${tp1.mata_pelajaran}`,
+        judul: `Tabel Evaluasi HOTS Masalah Teknologi Harian: ${tp1.mata_pelajaran}`,
         jenis: 'tabel',
         isi: JSON.stringify({
-          headers: ['Tahap Evaluasi', 'Fokus Kompetensi', 'Indikator Keberhasilan Proyek'],
+          headers: ['Masalah Teknologi Sehari-hari', 'Kompetensi & Materi Rujukan', 'Solusi Penerapan Nyata (HOTS)'],
           rows: [
             [
-              '1. Perencanaan & Konsep',
+              '1. Kendala Efisiensi & Alur Kerja Digital',
               tp0.mata_pelajaran,
-              `Kesesuaian konsep dengan TP: ${tp0.tujuan_pembelajaran.slice(0, 90)}`,
+              `Menganalisis & menata ulang alur sesuai TP: ${tp0.tujuan_pembelajaran.slice(0, 90)}`,
             ],
             [
-              '2. Eksekusi Teknis',
+              '2. Kesalahan Konfigurasi / Teknis Aplikasi',
               tp1.mata_pelajaran,
-              `Penerapan prosedur tepat sesuai materi: ${(tp1.isi_materi || tp1.tujuan_pembelajaran).slice(0, 90)}`,
+              `Menerapkan parameter teknis tepat sesuai: ${(tp1.isi_materi || tp1.tujuan_pembelajaran).slice(0, 90)}`,
             ],
             [
-              '3. Uji Kualitas & Publikasi',
-              'Refleksi & Standar Mutu',
-              'Karya teruji rapi, fungsional, dan mudah dipahami audiens sasaran',
+              '3. Evaluasi Pengalaman Pengguna (Audiens)',
+              'Uji Kelayakan & Solusi Nyata',
+              'Solusi terbukti mudah diakses di perangkat harian, cepat diproses, dan bebas dari kesalahan teknis',
             ],
           ],
         }),
-        sumber: `Bank Materi Kota Refleksia • ${tp1.mata_pelajaran}`,
+        sumber: `Bank Materi HOTS Kota Refleksia • ${tp1.mata_pelajaran}`,
       });
     }
   }
@@ -891,18 +891,18 @@ export function buildAdaptiveQuestionsFromTpList(params: {
         tipe_penyajian: isGrup ? 'grup' : 'tunggal',
         id_stimulus: chosenStimulus ? chosenStimulus.id_stimulus : '',
         nomor_urut: nomor,
-        teks_soal: `${stimPrefix}manakah langkah penerapan paling tepat untuk mencapai tujuan pembelajaran "${tp.tujuan_pembelajaran}" pada mata pelajaran ${tp.mata_pelajaran}?`,
+        teks_soal: `[HOTS - Analisis & Pemecahan Masalah C4] ${stimPrefix}ketika seorang siswa menghadapi masalah teknis sehari-hari pada penggunaan perangkat/aplikasi terkait "${tp.tujuan_pembelajaran}" (${tp.mata_pelajaran}), solusi paling tepat berdasarkan analisis akar masalahnya adalah...`,
         opsi: [
-          `Menerapkan konsep inti secara sistematis sesuai kaidah: ${(tp.isi_materi || tp.tujuan_pembelajaran).slice(0, 110)}`,
-          'Mengabaikan tahap perencanaan dan langsung mengekspor karya tanpa evaluasi kualitas',
-          'Menggunakan parameter teknis secara acak tanpa memperhatikan kebutuhan audiens sasaran',
-          'Menghilangkan struktur utama agar waktu pengerjaan lebih singkat namun pesan tidak terbaca',
+          `Menganalisis penyebab masalah lalu menerapkan kaidah secara terstruktur: ${(tp.isi_materi || tp.tujuan_pembelajaran).slice(0, 125)}`,
+          'Mengabaikan diagnosa awal dan langsung mengekspor/menjalankan sistem tanpa memeriksa kesesuaian spesifikasi perangkat',
+          'Mengubah pengaturan aplikasi secara acak (trial-and-error) tanpa memperhatikan kebutuhan pengguna di kehidupan sehari-hari',
+          'Menghapus seluruh struktur utama proyek agar ukuran file lebih kecil meskipun fungsi utamanya hilang',
         ],
         pernyataan_kategori: [],
         label_kategori: ['Benar', 'Salah'],
         kunci_jawaban: '0',
         poin_soal: Number(poinPerJenis.pg_tunggal) || 10,
-        pembahasan: `Jawaban A tepat karena selaras langsung dengan Tujuan Pembelajaran (${tp.id_tp}): ${tp.tujuan_pembelajaran}.`,
+        pembahasan: `Analisis HOTS (C4): Jawaban A menyelesaikan akar masalah teknologi sehari-hari menggunakan prinsip Tujuan Pembelajaran (${tp.id_tp}): ${tp.tujuan_pembelajaran}.`,
       };
     }
 
@@ -918,18 +918,18 @@ export function buildAdaptiveQuestionsFromTpList(params: {
         tipe_penyajian: isGrup ? 'grup' : 'tunggal',
         id_stimulus: chosenStimulus ? chosenStimulus.id_stimulus : '',
         nomor_urut: nomor,
-        teks_soal: `${stimPrefix}pilihlah SEMUA indikator praktik yang TEPAT dalam menguasai kompetensi "${tp.tujuan_pembelajaran}"! (Jawaban benar lebih dari satu)`,
+        teks_soal: `[HOTS - Evaluasi Multi-Solusi C5] ${stimPrefix}pilihlah SEMUA keputusan teknis yang TEPAT untuk menyelesaikan masalah penerapan "${tp.tujuan_pembelajaran}" dalam kehidupan sehari-hari! (Jawaban benar lebih dari satu)`,
         opsi: [
-          `Memahami prinsip dasar dan materi esensial pada ${tp.mata_pelajaran} secara utuh`,
-          `Menganalisis keterkaitan antara konsep "${tp.tujuan_pembelajaran.slice(0, 75)}" dengan studi kasus nyata`,
-          'Melakukan pemeriksaan mutu dan refleksi hasil kerja sebelum dikumpulkan',
-          'Melewatkan seluruh prosedur standar agar terhindar dari proses verifikasi kualitas',
+          `Mengidentifikasi akar masalah pada perangkat/media harian menggunakan konsep ${tp.mata_pelajaran}`,
+          `Menerapkan solusi terukur berdasarkan kaidah "${tp.tujuan_pembelajaran.slice(0, 80)}" agar sistem/karya berjalan optimal`,
+          'Menguji coba hasil solusi pada perangkat nyata (HP/laptop/cetak) untuk memastikan masalah benar-benar teratasi',
+          'Melewatkan tahap pengujian kualitas agar pekerjaan cepat selesai meskipun masih terjadi error pada perangkat pengguna',
         ],
         pernyataan_kategori: [],
         label_kategori: ['Benar', 'Salah'],
         kunci_jawaban: JSON.stringify([0, 1, 2]),
         poin_soal: Number(poinPerJenis.pg_mcma) || 15,
-        pembahasan: `Pernyataan 1, 2, dan 3 merupakan langkah komprehensif pencapaian TP "${tp.tujuan_pembelajaran}".`,
+        pembahasan: `Evaluasi HOTS (C5): Pernyataan 1, 2, dan 3 merupakan rangkaian solusi komprehensif pemecahan masalah teknologi sehari-hari sesuai TP "${tp.tujuan_pembelajaran}".`,
       };
     }
 
@@ -937,20 +937,20 @@ export function buildAdaptiveQuestionsFromTpList(params: {
     const stmts = [
       {
         id_pernyataan: 'S1',
-        teks: `Penerapan kompetensi "${tp.tujuan_pembelajaran.slice(0, 95)}" membutuhkan pemahaman konsep dan ketelitian analisis.`,
-        teks_pernyataan: `Penerapan kompetensi "${tp.tujuan_pembelajaran.slice(0, 95)}" membutuhkan pemahaman konsep dan ketelitian analisis.`,
+        teks: `Pemecahan masalah teknologi sehari-hari melalui kompetensi "${tp.tujuan_pembelajaran.slice(0, 95)}" memerlukan analisis penyebab masalah sebelum mengeksekusi solusi.`,
+        teks_pernyataan: `Pemecahan masalah teknologi sehari-hari melalui kompetensi "${tp.tujuan_pembelajaran.slice(0, 95)}" memerlukan analisis penyebab masalah sebelum mengeksekusi solusi.`,
         kunci: 'A' as const,
       },
       {
         id_pernyataan: 'S2',
-        teks: `Dalam mata pelajaran ${tp.mata_pelajaran}, kualitas hasil akhir tetap optimal meskipun seluruh prinsip dasar diabaikan.`,
-        teks_pernyataan: `Dalam mata pelajaran ${tp.mata_pelajaran}, kualitas hasil akhir tetap optimal meskipun seluruh prinsip dasar diabaikan.`,
+        teks: `Ketika terjadi kendala teknis pada penggunaan aplikasi/media ${tp.mata_pelajaran}, mengabaikan spesifikasi standar perangkat tetap akan menghasilkan performa yang optimal.`,
+        teks_pernyataan: `Ketika terjadi kendala teknis pada penggunaan aplikasi/media ${tp.mata_pelajaran}, mengabaikan spesifikasi standar perangkat tetap akan menghasilkan performa yang optimal.`,
         kunci: 'B' as const,
       },
       {
         id_pernyataan: 'S3',
-        teks: `Evaluasi bertahap berdasarkan materi "${(tp.isi_materi || tp.tujuan_pembelajaran).slice(0, 85)}" membantu mencegah kesalahan produksi.`,
-        teks_pernyataan: `Evaluasi bertahap berdasarkan materi "${(tp.isi_materi || tp.tujuan_pembelajaran).slice(0, 85)}" membantu mencegah kesalahan produksi.`,
+        teks: `Penerapan konsep "${(tp.isi_materi || tp.tujuan_pembelajaran).slice(0, 85)}" membantu pengguna menyelesaikan pekerjaan digital harian secara lebih cepat, rapi, dan akurat.`,
+        teks_pernyataan: `Penerapan konsep "${(tp.isi_materi || tp.tujuan_pembelajaran).slice(0, 85)}" membantu pengguna menyelesaikan pekerjaan digital harian secara lebih cepat, rapi, dan akurat.`,
         kunci: 'A' as const,
       },
     ];
@@ -966,7 +966,7 @@ export function buildAdaptiveQuestionsFromTpList(params: {
       tipe_penyajian: isGrup ? 'grup' : 'tunggal',
       id_stimulus: chosenStimulus ? chosenStimulus.id_stimulus : '',
       nomor_urut: nomor,
-      teks_soal: `${stimPrefix}tentukan apakah setiap pernyataan terkait Tujuan Pembelajaran "${tp.tujuan_pembelajaran}" berikut ${
+      teks_soal: `[HOTS - Analisis Kritis & Evaluasi C5] ${stimPrefix}tentukan apakah setiap pernyataan evaluasi kasus penerapan "${tp.tujuan_pembelajaran}" dalam kehidupan sehari-hari berikut ${
         useSesuai ? 'SESUAI atau TIDAK SESUAI' : 'BENAR atau SALAH'
       }!`,
       opsi: [],
@@ -974,9 +974,9 @@ export function buildAdaptiveQuestionsFromTpList(params: {
       label_kategori: useSesuai ? ['Sesuai', 'Tidak Sesuai'] : ['Benar', 'Salah'],
       kunci_jawaban: JSON.stringify({ S1: 'A', S2: 'B', S3: 'A' }),
       poin_soal: (Number(poinPerJenis.pg_kategori_per_pernyataan) || 5) * stmts.length,
-      pembahasan: `Pernyataan S1 dan S3 ${useSesuai ? 'Sesuai' : 'Benar'}, sedangkan S2 ${
+      pembahasan: `Evaluasi HOTS (C5): Pernyataan S1 dan S3 ${useSesuai ? 'Sesuai' : 'Benar'}, sedangkan S2 ${
         useSesuai ? 'Tidak Sesuai' : 'Salah'
-      } karena mengabaikan prinsip dasar akan menurunkan kualitas karya.`,
+      } karena mengabaikan standar teknis perangkat justru memperparah masalah di lapangan.`,
     };
   });
 

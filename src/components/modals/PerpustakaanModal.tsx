@@ -589,20 +589,37 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
                   <div className="border-b border-white/10 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950">
-                          BUKU {selectedTheme.num} DARI 05
-                        </span>
+                        {selectedBookIndex >= 0 ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950">
+                            BUKU {selectedTheme.num} DARI 05
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-500 text-white">
+                            🏦 MODUL PENGEMBANGAN AI BANK MATERI
+                          </span>
+                        )}
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${selectedTheme.badgeBg}`}>
                           {selectedBook.subject}
                         </span>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-slate-300">
                           Kelas: {selectedBook.targetClass}
                         </span>
+                        {selectedBook.teacherName && (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                            👩‍🏫 {selectedBook.teacherName}
+                          </span>
+                        )}
                       </div>
                       <h3 className="text-base sm:text-lg font-black text-white leading-snug flex items-center gap-2">
-                        <span>{selectedTheme.icon}</span>
+                        <span>{selectedBookIndex >= 0 ? selectedTheme.icon : '📘'}</span>
                         <span>{selectedBook.title}</span>
                       </h3>
+                      {selectedBook.tujuanPembelajaran && (
+                        <p className="text-xs text-indigo-200/95 bg-indigo-950/50 border border-indigo-500/30 rounded-xl px-3 py-2 mt-1">
+                          <strong className="text-amber-300">🎯 Tujuan Pembelajaran (TP):</strong>{' '}
+                          {selectedBook.tujuanPembelajaran}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -610,23 +627,192 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
                   <div className="p-4 rounded-2xl bg-emerald-950/35 border border-emerald-500/30 space-y-2">
                     <div className="text-xs font-extrabold text-emerald-300 flex items-center gap-1.5 uppercase tracking-wider">
                       <Layers className="w-4 h-4 text-emerald-400" />
-                      <span>Inti Sari & Poin Penting Buku {selectedTheme.num}</span>
+                      <span>
+                        {selectedBookIndex >= 0
+                          ? `Inti Sari & Poin Penting Buku ${selectedTheme.num}`
+                          : `Materi Esensial & Poin Inti Pengembangan (${selectedBook.elemen || selectedBook.subject})`}
+                      </span>
                     </div>
-                    <ul className="space-y-1.5 text-xs text-emerald-100/90 leading-relaxed pl-1">
-                      {selectedTheme.keyPoints.map((pt, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <span className="text-amber-400 font-bold">•</span>
-                          <span>{pt}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    {selectedBookIndex >= 0 ? (
+                      <ul className="space-y-1.5 text-xs text-emerald-100/90 leading-relaxed pl-1">
+                        {selectedTheme.keyPoints.map((pt, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-amber-400 font-bold">•</span>
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-xs text-emerald-100/95 whitespace-pre-line leading-relaxed">
+                        {selectedBook.materiEsensial || selectedBook.tujuanPembelajaran || selectedBook.title}
+                      </div>
+                    )}
                   </div>
+
+                  {/* ILUSTRASI VISUAL KONTEKSTUAL & DIAGRAM INFOGRAFIS INTERAKTIF */}
+                  {(() => {
+                    const visuals =
+                      selectedBook.ilustrasiVisual && selectedBook.ilustrasiVisual.length > 0
+                        ? selectedBook.ilustrasiVisual
+                        : [
+                            {
+                              id: `vis-auto-${selectedBook.id}-1`,
+                              title: `Diagram Visual Cara Kerja: ${selectedBook.elemen || selectedBook.title}`,
+                              badge: 'Infografis Visual Kontekstual',
+                              caption: `Visualisasi bagaimana konsep pada "${selectedBook.title}" diterapkan dari masalah harian menjadi solusi teknologi nyata.`,
+                              visualType: 'flow_diagram' as const,
+                              steps: [
+                                {
+                                  stepLabel: 'Tahap 1: Input & Identifikasi Masalah Harian',
+                                  icon: '🔍',
+                                  description: `Mengamati masalah teknologi di kehidupan sehari-hari terkait ${selectedBook.subject} dan memetakan kebutuhan data utama.`,
+                                },
+                                {
+                                  stepLabel: 'Tahap 2: Proses Transformasi Konsep',
+                                  icon: '⚙️',
+                                  description: `Menerapkan prinsip inti "${(selectedBook.tujuanPembelajaran || selectedBook.title).slice(0, 95)}" secara sistematis dan terstruktur.`,
+                                },
+                                {
+                                  stepLabel: 'Tahap 3: Output Solusi & Implementasi Nyata',
+                                  icon: '🚀',
+                                  description: `Menghasilkan sistem/karya yang cepat, akurat, ramah pengguna, dan langsung menyelesaikan masalah sehari-hari.`,
+                                },
+                              ],
+                              takeaway: `Setiap tahapan pada diagram di atas memastikan konsep ${selectedBook.subject} dapat dipraktikkan langsung dalam kehidupan sehari-hari.`,
+                            },
+                          ];
+
+                    return (
+                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-950/60 via-slate-900/95 to-cyan-950/40 border border-cyan-500/40 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-amber-300" />
+                            <span>Ilustrasi Visual Kontekstual &amp; Diagram Infografis Interaktif</span>
+                          </div>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-200 border border-cyan-400/30">
+                            Visualisasi Konsep &amp; Alur Sistem
+                          </span>
+                        </div>
+
+                        {/* Contextual SVG Banner Illustration */}
+                        <div className="rounded-2xl bg-slate-950/90 border border-indigo-500/30 p-3 sm:p-4 overflow-hidden">
+                          <svg
+                            viewBox="0 0 760 155"
+                            className="w-full h-auto rounded-xl"
+                            role="img"
+                            aria-label={`Ilustrasi Visual ${selectedBook.title}`}
+                          >
+                            <defs>
+                              <linearGradient id="bgGradPerpus" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#0f172a" />
+                                <stop offset="50%" stopColor="#1e1b4b" />
+                                <stop offset="100%" stopColor="#083344" />
+                              </linearGradient>
+                              <linearGradient id="cardGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.28" />
+                                <stop offset="100%" stopColor="#ea580c" stopOpacity="0.12" />
+                              </linearGradient>
+                              <linearGradient id="cardGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.28" />
+                                <stop offset="100%" stopColor="#6366f1" stopOpacity="0.14" />
+                              </linearGradient>
+                              <linearGradient id="cardGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#10b981" stopOpacity="0.28" />
+                                <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.14" />
+                              </linearGradient>
+                            </defs>
+                            <rect width="760" height="155" rx="16" fill="url(#bgGradPerpus)" />
+                            {/* Node 1: Masalah Sehari-hari */}
+                            <rect x="20" y="22" width="205" height="110" rx="14" fill="url(#cardGrad1)" stroke="#f59e0b" strokeWidth="1.5" />
+                            <circle cx="52" cy="54" r="16" fill="#f59e0b" fillOpacity="0.25" />
+                            <text x="52" y="60" textAnchor="middle" fontSize="16">🔍</text>
+                            <text x="78" y="50" fill="#fde68a" fontSize="11" fontWeight="bold">1. MASALAH HARIAN</text>
+                            <text x="78" y="66" fill="#cbd5e1" fontSize="9.5">Situasi &amp; Data Nyata</text>
+                            <text x="34" y="92" fill="#f8fafc" fontSize="10">• Kendala teknologi warga</text>
+                            <text x="34" y="108" fill="#f8fafc" fontSize="10">• Kebutuhan efisiensi harian</text>
+
+                            {/* Arrow 1 -> 2 */}
+                            <path d="M 232 77 L 268 77" stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="4 3" />
+                            <polygon points="268,72 278,77 268,82" fill="#38bdf8" />
+
+                            {/* Node 2: Proses Materi Esensial */}
+                            <rect x="282" y="22" width="205" height="110" rx="14" fill="url(#cardGrad2)" stroke="#38bdf8" strokeWidth="1.5" />
+                            <circle cx="314" cy="54" r="16" fill="#38bdf8" fillOpacity="0.25" />
+                            <text x="314" y="60" textAnchor="middle" fontSize="16">⚙️</text>
+                            <text x="340" y="50" fill="#bae6fd" fontSize="11" fontWeight="bold">2. KONSEP MATERI</text>
+                            <text x="340" y="66" fill="#cbd5e1" fontSize="9.5">Penerapan TP &amp; Esensial</text>
+                            <text x="296" y="92" fill="#f8fafc" fontSize="10">• Analisis &amp; struktur logis</text>
+                            <text x="296" y="108" fill="#f8fafc" fontSize="10">• Optimasi alur sistem/visual</text>
+
+                            {/* Arrow 2 -> 3 */}
+                            <path d="M 494 77 L 530 77" stroke="#10b981" strokeWidth="2.5" strokeDasharray="4 3" />
+                            <polygon points="530,72 540,77 530,82" fill="#10b981" />
+
+                            {/* Node 3: Solusi Kehidupan Sehari-hari */}
+                            <rect x="544" y="22" width="196" height="110" rx="14" fill="url(#cardGrad3)" stroke="#10b981" strokeWidth="1.5" />
+                            <circle cx="576" cy="54" r="16" fill="#10b981" fillOpacity="0.25" />
+                            <text x="576" y="60" textAnchor="middle" fontSize="16">🚀</text>
+                            <text x="602" y="50" fill="#a7f3d0" fontSize="11" fontWeight="bold">3. SOLUSI NYATA</text>
+                            <text x="602" y="66" fill="#cbd5e1" fontSize="9.5">Implementasi Sehari-hari</text>
+                            <text x="558" y="92" fill="#f8fafc" fontSize="10">• Cepat, akurat &amp; aman</text>
+                            <text x="558" y="108" fill="#f8fafc" fontSize="10">• Memudahkan warga &amp; siswa</text>
+                          </svg>
+                        </div>
+
+                        {/* Interactive Diagram Cards */}
+                        <div className="space-y-3">
+                          {visuals.map((vis, vIdx) => (
+                            <div
+                              key={vis.id || vIdx}
+                              className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 space-y-3"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <h4 className="text-xs sm:text-sm font-black text-white flex items-center gap-2">
+                                  <span className="text-amber-300">📊</span>
+                                  <span>{vis.title}</span>
+                                </h4>
+                                <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-[10px] font-bold">
+                                  {vis.badge}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-300 leading-relaxed">{vis.caption}</p>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                                {(vis.steps || []).map((st, sIdx) => (
+                                  <div
+                                    key={sIdx}
+                                    className="p-3 rounded-xl bg-slate-900/95 border border-cyan-500/25 hover:border-amber-400/50 transition-all space-y-1.5"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-base">
+                                        {st.icon}
+                                      </span>
+                                      <span className="text-xs font-extrabold text-amber-300 leading-tight">
+                                        {st.stepLabel}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-200 leading-relaxed">
+                                      {st.description}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                              {vis.takeaway && (
+                                <div className="text-[11px] text-cyan-200 bg-cyan-950/40 border border-cyan-500/30 rounded-xl px-3 py-2">
+                                  <strong className="text-amber-300">💡 Kesimpulan Visual:</strong> {vis.takeaway}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Full Detailed Text Material Body */}
                   <div className="space-y-3">
                     <div className="text-xs font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
                       <BookOpen className="w-4 h-4 text-amber-400" />
-                      <span>Uraian Materi Teks Lengkap</span>
+                      <span>Uraian Materi Lengkap &amp; Pengembangan Bab</span>
                     </div>
                     <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-slate-100 text-xs sm:text-sm leading-relaxed space-y-3 font-normal">
                       {selectedBook.content.split('\n\n').map((paragraph, pIdx) => (
@@ -636,6 +822,100 @@ export const PerpustakaanModal: React.FC<PerpustakaanModalProps> = ({
                       ))}
                     </div>
                   </div>
+
+                  {/* IMPLEMENTASI MATERI DALAM KEHIDUPAN SEHARI-HARI */}
+                  {(() => {
+                    const dailyList =
+                      selectedBook.implementasiSehariHari && selectedBook.implementasiSehariHari.length > 0
+                        ? selectedBook.implementasiSehariHari
+                        : [
+                            {
+                              id: `imp-auto-${selectedBook.id}-1`,
+                              title: 'Optimasi Penggunaan Aplikasi & Layanan Digital Harian',
+                              icon: '📱',
+                              dailyProblem:
+                                'Pengguna sering mengalami kelambatan akses data, antrean layanan digital, atau salah langkah saat mengoperasikan aplikasi sehari-hari.',
+                              conceptApplication: `Menerapkan prinsip inti pada "${selectedBook.title}" untuk menata urutan langkah (algoritma/alur kerja) dan menyusun struktur informasi yang jelas.`,
+                              realBenefit:
+                                'Aktivitas digital harian menjadi jauh lebih cepat, hemat waktu, dan meminimalkan risiko kesalahan.',
+                            },
+                            {
+                              id: `imp-auto-${selectedBook.id}-2`,
+                              title: 'Pemecahan Masalah Sistem Informasi di Lingkungan Sekolah',
+                              icon: '🏫',
+                              dailyProblem:
+                                'Pencarian dokumen tugas, pencatatan daftar hadir, atau penyampaian pengumuman penting di sekolah sering memakan waktu lama jika dilakukan secara acak.',
+                              conceptApplication: `Menggunakan konsep "${selectedBook.elemen || selectedBook.subject}" untuk mengelompokkan informasi secara terstruktur dan mudah dipindai.`,
+                              realBenefit:
+                                'Seluruh siswa dan guru dapat menemukan informasi krusial dalam hitungan detik.',
+                            },
+                            {
+                              id: `imp-auto-${selectedBook.id}-3`,
+                              title: 'Keamanan & Ketepatan Pengambilan Keputusan Teknologi Warga',
+                              icon: '🛡️',
+                              dailyProblem:
+                                'Warga sering bingung saat menghadapi gangguan teknis perangkat atau memverifikasi kebenaran instruksi digital.',
+                              conceptApplication: `Melakukan analisis bertahap sesuai Tujuan Pembelajaran "${(selectedBook.tujuanPembelajaran || selectedBook.title).slice(0, 95)}" sebelum mengambil keputusan.`,
+                              realBenefit:
+                                'Meningkatkan literasi digital keluarga dan menjaga keamanan data sehari-hari.',
+                            },
+                          ];
+
+                    return (
+                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-950/50 via-slate-900/95 to-teal-950/40 border border-emerald-500/40 space-y-3.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-xs font-extrabold uppercase tracking-wider text-emerald-300 flex items-center gap-2">
+                            <span>🌍</span>
+                            <span>Implementasi Materi dalam Kehidupan Sehari-hari</span>
+                          </div>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                            {dailyList.length} Studi Kasus Nyata
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          {dailyList.map((imp, idx) => (
+                            <div
+                              key={imp.id || idx}
+                              className="p-3.5 rounded-xl bg-slate-950/85 border border-emerald-500/25 space-y-2"
+                            >
+                              <div className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-2">
+                                <span className="text-base">{imp.icon}</span>
+                                <span>
+                                  Kasus #{idx + 1}: {imp.title}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+                                <div className="p-2.5 rounded-lg bg-rose-950/30 border border-rose-500/30">
+                                  <div className="text-[10px] font-extrabold uppercase text-rose-300 mb-1">
+                                    ⚠️ Masalah Sehari-hari
+                                  </div>
+                                  <p className="text-slate-200 leading-relaxed text-[11px]">
+                                    {imp.dailyProblem}
+                                  </p>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-sky-950/30 border border-sky-500/30">
+                                  <div className="text-[10px] font-extrabold uppercase text-sky-300 mb-1">
+                                    ⚙️ Penerapan Materi
+                                  </div>
+                                  <p className="text-slate-200 leading-relaxed text-[11px]">
+                                    {imp.conceptApplication}
+                                  </p>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-emerald-950/35 border border-emerald-500/30">
+                                  <div className="text-[10px] font-extrabold uppercase text-emerald-300 mb-1">
+                                    ✅ Manfaat &amp; Solusi Nyata
+                                  </div>
+                                  <p className="text-emerald-100 leading-relaxed text-[11px]">
+                                    {imp.realBenefit}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Pertanyaan Pemantik Diskusi & Refleksi */}
                   {selectedBook.customQuestions && selectedBook.customQuestions.length > 0 && (

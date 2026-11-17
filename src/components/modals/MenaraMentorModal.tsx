@@ -1330,6 +1330,93 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                     </div>
                   </div>
 
+                  {/* PENGEMBANGAN MATERI MENDALAM & STUDI KASUS SEHARI-HARI STUDIO ON AIR */}
+                  {selectedMateri && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/85 border border-rose-500/35 space-y-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                        <div className="text-xs font-extrabold uppercase tracking-wider text-rose-300 flex items-center gap-2">
+                          <Radio className="w-4 h-4 text-rose-400 animate-pulse" />
+                          <span>Briefing Materi Mendalam &amp; Studi Kasus Siaran ON AIR</span>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-200 border border-rose-400/30">
+                          Pengembangan AI Bank Materi
+                        </span>
+                      </div>
+
+                      {/* Ringkasan Mendalam */}
+                      <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 space-y-1">
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-300">
+                          📖 1. Eksplorasi Konsep &amp; Materi Mendalam
+                        </div>
+                        <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line">
+                          {selectedMateri.ringkasanMendalamPodcast ||
+                            `Topik siaran "${selectedMateri.title}" ini mengupas secara mendalam konsep esensial pada mata pelajaran ${selectedMateri.subject} (${
+                              selectedMateri.tujuanPembelajaran ||
+                              'penerapan konsep terstruktur dalam pemecahan masalah nyata'
+                            }). Selama siaran berlangsung, kita akan menghubungkan teori inti dengan penerapannya pada teknologi yang kita gunakan sehari-hari.`}
+                        </p>
+                      </div>
+
+                      {/* Studi Kasus Masalah Teknologi Sehari-hari */}
+                      <div className="p-3 rounded-xl bg-amber-950/35 border border-amber-500/30 space-y-1">
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300">
+                          🌍 2. Bedah Kasus Masalah Teknologi dalam Kehidupan Sehari-hari
+                        </div>
+                        <p className="text-xs text-amber-100/95 leading-relaxed">
+                          {selectedMateri.studiKasusPodcast ||
+                            `Studi Kasus Harian: Dalam aktivitas sehari-hari di rumah dan sekolah, pengguna sering mengalami kendala efisiensi layanan digital, pencarian data yang lambat, atau tampilan informasi yang membingungkan. Dengan menerapkan prinsip pada "${selectedMateri.title}" secara sistematis (Input-Process-Output), masalah tersebut dapat dianalisis akarnya dan diselesaikan secara cepat serta akurat!`}
+                        </p>
+                      </div>
+
+                      {/* Poin Diskusi & Pertanyaan Pemantik HOTS */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                          <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-300">
+                            🎙️ 3. Poin Bahasan Utama Siaran (Talking Points)
+                          </div>
+                          <ul className="space-y-1 text-[11px] text-slate-300 leading-relaxed">
+                            {(selectedMateri.poinDiskusiPodcast && selectedMateri.poinDiskusiPodcast.length > 0
+                              ? selectedMateri.poinDiskusiPodcast
+                              : [
+                                  `Konsep inti & Tujuan Pembelajaran pada "${selectedMateri.title}"`,
+                                  `Mengapa masalah teknologi sehari-hari membutuhkan pendekatan terstruktur`,
+                                  `Contoh penerapan praktis di perangkat digital & lingkungan sekolah`,
+                                  `Langkah aksi nyata yang akan dipraktikkan setelah siaran`,
+                                ]
+                            ).map((pt, i) => (
+                              <li key={i} className="flex items-start gap-1.5">
+                                <span className="text-emerald-400 font-bold">•</span>
+                                <span>{pt}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                          <div className="text-[10px] font-extrabold uppercase tracking-wider text-purple-300">
+                            🔥 4. Pertanyaan Pemantik HOTS Siaran
+                          </div>
+                          <ul className="space-y-1.5 text-[11px] text-purple-100/90 leading-relaxed">
+                            {(selectedMateri.daftarPemantikPodcast && selectedMateri.daftarPemantikPodcast.length > 0
+                              ? selectedMateri.daftarPemantikPodcast
+                              : selectedMateri.customQuestions && selectedMateri.customQuestions.length > 0
+                              ? selectedMateri.customQuestions
+                              : [
+                                  `Masalah teknologi sehari-hari apa yang paling sering kamu temui dan bagaimana konsep "${selectedMateri.title}" dapat menyelesaikannya?`,
+                                  `Apa dampak nyata bagi pengguna jika prinsip utama materi ini diterapkan dengan benar?`,
+                                ]
+                            ).map((q, qIdx) => (
+                              <li key={qIdx} className="flex items-start gap-1.5">
+                                <span className="text-rose-400 font-bold">{qIdx + 1}.</span>
+                                <span>{q}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="pt-2 flex justify-end">
                     <button
                       type="button"
@@ -1354,7 +1441,7 @@ export const MenaraMentorModal: React.FC<MenaraMentorModalProps> = ({
                         <span>LIVE STUDIO</span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-400 block">Topik Materi Podcast:</span>
+                        <span className="text-[10px] text-slate-400 block">Topik Materi &amp; Studi Kasus Sehari-hari:</span>
                         <h4 className="text-xs sm:text-sm font-extrabold text-white">
                           {selectedMateri.title}
                         </h4>

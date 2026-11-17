@@ -21,7 +21,7 @@ const TIER_LABELS = [
   { level: 5, name: 'Jenjang 5 • Mahir', badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
 ];
 
-const QUESTION_TIME_LIMIT_MS = 5000; // 5 detik per nomor
+const QUESTION_TIME_LIMIT_MS = 25000; // 25 detik per nomor untuk soal studi kasus sehari-hari
 const USED_QIDS_STORAGE_KEY = 'kota_lab_dkv_used_qids_v2';
 const ROUND_NUMBER_STORAGE_KEY = 'kota_lab_dkv_round_v2';
 
@@ -100,19 +100,63 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
   onAnswerCorrect,
   onCompleteQuiz,
 }) => {
-  // Combine incoming questions with the 25-question INITIAL_QUIZ pool so there are always 25 diverse questions
+  // Combine incoming questions with the 25-question INITIAL_QUIZ pool AND Bank Materi quiz pool
   const fullPool = useMemo(() => {
     const map = new Map<string, QuizQuestion>();
     INITIAL_QUIZ.forEach((q) => map.set(q.id, q));
     if (questions && questions.length > 0) {
       questions.forEach((q) => map.set(q.id, q));
     }
+    try {
+      const bmList = StorageService.getBankMateri();
+      bmList.forEach((bm) => {
+        const mId = bm.materiId || `materi-${bm.id}`;
+        const mTitle = `${bm.mataPelajaran}: ${bm.elemen}`;
+        (bm.kuisBengkel || []).forEach((q, idx) => {
+          const qId = q.id || `q-${bm.id}-${idx + 1}`;
+          map.set(qId, {
+            id: qId,
+            materiId: mId,
+            materiTitle: mTitle,
+            question: q.question,
+            options: q.options,
+            correctIndex: q.correctIndex,
+            explanation: q.explanation,
+          });
+        });
+      });
+    } catch {}
     return Array.from(map.values());
   }, [questions]);
 
+  const availableTopics = useMemo(() => {
+    const topicMap = new Map<string, string>();
+    try {
+      const bmList = StorageService.getBankMateri();
+      bmList.forEach((bm) => {
+        const mId = bm.materiId || `materi-${bm.id}`;
+        topicMap.set(mId, `🏦 [Bank Materi AI] ${bm.mataPelajaran}: ${bm.elemen}`);
+      });
+    } catch {}
+    fullPool.forEach((q) => {
+      if (q.materiId && !topicMap.has(q.materiId)) {
+        topicMap.set(q.materiId, q.materiTitle || q.materiId);
+      }
+    });
+    return Array.from(topicMap.entries()).map(([id, label]) => ({ id, label }));
+  }, [fullPool]);
+
+  const [selectedTopicId, setSelectedTopicId] = useState<string>('all');
+
   // Function to pick 5 random questions different from previously completed sets continuously
   const pickRandomFiveQuestions = useCallback(
-    (previousIds: string[] = []): QuizQuestion[] => {
+    (previousIds: string[] = [], topicFilter: string = selectedTopicId): QuizQuestion[] => {
+      const activePool =
+        topicFilter !== 'all'
+          ? fullPool.filter((q) => q.materiId === topicFilter)
+          : fullPool;
+      const sourcePool = activePool.length >= 5 ? activePool : fullPool;
+
       let usedIds: string[] = [];
       try {
         const raw = localStorage.getItem(USED_QIDS_STORAGE_KEY);
@@ -124,13 +168,11 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
       const picked: QuizQuestion[] = [];
 
       for (let tier = 1; tier <= 5; tier++) {
-        const tierCandidates = fullPool.filter((q) => getTierForQuestion(q) === tier);
+        const tierCandidates = sourcePool.filter((q) => getTierForQuestion(q) === tier);
         // Prefer questions in this tier that have not been used yet AND were not in the immediate previous round
         let available = tierCandidates.filter((q) => !usedSet.has(q.id) && !prevSet.has(q.id));
 
         if (available.length === 0) {
-          // All variants for this tier have been played — reset used tracking for this tier,
-          // while still excluding the question from the immediate previous round so it never repeats back-to-back!
           tierCandidates.forEach((q) => usedSet.delete(q.id));
           available = tierCandidates.filter((q) => !prevSet.has(q.id));
           if (available.length === 0) {
@@ -148,7 +190,7 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
       // Fallback if any tier was missing
       if (picked.length < 5) {
         const remaining = shuffleArray(
-          fullPool.filter((q) => !picked.some((p) => p.id === q.id))
+          sourcePool.filter((q) => !picked.some((p) => p.id === q.id))
         ).slice(0, 5 - picked.length);
         remaining.forEach((q) => {
           usedSet.add(q.id);
@@ -162,7 +204,7 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
 
       return picked.slice(0, 5);
     },
-    [fullPool]
+    [fullPool, selectedTopicId]
   );
 
   const [roundNumber, setRoundNumber] = useState<number>(() => {
@@ -175,7 +217,7 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
   });
 
   const [tieredQuestions, setTieredQuestions] = useState<QuizQuestion[]>(() =>
-    pickRandomFiveQuestions([])
+    pickRandomFiveQuestions([], 'all')
   );
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -387,7 +429,7 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-cyan-100 font-medium">
-                Waktu 5 Detik / Nomor • Benar +1 XP per Soal • Saldo: 🪙 {student.points} XP
+                Penerapan Masalah Teknologi Sehari-hari • Benar +1 XP per Soal • Saldo: 🪙 {student.points} XP
               </p>
             </div>
           </div>
@@ -400,8 +442,41 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
           </button>
         </div>
 
-        {/* 5 Tiered Steps Bar */}
-        <div className="px-5 sm:px-6 pt-4 pb-2 bg-slate-950/50 border-b border-slate-800">
+        {/* Topic Filter & 5 Tiered Steps Bar */}
+        <div className="px-5 sm:px-6 pt-3.5 pb-2.5 bg-slate-950/50 border-b border-slate-800 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-300">
+              🎯 Pilih Fokus Materi Latihan Sehari-hari:
+            </label>
+            <select
+              value={selectedTopicId}
+              onChange={(e) => {
+                const nextTopic = e.target.value;
+                sounds.playClick();
+                setSelectedTopicId(nextTopic);
+                const nextFive = pickRandomFiveQuestions([], nextTopic);
+                setTieredQuestions(nextFive);
+                setCurrentIndex(0);
+                setSelectedOption(null);
+                setIsAnswered(false);
+                setIsTimedOut(false);
+                setScore(0);
+                setEarnedXp(0);
+                setIsFinished(false);
+                setResultsHistory([null, null, null, null, null]);
+                setRemainingMs(QUESTION_TIME_LIMIT_MS);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 border border-cyan-500/40 text-xs font-bold text-white focus:border-cyan-400 focus:outline-none max-w-full sm:max-w-xs truncate"
+            >
+              <option value="all">🌐 Semua Materi (Bank Materi AI &amp; Kurikulum)</option>
+              {availableTopics.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
             {tieredQuestions.map((_, idx) => {
               const res = resultsHistory[idx];
@@ -435,7 +510,7 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
         <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {!isFinished && currentQ ? (
             <div className="space-y-4">
-              {/* Top Status Row: Tier Badge + 5-Second Countdown Timer */}
+              {/* Top Status Row: Tier Badge + Countdown Timer */}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className={`text-xs font-extrabold px-3 py-1 rounded-full border ${currentTier.badgeColor}`}>
@@ -446,12 +521,12 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
                   </span>
                 </div>
 
-                {/* 5-Second Countdown Pill */}
+                {/* Countdown Pill */}
                 <div
                   className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full font-mono text-xs sm:text-sm font-black border transition-colors ${
                     isAnswered
                       ? 'bg-slate-800 text-slate-400 border-slate-700'
-                      : secondsLeftDisplay <= 2
+                      : secondsLeftDisplay <= 5
                       ? 'bg-red-950/90 text-red-300 border-red-500 animate-pulse'
                       : 'bg-emerald-950/90 text-emerald-300 border-emerald-500/60'
                   }`}
@@ -461,13 +536,13 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
                 </div>
               </div>
 
-              {/* 5-Second Countdown Visual Bar */}
+              {/* Countdown Visual Bar */}
               <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700/80">
                 <div
                   className={`h-full transition-all duration-75 rounded-full ${
-                    secondsLeftDisplay <= 2
+                    secondsLeftDisplay <= 5
                       ? 'bg-gradient-to-r from-red-600 to-rose-400'
-                      : secondsLeftDisplay <= 3
+                      : secondsLeftDisplay <= 10
                       ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
                       : 'bg-gradient-to-r from-emerald-500 to-teal-400'
                   }`}
@@ -475,18 +550,21 @@ export const BengkelLatihanModal: React.FC<BengkelLatihanModalProps> = ({
                 />
               </div>
 
-              {/* Materi Tag */}
-              <div className="px-3.5 py-2 rounded-xl bg-slate-800/70 border border-slate-700/70 text-xs text-slate-300 flex items-center justify-between gap-2">
+              {/* Materi Tag & Daily Life Implementation Badge */}
+              <div className="px-3.5 py-2.5 rounded-xl bg-slate-800/70 border border-cyan-500/30 text-xs text-slate-300 flex flex-wrap items-center justify-between gap-2">
                 <span>
                   Topik: <strong className="text-white">{currentQ.materiTitle || currentTier.name}</strong>
                 </span>
-                <span className="text-[10px] font-mono text-amber-300 shrink-0">
-                  Soal Acak #{currentIndex + 1}
+                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                  🌍 Penerapan Masalah Teknologi Sehari-hari
                 </span>
               </div>
 
               {/* Question Text */}
-              <div className="p-4 rounded-2xl bg-slate-800/95 border border-slate-700 shadow-inner">
+              <div className="p-4 rounded-2xl bg-slate-800/95 border border-slate-700 shadow-inner space-y-2">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300">
+                  💡 Studi Kasus &amp; Penerapan Materi dalam Kehidupan Sehari-hari:
+                </div>
                 <p className="text-sm sm:text-base font-bold text-white leading-relaxed">
                   {currentQ.question}
                 </p>
